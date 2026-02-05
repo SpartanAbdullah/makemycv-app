@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8f6f2;
+  --foreground: #171717;
+  --surface: #ffffff;
+  --muted: #5b5b5b;
+  --accent: #1e5b54;
+  --accent-2: #d66a3a;
+  --ring: rgba(30, 91, 84, 0.2);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), serif;
+}
+
+@media print {
+  @page {
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+    color: #111111;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11pt;
+    line-height: 1.35;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-root {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-root ul {
+    list-style: disc !important;
+    padding-left: 1.25rem !important;
+    list-style-position: outside !important;
+  }
+
+  .cv-print {
+    font-size: 11pt;
+    line-height: 1.35;
+    color: #111111;
+    padding: 0 !important;
+  }
+
+  .print-surface {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .avoid-orphan {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
