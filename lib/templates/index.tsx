@@ -1,3 +1,4 @@
+import type React from "react";
 import type { CvData } from "../types/cv";
 import { ClassicTemplate } from "./classic";
 import { ModernTemplate } from "./modern";
@@ -6,8 +7,8 @@ export type TemplateDefinition = {
   id: string;
   name: string;
   description: string;
-  Thumbnail: () => JSX.Element;
-  Render: ({ data }: { data: CvData }) => JSX.Element;
+  Thumbnail: () => React.ReactElement;
+  Render: ({ data }: { data: CvData }) => React.ReactElement;
 };
 
 const ClassicThumb = () => (
