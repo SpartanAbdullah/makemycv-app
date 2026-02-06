@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import { Fraunces, Sora } from "next/font/google";
-import "./globals.css";
+import localFont from "next/font/local";
 
-const sora = Sora({
-  variable: "--font-sans",
-  subsets: ["latin"],
+const sora = localFont({
+  src: [
+    { path: "../public/fonts/Sora-400.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/Sora-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-sora",
+  display: "swap",
 });
 
-const fraunces = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
+const fraunces = localFont({
+  src: [
+    { path: "../public/fonts/Fraunces-600.woff2", weight: "600", style: "normal" },
+    { path: "../public/fonts/Fraunces-700.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-fraunces",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sora.variable} ${fraunces.variable}`}>
       <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
         {children}
       </body>

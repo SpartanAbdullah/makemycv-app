@@ -58,14 +58,17 @@ export const ProjectsStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.projects) {
-        const nextSerialized = JSON.stringify(value.projects);
+        const next = (value.projects ?? []).filter(
+          (project): project is CvProject => Boolean(project && project.id),
+        );
+        const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
-            updateSection("projects", value.projects);
+            updateSection("projects", next);
           }
         }, 250);
       }

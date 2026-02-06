@@ -55,14 +55,17 @@ export const EducationStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.education) {
-        const nextSerialized = JSON.stringify(value.education);
+        const next = (value.education ?? []).filter(
+          (e): e is CvEducation => Boolean(e && e.id && e.school && e.degree),
+        );
+        const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
-            updateSection("education", value.education);
+            updateSection("education", next);
           }
         }, 250);
       }

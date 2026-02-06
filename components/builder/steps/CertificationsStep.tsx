@@ -24,8 +24,9 @@ export const CertificationsStep = ({
   onSkip: () => void;
 }) => {
   const certifications = useCvStore((state) => state.data.certifications);
+  const safeCertifications = certifications ?? [];
   const updateSection = useCvStore((state) => state.updateSection);
-  const lastSerializedRef = useRef<string>(JSON.stringify(certifications));
+  const lastSerializedRef = useRef<string>(JSON.stringify(safeCertifications));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -37,7 +38,7 @@ export const CertificationsStep = ({
     formState: { isDirty },
   } = useForm<CertificationsForm>({
     resolver: zodResolver(certificationsSchema),
-    defaultValues: { certifications },
+    defaultValues: { certifications: safeCertifications },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -46,27 +47,28 @@ export const CertificationsStep = ({
   });
 
   useEffect(() => {
-    if (!isDirty) reset({ certifications });
-  }, [certifications, reset, isDirty]);
+    if (!isDirty) reset({ certifications: safeCertifications });
+  }, [safeCertifications, reset, isDirty]);
 
   useEffect(() => {
-    lastSerializedRef.current = JSON.stringify(certifications);
-  }, [certifications]);
+    lastSerializedRef.current = JSON.stringify(safeCertifications);
+  }, [safeCertifications]);
 
   useEffect(() => {
     const subscription = watch((value) => {
-      if (value.certifications) {
-        const nextSerialized = JSON.stringify(value.certifications);
-        if (nextSerialized === lastSerializedRef.current) return;
+      const next = (value.certifications ?? []).filter(
+        (item): item is CvCertification => Boolean(item),
+      );
+      const nextSerialized = JSON.stringify(next);
+      if (nextSerialized === lastSerializedRef.current) return;
 
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-          if (nextSerialized !== lastSerializedRef.current) {
-            lastSerializedRef.current = nextSerialized;
-            updateSection("certifications", value.certifications);
-          }
-        }, 250);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (nextSerialized !== lastSerializedRef.current) {
+          lastSerializedRef.current = nextSerialized;
+          updateSection("certifications", next);
+        }
+      }, 250);
     });
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);

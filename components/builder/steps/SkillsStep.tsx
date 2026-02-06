@@ -9,12 +9,19 @@ import { createId } from "../../../lib/utils/id";
 import { Field } from "../../forms/Field";
 import { TagInput } from "../../forms/TagInput";
 import { NavigationButtons } from "../NavigationButtons";
-import type { CvSkill } from "../../../lib/types/cv";
+import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
 const inputClass =
   "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
 type SkillsForm = { skills: CvSkill[] };
+
+const toSkillLevel = (value: string): SkillLevel => {
+  if (value === "beginner" || value === "intermediate" || value === "advanced") {
+    return value;
+  }
+  return "intermediate";
+};
 
 export const SkillsStep = ({
   onNext,
@@ -57,14 +64,17 @@ export const SkillsStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.skills) {
-        const nextSerialized = JSON.stringify(value.skills);
+        const next = (value.skills ?? []).filter(
+          (skill): skill is CvSkill => Boolean(skill && skill.id),
+        );
+        const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
-            updateSection("skills", value.skills);
+            updateSection("skills", next);
           }
         }, 250);
       }
@@ -92,9 +102,13 @@ export const SkillsStep = ({
       const existing = matches.find((skill) => !usedIds.has(skill.id));
       if (existing) {
         usedIds.add(existing.id);
-        return { ...existing, name: tag };
+        return {
+          ...existing,
+          name: tag,
+          level: toSkillLevel(existing.level ?? "intermediate"),
+        };
       }
-      return { id: createId(), name: tag, level: "intermediate" };
+      return { id: createId(), name: tag, level: toSkillLevel("intermediate") };
     });
     replace(next);
   };
@@ -135,7 +149,7 @@ export const SkillsStep = ({
                 />
                 <select
                   className={inputClass}
-                  {...register(`skills.${index}.level`)}
+                  {...register(`skills.${index}.level`, { setValueAs: toSkillLevel })}
                 >
                   <option value="beginner">Beginner</option>
                   <option value="intermediate">Intermediate</option>

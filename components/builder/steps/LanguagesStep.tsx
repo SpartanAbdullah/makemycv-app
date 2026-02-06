@@ -56,14 +56,17 @@ export const LanguagesStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.languages) {
-        const nextSerialized = JSON.stringify(value.languages);
+        const next = (value.languages ?? []).filter(
+          (language): language is CvLanguage => Boolean(language && language.id),
+        );
+        const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
-            updateSection("languages", value.languages);
+            updateSection("languages", next);
           }
         }, 250);
       }

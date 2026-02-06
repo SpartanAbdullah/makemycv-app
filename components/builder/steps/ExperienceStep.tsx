@@ -56,14 +56,17 @@ export const ExperienceStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.experience) {
-        const nextSerialized = JSON.stringify(value.experience);
+        const next = (value.experience ?? []).filter(
+          (role): role is CvExperience => Boolean(role && role.id),
+        );
+        const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
-            updateSection("experience", value.experience);
+            updateSection("experience", next);
           }
         }, 250);
       }
