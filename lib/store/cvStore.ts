@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import type { CvData, CvEducation, CvExperience, CvProject, CvSkill } from "../types/cv";
+import type {
+  CvData,
+  CvEducation,
+  CvExperience,
+  CvProject,
+  CvSkill,
+  SkillLevel,
+} from "../types/cv";
 import {
   clearCvStorage,
   debounce,
@@ -36,16 +43,38 @@ const createEmptyProject = (): CvProject => ({
   bullets: [""],
 });
 
-const ensureSkillIds = (skills: CvSkill[] | undefined) =>
-  (skills ?? []).map((skill) => {
-    if (typeof skill === "string") {
-      return { id: createId(), name: skill, level: "intermediate" };
+const toSkillLevel = (value: unknown): SkillLevel | undefined => {
+  if (value === "beginner" || value === "intermediate" || value === "advanced") {
+    return value;
+  }
+  return undefined;
+};
+
+const ensureSkillIds = (input: unknown): CvSkill[] => {
+  if (!Array.isArray(input)) return [];
+
+  return input.flatMap((item) => {
+    if (typeof item === "string") {
+      const name = item.trim();
+      if (!name) return [];
+      return [{ id: createId(), name }];
     }
-    if (!skill.id) {
-      return { ...skill, id: createId() };
-    }
-    return skill;
+
+    if (!item || typeof item !== "object") return [];
+
+    const maybeName = (item as { name?: unknown }).name;
+    if (typeof maybeName !== "string") return [];
+    const name = maybeName.trim();
+    if (!name) return [];
+
+    const maybeId = (item as { id?: unknown }).id;
+    const id =
+      typeof maybeId === "string" && maybeId.trim().length > 0 ? maybeId : createId();
+    const level = toSkillLevel((item as { level?: unknown }).level);
+
+    return level ? [{ id, name, level }] : [{ id, name }];
   });
+};
 
 export const defaultCvData: CvData = {
   personal: {
