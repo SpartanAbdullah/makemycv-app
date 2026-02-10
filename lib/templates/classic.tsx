@@ -12,15 +12,36 @@ export const ClassicTemplate = ({ data }: { data: CvData }) => {
   const hasCertifications = data.certifications.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasProjects = data.projects.length > 0;
+  const shortenUrl = (value: string) =>
+    value.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+
   const contactItems = [
-    data.personal.email,
-    data.personal.phone,
-    data.personal.location,
-    data.personal.linkedin,
-    data.personal.website,
-  ]
-    .map((value) => value?.trim())
-    .filter(Boolean) as string[];
+    data.personal.email?.trim()
+      ? {
+          text: data.personal.email.trim(),
+          href: `mailto:${data.personal.email.trim()}`,
+        }
+      : null,
+    data.personal.phone?.trim()
+      ? {
+          text: data.personal.phone.trim(),
+          href: `tel:${data.personal.phone.trim()}`,
+        }
+      : null,
+    data.personal.location?.trim() ? { text: data.personal.location.trim() } : null,
+    data.personal.linkedin?.trim()
+      ? {
+          text: shortenUrl(data.personal.linkedin),
+          href: data.personal.linkedin.trim(),
+        }
+      : null,
+    data.personal.website?.trim()
+      ? {
+          text: shortenUrl(data.personal.website),
+          href: data.personal.website.trim(),
+        }
+      : null,
+  ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
   const toTitleCase = (value: string) =>
     value
@@ -54,23 +75,33 @@ export const ClassicTemplate = ({ data }: { data: CvData }) => {
   return (
     <div className="cv-print bg-white px-10 py-12 text-[14px] leading-relaxed text-slate-900">
       <header className="border-b border-slate-200 pb-3">
-        <div className="flex flex-col gap-1.5">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1.5">
+          <div className="min-w-0">
             <h1 className="font-display text-[33px] font-semibold leading-none tracking-tight">
               {name}
             </h1>
             <p className="mt-0.5 text-[15px] font-normal text-slate-600">{headline}</p>
           </div>
-          <div className="text-[12px] text-slate-500">
+          <div className="min-w-0 flex-1">
             {contactItems.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 leading-snug">
+              <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-600 leading-snug">
                 {contactItems.map((item, index) => (
-                  <span
-                    key={`${item}-${index}`}
-                    className="after:ml-3 after:text-slate-300 after:content-['|'] last:after:content-none"
-                  >
-                    {item}
-                  </span>
+                  item.href ? (
+                    <a
+                      key={`${item.text}-${index}`}
+                      href={item.href}
+                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                    >
+                      {item.text}
+                    </a>
+                  ) : (
+                    <span
+                      key={`${item.text}-${index}`}
+                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                    >
+                      {item.text}
+                    </span>
+                  )
                 ))}
               </div>
             )}
