@@ -74,30 +74,30 @@ export const ClassicTemplate = ({ data }: { data: CvData }) => {
 
   return (
     <div className="cv-print bg-white px-10 py-12 text-[14px] leading-relaxed text-slate-900">
-      <header className="border-b border-slate-200 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1.5">
+      <header className="border-b border-slate-200 pb-2">
+        <div className="grid grid-cols-1 gap-3 items-start sm:grid-cols-[1fr,auto] sm:gap-4">
           <div className="min-w-0">
             <h1 className="font-display text-[33px] font-semibold leading-none tracking-tight">
               {name}
             </h1>
             <p className="mt-0.5 text-[15px] font-normal text-slate-600">{headline}</p>
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
             {contactItems.length > 0 && (
-              <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-600 leading-snug">
+              <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-600 leading-snug max-w-[320px]">
                 {contactItems.map((item, index) => (
                   item.href ? (
                     <a
                       key={`${item.text}-${index}`}
                       href={item.href}
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                      className="min-w-0 break-all"
                     >
-                      {item.text}
+                      <span>{item.text}</span>
                     </a>
                   ) : (
                     <span
                       key={`${item.text}-${index}`}
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                      className="min-w-0 break-all"
                     >
                       {item.text}
                     </span>
