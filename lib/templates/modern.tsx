@@ -65,24 +65,22 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
 
           {data.projects.length > 0 && (
             <section>
-              <div className="avoid-break [break-inside:avoid]">
-                <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Projects
-                </h2>
-                {firstProject ? (
-                  <div className="mt-3">
-                    <div className="text-sm font-semibold">
-                      {firstProject.name || "Project"}
-                      {firstProject.link ? ` - ${firstProject.link}` : ""}
-                    </div>
-                    <ul className="list-disc pl-5 text-sm text-slate-700">
-                      {firstProject.bullets.filter(Boolean).map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
-                      ))}
-                    </ul>
+              <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Projects
+              </h2>
+              {firstProject ? (
+                <div className="mt-3">
+                  <div className="text-sm font-semibold">
+                    {firstProject.name || "Project"}
+                    {firstProject.link ? ` - ${firstProject.link}` : ""}
                   </div>
-                ) : null}
-              </div>
+                  <ul className="list-disc pl-5 text-sm text-slate-700">
+                    {firstProject.bullets.filter(Boolean).map((bullet, index) => (
+                      <li key={index}>{bullet}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {remainingProjects.length > 0 && (
                 <div className="mt-3 space-y-3">
                   {remainingProjects.map((project) => (
