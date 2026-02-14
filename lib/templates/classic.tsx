@@ -12,6 +12,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const hasCertifications = data.certifications.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasProjects = data.projects.length > 0;
+  const [firstProject, ...remainingProjects] = data.projects;
   const shortenUrl = (value: string) =>
     value.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "");
 
@@ -243,20 +244,20 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
       {hasProjects && (
         <section className="mt-5">
-          <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-            <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
-          </div>
-          <div className="mt-2.5 space-y-2.5">
-            {data.projects.map((project) => (
-              <div key={project.id} className="avoid-break [break-inside:avoid]">
+          <div className="avoid-break [break-inside:avoid]">
+            <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
+              <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
+            </div>
+            {firstProject ? (
+              <div className="mt-2.5">
                 <div className="text-[14px] font-semibold">
-                  {project.name?.trim() || "Project"}
-                  {project.link ? (
-                    <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
+                  {firstProject.name?.trim() || "Project"}
+                  {firstProject.link ? (
+                    <span className="font-normal text-slate-500">{` | ${firstProject.link.trim()}`}</span>
                   ) : null}
                 </div>
                 <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
-                  {project.bullets
+                  {firstProject.bullets
                     .map((bullet) => bullet.trim())
                     .filter(Boolean)
                     .map((bullet, index) => (
@@ -264,8 +265,30 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                     ))}
                 </ul>
               </div>
-            ))}
+            ) : null}
           </div>
+          {remainingProjects.length > 0 && (
+            <div className="mt-2.5 space-y-2.5">
+              {remainingProjects.map((project) => (
+                <div key={project.id} className="avoid-break [break-inside:avoid]">
+                  <div className="text-[14px] font-semibold">
+                    {project.name?.trim() || "Project"}
+                    {project.link ? (
+                      <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
+                    ) : null}
+                  </div>
+                  <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+                    {project.bullets
+                      .map((bullet) => bullet.trim())
+                      .filter(Boolean)
+                      .map((bullet, index) => (
+                        <li key={index}>{bullet}</li>
+                      ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
       </div>
