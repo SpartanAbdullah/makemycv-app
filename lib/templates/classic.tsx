@@ -244,19 +244,19 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
       {hasProjects && (
         <section className="mt-5">
-          <div className="avoid-break [break-inside:avoid]">
+          <div className="keep-with-next">
             <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
               <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
             </div>
             {firstProject ? (
-              <div className="mt-2.5">
+              <div className="mt-2">
                 <div className="text-[14px] font-semibold">
                   {firstProject.name?.trim() || "Project"}
                   {firstProject.link ? (
                     <span className="font-normal text-slate-500">{` | ${firstProject.link.trim()}`}</span>
                   ) : null}
                 </div>
-                <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+                <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.25] text-slate-700 marker:text-slate-500">
                   {firstProject.bullets
                     .map((bullet) => bullet.trim())
                     .filter(Boolean)
@@ -268,7 +268,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             ) : null}
           </div>
           {remainingProjects.length > 0 && (
-            <div className="mt-2.5 space-y-2.5">
+            <div className="mt-2 space-y-2.5">
               {remainingProjects.map((project) => (
                 <div key={project.id} className="avoid-break [break-inside:avoid]">
                   <div className="text-[14px] font-semibold">

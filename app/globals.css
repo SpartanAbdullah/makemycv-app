@@ -87,6 +87,11 @@ body {
     page-break-inside: avoid;
   }
 
+  .keep-with-next {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .avoid-orphan {
     break-after: avoid;
     page-break-after: avoid;
