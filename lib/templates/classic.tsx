@@ -1,8 +1,8 @@
-import type { CvData, CvSkill } from "../types/cv";
+import type { CvData, CvSkill, PlanTier } from "../types/cv";
 import { formatDateRange } from "../utils/format";
 import { getFullName } from "./utils";
 
-export const ClassicTemplate = ({ data }: { data: CvData }) => {
+export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: PlanTier }) => {
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline || "Your Headline";
   const hasSummary = Boolean(data.personal.summary);
@@ -73,7 +73,18 @@ export const ClassicTemplate = ({ data }: { data: CvData }) => {
   };
 
   return (
-    <div className="cv-print bg-white px-10 py-12 text-[14px] leading-relaxed text-slate-900">
+    <div className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[14px] leading-relaxed text-slate-900">
+      {plan === "free" && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+        >
+          <span className="select-none rotate-[-28deg] text-[42px] font-semibold tracking-wide text-slate-500 opacity-[0.08]">
+            MakeMyCV • Free
+          </span>
+        </div>
+      )}
+      <div className="relative z-10">
       <header className="border-b border-slate-200 pb-2">
         <div className="grid grid-cols-1 gap-3 items-start sm:grid-cols-[1fr,auto] sm:gap-4">
           <div className="min-w-0">
@@ -257,6 +268,7 @@ export const ClassicTemplate = ({ data }: { data: CvData }) => {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import type React from "react";
-import type { CvData } from "../types/cv";
+import type { CvData, PlanTier } from "../types/cv";
 import { ClassicTemplate } from "./classic";
 import { ModernTemplate } from "./modern";
 
@@ -8,7 +8,7 @@ export type TemplateDefinition = {
   name: string;
   description: string;
   Thumbnail: () => React.ReactElement;
-  Render: ({ data }: { data: CvData }) => React.ReactElement;
+  Render: ({ data, plan }: { data: CvData; plan?: PlanTier }) => React.ReactElement;
 };
 
 const ClassicThumb = () => (

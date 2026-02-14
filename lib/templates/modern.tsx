@@ -1,7 +1,7 @@
 import type { CvData } from "../types/cv";
 import { formatRange, getFullName } from "./utils";
 
-export const ModernTemplate = ({ data }: { data: CvData }) => {
+export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }) => {
   const name = getFullName(data) || "Your Name";
 
   return (

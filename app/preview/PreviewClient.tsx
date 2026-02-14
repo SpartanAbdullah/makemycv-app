@@ -8,6 +8,7 @@ import { getTemplateById } from "../../lib/templates";
 
 export const PreviewClient = () => {
   const data = useCvStore((state) => state.data);
+  const plan = useCvStore((state) => state.plan);
   const searchParams = useSearchParams();
   const isPrint = searchParams.get("print") === "1";
   const template = useMemo(
@@ -56,7 +57,7 @@ export const PreviewClient = () => {
         <div
           className={`rounded-2xl border border-slate-200 bg-white shadow-sm print-surface print-root ${isPrint ? "rounded-none border-transparent shadow-none" : ""}`}
         >
-          <template.Render data={data} />
+          <template.Render data={data} plan={plan} />
         </div>
       </div>
     </div>

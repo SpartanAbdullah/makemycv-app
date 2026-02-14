@@ -29,7 +29,8 @@ body {
 
 @media print {
   @page {
-    margin: 10mm;
+    size: A4;
+    margin: 14mm;
   }
 
   html,
@@ -40,6 +41,15 @@ body {
     padding: 0 !important;
     font-size: 11pt;
     line-height: 1.35;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .print-hide {
@@ -69,7 +79,7 @@ body {
   .print-surface {
     border: none !important;
     box-shadow: none !important;
-    background: transparent !important;
+    background: #ffffff !important;
   }
 
   .avoid-break {
