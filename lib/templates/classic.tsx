@@ -1,4 +1,4 @@
-import type { CvData, CvSkill, PlanTier } from "../types/cv";
+import type { CvData, CvProject, CvSkill, PlanTier } from "../types/cv";
 import { formatDateRange } from "../utils/format";
 import { getFullName } from "./utils";
 
@@ -71,6 +71,43 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               ? toTitleCase(normalized)
               : "";
     return `${toTitleCase(name)}${prettyLevel ? ` (${prettyLevel})` : ""}`;
+  };
+
+  const renderProject = (project: CvProject, withTopMargin = false) => {
+    const bullets = project.bullets.map((bullet) => bullet.trim()).filter(Boolean);
+    const [firstBullet, ...remainingBullets] = bullets;
+
+    return (
+      <div key={project.id} className={withTopMargin ? "mt-2" : undefined}>
+        {firstBullet ? (
+          <div className="keep-with-next">
+            <div className="text-[14px] font-semibold">
+              {project.name?.trim() || "Project"}
+              {project.link ? (
+                <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
+              ) : null}
+            </div>
+            <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.25] text-slate-700 marker:text-slate-500">
+              <li>{firstBullet}</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="text-[14px] font-semibold">
+            {project.name?.trim() || "Project"}
+            {project.link ? (
+              <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
+            ) : null}
+          </div>
+        )}
+        {remainingBullets.length > 0 && (
+          <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+            {remainingBullets.map((bullet, index) => (
+              <li key={index}>{bullet}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -247,44 +284,10 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
           </div>
-          {firstProject ? (
-            <div className="mt-2" style={{ breakInside: "auto", pageBreakInside: "auto" }}>
-              <div className="text-[14px] font-semibold">
-                {firstProject.name?.trim() || "Project"}
-                {firstProject.link ? (
-                  <span className="font-normal text-slate-500">{` | ${firstProject.link.trim()}`}</span>
-                ) : null}
-              </div>
-              <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.25] text-slate-700 marker:text-slate-500">
-                {firstProject.bullets
-                  .map((bullet) => bullet.trim())
-                  .filter(Boolean)
-                  .map((bullet, index) => (
-                    <li key={index}>{bullet}</li>
-                  ))}
-              </ul>
-            </div>
-          ) : null}
+          {firstProject ? renderProject(firstProject, true) : null}
           {remainingProjects.length > 0 && (
             <div className="mt-2 space-y-2.5">
-              {remainingProjects.map((project) => (
-                <div key={project.id}>
-                  <div className="text-[14px] font-semibold">
-                    {project.name?.trim() || "Project"}
-                    {project.link ? (
-                      <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
-                    ) : null}
-                  </div>
-                  <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
-                    {project.bullets
-                      .map((bullet) => bullet.trim())
-                      .filter(Boolean)
-                      .map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
-                      ))}
-                  </ul>
-                </div>
-              ))}
+              {remainingProjects.map((project) => renderProject(project))}
             </div>
           )}
         </section>
