@@ -14,7 +14,6 @@ export const PreviewPanel = ({
   onToggle?: () => void;
 }) => {
   const data = useCvStore((state) => state.data);
-  const plan = useCvStore((state) => state.plan);
   const template = useMemo(
     () => getTemplateById(data.settings.templateId),
     [data.settings.templateId]
@@ -55,7 +54,7 @@ export const PreviewPanel = ({
           )}
         </div>
         <div className="max-h-[70vh] overflow-auto">
-          <template.Render data={data} plan={plan} />
+          <template.Render data={data} />
         </div>
       </div>
     </div>

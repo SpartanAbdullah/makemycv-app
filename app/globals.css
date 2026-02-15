@@ -74,6 +74,11 @@ body {
     line-height: 1.35;
     color: #111111;
     padding: 0 !important;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    text-wrap: pretty;
   }
 
   .print-surface {

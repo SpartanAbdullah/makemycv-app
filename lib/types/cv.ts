@@ -1,4 +1,5 @@
 export type SkillLevel = "beginner" | "intermediate" | "advanced";
+export type PlanTier = "free" | "pro";
 
 export type CvPersonal = {
   firstName: string;

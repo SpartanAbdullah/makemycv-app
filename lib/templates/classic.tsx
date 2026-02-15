@@ -248,7 +248,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
           </div>
           {firstProject ? (
-            <div className="mt-2">
+            <div className="mt-2" style={{ breakInside: "auto", pageBreakInside: "auto" }}>
               <div className="text-[14px] font-semibold">
                 {firstProject.name?.trim() || "Project"}
                 {firstProject.link ? (
