@@ -78,14 +78,14 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       {plan === "free" && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+          className="cv-watermark pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
         >
           <span className="select-none rotate-[-28deg] text-[42px] font-semibold tracking-wide text-slate-500 opacity-[0.08]">
             MakeMyCV • Free
           </span>
         </div>
       )}
-      <div className="relative z-10">
+      <div className="cv-content relative z-10">
       <header className="border-b border-slate-200 pb-2">
         <div className="grid grid-cols-1 gap-3 items-start sm:grid-cols-[1fr,auto] sm:gap-4">
           <div className="min-w-0">
@@ -122,7 +122,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       </header>
 
       {hasSummary && (
-        <section className="mt-5">
+        <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Summary</h2>
           </div>
@@ -131,7 +131,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
 
       {hasExperience && (
-        <section className="mt-5">
+        <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Experience</h2>
           </div>
@@ -167,7 +167,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
 
       {hasEducation && (
-        <section className="mt-5">
+        <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Education</h2>
           </div>
@@ -199,7 +199,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
 
       {hasSkills && (
-        <section className="mt-5">
+        <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Skills</h2>
           </div>
@@ -208,7 +208,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
 
       {(hasLanguages || hasCertifications) && (
-        <section className="mt-5 grid gap-5 md:grid-cols-2">
+        <section className="cv-section mt-5 grid gap-5 md:grid-cols-2">
           {hasLanguages && (
             <div>
               <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
@@ -228,7 +228,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               </div>
               <div className="mt-2 space-y-1.5 text-slate-700">
                 {data.certifications.map((cert) => (
-                  <div key={cert.id} className="avoid-break text-[13px] [break-inside:avoid]">
+                  <div key={cert.id} className="text-[13px]">
                     <span className="font-semibold">{cert.name.trim()}</span>
                     <span className="text-slate-500">
                       {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -243,7 +243,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
 
       {hasProjects && (
-        <section className="mt-5">
+        <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
           </div>
@@ -268,7 +268,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           {remainingProjects.length > 0 && (
             <div className="mt-2 space-y-2.5">
               {remainingProjects.map((project) => (
-                <div key={project.id} className="avoid-break [break-inside:avoid]">
+                <div key={project.id}>
                   <div className="text-[14px] font-semibold">
                     {project.name?.trim() || "Project"}
                     {project.link ? (
