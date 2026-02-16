@@ -1,42 +1,9 @@
-import type { CvData, CvProject } from "../types/cv";
+import type { CvData } from "../types/cv";
 import { formatRange, getFullName } from "./utils";
 
 export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }) => {
   const name = getFullName(data) || "Your Name";
   const [firstProject, ...remainingProjects] = data.projects;
-
-  const renderProject = (project: CvProject, withTopMargin = false) => {
-    const bullets = project.bullets.filter(Boolean);
-    const [firstBullet, ...remainingBullets] = bullets;
-
-    return (
-      <div key={project.id} className={withTopMargin ? "mt-3" : undefined}>
-        {firstBullet ? (
-          <div className="keep-with-next">
-            <div className="text-sm font-semibold">
-              {project.name || "Project"}
-              {project.link ? ` - ${project.link}` : ""}
-            </div>
-            <ul className="list-disc pl-5 text-sm text-slate-700">
-              <li>{firstBullet}</li>
-            </ul>
-          </div>
-        ) : (
-          <div className="text-sm font-semibold">
-            {project.name || "Project"}
-            {project.link ? ` - ${project.link}` : ""}
-          </div>
-        )}
-        {remainingBullets.length > 0 && (
-          <ul className="list-disc pl-5 text-sm text-slate-700">
-            {remainingBullets.map((bullet, index) => (
-              <li key={index}>{bullet}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed">
@@ -98,13 +65,43 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
 
           {data.projects.length > 0 && (
             <section>
-              <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Projects
-              </h2>
-              {firstProject ? renderProject(firstProject, true) : null}
+              {firstProject ? (
+                <div className="keep-with-next">
+                  <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Projects
+                  </h2>
+                  <div className="mt-3 text-sm font-semibold">
+                    {firstProject.name || "Project"}
+                    {firstProject.link ? ` - ${firstProject.link}` : ""}
+                  </div>
+                </div>
+              ) : (
+                <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Projects
+                </h2>
+              )}
+              {firstProject && (
+                <ul className="list-disc pl-5 text-sm text-slate-700">
+                  {firstProject.bullets.filter(Boolean).map((bullet, index) => (
+                    <li key={index}>{bullet}</li>
+                  ))}
+                </ul>
+              )}
               {remainingProjects.length > 0 && (
                 <div className="mt-3 space-y-3">
-                  {remainingProjects.map((project) => renderProject(project))}
+                  {remainingProjects.map((project) => (
+                    <div key={project.id}>
+                      <div className="text-sm font-semibold">
+                        {project.name || "Project"}
+                        {project.link ? ` - ${project.link}` : ""}
+                      </div>
+                      <ul className="list-disc pl-5 text-sm text-slate-700">
+                        {project.bullets.filter(Boolean).map((bullet, index) => (
+                          <li key={index}>{bullet}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
