@@ -276,35 +276,53 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             </div>
           )}
           {firstProject && (
-            <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-              {firstProject.bullets
+            (() => {
+              const bullets = (firstProject.bullets ?? [])
                 .map((bullet) => bullet.trim())
-                .filter(Boolean)
-                .map((bullet, index) => (
-                  <li key={index}>{bullet}</li>
-                ))}
-            </ul>
+                .filter(Boolean);
+              const bulletsCount = bullets.length;
+              const listClass =
+                bulletsCount <= 2
+                  ? "avoid-break list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500"
+                  : "list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500";
+
+              return (
+                <ul className={listClass}>
+                  {bullets.map((bullet, index) => (
+                    <li key={index}>{bullet}</li>
+                  ))}
+                </ul>
+              );
+            })()
           )}
           {remainingProjects.length > 0 && (
             <div className="mt-2 space-y-2.5">
-              {remainingProjects.map((project) => (
-                <div key={project.id}>
-                  <div className="text-[14px] font-semibold">
-                    {project.name?.trim() || "Project"}
-                    {project.link ? (
-                      <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
-                    ) : null}
-                  </div>
-                  <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                    {project.bullets
-                      .map((bullet) => bullet.trim())
-                      .filter(Boolean)
-                      .map((bullet, index) => (
+              {remainingProjects.map((project) => {
+                const bullets = (project.bullets ?? [])
+                  .map((bullet) => bullet.trim())
+                  .filter(Boolean);
+                const bulletsCount = bullets.length;
+                const listClass =
+                  bulletsCount <= 2
+                    ? "avoid-break list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500"
+                    : "list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500";
+
+                return (
+                  <div key={project.id}>
+                    <div className="text-[14px] font-semibold">
+                      {project.name?.trim() || "Project"}
+                      {project.link ? (
+                        <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
+                      ) : null}
+                    </div>
+                    <ul className={listClass}>
+                      {bullets.map((bullet, index) => (
                         <li key={index}>{bullet}</li>
                       ))}
-                  </ul>
-                </div>
-              ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

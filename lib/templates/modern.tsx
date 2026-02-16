@@ -123,27 +123,47 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
                 </h2>
               )}
               {firstProject && (
-                <ul className="list-disc pl-5 text-sm text-slate-700">
-                  {firstProject.bullets.filter(Boolean).map((bullet, index) => (
-                    <li key={index}>{bullet}</li>
-                  ))}
-                </ul>
+                (() => {
+                  const bullets = (firstProject.bullets ?? []).filter(Boolean);
+                  const bulletsCount = bullets.length;
+                  const listClass =
+                    bulletsCount <= 2
+                      ? "avoid-break list-disc pl-5 text-sm text-slate-700"
+                      : "list-disc pl-5 text-sm text-slate-700";
+
+                  return (
+                    <ul className={listClass}>
+                      {bullets.map((bullet, index) => (
+                        <li key={index}>{bullet}</li>
+                      ))}
+                    </ul>
+                  );
+                })()
               )}
               {remainingProjects.length > 0 && (
                 <div className="mt-3 space-y-3">
-                  {remainingProjects.map((project) => (
-                    <div key={project.id}>
-                      <div className="text-sm font-semibold">
-                        {project.name || "Project"}
-                        {project.link ? ` - ${project.link}` : ""}
+                  {remainingProjects.map((project) => {
+                    const bullets = (project.bullets ?? []).filter(Boolean);
+                    const bulletsCount = bullets.length;
+                    const listClass =
+                      bulletsCount <= 2
+                        ? "avoid-break list-disc pl-5 text-sm text-slate-700"
+                        : "list-disc pl-5 text-sm text-slate-700";
+
+                    return (
+                      <div key={project.id}>
+                        <div className="text-sm font-semibold">
+                          {project.name || "Project"}
+                          {project.link ? ` - ${project.link}` : ""}
+                        </div>
+                        <ul className={listClass}>
+                          {bullets.map((bullet, index) => (
+                            <li key={index}>{bullet}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="list-disc pl-5 text-sm text-slate-700">
-                        {project.bullets.filter(Boolean).map((bullet, index) => (
-                          <li key={index}>{bullet}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
