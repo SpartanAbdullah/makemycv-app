@@ -107,60 +107,88 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
 
           {data.projects.length > 0 && (
             <section>
-              {firstProject ? (
-                <div className="keep-with-next">
-                  <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Projects
-                  </h2>
-                  <div className="mt-3 text-sm font-semibold">
-                    {firstProject.name || "Project"}
-                    {firstProject.link ? ` - ${firstProject.link}` : ""}
-                  </div>
-                </div>
-              ) : (
-                <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Projects
-                </h2>
-              )}
-              {firstProject && (
+              {firstProject &&
                 (() => {
                   const bullets = (firstProject.bullets ?? []).filter(Boolean);
                   const bulletsCount = bullets.length;
-                  const listClass =
-                    bulletsCount <= 2
-                      ? "avoid-break list-disc pl-5 text-sm text-slate-700"
-                      : "list-disc pl-5 text-sm text-slate-700";
+                  const [firstBullet, ...remainingBullets] = bullets;
 
                   return (
-                    <ul className={listClass}>
-                      {bullets.map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
-                      ))}
-                    </ul>
+                    <div className={bulletsCount <= 2 ? "avoid-break" : undefined}>
+                      <div className="keep-with-next">
+                        <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                          Projects
+                        </h2>
+                        <div className="mt-3 text-sm font-semibold">
+                          {firstProject.name || "Project"}
+                          {firstProject.link ? ` - ${firstProject.link}` : ""}
+                        </div>
+                        {bulletsCount >= 3 && firstBullet && (
+                          <ul className="list-disc pl-5 text-sm text-slate-700">
+                            <li>{firstBullet}</li>
+                          </ul>
+                        )}
+                      </div>
+                      {bulletsCount <= 2 && (
+                        <ul className="list-disc pl-5 text-sm text-slate-700">
+                          {bullets.map((bullet, index) => (
+                            <li key={index}>{bullet}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {bulletsCount >= 3 && remainingBullets.length > 0 && (
+                        <ul className="list-disc pl-5 text-sm text-slate-700">
+                          {remainingBullets.map((bullet, index) => (
+                            <li key={index}>{bullet}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   );
-                })()
-              )}
+                })()}
               {remainingProjects.length > 0 && (
                 <div className="mt-3 space-y-3">
                   {remainingProjects.map((project) => {
                     const bullets = (project.bullets ?? []).filter(Boolean);
                     const bulletsCount = bullets.length;
-                    const listClass =
-                      bulletsCount <= 2
-                        ? "avoid-break list-disc pl-5 text-sm text-slate-700"
-                        : "list-disc pl-5 text-sm text-slate-700";
+                    const [firstBullet, ...remainingBullets] = bullets;
 
                     return (
-                      <div key={project.id}>
-                        <div className="text-sm font-semibold">
-                          {project.name || "Project"}
-                          {project.link ? ` - ${project.link}` : ""}
-                        </div>
-                        <ul className={listClass}>
-                          {bullets.map((bullet, index) => (
-                            <li key={index}>{bullet}</li>
-                          ))}
-                        </ul>
+                      <div key={project.id} className={bulletsCount <= 2 ? "avoid-break" : undefined}>
+                        {bulletsCount <= 2 ? (
+                          <>
+                            <div className="text-sm font-semibold">
+                              {project.name || "Project"}
+                              {project.link ? ` - ${project.link}` : ""}
+                            </div>
+                            <ul className="list-disc pl-5 text-sm text-slate-700">
+                              {bullets.map((bullet, index) => (
+                                <li key={index}>{bullet}</li>
+                              ))}
+                            </ul>
+                          </>
+                        ) : (
+                          <>
+                            <div className="keep-with-next">
+                              <div className="text-sm font-semibold">
+                                {project.name || "Project"}
+                                {project.link ? ` - ${project.link}` : ""}
+                              </div>
+                              {firstBullet && (
+                                <ul className="list-disc pl-5 text-sm text-slate-700">
+                                  <li>{firstBullet}</li>
+                                </ul>
+                              )}
+                            </div>
+                            {remainingBullets.length > 0 && (
+                              <ul className="list-disc pl-5 text-sm text-slate-700">
+                                {remainingBullets.map((bullet, index) => (
+                                  <li key={index}>{bullet}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
+                        )}
                       </div>
                     );
                   })}

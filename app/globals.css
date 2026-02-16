@@ -128,12 +128,8 @@ body {
     background: #ffffff !important;
   }
 
+  .keep-with-next,
   .avoid-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  .keep-with-next {
     break-inside: avoid;
     page-break-inside: avoid;
   }
