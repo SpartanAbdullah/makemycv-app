@@ -138,7 +138,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       {hasSummary && (
         <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-            <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Summary</h2>
+            <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Summary</h2>
           </div>
           <p className="mt-2 text-[14px] text-slate-700">{data.personal.summary?.trim()}</p>
         </section>
@@ -147,26 +147,26 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       {hasExperience && (
         <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-            <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Experience</h2>
+            <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Experience</h2>
           </div>
-          <div className="mt-2.5 space-y-3">
+          <div className="mt-2 space-y-2.5">
             {data.experience.map((role) => (
               <div key={role.id} className="avoid-break space-y-1 [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[14px]">
-                    <span className="font-semibold">{role.role?.trim() || "Role"}</span>
-                    <span className="font-normal text-slate-600">
+                    <span className="font-semibold text-slate-900">{role.role?.trim() || "Role"}</span>
+                    <span className="font-normal text-slate-500">
                       {role.company ? ` | ${role.company.trim()}` : ""}
                     </span>
                   </div>
-                  <span className="whitespace-nowrap text-[11px] font-normal text-slate-400">
+                  <span className="whitespace-nowrap text-right text-[11px] font-normal text-slate-400">
                     {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                   </span>
                 </div>
                 {role.location && (
                   <div className="text-[11px] text-slate-400">{role.location.trim()}</div>
                 )}
-                <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+                <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
                   {role.bullets
                     .map((bullet) => bullet.trim())
                     .filter(Boolean)
@@ -183,9 +183,9 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       {hasEducation && (
         <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-            <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Education</h2>
+            <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Education</h2>
           </div>
-          <div className="mt-2.5 space-y-2.5">
+          <div className="mt-2 space-y-2.5">
             {data.education.map((edu) => (
               <div key={edu.id} className="avoid-break [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
@@ -215,7 +215,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       {hasSkills && (
         <section className="cv-section mt-5">
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-            <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Skills</h2>
+            <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Skills</h2>
           </div>
           <p className="mt-2 text-[14px] text-slate-700">{data.skills.map(formatSkill).join(" | ")}</p>
         </section>
@@ -226,7 +226,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           {hasLanguages && (
             <div>
               <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-                <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Languages</h2>
+                <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Languages</h2>
               </div>
               <p className="mt-2 text-[14px] text-slate-700">
                 {data.languages
@@ -238,7 +238,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           {hasCertifications && (
             <div>
               <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-                <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Certifications</h2>
+                <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Certifications</h2>
               </div>
               <div className="mt-2 space-y-1.5 text-slate-700">
                 {data.certifications.map((cert) => (
@@ -261,7 +261,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           {firstProject ? (
             <div className="keep-with-next">
               <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
-                <h2 className="text-[13px] font-semibold tracking-wide text-slate-700">Projects</h2>
+                <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Projects</h2>
               </div>
               <div className="mt-2 text-[14px] font-semibold">
                 {firstProject.name?.trim() || "Project"}
@@ -276,7 +276,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             </div>
           )}
           {firstProject && (
-            <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+            <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
               {firstProject.bullets
                 .map((bullet) => bullet.trim())
                 .filter(Boolean)
@@ -295,7 +295,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                       <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
                     ) : null}
                   </div>
-                  <ul className="list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-slate-700 marker:text-slate-500">
+                  <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
                     {project.bullets
                       .map((bullet) => bullet.trim())
                       .filter(Boolean)
