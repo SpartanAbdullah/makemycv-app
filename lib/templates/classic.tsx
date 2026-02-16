@@ -92,7 +92,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   };
 
   return (
-    <div className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[14px] leading-relaxed text-slate-900">
+    <div className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[12px] leading-[1.45] text-slate-900">
       {plan === "free" && (
         <div
           aria-hidden="true"
@@ -107,31 +107,25 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       <header className="border-b border-slate-200 pb-2">
         <div className="grid grid-cols-1 gap-3 items-start sm:grid-cols-[1fr,auto] sm:gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-[33px] font-semibold leading-none tracking-tight">
+            <h1 className="text-[30px] font-bold leading-none tracking-tight text-slate-900">
               {name}
             </h1>
-            <p className="mt-0.5 text-[15px] font-normal text-slate-600">{headline}</p>
+            <p className="mt-1 text-[15px] font-medium text-slate-600">{headline}</p>
           </div>
           <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
             {contactItems.length > 0 && (
-              <div className="flex max-w-[320px] flex-wrap justify-start gap-x-3 gap-y-1 text-xs leading-snug text-slate-600 sm:justify-end">
+              <div className="flex max-w-[320px] flex-wrap items-center justify-start gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-slate-500 sm:justify-end">
                 {contactItems.map((item, index) => (
-                  item.href ? (
-                    <a
-                      key={`${item.text}-${index}`}
-                      href={item.href}
-                      className="min-w-0"
-                    >
-                      <span className="break-words [overflow-wrap:anywhere]">{item.text}</span>
-                    </a>
-                  ) : (
-                    <span
-                      key={`${item.text}-${index}`}
-                      className="min-w-0 break-words [overflow-wrap:anywhere]"
-                    >
-                      {item.text}
-                    </span>
-                  )
+                  <div key={`${item.text}-${index}`} className="inline-flex items-center gap-1.5 min-w-0">
+                    {item.href ? (
+                      <a href={item.href} className="min-w-0">
+                        <span className="break-words [overflow-wrap:anywhere]">{item.text}</span>
+                      </a>
+                    ) : (
+                      <span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.text}</span>
+                    )}
+                    {index < contactItems.length - 1 ? <span className="text-slate-300">•</span> : null}
+                  </div>
                 ))}
               </div>
             )}
@@ -144,7 +138,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Summary</h2>
           </div>
-          <p className="mt-2 text-[14px] text-slate-700">{data.personal.summary?.trim()}</p>
+          <p className="mt-2 text-[12px] text-slate-700">{data.personal.summary?.trim()}</p>
         </section>
       )}
 
@@ -157,7 +151,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             {data.experience.map((role) => (
               <div key={role.id} className="avoid-break space-y-1 [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-[14px]">
+                  <div className="text-[13px]">
                     <span className="font-semibold text-slate-900">{role.role?.trim() || "Role"}</span>
                     <span className="font-normal text-slate-500">
                       {role.company ? ` | ${role.company.trim()}` : ""}
@@ -168,9 +162,9 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                   </span>
                 </div>
                 {role.location && (
-                  <div className="text-[11px] text-slate-400">{role.location.trim()}</div>
+                  <div className="text-[10px] text-slate-400">{role.location.trim()}</div>
                 )}
-                <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                <ul className="list-disc space-y-0.5 pl-4 text-[11px] leading-[1.35] text-slate-700 marker:text-slate-500">
                   {role.bullets
                     .map((bullet) => bullet.trim())
                     .filter(Boolean)
@@ -193,7 +187,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             {data.education.map((edu) => (
               <div key={edu.id} className="avoid-break [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-[14px] font-semibold text-slate-800">
+                  <div className="text-[13px] font-semibold text-slate-800">
                     {edu.degree?.trim() || "Degree"}
                     <span className="font-normal text-slate-600">
                       {edu.school ? ` | ${edu.school.trim()}` : ""}
@@ -221,7 +215,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
             <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Skills</h2>
           </div>
-          <p className="mt-2 text-[14px] text-slate-700">{data.skills.map(formatSkill).join(" | ")}</p>
+          <p className="mt-2 text-[12px] text-slate-700">{data.skills.map(formatSkill).join(" • ")}</p>
         </section>
       )}
 
@@ -232,7 +226,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
                 <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">Languages</h2>
               </div>
-              <p className="mt-2 text-[14px] text-slate-700">
+              <p className="mt-2 text-[12px] text-slate-700">
                 {data.languages
                   .map((lang) => formatLanguage(lang.name, normalizeLevel(lang.level)))
                   .join(" | ")}
@@ -246,7 +240,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               </div>
               <div className="mt-2 space-y-1.5 text-slate-700">
                 {data.certifications.map((cert) => (
-                  <div key={cert.id} className="text-[13px]">
+                  <div key={cert.id} className="text-[12px]">
                     <span className="font-semibold">{cert.name.trim()}</span>
                     <span className="text-slate-500">
                       {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -269,7 +263,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             const [firstBullet, ...remainingBullets] = bullets;
             const showLink = shouldShowProjectLink(project.link);
             const titleRow = (
-              <div className={`${index === 0 ? "mt-2 " : ""}text-[14px] font-semibold`}>
+              <div className={`${index === 0 ? "mt-2 " : ""}text-[13px] font-semibold`}>
                 {project.name?.trim() || "Project"}
                 {showLink ? (
                   <span className="font-normal text-slate-500 [overflow-wrap:anywhere]">{` | ${project.link?.trim()}`}</span>
@@ -288,13 +282,13 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                     </div>
                     {titleRow}
                     {firstBullet && (
-                      <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                      <ul className="list-disc space-y-0.5 pl-4 text-[11px] leading-[1.35] text-slate-700 marker:text-slate-500">
                         <li>{firstBullet}</li>
                       </ul>
                     )}
                   </div>
                   {remainingBullets.length > 0 && (
-                    <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                    <ul className="list-disc space-y-0.5 pl-4 text-[11px] leading-[1.35] text-slate-700 marker:text-slate-500">
                       {remainingBullets.map((bullet, bulletIndex) => (
                         <li key={bulletIndex}>{bullet}</li>
                       ))}
@@ -309,7 +303,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 <div className="keep-with-next">
                   {titleRow}
                   {firstBullet && (
-                    <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                    <ul className="list-disc space-y-0.5 pl-4 text-[11px] leading-[1.35] text-slate-700 marker:text-slate-500">
                       <li>{firstBullet}</li>
                     </ul>
                   )}
