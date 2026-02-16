@@ -101,8 +101,8 @@ body {
 
   .cv-section {
     display: block !important;
-    break-inside: auto;
-    page-break-inside: auto;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   .cv-watermark {
