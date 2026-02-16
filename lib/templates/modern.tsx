@@ -3,7 +3,6 @@ import { formatRange, getFullName } from "./utils";
 
 export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }) => {
   const name = getFullName(data) || "Your Name";
-  const [firstProject, ...remainingProjects] = data.projects;
   const shortenDisplayUrl = (value: string) => {
     const cleaned = value
       .trim()
@@ -107,45 +106,55 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
 
           {data.projects.length > 0 && (
             <section>
-              {firstProject ? (
-                <div className="keep-with-next">
-                  <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Projects
-                  </h2>
-                  <div className="mt-3 text-sm font-semibold">
-                    {firstProject.name || "Project"}
-                    {firstProject.link ? ` - ${firstProject.link}` : ""}
-                  </div>
-                </div>
-              ) : (
-                <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Projects
-                </h2>
-              )}
-              {firstProject && (
-                <ul className="list-disc pl-5 text-sm text-slate-700">
-                  {firstProject.bullets.filter(Boolean).map((bullet, index) => (
-                    <li key={index}>{bullet}</li>
-                  ))}
-                </ul>
-              )}
-              {remainingProjects.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  {remainingProjects.map((project) => (
+              <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Projects
+              </h2>
+              <div className="mt-3 space-y-3">
+                {data.projects.map((project) => {
+                  const bullets = project.bullets.filter(Boolean);
+                  const bulletsCount = bullets.length;
+                  const [firstBullet, ...remainingBullets] = bullets;
+
+                  return (
                     <div key={project.id}>
-                      <div className="text-sm font-semibold">
-                        {project.name || "Project"}
-                        {project.link ? ` - ${project.link}` : ""}
-                      </div>
-                      <ul className="list-disc pl-5 text-sm text-slate-700">
-                        {project.bullets.filter(Boolean).map((bullet, index) => (
-                          <li key={index}>{bullet}</li>
-                        ))}
-                      </ul>
+                      {bulletsCount <= 3 ? (
+                        <div className="keep-with-next">
+                          <div className="text-sm font-semibold">
+                            {project.name || "Project"}
+                            {project.link ? ` - ${project.link}` : ""}
+                          </div>
+                          {bulletsCount > 0 && (
+                            <ul className="list-disc pl-5 text-sm text-slate-700">
+                              {bullets.map((bullet, index) => (
+                                <li key={index}>{bullet}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="keep-with-next">
+                            <div className="text-sm font-semibold">
+                              {project.name || "Project"}
+                              {project.link ? ` - ${project.link}` : ""}
+                            </div>
+                            <ul className="list-disc pl-5 text-sm text-slate-700">
+                              {firstBullet ? <li>{firstBullet}</li> : null}
+                            </ul>
+                          </div>
+                          {remainingBullets.length > 0 && (
+                            <ul className="list-disc pl-5 text-sm text-slate-700">
+                              {remainingBullets.map((bullet, index) => (
+                                <li key={index}>{bullet}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </section>
           )}
         </div>
