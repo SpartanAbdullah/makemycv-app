@@ -12,7 +12,11 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const hasCertifications = data.certifications.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasProjects = data.projects.length > 0;
-  const [firstProject, ...remainingProjects] = data.projects;
+  const shouldShowProjectLink = (value?: string) => {
+    const normalized = value?.trim();
+    if (!normalized) return false;
+    return normalized.toLowerCase() !== "no link was pasted";
+  };
   const shortenDisplayUrl = (value: string) => {
     const cleaned = value
       .trim()
@@ -258,105 +262,68 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
       {hasProjects && (
         <section className="cv-section mt-5">
-          {firstProject &&
-            (() => {
-              const bullets = (firstProject.bullets ?? [])
-                .map((bullet) => bullet.trim())
-                .filter(Boolean);
-              const bulletsCount = bullets.length;
-              const [firstBullet, ...remainingBullets] = bullets;
+          {data.projects.map((project, index) => {
+            const bullets = (project.bullets ?? [])
+              .map((bullet) => bullet.trim())
+              .filter(Boolean);
+            const [firstBullet, ...remainingBullets] = bullets;
+            const showLink = shouldShowProjectLink(project.link);
+            const titleRow = (
+              <div className={`${index === 0 ? "mt-2 " : ""}text-[14px] font-semibold`}>
+                {project.name?.trim() || "Project"}
+                {showLink ? (
+                  <span className="font-normal text-slate-500 [overflow-wrap:anywhere]">{` | ${project.link?.trim()}`}</span>
+                ) : null}
+              </div>
+            );
 
+            if (index === 0) {
               return (
-                <div className={bulletsCount <= 2 ? "avoid-break" : undefined}>
+                <div key={project.id}>
                   <div className="keep-with-next">
                     <div className="avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]">
                       <h2 className="text-[13px] font-semibold tracking-normal text-slate-700">
                         Projects
                       </h2>
                     </div>
-                    <div className="mt-2 text-[14px] font-semibold">
-                      {firstProject.name?.trim() || "Project"}
-                      {firstProject.link ? (
-                        <span className="font-normal text-slate-500">{` | ${firstProject.link.trim()}`}</span>
-                      ) : null}
-                    </div>
-                    {bulletsCount >= 3 && firstBullet && (
+                    {titleRow}
+                    {firstBullet && (
                       <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
                         <li>{firstBullet}</li>
                       </ul>
                     )}
                   </div>
-                  {bulletsCount <= 2 && (
+                  {remainingBullets.length > 0 && (
                     <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                      {bullets.map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {bulletsCount >= 3 && remainingBullets.length > 0 && (
-                    <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                      {remainingBullets.map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
+                      {remainingBullets.map((bullet, bulletIndex) => (
+                        <li key={bulletIndex}>{bullet}</li>
                       ))}
                     </ul>
                   )}
                 </div>
               );
-            })()}
-          {remainingProjects.length > 0 && (
-            <div className="mt-2.5 space-y-2.5">
-              {remainingProjects.map((project) => {
-                const bullets = (project.bullets ?? [])
-                  .map((bullet) => bullet.trim())
-                  .filter(Boolean);
-                const bulletsCount = bullets.length;
-                const [firstBullet, ...remainingBullets] = bullets;
+            }
 
-                return (
-                  <div key={project.id} className={bulletsCount <= 2 ? "avoid-break" : undefined}>
-                    {bulletsCount <= 2 ? (
-                      <>
-                        <div className="text-[14px] font-semibold">
-                          {project.name?.trim() || "Project"}
-                          {project.link ? (
-                            <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
-                          ) : null}
-                        </div>
-                        <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                          {bullets.map((bullet, index) => (
-                            <li key={index}>{bullet}</li>
-                          ))}
-                        </ul>
-                      </>
-                    ) : (
-                      <>
-                        <div className="keep-with-next">
-                          <div className="text-[14px] font-semibold">
-                            {project.name?.trim() || "Project"}
-                            {project.link ? (
-                              <span className="font-normal text-slate-500">{` | ${project.link.trim()}`}</span>
-                            ) : null}
-                          </div>
-                          {firstBullet && (
-                            <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                              <li>{firstBullet}</li>
-                            </ul>
-                          )}
-                        </div>
-                        {remainingBullets.length > 0 && (
-                          <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
-                            {remainingBullets.map((bullet, index) => (
-                              <li key={index}>{bullet}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            return (
+              <div key={project.id} className="mt-2.5">
+                <div className="keep-with-next">
+                  {titleRow}
+                  {firstBullet && (
+                    <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                      <li>{firstBullet}</li>
+                    </ul>
+                  )}
+                </div>
+                {remainingBullets.length > 0 && (
+                  <ul className="list-disc space-y-0 pl-4 text-[12px] leading-[1.3] text-slate-700 marker:text-slate-500">
+                    {remainingBullets.map((bullet, bulletIndex) => (
+                      <li key={bulletIndex}>{bullet}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </section>
       )}
       </div>

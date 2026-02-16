@@ -84,10 +84,8 @@ body {
     overflow: visible !important;
     background: #ffffff !important;
     box-shadow: none !important;
-    -webkit-hyphens: auto;
-    hyphens: auto;
-    overflow-wrap: anywhere;
-    word-break: normal;
+    -webkit-hyphens: none;
+    hyphens: none;
     text-wrap: pretty;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -95,8 +93,6 @@ body {
 
   .cv-print * {
     max-width: 100%;
-    overflow-wrap: anywhere;
-    word-break: normal;
   }
 
   .cv-section {
