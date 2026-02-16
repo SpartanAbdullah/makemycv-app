@@ -4,6 +4,37 @@ import { formatRange, getFullName } from "./utils";
 export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }) => {
   const name = getFullName(data) || "Your Name";
   const [firstProject, ...remainingProjects] = data.projects;
+  const shortenDisplayUrl = (value: string) => {
+    const cleaned = value
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/[?#].*$/, "")
+      .replace(/\/+$/, "");
+    if (!cleaned) return value.trim();
+
+    const [domain, ...pathParts] = cleaned.split("/");
+    if (pathParts.length === 0) return domain;
+
+    const maxSegments = domain.toLowerCase().includes("linkedin.com") ? 2 : 1;
+    const kept = pathParts.filter(Boolean).slice(0, maxSegments);
+    return kept.length > 0 ? `${domain}/${kept.join("/")}` : domain;
+  };
+  const contactItems = [
+    data.personal.email?.trim()
+      ? { text: data.personal.email.trim(), href: `mailto:${data.personal.email.trim()}` }
+      : null,
+    data.personal.phone?.trim()
+      ? { text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` }
+      : null,
+    data.personal.location?.trim() ? { text: data.personal.location.trim() } : null,
+    data.personal.website?.trim()
+      ? { text: shortenDisplayUrl(data.personal.website), href: data.personal.website.trim() }
+      : null,
+    data.personal.linkedin?.trim()
+      ? { text: shortenDisplayUrl(data.personal.linkedin), href: data.personal.linkedin.trim() }
+      : null,
+  ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
   return (
     <div className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed">
@@ -14,13 +45,24 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
         <p className="text-sm text-slate-500">
           {data.personal.headline || "Headline"}
         </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-          {data.personal.email && <span>{data.personal.email}</span>}
-          {data.personal.phone && <span>{data.personal.phone}</span>}
-          {data.personal.location && <span>{data.personal.location}</span>}
-          {data.personal.website && <span>{data.personal.website}</span>}
-          {data.personal.linkedin && <span>{data.personal.linkedin}</span>}
-        </div>
+        {contactItems.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+            {contactItems.map((item, index) =>
+              item.href ? (
+                <a key={`${item.text}-${index}`} href={item.href} className="min-w-0">
+                  <span className="break-words [overflow-wrap:anywhere]">{item.text}</span>
+                </a>
+              ) : (
+                <span
+                  key={`${item.text}-${index}`}
+                  className="min-w-0 break-words [overflow-wrap:anywhere]"
+                >
+                  {item.text}
+                </span>
+              ),
+            )}
+          </div>
+        )}
       </header>
 
       <div className="mt-6 grid gap-8 md:grid-cols-[2fr_1fr]">

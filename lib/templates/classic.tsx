@@ -13,8 +13,22 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const hasLanguages = data.languages.length > 0;
   const hasProjects = data.projects.length > 0;
   const [firstProject, ...remainingProjects] = data.projects;
-  const shortenUrl = (value: string) =>
-    value.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  const shortenDisplayUrl = (value: string) => {
+    const cleaned = value
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/[?#].*$/, "")
+      .replace(/\/+$/, "");
+    if (!cleaned) return value.trim();
+
+    const [domain, ...pathParts] = cleaned.split("/");
+    if (pathParts.length === 0) return domain;
+
+    const maxSegments = domain.toLowerCase().includes("linkedin.com") ? 2 : 1;
+    const kept = pathParts.filter(Boolean).slice(0, maxSegments);
+    return kept.length > 0 ? `${domain}/${kept.join("/")}` : domain;
+  };
 
   const contactItems = [
     data.personal.email?.trim()
@@ -32,13 +46,13 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
     data.personal.location?.trim() ? { text: data.personal.location.trim() } : null,
     data.personal.linkedin?.trim()
       ? {
-          text: shortenUrl(data.personal.linkedin),
+          text: shortenDisplayUrl(data.personal.linkedin),
           href: data.personal.linkedin.trim(),
         }
       : null,
     data.personal.website?.trim()
       ? {
-          text: shortenUrl(data.personal.website),
+          text: shortenDisplayUrl(data.personal.website),
           href: data.personal.website.trim(),
         }
       : null,
@@ -96,20 +110,20 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           </div>
           <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
             {contactItems.length > 0 && (
-              <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-600 leading-snug max-w-[320px]">
+              <div className="flex max-w-[320px] flex-wrap justify-start gap-x-3 gap-y-1 text-xs leading-snug text-slate-600 sm:justify-end">
                 {contactItems.map((item, index) => (
                   item.href ? (
                     <a
                       key={`${item.text}-${index}`}
                       href={item.href}
-                      className="min-w-0 break-all"
+                      className="min-w-0"
                     >
-                      <span>{item.text}</span>
+                      <span className="break-words [overflow-wrap:anywhere]">{item.text}</span>
                     </a>
                   ) : (
                     <span
                       key={`${item.text}-${index}`}
-                      className="min-w-0 break-all"
+                      className="min-w-0 break-words [overflow-wrap:anywhere]"
                     >
                       {item.text}
                     </span>
