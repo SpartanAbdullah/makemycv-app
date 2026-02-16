@@ -30,7 +30,7 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 14mm;
+    margin: 12mm;
   }
 
   html,
@@ -61,6 +61,9 @@ body {
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 
   .print-root ul {
@@ -71,15 +74,29 @@ body {
 
   .cv-print {
     display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
     font-size: 11pt;
     line-height: 1.35;
     color: #111111;
     padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
     -webkit-hyphens: auto;
     hyphens: auto;
     overflow-wrap: anywhere;
     word-break: normal;
     text-wrap: pretty;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cv-print * {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 
   .cv-section {
