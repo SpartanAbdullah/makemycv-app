@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectsSchema } from "../../../lib/schemas/cvSchemas";
@@ -8,6 +8,7 @@ import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import type { CvProject } from "../../../lib/types/cv";
 
 const inputClass =
@@ -34,7 +35,7 @@ export const ProjectsStep = ({
     handleSubmit,
     control,
     watch,
-    setValue,
+    getValues,
     reset,
     formState: { isDirty },
   } = useForm<ProjectsForm>({
@@ -42,10 +43,15 @@ export const ProjectsStep = ({
     defaultValues: { projects },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control,
     name: "projects",
   });
+
+  const [focusedBullet, setFocusedBullet] = useState<{
+    itemIndex: number;
+    bulletIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!isDirty) reset({ projects });
@@ -80,14 +86,51 @@ export const ProjectsStep = ({
   }, [watch, updateSection]);
 
   const addBullet = (index: number) => {
-    const current = watch(`projects.${index}.bullets`) || [];
-    setValue(`projects.${index}.bullets`, [...current, ""]);
+    const currentItem = getValues(`projects.${index}`);
+    if (!currentItem) return;
+
+    const currentBullets = currentItem.bullets || [];
+    if (currentBullets.length >= MAX_BULLETS) return;
+
+    update(index, {
+      ...currentItem,
+      bullets: [...currentBullets, ""],
+    });
   };
 
   const removeBullet = (index: number, bulletIndex: number) => {
-    const current = watch(`projects.${index}.bullets`) || [];
-    const next = current.filter((_, i) => i !== bulletIndex);
-    setValue(`projects.${index}.bullets`, next.length ? next : [""]);
+    const currentItem = getValues(`projects.${index}`);
+    if (!currentItem) return;
+
+    const currentBullets = currentItem.bullets || [];
+    const next = currentBullets.filter((_, i) => i !== bulletIndex);
+
+    update(index, {
+      ...currentItem,
+      bullets: next.length ? next : [""],
+    });
+  };
+
+  const splitFocusedBullet = (index: number) => {
+    if (!focusedBullet || focusedBullet.itemIndex !== index) return;
+
+    const currentItem = getValues(`projects.${index}`);
+    if (!currentItem) return;
+
+    const currentBullets = currentItem.bullets || [];
+    const rawValue = currentBullets[focusedBullet.bulletIndex] || "";
+    const split = splitPastedBulletText(rawValue, MAX_BULLETS);
+    if (split.length <= 1) return;
+
+    const before = currentBullets.slice(0, focusedBullet.bulletIndex);
+    const after = currentBullets.slice(focusedBullet.bulletIndex + 1);
+    const availableSlots = Math.max(1, MAX_BULLETS - before.length - after.length);
+    const next = [...before, ...split.slice(0, availableSlots), ...after];
+
+    update(index, {
+      ...currentItem,
+      bullets: next.length ? next : [""],
+    });
   };
 
   return (
@@ -144,29 +187,58 @@ export const ProjectsStep = ({
 
                 <div className="mt-4 space-y-3">
                   <p className="text-sm font-medium text-slate-700">Highlights</p>
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    <p>
+                      Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.
+                    </p>
+                    <p className="mt-1">
+                      Example: Built a search feature that cut average lookup time by 40%.
+                    </p>
+                    <p className="mt-1">
+                      Example: Increased daily active users by 15% after launching onboarding improvements.
+                    </p>
+                  </div>
                   {(watch(`projects.${index}.bullets`) || []).map((_, bulletIndex) => (
-                    <div key={bulletIndex} className="flex items-start gap-2">
-                      <textarea
-                        rows={2}
-                        className={`${inputClass} flex-1`}
-                        {...register(`projects.${index}.bullets.${bulletIndex}`)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeBullet(index, bulletIndex)}
-                        className="text-xs text-red-500"
-                      >
-                        Remove
-                      </button>
+                    <div key={bulletIndex} className="space-y-1">
+                      <div className="flex items-start gap-2">
+                        <textarea
+                          rows={2}
+                          className={`${inputClass} flex-1`}
+                          {...register(`projects.${index}.bullets.${bulletIndex}`)}
+                          onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeBullet(index, bulletIndex)}
+                          className="text-xs text-red-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {(watch(`projects.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
+                        <p className="text-xs text-amber-600">
+                          Consider splitting into 2 bullets for readability.
+                        </p>
+                      )}
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => addBullet(index)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
-                  >
-                    Add bullet
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addBullet(index)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
+                    >
+                      Add bullet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => splitFocusedBullet(index)}
+                      disabled={!focusedBullet || focusedBullet.itemIndex !== index}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Split pasted text
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
