@@ -31,10 +31,10 @@ export default function ExportPage() {
           </p>
           <div className="mt-6 print-hide">
             <Link
-              href="/preview?print=1"
+              href="/preview?print=1&autoprint=1"
               className="inline-flex items-center rounded-full bg-slate-900 px-6 py-2 text-sm text-white"
             >
-              Open print view
+              Download PDF (A4)
             </Link>
           </div>
         </div>
