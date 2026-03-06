@@ -1,15 +1,38 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
-import { Field } from "../../forms/Field";
+import { NavigationButtons } from "../NavigationButtons";
 import type { CvPersonal } from "../../../lib/types/cv";
 
 const inputClass =
-  "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
+
+const labelClass =
+  "block mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500";
+
+const CheckBadge = () => (
+  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-md bg-[#22c55e]">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3 8.5L6.5 12L13 5"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  </div>
+);
 
 export const PersonalStep = ({
   onNext,
@@ -20,6 +43,7 @@ export const PersonalStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
   const {
     register,
@@ -31,6 +55,8 @@ export const PersonalStep = ({
     resolver: zodResolver(personalSchema),
     defaultValues: personal,
   });
+
+  const watched = watch();
 
   useEffect(() => {
     if (!isDirty) reset(personal);
@@ -61,47 +87,186 @@ export const PersonalStep = ({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
+      {/* Heading */}
       <div>
-        <h2 className="font-display text-2xl text-slate-900">Personal Info</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          The basics that power the header of your CV.
+        <h1 className="text-3xl font-bold text-slate-800">
+          Please enter your{" "}
+          <span className="text-[#2563eb]">contact</span> info
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Add your phone number and email so recruiters can reach you.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="First name" error={errors.firstName?.message}>
-          <input className={inputClass} {...register("firstName")} />
-        </Field>
-        <Field label="Last name" error={errors.lastName?.message}>
-          <input className={inputClass} {...register("lastName")} />
-        </Field>
-        <Field label="Headline" hint="Example: Product Designer" error={errors.headline?.message}>
-          <input className={inputClass} {...register("headline")} />
-        </Field>
-        <Field label="Email" error={errors.email?.message}>
-          <input className={inputClass} type="email" {...register("email")} />
-        </Field>
-        <Field label="Phone">
-          <input className={inputClass} {...register("phone")} />
-        </Field>
-        <Field label="Location">
-          <input className={inputClass} {...register("location")} />
-        </Field>
-        <Field label="Website">
-          <input className={inputClass} {...register("website")} />
-        </Field>
-        <Field label="LinkedIn">
-          <input className={inputClass} {...register("linkedin")} />
-        </Field>
+      {/* Core fields */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* First Name */}
+        <div>
+          <label className={labelClass}>FIRST NAME (MANDATORY)</label>
+          <div className="relative">
+            <input
+              className={inputClass}
+              placeholder="e.g. Muhammad"
+              {...register("firstName")}
+            />
+            {watched.firstName?.trim() && <CheckBadge />}
+          </div>
+          {errors.firstName?.message && (
+            <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
+          )}
+        </div>
+
+        {/* Last Name */}
+        <div>
+          <label className={labelClass}>LAST NAME (MANDATORY)</label>
+          <div className="relative">
+            <input
+              className={inputClass}
+              placeholder="e.g. Abdullah"
+              {...register("lastName")}
+            />
+            {watched.lastName?.trim() && <CheckBadge />}
+          </div>
+          {errors.lastName?.message && (
+            <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
+          )}
+        </div>
+
+        {/* City */}
+        <div>
+          <label className={labelClass}>CITY</label>
+          <input
+            className={inputClass}
+            placeholder="e.g. Dubai"
+            {...register("location")}
+          />
+        </div>
+
+        {/* Headline / Job Title */}
+        <div>
+          <label className={labelClass}>HEADLINE / JOB TITLE</label>
+          <input
+            className={inputClass}
+            placeholder="e.g. Project Manager"
+            {...register("headline")}
+          />
+          {errors.headline?.message && (
+            <p className="mt-1 text-xs text-red-500">{errors.headline.message}</p>
+          )}
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className={labelClass}>PHONE (MANDATORY)</label>
+          <div className="relative">
+            <input
+              className={inputClass}
+              placeholder="+971 50 000 0000"
+              {...register("phone")}
+            />
+            {watched.phone?.trim() && <CheckBadge />}
+          </div>
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className={labelClass}>EMAIL (MANDATORY)</label>
+          <div className="relative">
+            <input
+              className={inputClass}
+              type="email"
+              placeholder="your@email.com"
+              {...register("email")}
+            />
+            {watched.email?.trim() && <CheckBadge />}
+          </div>
+          {errors.email?.message && (
+            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+          )}
+        </div>
       </div>
 
-      <button
-        type="submit"
-        className="w-full rounded-xl bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-      >
-        Continue &rarr;
-      </button>
+      {/* Add more details */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          className="flex items-center gap-1.5 text-sm font-semibold text-[#2563eb] hover:text-blue-700 transition-colors"
+        >
+          <span
+            className={`inline-block transition-transform ${
+              showMore ? "rotate-45" : ""
+            }`}
+          >
+            +
+          </span>
+          {showMore ? "Hide extra details" : "Add more details"}
+        </button>
+
+        {showMore && (
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>LINKEDIN</label>
+              <input
+                className={inputClass}
+                placeholder="linkedin.com/in/yourname"
+                {...register("linkedin")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>WEBSITE</label>
+              <input
+                className={inputClass}
+                placeholder="yourwebsite.com"
+                {...register("website")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>NATIONALITY</label>
+              <input
+                className={inputClass}
+                placeholder="e.g. Emirati, Pakistani"
+                {...register("nationality")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>COUNTRY</label>
+              <input
+                className={inputClass}
+                placeholder="e.g. United Arab Emirates"
+                {...register("country")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>DATE OF BIRTH</label>
+              <input
+                className={inputClass}
+                placeholder="DD/MM/YYYY"
+                {...register("dateOfBirth")}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>DRIVING LICENSE</label>
+              <input
+                className={inputClass}
+                placeholder="e.g. UAE Light Vehicle"
+                {...register("drivingLicense")}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ATS tip */}
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-xs text-slate-500">
+        ATS tip: Match the contact details you use on job applications.
+      </div>
+
+      {/* Navigation */}
+      <NavigationButtons
+        onNext={handleSubmit(onNext)}
+        nextLabel="Next to Experience &rarr;"
+      />
     </form>
   );
 };
-

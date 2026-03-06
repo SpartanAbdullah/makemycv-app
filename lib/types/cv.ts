@@ -11,6 +11,10 @@ export type CvPersonal = {
   website: string;
   linkedin: string;
   summary: string;
+  nationality?: string;
+  country?: string;
+  dateOfBirth?: string;
+  drivingLicense?: string;
 };
 
 export type CvExperience = {

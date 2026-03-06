@@ -25,6 +25,18 @@ type ImportState =
   | { phase: "review"; source: string; parsed: ParsedDocument }
   | { phase: "linkedin-input" };
 
+const STEP_LABELS: Record<string, string> = {
+  personal: "CONTACT",
+  summary: "ABOUT",
+  experience: "EXPERIENCE",
+  education: "EDUCATION",
+  skills: "SKILLS",
+  languages: "LANGUAGES",
+  certifications: "CERTIFICATIONS",
+  projects: "PROJECTS",
+  review: "FINISH IT",
+};
+
 export const BuilderShell = ({
   stepId,
   children,
@@ -140,108 +152,161 @@ export const BuilderShell = ({
     setImportState({ phase: "idle" });
   };
 
-  return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      {/* ── Top bar: logo + dot stepper ── */}
-      <header className="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-3">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between">
-          <Link href="/" className="flex-shrink-0">
-            <span className="font-display text-lg font-semibold text-slate-900">
-              MakeMyCV
-            </span>
-          </Link>
+  const currentStep = builderSteps.find((s) => s.id === stepId);
+  const stepIndex = builderSteps.findIndex((s) => s.id === stepId);
 
-          {/* Dot stepper — desktop */}
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f0f0f0]">
+      {/* ── Header ── */}
+      <header className="flex-shrink-0 h-14 border-b border-slate-200 bg-white">
+        <div className="flex h-full items-center px-4">
+          {/* Left: logo */}
+          <div className="w-36 flex-shrink-0">
+            <Link href="/">
+              <span className="font-display text-lg font-bold text-slate-900">
+                MakeMyCV
+              </span>
+            </Link>
+          </div>
+
+          {/* Centre: horizontal step progress bar */}
           <nav
-            className="hidden sm:flex items-center gap-0.5"
+            className="hidden lg:flex flex-1 items-center justify-center"
             aria-label="CV builder steps"
           >
-            {builderSteps.map((step, i) => {
-              const status = statuses[step.id];
-              const isActive = step.id === stepId;
-              const isDone = status === "done";
-              const isLocked = status === "locked";
+            <div className="flex items-end gap-0">
+              {builderSteps.map((step, i) => {
+                const status = statuses[step.id];
+                const isActive = step.id === stepId;
+                const isDone = status === "done";
+                const isLocked = status === "locked";
+                const canClick = isDone || isActive;
 
-              return (
-                <Fragment key={step.id}>
-                  {i > 0 && (
-                    <div
-                      className={`h-px w-4 md:w-6 transition-colors ${
-                        isDone ? "bg-blue-500" : "bg-slate-200"
+                return (
+                  <Fragment key={step.id}>
+                    {/* Connector line between dots */}
+                    {i > 0 && (
+                      <div className="flex items-center pb-[7px]">
+                        <div
+                          className={`h-px w-5 ${
+                            statuses[builderSteps[i - 1].id] === "done"
+                              ? "bg-[#2563eb]"
+                              : "bg-[#e2e8f0]"
+                          }`}
+                        />
+                      </div>
+                    )}
+
+                    {/* Step column: label + dot + underline */}
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => canClick && handleStepClick(step.id)}
+                      className={`flex flex-col items-center gap-1 px-1 ${
+                        isLocked ? "cursor-not-allowed" : "cursor-pointer"
                       }`}
-                    />
-                  )}
-                  <button
-                    type="button"
-                    disabled={isLocked}
-                    onClick={() => handleStepClick(step.id)}
-                    title={step.title}
-                    aria-current={isActive ? "step" : undefined}
-                    aria-label={step.title}
-                    className={[
-                      "h-2.5 w-2.5 rounded-full transition-all",
-                      isActive
-                        ? "bg-blue-600 ring-[3px] ring-blue-600/20 scale-125"
-                        : isDone
-                        ? "bg-blue-600"
-                        : "bg-slate-300",
-                      isLocked
-                        ? "cursor-not-allowed opacity-40"
-                        : "cursor-pointer hover:scale-125",
-                    ].join(" ")}
-                  />
-                </Fragment>
-              );
-            })}
+                      aria-current={isActive ? "step" : undefined}
+                      aria-label={step.title}
+                    >
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-widest leading-none ${
+                          isActive
+                            ? "text-[#2563eb]"
+                            : isDone
+                            ? "text-[#64748b]"
+                            : "text-[#94a3b8]"
+                        }`}
+                      >
+                        {STEP_LABELS[step.id] ?? step.title}
+                      </span>
+                      <div
+                        className={`rounded-full ${
+                          isActive
+                            ? "h-3 w-3 bg-[#2563eb]"
+                            : isDone
+                            ? "h-2 w-2 bg-[#2563eb]"
+                            : "h-2 w-2 bg-[#cbd5e1]"
+                        }`}
+                      />
+                      {isActive && (
+                        <div className="h-0.5 w-6 rounded-full bg-[#2563eb]" />
+                      )}
+                    </button>
+                  </Fragment>
+                );
+              })}
+            </div>
           </nav>
 
-          {/* Mobile: step counter */}
-          <p className="text-sm text-slate-400 sm:hidden">
-            Step {builderSteps.findIndex((s) => s.id === stepId) + 1} / {totalSteps}
-          </p>
-
-          {/* Right spacer to keep dots centred */}
-          <div className="w-[72px]" />
+          {/* Right: Import / Export */}
+          <div className="w-36 flex-shrink-0 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => handleImport("pdf")}
+              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Import
+            </button>
+            <Link
+              href="/preview?print=1&autoprint=1"
+              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              Export
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* ── Split content ── */}
+      {/* ── Main area ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: form (~55%) */}
-        <div className="flex w-full flex-col overflow-hidden bg-white lg:w-[55%]">
+        {/* Left panel: form */}
+        <div className="flex w-full flex-col overflow-hidden bg-[#f0f0f0] lg:w-[55%]">
+          {/* Mobile: step name bar */}
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 lg:hidden">
+            <p className="text-sm font-medium text-slate-700">
+              {currentStep?.title}
+            </p>
+            <p className="text-xs text-slate-400">
+              Step {stepIndex + 1} / {totalSteps}
+            </p>
+          </div>
+
+          {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
             {!hydrated && (
-              <div className="px-6 py-8 text-sm text-slate-400 lg:px-10">
+              <div className="px-6 py-8 text-sm text-slate-400">
                 Loading your saved CV...
               </div>
             )}
 
-            <div className="px-6 py-6 lg:px-10 lg:py-8">
+            <div className="mx-auto max-w-2xl px-6 py-8">
               {children}
             </div>
           </div>
 
-          {/* Bottom: subtle reset */}
-          <div className="flex-shrink-0 border-t border-slate-100 px-6 py-2 lg:px-10">
+          {/* Bottom: reset */}
+          <div className="flex-shrink-0 px-6 py-2">
             <button
               type="button"
               onClick={handleReset}
-              className="text-xs text-slate-300 hover:text-red-500 transition-colors"
+              className="text-xs text-red-400 hover:text-red-600 transition-colors"
             >
               Reset CV
             </button>
           </div>
         </div>
 
-        {/* Right panel: live preview (~45%, dark) */}
-        <div className="hidden lg:flex lg:w-[45%] flex-col overflow-hidden bg-[#1a1a2e]">
-          <div className="flex-shrink-0 px-6 py-3">
-            <p className="text-[11px] uppercase tracking-widest text-white/30">
-              Preview
+        {/* Right panel: preview (dark) */}
+        <div className="hidden lg:flex lg:flex-1 flex-col overflow-hidden bg-[#3a3a3a]">
+          <div className="flex-shrink-0 px-5 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              PREVIEW
             </p>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
-            <PreviewPanel sticky={false} />
+          <div className="flex-1 overflow-y-auto px-5 pb-6">
+            <div className="rounded-xl bg-white shadow-2xl">
+              <PreviewPanel sticky={false} />
+            </div>
           </div>
         </div>
       </div>
@@ -251,7 +316,7 @@ export const BuilderShell = ({
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-[#1a1a2e] px-5 py-2.5 text-sm font-medium text-white shadow-lg"
+          className="flex items-center gap-2 rounded-full bg-[#3a3a3a] px-5 py-2.5 text-sm font-medium text-white shadow-lg"
         >
           Preview CV
         </button>
@@ -260,7 +325,7 @@ export const BuilderShell = ({
       {/* ── Mobile: preview overlay ── */}
       {previewOpen && (
         <div
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1a1a2e] lg:hidden"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#3a3a3a] lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="CV preview"
@@ -276,7 +341,9 @@ export const BuilderShell = ({
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            <PreviewPanel sticky={false} onToggle={() => setPreviewOpen(false)} />
+            <div className="rounded-xl bg-white shadow-2xl">
+              <PreviewPanel sticky={false} onToggle={() => setPreviewOpen(false)} />
+            </div>
           </div>
         </div>
       )}

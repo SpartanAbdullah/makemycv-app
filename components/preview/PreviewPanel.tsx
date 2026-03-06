@@ -33,11 +33,7 @@ export const PreviewPanel = ({
 
   return (
     <div className={`w-full ${sticky ? "lg:sticky lg:top-6" : ""}`}>
-      <div className="rounded-2xl bg-white shadow-sm">
-        <div className="overflow-auto">
-          <template.Render data={data} />
-        </div>
-      </div>
+      <template.Render data={data} />
     </div>
   );
 };
