@@ -33,27 +33,8 @@ export const PreviewPanel = ({
 
   return (
     <div className={`w-full ${sticky ? "lg:sticky lg:top-6" : ""}`}>
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Live Preview
-            </p>
-            <p className="text-sm font-semibold text-slate-700">
-              {template.name}
-            </p>
-          </div>
-          {onToggle && (
-            <button
-              type="button"
-              onClick={onToggle}
-              className="text-xs text-slate-500 underline"
-            >
-              Close
-            </button>
-          )}
-        </div>
-        <div className="max-h-[70vh] overflow-auto">
+      <div className="rounded-2xl bg-white shadow-sm">
+        <div className="overflow-auto">
           <template.Render data={data} />
         </div>
       </div>

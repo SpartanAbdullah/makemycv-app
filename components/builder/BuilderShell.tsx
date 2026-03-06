@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StepStatus } from "./Stepper";
-import { CompactStepper } from "./CompactStepper";
-import { BuilderHeader } from "./BuilderHeader";
 import { builderSteps, totalSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import { clearCvStorage } from "../../lib/utils/localStorage";
-import { exportToDocx } from "../../lib/utils/docxExport";
 import { MappingReview } from "../import/MappingReview";
 import { LinkedInImportModal } from "../import/LinkedInImportModal";
 import { pdfAdapter } from "../../lib/importers/pdfAdapter";
@@ -39,7 +37,6 @@ export const BuilderShell = ({
   const router = useRouter();
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
-  const setData = useCvStore((state) => state.setData);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const reset = useCvStore((state) => state.reset);
 
@@ -73,16 +70,6 @@ export const BuilderShell = ({
     return result;
   }, [data, stepId]);
 
-  // Progress percentage based on required steps completion
-  const progressPct = useMemo(() => {
-    const required = builderSteps.filter((s) => s.required);
-    const done = required.filter((s) => getStepCompletion(s, data)).length;
-    return Math.round((done / required.length) * 100);
-  }, [data]);
-
-  const currentStep = builderSteps.find((s) => s.id === stepId);
-  const stepIndex = builderSteps.findIndex((s) => s.id === stepId);
-
   const handleStepClick = (id: string) => {
     const index = builderSteps.findIndex((step) => step.id === id);
     const allowed = builderSteps
@@ -90,10 +77,6 @@ export const BuilderShell = ({
       .filter((step) => step.required)
       .every((step) => getStepCompletion(step, data));
     if (allowed) onStepChange(id);
-  };
-
-  const handleExportDocx = async () => {
-    await exportToDocx(data);
   };
 
   const handleReset = () => {
@@ -158,76 +141,106 @@ export const BuilderShell = ({
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-white">
-      {/* ── Sticky header ── */}
-      <BuilderHeader
-        stepTitle={currentStep?.title ?? ""}
-        stepIndex={stepIndex}
-        totalSteps={totalSteps}
-        progressPct={progressPct}
-        onImport={handleImport}
-        onExportDocx={handleExportDocx}
-      />
+    <div className="flex h-screen flex-col overflow-hidden">
+      {/* ── Top bar: logo + dot stepper ── */}
+      <header className="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between">
+          <Link href="/" className="flex-shrink-0">
+            <span className="font-display text-lg font-semibold text-slate-900">
+              MakeMyCV
+            </span>
+          </Link>
 
-      {/* ── Split content area (desktop) ── */}
-      <div className="flex flex-1 overflow-hidden lg:divide-x lg:divide-slate-200">
+          {/* Dot stepper — desktop */}
+          <nav
+            className="hidden sm:flex items-center gap-0.5"
+            aria-label="CV builder steps"
+          >
+            {builderSteps.map((step, i) => {
+              const status = statuses[step.id];
+              const isActive = step.id === stepId;
+              const isDone = status === "done";
+              const isLocked = status === "locked";
 
-        {/* ── Left panel: stepper + form ── */}
-        <div className="flex w-full flex-col overflow-hidden lg:w-[42%] lg:min-w-[420px] lg:max-w-[560px]">
-          {/* Compact step nav */}
-          <div className="hidden lg:block flex-shrink-0 overflow-y-auto border-b border-slate-100 bg-slate-50/60 max-h-64">
-            <CompactStepper
-              steps={builderSteps}
-              statuses={statuses}
-              currentId={stepId}
-              onStepClick={handleStepClick}
-            />
-          </div>
+              return (
+                <Fragment key={step.id}>
+                  {i > 0 && (
+                    <div
+                      className={`h-px w-4 md:w-6 transition-colors ${
+                        isDone ? "bg-blue-500" : "bg-slate-200"
+                      }`}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => handleStepClick(step.id)}
+                    title={step.title}
+                    aria-current={isActive ? "step" : undefined}
+                    aria-label={step.title}
+                    className={[
+                      "h-2.5 w-2.5 rounded-full transition-all",
+                      isActive
+                        ? "bg-blue-600 ring-[3px] ring-blue-600/20 scale-125"
+                        : isDone
+                        ? "bg-blue-600"
+                        : "bg-slate-300",
+                      isLocked
+                        ? "cursor-not-allowed opacity-40"
+                        : "cursor-pointer hover:scale-125",
+                    ].join(" ")}
+                  />
+                </Fragment>
+              );
+            })}
+          </nav>
 
-          {/* Mobile step progress bar label */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2 lg:hidden">
-            <p className="text-sm font-medium text-slate-700">
-              {currentStep?.title}
-            </p>
-            <p className="text-xs text-slate-400">
-              Step {stepIndex + 1} / {totalSteps}
-            </p>
-          </div>
+          {/* Mobile: step counter */}
+          <p className="text-sm text-slate-400 sm:hidden">
+            Step {builderSteps.findIndex((s) => s.id === stepId) + 1} / {totalSteps}
+          </p>
 
-          {/* Form area — scrollable */}
+          {/* Right spacer to keep dots centred */}
+          <div className="w-[72px]" />
+        </div>
+      </header>
+
+      {/* ── Split content ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left panel: form (~55%) */}
+        <div className="flex w-full flex-col overflow-hidden bg-white lg:w-[55%]">
           <div className="flex-1 overflow-y-auto">
             {!hydrated && (
-              <div className="m-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
-                Loading your saved CV…
+              <div className="px-6 py-8 text-sm text-slate-400 lg:px-10">
+                Loading your saved CV...
               </div>
             )}
 
-            <div className="px-4 py-5 space-y-5 lg:px-6">
+            <div className="px-6 py-6 lg:px-10 lg:py-8">
               {children}
             </div>
+          </div>
 
-            {/* Bottom reset link */}
-            <div className="border-t border-slate-100 px-6 py-3 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                Reset CV
-              </button>
-            </div>
+          {/* Bottom: subtle reset */}
+          <div className="flex-shrink-0 border-t border-slate-100 px-6 py-2 lg:px-10">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs text-slate-300 hover:text-red-500 transition-colors"
+            >
+              Reset CV
+            </button>
           </div>
         </div>
 
-        {/* ── Right panel: live preview (desktop only) ── */}
-        <div className="hidden lg:flex lg:flex-1 lg:min-w-[520px] lg:flex-col bg-slate-50/40">
-          <div className="flex-shrink-0 border-b border-slate-100 px-5 py-3 flex items-center justify-between">
-            <p className="text-xs uppercase tracking-widest text-slate-400">
-              Live Preview
+        {/* Right panel: live preview (~45%, dark) */}
+        <div className="hidden lg:flex lg:w-[45%] flex-col overflow-hidden bg-[#1a1a2e]">
+          <div className="flex-shrink-0 px-6 py-3">
+            <p className="text-[11px] uppercase tracking-widest text-white/30">
+              Preview
             </p>
-            <p className="text-xs text-slate-400">Updates as you type</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
             <PreviewPanel sticky={false} />
           </div>
         </div>
@@ -238,26 +251,26 @@ export const BuilderShell = ({
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium shadow-lg backdrop-blur"
+          className="flex items-center gap-2 rounded-full bg-[#1a1a2e] px-5 py-2.5 text-sm font-medium text-white shadow-lg"
         >
-          <span aria-hidden="true">👁</span> Preview CV
+          Preview CV
         </button>
       </div>
 
       {/* ── Mobile: preview overlay ── */}
       {previewOpen && (
         <div
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-white lg:hidden"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#1a1a2e] lg:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="CV preview"
         >
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <p className="font-display text-lg font-semibold">Live Preview</p>
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <p className="font-display text-lg font-semibold text-white">Preview</p>
             <button
               type="button"
               onClick={() => setPreviewOpen(false)}
-              className="text-sm text-slate-500 underline"
+              className="text-sm text-slate-400 underline"
             >
               Close
             </button>
@@ -274,7 +287,7 @@ export const BuilderShell = ({
           <div className="rounded-2xl border border-slate-200 bg-white px-8 py-6 text-center shadow-xl">
             <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-700 mx-auto" />
             <p className="text-sm font-medium text-slate-700">
-              Parsing {importState.source}…
+              Parsing {importState.source}...
             </p>
           </div>
         </div>
