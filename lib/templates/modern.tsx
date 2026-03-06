@@ -109,6 +109,37 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
             </section>
           )}
 
+          {data.languages.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Languages
+              </h2>
+              <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                {data.languages.map((lang) => (
+                  <li key={lang.id}>
+                    {lang.name}
+                    {lang.level ? ` - ${lang.level}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {data.certifications.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Certifications
+              </h2>
+              <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                {data.certifications.map((cert) => (
+                  <li key={cert.id}>
+                    {cert.name} - {cert.issuer}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {data.projects.length > 0 && (
             <section>
               {data.projects.map((project, index) => {
@@ -216,36 +247,6 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
             </section>
           )}
 
-          {data.languages.length > 0 && (
-            <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Languages
-              </h2>
-              <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                {data.languages.map((lang) => (
-                  <li key={lang.id}>
-                    {lang.name}
-                    {lang.level ? ` - ${lang.level}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {data.certifications.length > 0 && (
-            <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Certifications
-              </h2>
-              <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                {data.certifications.map((cert) => (
-                  <li key={cert.id}>
-                    {cert.name} - {cert.issuer}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </aside>
       </div>
     </div>

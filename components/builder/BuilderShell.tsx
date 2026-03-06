@@ -83,12 +83,7 @@ export const BuilderShell = ({
   }, [data, stepId]);
 
   const handleStepClick = (id: string) => {
-    const index = builderSteps.findIndex((step) => step.id === id);
-    const allowed = builderSteps
-      .slice(0, index)
-      .filter((step) => step.required)
-      .every((step) => getStepCompletion(step, data));
-    if (allowed) onStepChange(id);
+    if (statuses[id] === "done") onStepChange(id);
   };
 
   const handleReset = () => {
@@ -180,15 +175,13 @@ export const BuilderShell = ({
                 const isActive = step.id === stepId;
                 const isDone = status === "done";
                 const isLocked = status === "locked";
-                const canClick = isDone || isActive;
-
                 return (
                   <Fragment key={step.id}>
                     {/* Connector line between dots */}
                     {i > 0 && (
                       <div className="flex items-center pb-[7px]">
                         <div
-                          className={`h-px w-5 ${
+                          className={`h-[3px] w-7 rounded-sm ${
                             statuses[builderSteps[i - 1].id] === "done"
                               ? "bg-[#2563eb]"
                               : "bg-[#e2e8f0]"
@@ -200,10 +193,10 @@ export const BuilderShell = ({
                     {/* Step column: label + dot + underline */}
                     <button
                       type="button"
-                      disabled={isLocked}
-                      onClick={() => canClick && handleStepClick(step.id)}
+                      disabled={!isDone}
+                      onClick={() => isDone && handleStepClick(step.id)}
                       className={`flex flex-col items-center gap-1 px-1 ${
-                        isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                        isDone ? "cursor-pointer" : "cursor-default"
                       }`}
                       aria-current={isActive ? "step" : undefined}
                       aria-label={step.title}
@@ -222,9 +215,9 @@ export const BuilderShell = ({
                       <div
                         className={`rounded-full ${
                           isActive
-                            ? "h-3 w-3 bg-[#2563eb]"
+                            ? "h-3.5 w-3.5 bg-[#2563eb]"
                             : isDone
-                            ? "h-2 w-2 bg-[#2563eb]"
+                            ? "h-2.5 w-2.5 bg-[#2563eb]"
                             : "h-2 w-2 bg-[#cbd5e1]"
                         }`}
                       />

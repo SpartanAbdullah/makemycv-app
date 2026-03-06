@@ -9,30 +9,10 @@ import { NavigationButtons } from "../NavigationButtons";
 import type { CvPersonal } from "../../../lib/types/cv";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
+  "cv-input w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
 
 const labelClass =
   "block mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500";
-
-const CheckBadge = () => (
-  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-md bg-[#22c55e]">
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M3 8.5L6.5 12L13 5"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  </div>
-);
 
 export const PersonalStep = ({
   onNext,
@@ -55,8 +35,6 @@ export const PersonalStep = ({
     resolver: zodResolver(personalSchema),
     defaultValues: personal,
   });
-
-  const watched = watch();
 
   useEffect(() => {
     if (!isDirty) reset(personal);
@@ -100,39 +78,30 @@ export const PersonalStep = ({
 
       {/* Core fields */}
       <div className="grid grid-cols-2 gap-4">
-        {/* First Name */}
         <div>
           <label className={labelClass}>FIRST NAME (MANDATORY)</label>
-          <div className="relative">
-            <input
-              className={inputClass}
-              placeholder="e.g. Muhammad"
-              {...register("firstName")}
-            />
-            {watched.firstName?.trim() && <CheckBadge />}
-          </div>
+          <input
+            className={inputClass}
+            placeholder="e.g. Muhammad"
+            {...register("firstName")}
+          />
           {errors.firstName?.message && (
             <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
           )}
         </div>
 
-        {/* Last Name */}
         <div>
           <label className={labelClass}>LAST NAME (MANDATORY)</label>
-          <div className="relative">
-            <input
-              className={inputClass}
-              placeholder="e.g. Abdullah"
-              {...register("lastName")}
-            />
-            {watched.lastName?.trim() && <CheckBadge />}
-          </div>
+          <input
+            className={inputClass}
+            placeholder="e.g. Abdullah"
+            {...register("lastName")}
+          />
           {errors.lastName?.message && (
             <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
           )}
         </div>
 
-        {/* City */}
         <div>
           <label className={labelClass}>CITY</label>
           <input
@@ -142,7 +111,6 @@ export const PersonalStep = ({
           />
         </div>
 
-        {/* Headline / Job Title */}
         <div>
           <label className={labelClass}>HEADLINE / JOB TITLE</label>
           <input
@@ -155,31 +123,23 @@ export const PersonalStep = ({
           )}
         </div>
 
-        {/* Phone */}
         <div>
           <label className={labelClass}>PHONE (MANDATORY)</label>
-          <div className="relative">
-            <input
-              className={inputClass}
-              placeholder="+971 50 000 0000"
-              {...register("phone")}
-            />
-            {watched.phone?.trim() && <CheckBadge />}
-          </div>
+          <input
+            className={inputClass}
+            placeholder="+971 50 000 0000"
+            {...register("phone")}
+          />
         </div>
 
-        {/* Email */}
         <div>
           <label className={labelClass}>EMAIL (MANDATORY)</label>
-          <div className="relative">
-            <input
-              className={inputClass}
-              type="email"
-              placeholder="your@email.com"
-              {...register("email")}
-            />
-            {watched.email?.trim() && <CheckBadge />}
-          </div>
+          <input
+            className={inputClass}
+            type="email"
+            placeholder="your@email.com"
+            {...register("email")}
+          />
           {errors.email?.message && (
             <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
           )}

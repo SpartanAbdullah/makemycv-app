@@ -78,6 +78,15 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           wrapAnywhere: true,
         }
       : null,
+    data.personal.nationality?.trim()
+      ? { text: data.personal.nationality.trim(), wrapAnywhere: false }
+      : null,
+    data.personal.drivingLicense?.trim()
+      ? { text: data.personal.drivingLicense.trim(), wrapAnywhere: false }
+      : null,
+    data.personal.dateOfBirth?.trim()
+      ? { text: `DOB: ${data.personal.dateOfBirth.trim()}`, wrapAnywhere: false }
+      : null,
   ].filter(Boolean) as Array<{ text: string; href?: string; wrapAnywhere: boolean }>;
 
   const toTitleCase = (value: string) =>

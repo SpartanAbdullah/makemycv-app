@@ -12,7 +12,7 @@ import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import type { CvProject } from "../../../lib/types/cv";
 
 const inputClass =
-  "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
 type ProjectsForm = { projects: CvProject[] };
 
@@ -137,7 +137,7 @@ export const ProjectsStep = ({
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl">Projects</h2>
+          <h2 className="font-display text-2xl font-bold">Projects</h2>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
             Optional
           </span>
@@ -178,10 +178,10 @@ export const ProjectsStep = ({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <Field label="Project name">
-                    <input className={inputClass} {...register(`projects.${index}.name`)} />
+                    <input className={inputClass} placeholder="e.g. Dubai Mall Fit-Out Project" {...register(`projects.${index}.name`)} />
                   </Field>
                   <Field label="Link">
-                    <input className={inputClass} {...register(`projects.${index}.link`)} />
+                    <input className={inputClass} placeholder="e.g. www.projectsite.com" {...register(`projects.${index}.link`)} />
                   </Field>
                 </div>
 

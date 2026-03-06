@@ -23,7 +23,7 @@ export const NavigationButtons = ({
         <button
           type="button"
           onClick={onBack}
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm"
+          className="rounded-full border border-slate-200 bg-white px-5 py-3.5 text-base font-medium"
         >
           {backLabel}
         </button>
@@ -32,7 +32,7 @@ export const NavigationButtons = ({
         <button
           type="button"
           onClick={onSkip}
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500"
+          className="rounded-full border border-slate-200 bg-white px-5 py-3.5 text-base font-medium text-slate-500"
         >
           Skip for now
         </button>
@@ -43,7 +43,7 @@ export const NavigationButtons = ({
         type="button"
         onClick={onNext}
         disabled={disableNext}
-        className="rounded-full bg-slate-900 px-5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+        className="rounded-full bg-[#2563eb] px-8 py-3.5 text-base font-bold text-white min-w-[200px] text-center disabled:cursor-not-allowed disabled:bg-slate-400"
       >
         {nextLabel}
       </button>

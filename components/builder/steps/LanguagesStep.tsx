@@ -10,7 +10,7 @@ import { NavigationButtons } from "../NavigationButtons";
 import type { CvLanguage } from "../../../lib/types/cv";
 
 const inputClass =
-  "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
 type LanguagesForm = { languages: CvLanguage[] };
 
@@ -81,7 +81,7 @@ export const LanguagesStep = ({
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl">Languages</h2>
+          <h2 className="font-display text-2xl font-bold">Languages</h2>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
             Optional
           </span>
@@ -104,10 +104,11 @@ export const LanguagesStep = ({
           {fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
               <Field label="Language">
-                <input className={inputClass} {...register(`languages.${index}.name`)} />
+                <input className={inputClass} placeholder="e.g. Arabic" {...register(`languages.${index}.name`)} />
               </Field>
               <Field label="Level">
                 <select className={inputClass} {...register(`languages.${index}.level`)}>
+                  <option value="" disabled>Select level</option>
                   <option value="beginner">Beginner</option>
                   <option value="intermediate">Intermediate</option>
                   <option value="advanced">Advanced</option>

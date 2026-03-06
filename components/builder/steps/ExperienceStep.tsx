@@ -12,7 +12,7 @@ import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import type { CvExperience } from "../../../lib/types/cv";
 
 const inputClass =
-  "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
 type ExperienceForm = { experience: CvExperience[] };
 
@@ -27,6 +27,7 @@ export const ExperienceStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const {
     register,
@@ -131,16 +132,21 @@ export const ExperienceStep = ({
     });
   };
 
+  const handleAddRole = () => {
+    append(createEmptyItems.experience());
+    setOpenIndex(fields.length);
+  };
+
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl">Work Experience</h2>
+          <h2 className="font-display text-2xl font-bold">Work Experience</h2>
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
             Required
           </span>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm font-medium text-slate-500">
           Add your most impactful roles first. Use bullet points with results.
         </p>
 
@@ -150,118 +156,144 @@ export const ExperienceStep = ({
             action={
               <button
                 type="button"
-                onClick={() => append(createEmptyItems.experience())}
+                onClick={handleAddRole}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
               >
-                Add role
+                Add Employment
               </button>
             }
           >
-            {fields.map((field, index) => (
-              <div key={field.id} className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-slate-700">
-                    Role {index + 1}
-                  </h4>
-                  {fields.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => remove(index)}
-                      className="text-xs text-red-500"
+            {fields.map((field, index) => {
+              const isOpen = openIndex === index;
+              const role = watch(`experience.${index}.role`) || "";
+              const company = watch(`experience.${index}.company`) || "";
+              const startDate = watch(`experience.${index}.startDate`) || "";
+              const endDate = watch(`experience.${index}.endDate`) || "";
+              const summaryLine = [role, company, [startDate, endDate].filter(Boolean).join(" - ")].filter(Boolean).join(" | ");
+
+              return (
+                <div key={field.id} className="rounded-2xl border border-slate-200">
+                  {/* Accordion header */}
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-sm font-semibold text-slate-700 truncate">
+                      {summaryLine || `Role ${index + 1}`}
+                    </span>
+                    <svg
+                      className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
                     >
-                      Remove
-                    </button>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Accordion body */}
+                  {isOpen && (
+                    <div className="border-t border-slate-100 p-4">
+                      <div className="flex justify-end">
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            className="text-xs text-red-500"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="mt-2 grid gap-4 md:grid-cols-2">
+                        <Field
+                          label="Job Title"
+                          error={errors.experience?.[index]?.role?.message}
+                        >
+                          <input className={inputClass} placeholder="e.g. Operations Manager" {...register(`experience.${index}.role`)} />
+                        </Field>
+                        <Field
+                          label="Employer / Company"
+                          error={errors.experience?.[index]?.company?.message}
+                        >
+                          <input className={inputClass} placeholder="e.g. Interior360 General Trading LLC" {...register(`experience.${index}.company`)} />
+                        </Field>
+                        <Field
+                          label="Start date"
+                          error={errors.experience?.[index]?.startDate?.message}
+                        >
+                          <input className={inputClass} placeholder="e.g. Jan 2024" {...register(`experience.${index}.startDate`)} />
+                        </Field>
+                        <Field label="End date">
+                          <input className={inputClass} placeholder="e.g. Mar 2026" {...register(`experience.${index}.endDate`)} />
+                        </Field>
+                        <Field label="City">
+                          <input className={inputClass} placeholder="e.g. Dubai" {...register(`experience.${index}.location`)} />
+                        </Field>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" {...register(`experience.${index}.isCurrent`)} />
+                          I currently work here
+                        </label>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm font-bold text-slate-700">Highlights</p>
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                          <p>
+                            Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.
+                          </p>
+                        </div>
+                        {(watch(`experience.${index}.bullets`) || []).map((_, bulletIndex) => (
+                          <div key={bulletIndex} className="space-y-1">
+                            <div className="flex items-start gap-2">
+                              <textarea
+                                rows={2}
+                                placeholder="Describe your responsibilities and achievements. Start with action verbs like 'Led', 'Managed', 'Increased'..."
+                                className={`${inputClass} flex-1`}
+                                {...register(`experience.${index}.bullets.${bulletIndex}`)}
+                                onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeBullet(index, bulletIndex)}
+                                className="text-xs text-red-500"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            {(watch(`experience.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
+                              <p className="text-xs text-amber-600">
+                                Consider splitting into 2 bullets for readability.
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addBullet(index)}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
+                          >
+                            Add bullet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => splitFocusedBullet(index)}
+                            disabled={!focusedBullet || focusedBullet.itemIndex !== index}
+                            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Split pasted text
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <Field
-                    label="Company"
-                    error={errors.experience?.[index]?.company?.message}
-                  >
-                    <input className={inputClass} {...register(`experience.${index}.company`)} />
-                  </Field>
-                  <Field
-                    label="Role"
-                    error={errors.experience?.[index]?.role?.message}
-                  >
-                    <input className={inputClass} {...register(`experience.${index}.role`)} />
-                  </Field>
-                  <Field label="Location">
-                    <input className={inputClass} {...register(`experience.${index}.location`)} />
-                  </Field>
-                  <Field
-                    label="Start date"
-                    error={errors.experience?.[index]?.startDate?.message}
-                  >
-                    <input className={inputClass} {...register(`experience.${index}.startDate`)} />
-                  </Field>
-                  <Field label="End date">
-                    <input className={inputClass} {...register(`experience.${index}.endDate`)} />
-                  </Field>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input type="checkbox" {...register(`experience.${index}.isCurrent`)} />
-                    I currently work here
-                  </label>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <p className="text-sm font-medium text-slate-700">Highlights</p>
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                    <p>
-                      Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.
-                    </p>
-                    <p className="mt-1">
-                      Example: Improved release speed by 30% by automating CI test runs.
-                    </p>
-                    <p className="mt-1">
-                      Example: Reduced support tickets by 22% after redesigning onboarding flow.
-                    </p>
-                  </div>
-                  {(watch(`experience.${index}.bullets`) || []).map((_, bulletIndex) => (
-                    <div key={bulletIndex} className="space-y-1">
-                      <div className="flex items-start gap-2">
-                        <textarea
-                          rows={2}
-                          className={`${inputClass} flex-1`}
-                          {...register(`experience.${index}.bullets.${bulletIndex}`)}
-                          onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeBullet(index, bulletIndex)}
-                          className="text-xs text-red-500"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      {(watch(`experience.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
-                        <p className="text-xs text-amber-600">
-                          Consider splitting into 2 bullets for readability.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => addBullet(index)}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
-                    >
-                      Add bullet
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => splitFocusedBullet(index)}
-                      disabled={!focusedBullet || focusedBullet.itemIndex !== index}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Split pasted text
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </Repeater>
         </div>
 
