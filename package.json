@@ -11,7 +11,10 @@
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@react-pdf/renderer": "^4.2.1",
+    "docx": "^9.0.0",
+    "mammoth": "^1.8.0",
     "next": "16.1.6",
+    "pdfjs-dist": "^4.4.168",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",

@@ -118,9 +118,16 @@ type CvStore = {
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
   reset: () => void;
   importJson: (data: CvData) => void;
+  /**
+   * Import a partial CV document from an external source (PDF/DOCX/LinkedIn).
+   * mode "replace": overwrites the current document (preserves settings).
+   * mode "merge":   appends arrays and fills empty personal fields only.
+   * Importing always saves to localStorage (versioning via timestamp).
+   */
+  importCvVersion: (partial: Partial<CvData>, mode: "replace" | "merge") => void;
 };
 
-export const useCvStore = create<CvStore>((set) => ({
+export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
   setHydrated: (value) => set({ hydrated: value }),
@@ -132,6 +139,46 @@ export const useCvStore = create<CvStore>((set) => ({
     set({ data: defaultCvData });
   },
   importJson: (data) => set({ data }),
+  importCvVersion: (partial, mode) => {
+    const current = get().data;
+    let next: CvData;
+    if (mode === "replace") {
+      next = {
+        ...defaultCvData,
+        ...partial,
+        // Always preserve user-chosen template settings
+        settings: current.settings,
+      };
+    } else {
+      // Merge: fill empty personal fields, append arrays
+      next = {
+        ...current,
+        personal: {
+          ...current.personal,
+          ...Object.fromEntries(
+            Object.entries(partial.personal ?? {}).filter(
+              ([k, v]) =>
+                v !== "" &&
+                current.personal[k as keyof typeof current.personal] === ""
+            )
+          ),
+        },
+        experience: [
+          ...current.experience,
+          ...(partial.experience ?? []),
+        ],
+        education: [...current.education, ...(partial.education ?? [])],
+        skills: [...current.skills, ...(partial.skills ?? [])],
+        languages: [...current.languages, ...(partial.languages ?? [])],
+        certifications: [
+          ...current.certifications,
+          ...(partial.certifications ?? []),
+        ],
+        projects: [...current.projects, ...(partial.projects ?? [])],
+      };
+    }
+    set({ data: next });
+  },
 }));
 
 let hasBoundStorage = false;

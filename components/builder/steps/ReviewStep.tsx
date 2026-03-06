@@ -5,6 +5,7 @@ import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
+import { exportToDocx } from "../../../lib/utils/docxExport";
 
 export const ReviewStep = ({
   onBack,
@@ -14,6 +15,7 @@ export const ReviewStep = ({
   onJump: (stepId: string) => void;
 }) => {
   const data = useCvStore((state) => state.data);
+  const handleExportDocx = () => exportToDocx(data);
   const incomplete = builderSteps.filter(
     (step) => step.id !== "review" && !getStepCompletion(step, data)
   );
@@ -65,6 +67,13 @@ export const ReviewStep = ({
           >
             Export PDF
           </Link>
+          <button
+            type="button"
+            onClick={handleExportDocx}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-left"
+          >
+            Export DOCX
+          </button>
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
