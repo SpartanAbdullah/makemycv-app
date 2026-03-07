@@ -1,0 +1,7 @@
+ACTION REQUIRED: Create a 1200x630px PNG image named
+og-image.png and place it in /public/.
+This image appears when makemycv.ae links are shared on
+WhatsApp, LinkedIn, and Twitter.
+Design recommendation: Blue background (#2563eb),
+white MakeMyCV logo left, sample CV preview right,
+tagline: 'Build your CV in minutes. UAE job market ready.'

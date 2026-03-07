@@ -54,6 +54,7 @@ export const BuilderShell = ({
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     bindCvStorage();
@@ -123,7 +124,7 @@ export const BuilderShell = ({
         setImportState({ phase: "review", source, parsed });
       } catch {
         setImportState({ phase: "idle" });
-        alert(`Could not parse ${source} file.`);
+        setErrorMsg(`Could not parse ${source}. Please check the file and try again.`);
       }
     });
   };
@@ -135,7 +136,7 @@ export const BuilderShell = ({
       setImportState({ phase: "review", source: "LinkedIn", parsed });
     } catch {
       setImportState({ phase: "idle" });
-      alert("Could not parse LinkedIn profile text.");
+      setErrorMsg("Could not parse LinkedIn profile text. Please paste the full profile text.");
     }
   };
 
@@ -249,6 +250,19 @@ export const BuilderShell = ({
           </div>
         </div>
       </header>
+
+      {errorMsg && (
+        <div className="flex-shrink-0 flex items-center justify-between bg-red-50 border-b border-red-200 px-6 py-2.5">
+          <p className="text-sm text-red-700 font-medium">{errorMsg}</p>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            className="text-red-400 hover:text-red-600 text-xs underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── Main area ── */}
       <div className="flex flex-1 overflow-hidden">
