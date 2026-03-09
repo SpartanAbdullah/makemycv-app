@@ -132,33 +132,61 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       )}
       <div className="cv-content relative z-10">
         <header className="border-b border-slate-200 pb-2">
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1fr,auto] sm:gap-4">
-            <div className="min-w-0">
-              <h1 className="text-[30px] font-bold leading-none tracking-tight text-slate-900">{name}</h1>
-              <p className="mt-1 text-[15px] font-medium text-slate-600">{headline}</p>
-            </div>
-            <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
-              {contactItems.length > 0 && (
-                <div className="flex max-w-[320px] flex-wrap items-center justify-start gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-slate-500 sm:justify-end">
-                  {contactItems.map((item, index) => (
-                    <div key={`${item.text}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
-                      {item.href ? (
-                        <a href={item.href} className="min-w-0">
-                          <span className={item.wrapAnywhere ? "break-words [overflow-wrap:anywhere]" : ""}>
-                            {item.text}
-                          </span>
-                        </a>
-                      ) : (
-                        <span className={item.wrapAnywhere ? "min-w-0 break-words [overflow-wrap:anywhere]" : "min-w-0"}>
-                          {item.text}
-                        </span>
-                      )}
-                      {index < contactItems.length - 1 ? <span className="text-slate-300">|</span> : null}
-                    </div>
-                  ))}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1fr,auto] sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-[30px] font-bold leading-none tracking-tight text-slate-900">{name}</h1>
+                  <p className="mt-1 text-[15px] font-medium text-slate-600">{headline}</p>
                 </div>
-              )}
+                <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
+                  {contactItems.length > 0 && (
+                    <div className="flex max-w-[320px] flex-wrap items-center justify-start gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-slate-500 sm:justify-end">
+                      {contactItems.map((item, index) => (
+                        <div key={`${item.text}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
+                          {item.href ? (
+                            <a href={item.href} className="min-w-0">
+                              <span className={item.wrapAnywhere ? "break-words [overflow-wrap:anywhere]" : ""}>
+                                {item.text}
+                              </span>
+                            </a>
+                          ) : (
+                            <span className={item.wrapAnywhere ? "min-w-0 break-words [overflow-wrap:anywhere]" : "min-w-0"}>
+                              {item.text}
+                            </span>
+                          )}
+                          {index < contactItems.length - 1 ? <span className="text-slate-300">|</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+            {data.personal.photo && data.personal.showPhoto && (
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  border: "2px solid #e2e8f0",
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.personal.photo}
+                  alt={`${data.personal.firstName} ${data.personal.lastName}`}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              </div>
+            )}
           </div>
         </header>
 

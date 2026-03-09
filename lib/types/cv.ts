@@ -11,6 +11,8 @@ export type CvPersonal = {
   website: string;
   linkedin: string;
   summary: string;
+  photo?: string;
+  showPhoto?: boolean;
   nationality?: string;
   country?: string;
   dateOfBirth?: string;

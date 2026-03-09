@@ -78,13 +78,13 @@ export const SummaryStep = ({
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold">Professional Summary</h2>
+          <h2 className="font-display text-2xl font-bold">Tell Us About Yourself</h2>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
             Optional
           </span>
         </div>
         <p className="mt-2 text-sm text-slate-500">
-          Share a quick intro that highlights your strengths and goals.
+          Write a short professional summary that highlights your strengths and career goals. This appears at the top of your CV.
         </p>
 
         <div className="mt-6">
@@ -92,14 +92,14 @@ export const SummaryStep = ({
             <textarea
               rows={6}
               className={inputClass}
-              placeholder="Write 2-3 lines summarising your experience, key skills, and what you bring to the role. Match keywords from the job description."
+              placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
               {...register("summary")}
             />
           </Field>
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Aim for 2-3 short sentences and include relevant keywords.
+          ATS tip: Aim for 2-3 short sentences. Include keywords from the job description — recruiters in the UAE often use automated screening.
         </div>
       </section>
 

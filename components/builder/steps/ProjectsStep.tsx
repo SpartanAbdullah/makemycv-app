@@ -246,7 +246,7 @@ export const ProjectsStep = ({
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Use project titles that clearly convey scope and tools.
+          ATS tip: Use project titles that clearly convey scope and tools. Mention technologies, budgets, or team sizes where relevant.
         </div>
       </section>
 

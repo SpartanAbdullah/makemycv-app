@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site//**)",
+      "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site/app/**)",
+      "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site/**)",
+      "Bash(npm run build)"
+    ]
+  }
+}

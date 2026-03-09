@@ -126,7 +126,7 @@ export const LanguagesStep = ({
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Use standard proficiency labels.
+          ATS tip: Use standard proficiency labels. Arabic and English are highly valued in the UAE — list both if applicable.
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
+import { PhotoUpload } from "../PhotoUpload";
 import type { CvPersonal } from "../../../lib/types/cv";
 
 const inputClass =
@@ -24,6 +25,16 @@ export const PersonalStep = ({
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMore, setShowMore] = useState(false);
+
+  const handlePhotoChange = (base64: string | undefined) => {
+    const current = useCvStore.getState().data.personal;
+    updateSection("personal", { ...current, photo: base64 } as CvPersonal);
+  };
+
+  const handleToggleChange = (show: boolean) => {
+    const current = useCvStore.getState().data.personal;
+    updateSection("personal", { ...current, showPhoto: show } as CvPersonal);
+  };
 
   const {
     register,
@@ -76,6 +87,16 @@ export const PersonalStep = ({
         </p>
       </div>
 
+      {/* Photo upload */}
+      <div className="pb-6 border-b border-slate-200 mb-2">
+        <PhotoUpload
+          photo={personal.photo}
+          showPhoto={personal.showPhoto}
+          onPhotoChange={handlePhotoChange}
+          onToggleChange={handleToggleChange}
+        />
+      </div>
+
       {/* Core fields */}
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -94,7 +115,7 @@ export const PersonalStep = ({
           <label className={labelClass}>LAST NAME (MANDATORY)</label>
           <input
             className={inputClass}
-            placeholder="e.g. Abdullah"
+            placeholder="e.g. Al-Rashidi"
             {...register("lastName")}
           />
           {errors.lastName?.message && (
@@ -106,7 +127,7 @@ export const PersonalStep = ({
           <label className={labelClass}>CITY</label>
           <input
             className={inputClass}
-            placeholder="e.g. Dubai"
+            placeholder="e.g. Dubai, UAE"
             {...register("location")}
           />
         </div>
@@ -115,7 +136,7 @@ export const PersonalStep = ({
           <label className={labelClass}>HEADLINE / JOB TITLE</label>
           <input
             className={inputClass}
-            placeholder="e.g. Project Manager"
+            placeholder="e.g. Senior Operations Manager"
             {...register("headline")}
           />
           {errors.headline?.message && (
@@ -127,7 +148,7 @@ export const PersonalStep = ({
           <label className={labelClass}>PHONE (MANDATORY)</label>
           <input
             className={inputClass}
-            placeholder="+971 50 000 0000"
+            placeholder="+971 50 123 4567"
             {...register("phone")}
           />
         </div>
@@ -137,7 +158,7 @@ export const PersonalStep = ({
           <input
             className={inputClass}
             type="email"
-            placeholder="your@email.com"
+            placeholder="yourname@email.com"
             {...register("email")}
           />
           {errors.email?.message && (
@@ -177,7 +198,7 @@ export const PersonalStep = ({
               <label className={labelClass}>WEBSITE</label>
               <input
                 className={inputClass}
-                placeholder="yourwebsite.com"
+                placeholder="www.yourportfolio.com"
                 {...register("website")}
               />
             </div>
@@ -185,7 +206,7 @@ export const PersonalStep = ({
               <label className={labelClass}>NATIONALITY</label>
               <input
                 className={inputClass}
-                placeholder="e.g. Emirati, Pakistani"
+                placeholder="e.g. Emirati, Pakistani, Indian"
                 {...register("nationality")}
               />
             </div>
@@ -201,7 +222,7 @@ export const PersonalStep = ({
               <label className={labelClass}>DATE OF BIRTH</label>
               <input
                 className={inputClass}
-                placeholder="DD/MM/YYYY"
+                placeholder="e.g. 15/03/1990"
                 {...register("dateOfBirth")}
               />
             </div>
@@ -209,7 +230,7 @@ export const PersonalStep = ({
               <label className={labelClass}>DRIVING LICENSE</label>
               <input
                 className={inputClass}
-                placeholder="e.g. UAE Light Vehicle"
+                placeholder="e.g. UAE Light Vehicle License"
                 {...register("drivingLicense")}
               />
             </div>

@@ -128,7 +128,7 @@ export const SkillsStep = ({
           </span>
         </div>
         <p className="mt-2 text-sm text-slate-500">
-          Add key skills and adjust proficiency if needed.
+          Add key skills and adjust proficiency if needed. Aim for 6-10 skills that match the job description.
         </p>
 
         <div className="mt-6 space-y-4">

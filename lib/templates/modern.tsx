@@ -42,13 +42,15 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
 
   return (
     <div className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed">
-      <header className="flex flex-col gap-2 border-b border-slate-200 pb-4">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {name}
-        </h1>
-        <p className="text-sm text-slate-500">
-          {data.personal.headline || "Headline"}
-        </p>
+      <header className="border-b border-slate-200 pb-4">
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+          <div style={{ flex: 1, minWidth: 0 }} className="flex flex-col gap-2">
+            <h1 className="font-display text-3xl font-semibold tracking-tight">
+              {name}
+            </h1>
+            <p className="text-sm text-slate-500">
+              {data.personal.headline || "Headline"}
+            </p>
         {contactItems.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             {contactItems.map((item, index) =>
@@ -67,6 +69,32 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
             )}
           </div>
         )}
+          </div>
+          {data.personal.photo && data.personal.showPhoto && (
+            <div
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                overflow: "hidden",
+                flexShrink: 0,
+                border: "2px solid #e2e8f0",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={data.personal.photo}
+                alt={`${data.personal.firstName} ${data.personal.lastName}`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="mt-6 grid gap-8 md:grid-cols-[2fr_1fr]">

@@ -195,7 +195,7 @@ export const EducationStep = ({
         )}
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Include graduation dates or expected completion.
+          ATS tip: Include graduation dates. If your degree was earned outside the UAE, note whether it has been attested by MOFA or the relevant emirate authority.
         </div>
       </section>
 

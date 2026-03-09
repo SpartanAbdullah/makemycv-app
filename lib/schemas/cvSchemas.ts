@@ -10,6 +10,12 @@ export const personalSchema = z.object({
   website: z.string().optional().or(z.literal("")),
   linkedin: z.string().optional().or(z.literal("")),
   summary: z.string().optional().or(z.literal("")),
+  photo: z.string().optional(),
+  showPhoto: z.boolean().optional(),
+  nationality: z.string().optional(),
+  country: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  drivingLicense: z.string().optional(),
 });
 
 export const summarySchema = z.object({

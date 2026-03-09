@@ -130,7 +130,7 @@ export const CertificationsStep = ({
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Prioritize certs earned within the last 3-5 years.
+          ATS tip: Prioritize certs earned within the last 3-5 years. UAE employers value PMP, NEBOSH, CFA, CPA, and CIPD certifications.
         </div>
       </section>
 

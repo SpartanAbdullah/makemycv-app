@@ -302,7 +302,7 @@ export const ExperienceStep = ({
         )}
 
         <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          ATS tip: Lead each bullet with an action verb and quantify impact.
+          ATS tip: Lead each bullet with an action verb (Led, Managed, Delivered) and quantify impact (%, AED, headcount). UAE recruiters scan for measurable results.
         </div>
       </section>
 
