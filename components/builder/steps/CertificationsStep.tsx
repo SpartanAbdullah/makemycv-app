@@ -81,7 +81,7 @@ export const CertificationsStep = ({
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-2xl font-bold">Certifications</h2>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
             Optional
           </span>
         </div>
@@ -109,8 +109,9 @@ export const CertificationsStep = ({
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  className="text-xs text-red-500"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-all duration-200"
                 >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                   Remove
                 </button>
               </div>

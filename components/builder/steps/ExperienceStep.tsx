@@ -157,8 +157,9 @@ export const ExperienceStep = ({
               <button
                 type="button"
                 onClick={handleAddRole}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 text-sm font-semibold hover:border-[#2563eb] hover:text-[#2563eb] hover:bg-blue-50 active:bg-blue-100 transition-all duration-200 cursor-pointer group"
               >
+                <svg className="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                 Add Employment
               </button>
             }
@@ -201,8 +202,9 @@ export const ExperienceStep = ({
                           <button
                             type="button"
                             onClick={() => remove(index)}
-                            className="text-xs text-red-500"
+                            className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-all duration-200"
                           >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                             Remove
                           </button>
                         )}
@@ -259,8 +261,9 @@ export const ExperienceStep = ({
                               <button
                                 type="button"
                                 onClick={() => removeBullet(index, bulletIndex)}
-                                className="text-xs text-red-500"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-all duration-200"
                               >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                 Remove
                               </button>
                             </div>

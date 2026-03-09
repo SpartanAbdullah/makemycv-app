@@ -26,11 +26,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://api.anthropic.com https://vitals.vercel-insights.com",
+              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

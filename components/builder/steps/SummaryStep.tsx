@@ -79,7 +79,7 @@ export const SummaryStep = ({
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-2xl font-bold">Tell Us About Yourself</h2>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
             Optional
           </span>
         </div>

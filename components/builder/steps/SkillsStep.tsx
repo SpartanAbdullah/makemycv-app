@@ -11,9 +11,6 @@ import { TagInput } from "../../forms/TagInput";
 import { NavigationButtons } from "../NavigationButtons";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
-const inputClass =
-  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
-
 type SkillsForm = { skills: CvSkill[] };
 
 const toSkillLevel = (value: string): SkillLevel => {
@@ -40,14 +37,13 @@ export const SkillsStep = ({
     control,
     watch,
     reset,
-    register,
     formState: { errors, isDirty },
   } = useForm<SkillsForm>({
     resolver: zodResolver(skillsSchema),
     defaultValues: { skills },
   });
 
-  const { fields, replace, remove } = useFieldArray({
+  const { fields, replace } = useFieldArray({
     control,
     name: "skills",
     keyName: "fieldKey",
@@ -113,9 +109,11 @@ export const SkillsStep = ({
     replace(next);
   };
 
-  const removeSkill = (id: string) => {
-    const index = fields.findIndex((skill) => skill.id === id);
-    if (index !== -1) remove(index);
+  const removeSkillByIndex = (indexToRemove: number) => {
+    const updated = fields
+      .filter((_, i) => i !== indexToRemove)
+      .map((f) => ({ id: f.id, name: f.name, level: toSkillLevel(f.level ?? "intermediate") }));
+    replace(updated);
   };
 
   return (
@@ -140,27 +138,22 @@ export const SkillsStep = ({
             />
           </Field>
 
-          <div className="space-y-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
-                <input
-                  className={inputClass}
-                  {...register(`skills.${index}.name`)}
-                />
-                <select
-                  className={inputClass}
-                  {...register(`skills.${index}.level`, { setValueAs: toSkillLevel })}
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
+              <div
+                key={field.id}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors duration-150 group"
+              >
+                <span>{field.name}</span>
                 <button
                   type="button"
-                  onClick={() => removeSkill(field.id)}
-                  className="text-xs text-red-500"
+                  onClick={() => removeSkillByIndex(index)}
+                  aria-label={`Remove ${field.name}`}
+                  className="flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:bg-blue-200 hover:text-blue-700 transition-colors duration-150 flex-shrink-0"
                 >
-                  Remove
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
                 </button>
               </div>
             ))}

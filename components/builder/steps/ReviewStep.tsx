@@ -6,6 +6,7 @@ import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
 import { exportToDocx } from "../../../lib/utils/docxExport";
+import { exportCvToPdf } from "../../../lib/utils/pdfExport";
 import { templates } from "../../../lib/templates";
 
 export const ReviewStep = ({
@@ -19,9 +20,29 @@ export const ReviewStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const currentTemplateId = data.settings.templateId;
   const [isPro] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const handleExportDocx = () => exportToDocx(data);
-  const handleDownloadPdf = () => window.print();
+  const handleDownloadPdf = async () => {
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      const firstName = data?.personal?.firstName ?? "my";
+      const lastName = data?.personal?.lastName ?? "cv";
+      const filename = `${firstName}-${lastName}-cv.pdf`
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+      await exportCvToPdf("cv-preview-root", filename);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      setDownloadError(
+        "PDF export failed. Please try again or use Export as Word instead."
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleTemplateChange = (id: string) => {
     updateSection("settings", { ...data.settings, templateId: id });
@@ -65,10 +86,28 @@ export const ReviewStep = ({
         <button
           type="button"
           onClick={handleDownloadPdf}
-          className="print-hide w-full bg-[#2563eb] text-white font-bold text-base py-4 rounded-xl hover:bg-blue-700 transition-colors"
+          disabled={isDownloading}
+          className="w-full flex items-center justify-center gap-2 bg-[#2563eb] hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-base py-4 rounded-xl transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:shadow-blue-200"
         >
-          {"\u2B07"} Download PDF
+          {isDownloading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Preparing PDF...
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download CV as PDF
+            </>
+          )}
         </button>
+        {downloadError && (
+          <p className="text-xs text-red-500 text-center mt-2">{downloadError}</p>
+        )}
         <button
           type="button"
           onClick={handleExportDocx}

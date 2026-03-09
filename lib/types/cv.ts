@@ -38,6 +38,8 @@ export type CvEducation = {
   startDate: string;
   endDate: string;
   notes?: string;
+  attested?: boolean;
+  attestingBody?: string;
 };
 
 export type CvSkill = {

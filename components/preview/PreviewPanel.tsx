@@ -33,7 +33,9 @@ export const PreviewPanel = ({
 
   return (
     <div className={`w-full ${sticky ? "lg:sticky lg:top-6" : ""}`}>
-      <template.Render data={data} />
+      <div id="cv-preview-root">
+        <template.Render data={data} />
+      </div>
     </div>
   );
 };

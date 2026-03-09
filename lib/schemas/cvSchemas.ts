@@ -50,6 +50,8 @@ export const educationSchema = z.object({
         startDate: z.string().min(1, "Start date is required"),
         endDate: z.string().optional().or(z.literal("")),
         notes: z.string().optional().or(z.literal("")),
+        attested: z.boolean().optional(),
+        attestingBody: z.string().optional(),
       })
     )
     .min(1, "Add at least one entry"),
