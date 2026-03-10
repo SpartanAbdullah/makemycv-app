@@ -11,10 +11,10 @@ export const Field = ({
   error?: string;
   children: ReactNode;
 }) => (
-  <label className="flex flex-col gap-1 text-sm">
-    <span className="text-slate-700 font-medium">{label}</span>
+  <label className="cv-field" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <span className="cv-label">{label}</span>
     {children}
-    {hint && <span className="text-xs text-slate-400">{hint}</span>}
-    {error && <span className="text-xs text-red-500">{error}</span>}
+    {hint && <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{hint}</span>}
+    {error && <span style={{ fontSize: 12, color: "var(--status-error)" }}>{error}</span>}
   </label>
 );

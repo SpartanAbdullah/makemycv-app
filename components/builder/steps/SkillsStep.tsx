@@ -118,14 +118,12 @@ export const SkillsStep = ({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold">Skills</h2>
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700">
-            Required
-          </span>
+      <section className="cv-step-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 className="cv-step-heading">Skills</h2>
+          <span className="cv-badge-required">Required</span>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="cv-step-subtitle">
           Add key skills and adjust proficiency if needed. Aim for 6-10 skills that match the job description.
         </p>
 
@@ -140,16 +138,13 @@ export const SkillsStep = ({
 
           <div className="flex flex-wrap gap-2 mt-3">
             {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors duration-150 group"
-              >
+              <div key={field.id} className="cv-skill-chip">
                 <span>{field.name}</span>
                 <button
                   type="button"
                   onClick={() => removeSkillByIndex(index)}
                   aria-label={`Remove ${field.name}`}
-                  className="flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:bg-blue-200 hover:text-blue-700 transition-colors duration-150 flex-shrink-0"
+                  className="cv-skill-chip-remove"
                 >
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                     <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -160,11 +155,11 @@ export const SkillsStep = ({
           </div>
 
           {errors.skills?.message && (
-            <p className="text-xs text-red-500">{errors.skills?.message}</p>
+            <p style={{ fontSize: 12, color: "var(--status-error)" }}>{errors.skills?.message}</p>
           )}
         </div>
 
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+        <div className="cv-tip-box" style={{ marginTop: 16 }}>
           ATS tip: Keep skill names consistent with job descriptions.
         </div>
       </section>

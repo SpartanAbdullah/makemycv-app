@@ -54,25 +54,40 @@ export const ReviewStep = ({
 
   return (
     <div className="space-y-6">
-      {/* Section 1 — Completion header */}
+      {/* Heading */}
       <div>
-        <h2 className="font-bold text-3xl text-slate-800">Your CV is ready.</h2>
-        <p className="text-sm text-slate-500 mt-2">
+        <h2 className="cv-step-heading">Your CV is ready.</h2>
+        <p className="cv-step-subtitle">
           Review it on the right, then download or export below.
         </p>
       </div>
 
       {/* Missing sections warning */}
       {incomplete.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">Missing sections</p>
+        <div style={{
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid #FDE68A",
+          background: "#FFFBEB",
+          padding: 16,
+        }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>Missing sections</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {incomplete.map((step) => (
               <button
                 key={step.id}
                 type="button"
                 onClick={() => onJump(step.id)}
-                className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                style={{
+                  borderRadius: 20,
+                  border: "1px solid #FDE68A",
+                  background: "white",
+                  padding: "4px 12px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#92400E",
+                  cursor: "pointer",
+                  transition: "background var(--transition-fast)",
+                }}
               >
                 {step.title}
               </button>
@@ -81,17 +96,25 @@ export const ReviewStep = ({
         </div>
       )}
 
-      {/* Section 2 — Download Actions */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      {/* Download Actions */}
+      <div className="cv-step-card">
         <button
           type="button"
           onClick={handleDownloadPdf}
           disabled={isDownloading}
-          className="w-full flex items-center justify-center gap-2 bg-[#2563eb] hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-base py-4 rounded-xl transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:shadow-blue-200"
+          className="cv-btn-primary"
+          style={{ width: "100%", padding: "16px 24px", fontSize: 15 }}
         >
           {isDownloading ? (
             <>
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span style={{
+                width: 16, height: 16,
+                border: "2px solid white",
+                borderTopColor: "transparent",
+                borderRadius: "50%",
+                display: "inline-block",
+                animation: "spin 1s linear infinite",
+              }} />
               Preparing PDF...
             </>
           ) : (
@@ -106,23 +129,24 @@ export const ReviewStep = ({
           )}
         </button>
         {downloadError && (
-          <p className="text-xs text-red-500 text-center mt-2">{downloadError}</p>
+          <p style={{ fontSize: 12, color: "var(--status-error)", textAlign: "center", marginTop: 8 }}>{downloadError}</p>
         )}
         <button
           type="button"
           onClick={handleExportDocx}
-          className="mt-3 w-full border border-slate-300 bg-white text-slate-700 font-semibold text-base py-3.5 rounded-xl hover:bg-slate-50 transition-colors"
+          className="cv-btn-secondary"
+          style={{ width: "100%", marginTop: 12, padding: "14px 24px", fontSize: 15 }}
         >
           {"\uD83D\uDCC4"} Export as Word (.docx)
         </button>
-        <p className="text-xs text-slate-400 text-center mt-3">
+        <p style={{ fontSize: 12, color: "var(--text-faint)", textAlign: "center", marginTop: 12 }}>
           PDF is best for job applications. DOCX is editable.
         </p>
       </div>
 
-      {/* Section 3 — Template Selector */}
+      {/* Template Selector */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3 mt-6">
+        <p className="cv-label" style={{ marginBottom: 12, marginTop: 24 }}>
           Choose Template
         </p>
         <div className="flex flex-row gap-3">
@@ -131,36 +155,54 @@ export const ReviewStep = ({
               key={tmpl.id}
               type="button"
               onClick={() => handleTemplateChange(tmpl.id)}
-              className={`rounded-xl border-2 cursor-pointer p-3 text-center transition-all w-full ${
-                currentTemplateId === tmpl.id
-                  ? "border-[#2563eb] bg-blue-50"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
+              className="cv-entry-card"
+              style={{
+                padding: 12,
+                textAlign: "center" as const,
+                cursor: "pointer",
+                width: "100%",
+                borderWidth: 2,
+                borderColor: currentTemplateId === tmpl.id ? "var(--brand-primary)" : undefined,
+                background: currentTemplateId === tmpl.id ? "var(--brand-primary-s)" : undefined,
+              }}
             >
               <tmpl.Thumbnail />
-              <p className="text-sm font-semibold text-slate-700 mt-2">{tmpl.name}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{tmpl.description}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", marginTop: 8 }}>{tmpl.name}</p>
+              <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{tmpl.description}</p>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Section 4 — Pro Plan Gate */}
+      {/* Pro Plan Gate */}
       {!isPro && (
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 p-6">
+        <div style={{
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-soft)",
+          background: "linear-gradient(135deg, var(--surface-sunken), var(--brand-primary-s))",
+          padding: 24,
+        }}>
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-full bg-[#2563eb]/10 flex items-center justify-center">
-              <span className="text-[#2563eb] text-sm font-bold">P</span>
+            <div style={{
+              flexShrink: 0,
+              marginTop: 2,
+              width: 32, height: 32,
+              borderRadius: "50%",
+              background: "rgba(79,70,229,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <span style={{ color: "var(--brand-primary)", fontSize: 14, fontWeight: 700 }}>P</span>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-slate-800">Upgrade to Pro</p>
-              <p className="text-xs text-slate-500 mt-1">
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>Upgrade to Pro</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
                 Remove the watermark, unlock all templates, and export
                 unlimited CVs with priority support.
               </p>
               <button
                 type="button"
-                className="mt-3 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                className="cv-btn-primary"
+                style={{ marginTop: 12, fontSize: 12, padding: "8px 16px" }}
               >
                 Coming Soon
               </button>

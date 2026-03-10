@@ -3,8 +3,8 @@
 export const NavigationButtons = ({
   onBack,
   onNext,
-  backLabel = "Back",
-  nextLabel = "Next",
+  backLabel = "← Back",
+  nextLabel = "Continue →",
   disableNext,
   showSkip,
   onSkip,
@@ -17,33 +17,43 @@ export const NavigationButtons = ({
   showSkip?: boolean;
   onSkip?: () => void;
 }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3">
-    <div className="flex gap-2">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-slate-200 bg-white px-5 py-3.5 text-base font-medium"
-        >
-          {backLabel}
-        </button>
-      )}
-      {showSkip && (
-        <button
-          type="button"
-          onClick={onSkip}
-          className="rounded-full border border-slate-200 bg-white px-5 py-3.5 text-base font-medium text-slate-500"
-        >
-          Skip for now
-        </button>
-      )}
-    </div>
+  <div
+    style={{
+      display: "flex",
+      gap: 12,
+      marginTop: 32,
+      paddingTop: 24,
+      borderTop: "1px solid var(--border-soft)",
+      alignItems: "center",
+    }}
+  >
+    {onBack && (
+      <button
+        type="button"
+        onClick={onBack}
+        className="cv-btn-secondary"
+        style={{ flexShrink: 0 }}
+      >
+        {backLabel}
+      </button>
+    )}
+    {showSkip && onSkip && (
+      <button
+        type="button"
+        onClick={onSkip}
+        className="cv-btn-secondary"
+        style={{ flexShrink: 0, color: "var(--text-muted)" }}
+      >
+        Skip for now
+      </button>
+    )}
     {onNext && (
       <button
         type="button"
         onClick={onNext}
         disabled={disableNext}
-        className="rounded-full bg-[#2563eb] px-8 py-3.5 text-base font-bold text-white min-w-[200px] text-center disabled:cursor-not-allowed disabled:bg-slate-400"
+        className="cv-btn-primary"
+        style={{ flex: 1, padding: "14px 24px", fontSize: 15 }}
       >
         {nextLabel}
       </button>

@@ -9,12 +9,6 @@ import { NavigationButtons } from "../NavigationButtons";
 import { PhotoUpload } from "../PhotoUpload";
 import type { CvPersonal } from "../../../lib/types/cv";
 
-const inputClass =
-  "cv-input w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all";
-
-const labelClass =
-  "block mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500";
-
 export const PersonalStep = ({
   onNext,
 }: {
@@ -78,17 +72,17 @@ export const PersonalStep = ({
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       {/* Heading */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-800">
+        <h1 className="cv-step-heading">
           Please enter your{" "}
-          <span className="text-[#2563eb]">contact</span> info
+          <span className="accent">contact</span> info
         </h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="cv-step-subtitle">
           Add your phone number and email so recruiters can reach you.
         </p>
       </div>
 
       {/* Photo upload */}
-      <div className="pb-6 border-b border-slate-200 mb-2">
+      <div style={{ paddingBottom: 24, borderBottom: "1px solid var(--border-soft)", marginBottom: 8 }}>
         <PhotoUpload
           photo={personal.photo}
           showPhoto={personal.showPhoto}
@@ -100,69 +94,69 @@ export const PersonalStep = ({
       {/* Core fields */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>FIRST NAME (MANDATORY)</label>
+          <label className="cv-label">FIRST NAME (MANDATORY)</label>
           <input
-            className={inputClass}
+            className="cv-input"
             placeholder="e.g. Muhammad"
             {...register("firstName")}
           />
           {errors.firstName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
+            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.firstName.message}</p>
           )}
         </div>
 
         <div>
-          <label className={labelClass}>LAST NAME (MANDATORY)</label>
+          <label className="cv-label">LAST NAME (MANDATORY)</label>
           <input
-            className={inputClass}
+            className="cv-input"
             placeholder="e.g. Al-Rashidi"
             {...register("lastName")}
           />
           {errors.lastName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
+            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.lastName.message}</p>
           )}
         </div>
 
         <div>
-          <label className={labelClass}>CITY</label>
+          <label className="cv-label">CITY</label>
           <input
-            className={inputClass}
+            className="cv-input"
             placeholder="e.g. Dubai, UAE"
             {...register("location")}
           />
         </div>
 
         <div>
-          <label className={labelClass}>HEADLINE / JOB TITLE</label>
+          <label className="cv-label">HEADLINE / JOB TITLE</label>
           <input
-            className={inputClass}
+            className="cv-input"
             placeholder="e.g. Senior Operations Manager"
             {...register("headline")}
           />
           {errors.headline?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.headline.message}</p>
+            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.headline.message}</p>
           )}
         </div>
 
         <div>
-          <label className={labelClass}>PHONE (MANDATORY)</label>
+          <label className="cv-label">PHONE (MANDATORY)</label>
           <input
-            className={inputClass}
+            className="cv-input"
             placeholder="+971 50 123 4567"
             {...register("phone")}
           />
         </div>
 
         <div>
-          <label className={labelClass}>EMAIL (MANDATORY)</label>
+          <label className="cv-label">EMAIL (MANDATORY)</label>
           <input
-            className={inputClass}
+            className="cv-input"
             type="email"
             placeholder="yourname@email.com"
             {...register("email")}
           />
           {errors.email?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.email.message}</p>
           )}
         </div>
       </div>
@@ -172,12 +166,26 @@ export const PersonalStep = ({
         <button
           type="button"
           onClick={() => setShowMore((v) => !v)}
-          className="flex items-center gap-1.5 text-sm font-semibold text-[#2563eb] hover:text-blue-700 transition-colors"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--brand-primary)",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+            transition: "color var(--transition-fast)",
+          }}
         >
           <span
-            className={`inline-block transition-transform ${
-              showMore ? "rotate-45" : ""
-            }`}
+            style={{
+              display: "inline-block",
+              transition: "transform var(--transition-fast)",
+              transform: showMore ? "rotate(45deg)" : "none",
+            }}
           >
             +
           </span>
@@ -187,49 +195,49 @@ export const PersonalStep = ({
         {showMore && (
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>LINKEDIN</label>
+              <label className="cv-label">LINKEDIN</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="linkedin.com/in/yourname"
                 {...register("linkedin")}
               />
             </div>
             <div>
-              <label className={labelClass}>WEBSITE</label>
+              <label className="cv-label">WEBSITE</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="www.yourportfolio.com"
                 {...register("website")}
               />
             </div>
             <div>
-              <label className={labelClass}>NATIONALITY</label>
+              <label className="cv-label">NATIONALITY</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="e.g. Emirati, Pakistani, Indian"
                 {...register("nationality")}
               />
             </div>
             <div>
-              <label className={labelClass}>COUNTRY</label>
+              <label className="cv-label">COUNTRY</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="e.g. United Arab Emirates"
                 {...register("country")}
               />
             </div>
             <div>
-              <label className={labelClass}>DATE OF BIRTH</label>
+              <label className="cv-label">DATE OF BIRTH</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="e.g. 15/03/1990"
                 {...register("dateOfBirth")}
               />
             </div>
             <div>
-              <label className={labelClass}>DRIVING LICENSE</label>
+              <label className="cv-label">DRIVING LICENSE</label>
               <input
-                className={inputClass}
+                className="cv-input"
                 placeholder="e.g. UAE Light Vehicle License"
                 {...register("drivingLicense")}
               />
@@ -239,14 +247,13 @@ export const PersonalStep = ({
       </div>
 
       {/* ATS tip */}
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-xs text-slate-500">
+      <div className="cv-tip-box">
         ATS tip: Match the contact details you use on job applications.
       </div>
 
       {/* Navigation */}
       <NavigationButtons
         onNext={handleSubmit(onNext)}
-        nextLabel="Next to Experience &rarr;"
       />
     </form>
   );

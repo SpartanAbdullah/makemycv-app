@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 
 const sora = localFont({
   src: [
@@ -18,6 +19,19 @@ const fraunces = localFont({
   ],
   variable: "--font-fraunces",
   display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+  display: "swap",
+  weight: ["500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -114,8 +128,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sora.variable} ${fraunces.variable}`}>
-      <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
+    <html lang="en" className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable}`}>
+      <body className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} antialiased`}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

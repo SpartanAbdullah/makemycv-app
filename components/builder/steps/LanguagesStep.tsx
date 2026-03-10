@@ -9,9 +9,6 @@ import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import type { CvLanguage } from "../../../lib/types/cv";
 
-const inputClass =
-  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
-
 type LanguagesForm = { languages: CvLanguage[] };
 
 export const LanguagesStep = ({
@@ -79,14 +76,12 @@ export const LanguagesStep = ({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold">Languages</h2>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-            Optional
-          </span>
+      <section className="cv-step-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 className="cv-step-heading">Languages</h2>
+          <span className="cv-badge-optional">Optional</span>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="cv-step-subtitle">
           Add languages and proficiency levels.
         </p>
 
@@ -96,18 +91,19 @@ export const LanguagesStep = ({
             onClick={() =>
               append({ id: crypto.randomUUID(), name: "", level: "intermediate" })
             }
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs"
+            className="cv-btn-ghost"
           >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
             Add language
           </button>
 
           {fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
               <Field label="Language">
-                <input className={inputClass} placeholder="e.g. Arabic" {...register(`languages.${index}.name`)} />
+                <input className="cv-input" placeholder="e.g. Arabic" {...register(`languages.${index}.name`)} />
               </Field>
               <Field label="Level">
-                <select className={inputClass} {...register(`languages.${index}.level`)}>
+                <select className="cv-select" {...register(`languages.${index}.level`)}>
                   <option value="" disabled>Select level</option>
                   <option value="beginner">Beginner</option>
                   <option value="intermediate">Intermediate</option>
@@ -117,7 +113,8 @@ export const LanguagesStep = ({
               <button
                 type="button"
                 onClick={() => remove(index)}
-                className="flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg mx-auto mt-2 bg-red-50 text-red-500 border border-red-200 text-xs font-semibold hover:bg-red-100 hover:text-red-700 hover:border-red-300 active:bg-red-200 transition-all duration-200 cursor-pointer self-end"
+                className="cv-btn-danger self-end"
+                style={{ marginTop: 8 }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 Remove
@@ -126,7 +123,7 @@ export const LanguagesStep = ({
           ))}
         </div>
 
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+        <div className="cv-tip-box" style={{ marginTop: 16 }}>
           ATS tip: Use standard proficiency labels. Arabic and English are highly valued in the UAE — list both if applicable.
         </div>
       </section>

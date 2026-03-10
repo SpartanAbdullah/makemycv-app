@@ -8,9 +8,6 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 
-const inputClass =
-  "cv-input rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]";
-
 type SummaryForm = { summary: string };
 
 export const SummaryStep = ({
@@ -76,14 +73,12 @@ export const SummaryStep = ({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold">Tell Us About Yourself</h2>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
-            Optional
-          </span>
+      <section className="cv-step-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 className="cv-step-heading">Tell Us About Yourself</h2>
+          <span className="cv-badge-optional">Optional</span>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="cv-step-subtitle">
           Write a short professional summary that highlights your strengths and career goals. This appears at the top of your CV.
         </p>
 
@@ -91,14 +86,14 @@ export const SummaryStep = ({
           <Field label="Summary" error={errors.summary?.message}>
             <textarea
               rows={6}
-              className={inputClass}
+              className="cv-input cv-textarea"
               placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
               {...register("summary")}
             />
           </Field>
         </div>
 
-        <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+        <div className="cv-tip-box" style={{ marginTop: 16 }}>
           ATS tip: Aim for 2-3 short sentences. Include keywords from the job description — recruiters in the UAE often use automated screening.
         </div>
       </section>
