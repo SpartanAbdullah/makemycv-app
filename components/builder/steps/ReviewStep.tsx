@@ -6,7 +6,7 @@ import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
 import { exportToDocx } from "../../../lib/utils/docxExport";
-import { exportCvToPdf } from "../../../lib/utils/pdfExport";
+import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
 
 export const ReviewStep = ({
@@ -28,17 +28,9 @@ export const ReviewStep = ({
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      const firstName = data?.personal?.firstName ?? "my";
-      const lastName = data?.personal?.lastName ?? "cv";
-      const filename = `${firstName}-${lastName}-cv.pdf`
-        .toLowerCase()
-        .replace(/\s+/g, "-");
-      await exportCvToPdf("cv-preview-root", filename);
-    } catch (err) {
-      console.error("PDF export failed:", err);
-      setDownloadError(
-        "PDF export failed. Please try again or use Export as Word instead."
-      );
+      await downloadCV(data, isPro ? "pro" : "free");
+    } catch {
+      setDownloadError("pdf-failed");
     } finally {
       setIsDownloading(false);
     }
@@ -128,8 +120,18 @@ export const ReviewStep = ({
             </>
           )}
         </button>
-        {downloadError && (
-          <p style={{ fontSize: 12, color: "var(--status-error)", textAlign: "center", marginTop: 8 }}>{downloadError}</p>
+        {downloadError === "pdf-failed" && (
+          <div style={{
+            marginTop: 12,
+            padding: "12px 16px",
+            borderRadius: "var(--radius-md)",
+            background: "#FEF2F2",
+            border: "1px solid #FECACA",
+          }}>
+            <p style={{ fontSize: 13, color: "#B91C1C", fontWeight: 500 }}>
+              PDF download failed. Please try again or export as Word below.
+            </p>
+          </div>
         )}
         <button
           type="button"

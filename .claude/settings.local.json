@@ -4,7 +4,9 @@
       "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site//**)",
       "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site/app/**)",
       "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site/**)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app -name pdfExport* -o -name *pdf* -type f)",
+      "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib -name *.ts -o -name *.tsx)"
     ]
   }
 }

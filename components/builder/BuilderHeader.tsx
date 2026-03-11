@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { LINKEDIN_IMPORT_ENABLED } from "../../lib/importers/linkedinAdapter";
+import { useCvStore } from "../../lib/store/cvStore";
+import { downloadCV } from "../../hooks/useDownloadCV";
 
 type ImportType = "pdf" | "docx" | "linkedin";
 
@@ -145,12 +147,16 @@ export const BuilderHeader = ({
           </button>
 
           {/* Export PDF */}
-          <Link
-            href="/preview?print=1&autoprint=1"
+          <button
+            type="button"
+            onClick={() => {
+              const data = useCvStore.getState().data;
+              downloadCV(data, "free").catch(() => {});
+            }}
             className="rounded-full bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
           >
             Export PDF
-          </Link>
+          </button>
         </div>
       </div>
 
