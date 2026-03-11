@@ -45,31 +45,66 @@ const formatLanguage = (name: string, level?: string) => {
   return `${toTitleCase(name)}${prettyLevel ? ` (${prettyLevel})` : ""}`;
 };
 
-const shortenUrl = (value: string) =>
-  value
+/** Smart URL shortening matching Classic template logic */
+const shortenDisplayUrl = (value: string) => {
+  const cleaned = value
     .trim()
     .replace(/^https?:\/\//i, "")
     .replace(/^www\./i, "")
     .replace(/[?#].*$/, "")
     .replace(/\/+$/, "");
+  if (!cleaned) return value.trim();
 
-/* ─── Styles ──────────────────────────────────────────────── */
+  const [domain, ...pathParts] = cleaned.split("/");
+  if (pathParts.length === 0) return domain;
+
+  const maxSegments = domain.toLowerCase().includes("linkedin.com") ? 2 : 1;
+  const kept = pathParts.filter(Boolean).slice(0, maxSegments);
+  return kept.length > 0 ? `${domain}/${kept.join("/")}` : domain;
+};
+
+const shouldShowProjectLink = (value?: string) => {
+  const normalized = value?.trim();
+  if (!normalized) return false;
+  return normalized.toLowerCase() !== "no link was pasted";
+};
+
+/* ─── Colors (from Classic template slate palette) ────────── */
 
 const SLATE_900 = "#0F172A";
 const SLATE_800 = "#1E293B";
 const SLATE_700 = "#334155";
+const SLATE_600 = "#475569";
 const SLATE_500 = "#64748B";
+const SLATE_400 = "#94A3B8";
 const SLATE_300 = "#CBD5E1";
 const SLATE_200 = "#E2E8F0";
 
+/* ─── Styles ──────────────────────────────────────────────── */
+/*
+ * Font-size conversion: Classic uses CSS px (96 DPI),
+ * @react-pdf uses pt (72 DPI). Factor: pt = px × 0.75
+ *
+ * Classic 30px  → 22.5pt  (name)
+ * Classic 15px  → 11.25pt (headline)
+ * Classic 12.5px → 9.4pt  (section headings)
+ * Classic 12px  → 9pt     (entry title / company)
+ * Classic 11.5px → 8.6pt  (body, bullets, certs)
+ * Classic 11px  → 8.25pt  (dates, contact, subtext)
+ *
+ * Spacing: Classic px-10 = 40px → 30pt, py-12 = 48px → 36pt
+ * mt-6 = 24px → 18pt, space-y-3 = 12px → 9pt, pb-1 = 4px → 3pt
+ * pl-4 = 16px → 12pt, space-y-1 = 4px → 3pt
+ */
+
 const s = StyleSheet.create({
   page: {
-    paddingTop: 40,
-    paddingBottom: 40,
-    paddingLeft: 50,
-    paddingRight: 50,
+    paddingTop: 36,
+    paddingBottom: 36,
+    paddingLeft: 30,
+    paddingRight: 30,
     fontFamily: "Helvetica",
-    fontSize: 9.5,
+    fontSize: 8.6,
     lineHeight: 1.45,
     color: SLATE_700,
   },
@@ -81,37 +116,37 @@ const s = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: SLATE_200,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
   headerLeft: { flex: 1 },
   name: {
-    fontSize: 22,
+    fontSize: 22.5,
     fontFamily: "Helvetica-Bold",
     color: SLATE_900,
     letterSpacing: -0.5,
   },
   headline: {
-    fontSize: 12,
-    color: SLATE_700,
+    fontSize: 11.25,
+    color: SLATE_600,
     marginTop: 2,
   },
   contactRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 4,
-    marginTop: 6,
+    marginTop: 5,
   },
   contactItem: {
-    fontSize: 8.5,
+    fontSize: 8.25,
     color: SLATE_500,
   },
   contactSep: {
-    fontSize: 8.5,
+    fontSize: 8.25,
     color: SLATE_300,
     marginHorizontal: 2,
   },
   contactLink: {
-    fontSize: 8.5,
+    fontSize: 8.25,
     color: SLATE_500,
     textDecoration: "none",
   },
@@ -120,23 +155,25 @@ const s = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     objectFit: "cover",
+    borderWidth: 1.5,
+    borderColor: SLATE_200,
   },
 
   /* Sections */
-  section: { marginTop: 14 },
+  section: { marginTop: 18 },
   sectionHeadingWrap: {
     borderBottomWidth: 1,
     borderBottomColor: SLATE_200,
-    paddingBottom: 2,
+    paddingBottom: 3,
     marginBottom: 6,
   },
   sectionHeading: {
-    fontSize: 10.5,
+    fontSize: 9.4,
     fontFamily: "Helvetica-Bold",
     color: SLATE_800,
   },
   body: {
-    fontSize: 9.5,
+    fontSize: 8.6,
     lineHeight: 1.45,
     color: SLATE_700,
   },
@@ -146,46 +183,46 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 8,
+    gap: 6,
   },
   entryTitle: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: SLATE_800,
   },
   entryCompany: {
-    fontSize: 10,
+    fontSize: 9,
     color: SLATE_700,
   },
   entryDate: {
-    fontSize: 9,
+    fontSize: 8.25,
     color: SLATE_500,
     textAlign: "right",
     flexShrink: 0,
   },
   entrySubtext: {
-    fontSize: 9,
+    fontSize: 8.25,
     color: SLATE_500,
     marginTop: 1,
   },
   entryBlock: {
-    marginBottom: 8,
+    marginBottom: 9,
   },
 
   /* Bullet list */
-  bulletList: { marginTop: 3, paddingLeft: 10 },
+  bulletList: { marginTop: 3, paddingLeft: 12 },
   bulletItem: {
     flexDirection: "row",
-    marginBottom: 2,
+    marginBottom: 3,
   },
   bulletDot: {
     width: 10,
-    fontSize: 9.5,
-    color: SLATE_500,
+    fontSize: 8.6,
+    color: SLATE_400,
   },
   bulletText: {
     flex: 1,
-    fontSize: 9.5,
+    fontSize: 8.6,
     lineHeight: 1.45,
     color: SLATE_700,
   },
@@ -193,17 +230,27 @@ const s = StyleSheet.create({
   /* Two-column section (languages + certs) */
   twoCol: {
     flexDirection: "row",
-    gap: 24,
-    marginTop: 14,
+    gap: 18,
+    marginTop: 18,
   },
   twoColItem: { flex: 1 },
 
-  /* Watermark */
-  watermark: {
-    fontSize: 8,
-    color: "#9CA3AF",
-    textAlign: "center",
-    marginTop: 24,
+  /* Watermark — diagonal overlay matching Classic template */
+  watermarkContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  watermarkText: {
+    fontSize: 32,
+    fontFamily: "Helvetica-Bold",
+    color: SLATE_500,
+    opacity: 0.08,
+    transform: "rotate(-28deg)",
   },
 });
 
@@ -227,7 +274,7 @@ export const CVDocument = ({ data, plan = "free" }: Props) => {
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
 
-  // Build contact items
+  // Build contact items (same order as Classic template)
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
   if (data.personal.email?.trim())
@@ -237,9 +284,9 @@ export const CVDocument = ({ data, plan = "free" }: Props) => {
   if (data.personal.location?.trim())
     contacts.push({ text: data.personal.location.trim() });
   if (data.personal.linkedin?.trim())
-    contacts.push({ text: shortenUrl(data.personal.linkedin), href: data.personal.linkedin.trim() });
+    contacts.push({ text: shortenDisplayUrl(data.personal.linkedin), href: data.personal.linkedin.trim() });
   if (data.personal.website?.trim())
-    contacts.push({ text: shortenUrl(data.personal.website), href: data.personal.website.trim() });
+    contacts.push({ text: shortenDisplayUrl(data.personal.website), href: data.personal.website.trim() });
   if (data.personal.nationality?.trim())
     contacts.push({ text: data.personal.nationality.trim() });
   if (data.personal.drivingLicense?.trim())
@@ -252,6 +299,13 @@ export const CVDocument = ({ data, plan = "free" }: Props) => {
   return (
     <Document>
       <Page size="A4" style={s.page}>
+        {/* ── Watermark (free plan — diagonal overlay like Classic) ── */}
+        {plan === "free" && (
+          <View style={s.watermarkContainer} fixed>
+            <Text style={s.watermarkText}>MakeMyCV | Free</Text>
+          </View>
+        )}
+
         {/* ── Header ── */}
         <View style={s.headerRow}>
           <View style={s.headerLeft}>
@@ -424,15 +478,16 @@ export const CVDocument = ({ data, plan = "free" }: Props) => {
               const bullets = (project.bullets ?? [])
                 .map((b) => b.trim())
                 .filter(Boolean);
+              const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
                   <View style={{ flexDirection: "row" }}>
                     <Text style={s.entryTitle}>
                       {project.name?.trim() || "Project"}
                     </Text>
-                    {project.link?.trim() && (
+                    {showLink && (
                       <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                        {` | ${project.link.trim()}`}
+                        {` | ${project.link?.trim()}`}
                       </Text>
                     )}
                   </View>
@@ -450,13 +505,6 @@ export const CVDocument = ({ data, plan = "free" }: Props) => {
               );
             })}
           </View>
-        )}
-
-        {/* ── Watermark (free plan only) ── */}
-        {plan === "free" && (
-          <Text style={s.watermark}>
-            Created with MakeMyCV.ae — Free Plan
-          </Text>
         )}
       </Page>
     </Document>
