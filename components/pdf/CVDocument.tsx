@@ -444,9 +444,15 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Header ── */}
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
-          <Text style={s.name}>{name}</Text>
+          <View style={{ marginBottom: 2 }}>
+            <Text style={{ ...s.name, lineHeight: 1 }}>{name}</Text>
+          </View>
           {data.personal.headline?.trim() ? (
-            <Text style={s.headline}>{data.personal.headline.trim()}</Text>
+            <View style={{ marginBottom: 3 }}>
+              <Text style={{ ...s.headline, lineHeight: 1.2 }}>
+                {data.personal.headline.trim()}
+              </Text>
+            </View>
           ) : null}
           {contacts.length > 0 && (
             <View style={s.contactRow}>
@@ -885,10 +891,16 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View>
       {/* ── Header ── */}
-      <View style={{ marginBottom: 4 }}>
-        <Text style={s.atsName}>{name}</Text>
+      <View style={{ flexDirection: "column", alignItems: "flex-start", marginBottom: 6 }}>
+        <View style={{ marginBottom: 6 }}>
+          <Text style={{ ...s.atsName, lineHeight: 1 }}>{name}</Text>
+        </View>
         {data.personal.headline?.trim() ? (
-          <Text style={s.atsHeadline}>{data.personal.headline.trim()}</Text>
+          <View style={{ marginBottom: 4 }}>
+            <Text style={{ ...s.atsHeadline, lineHeight: 1.2 }}>
+              {data.personal.headline.trim()}
+            </Text>
+          </View>
         ) : null}
       </View>
       {contactParts.length > 0 && (
@@ -1057,6 +1069,236 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   MODERN PDF LAYOUT
+   ═══════════════════════════════════════════════════════════ */
+
+const ModernPDFLayout = ({ data }: { data: CvData }) => {
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
+    "Your Name";
+
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasExperience = data.experience.length > 0;
+  const hasEducation = data.education.length > 0;
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasProjects = data.projects.length > 0;
+
+  type ContactItem = { text: string; href?: string };
+  const contacts: ContactItem[] = [];
+  if (data.personal.email?.trim())
+    contacts.push({
+      text: data.personal.email.trim(),
+      href: `mailto:${data.personal.email.trim()}`,
+    });
+  if (data.personal.phone?.trim())
+    contacts.push({
+      text: data.personal.phone.trim(),
+      href: `tel:${data.personal.phone.trim()}`,
+    });
+  if (data.personal.location?.trim())
+    contacts.push({ text: data.personal.location.trim() });
+  if (data.personal.linkedin?.trim())
+    contacts.push({
+      text: shortenDisplayUrl(data.personal.linkedin),
+      href: data.personal.linkedin.trim(),
+    });
+  if (data.personal.website?.trim())
+    contacts.push({
+      text: shortenDisplayUrl(data.personal.website),
+      href: data.personal.website.trim(),
+    });
+  if (data.personal.nationality?.trim())
+    contacts.push({ text: data.personal.nationality.trim() });
+  if (data.personal.drivingLicense?.trim())
+    contacts.push({ text: data.personal.drivingLicense.trim() });
+  if (data.personal.dateOfBirth?.trim())
+    contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
+
+  const modernSectionHeadingWrap: Style = {
+    borderLeftWidth: 3,
+    borderLeftColor: "#4F46E5",
+    paddingLeft: 8,
+    marginBottom: 6,
+  };
+
+  return (
+    <View>
+      {/* ── Header ── */}
+      <View style={s.headerRow}>
+        <View style={s.headerLeft}>
+          <View style={{ marginBottom: 2 }}>
+            <Text style={{ ...s.name, color: "#4F46E5", lineHeight: 1 }}>{name}</Text>
+          </View>
+          {data.personal.headline?.trim() ? (
+            <View style={{ marginBottom: 3 }}>
+              <Text style={{ ...s.headline, lineHeight: 1.2 }}>
+                {data.personal.headline.trim()}
+              </Text>
+            </View>
+          ) : null}
+          {contacts.length > 0 && (
+            <View style={s.contactRow}>
+              {contacts.map((item, i) => (
+                <View
+                  key={i}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  {item.href ? (
+                    <Link src={item.href} style={s.contactLink}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={s.contactItem}>{item.text}</Text>
+                  )}
+                  {i < contacts.length - 1 && (
+                    <Text style={s.contactSep}>|</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* ── Summary ── */}
+      {hasSummary && (
+        <View style={s.section}>
+          <View style={modernSectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Summary</Text>
+          </View>
+          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+        </View>
+      )}
+
+      {/* ── Experience ── */}
+      {hasExperience && (
+        <View style={s.section}>
+          <View style={modernSectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Experience</Text>
+          </View>
+          {data.experience.map((role) => (
+            <View key={role.id} style={s.entryBlock} wrap={false}>
+              <View style={s.entryRow}>
+                <View style={{ flexDirection: "row", flex: 1 }}>
+                  <Text style={s.entryTitle}>
+                    {role.role?.trim() || "Role"}
+                  </Text>
+                  {role.company && (
+                    <Text style={s.entryCompany}>
+                      {` | ${role.company.trim()}`}
+                    </Text>
+                  )}
+                </View>
+                <Text style={s.entryDate}>
+                  {formatDateRange(
+                    role.startDate,
+                    role.endDate,
+                    role.isCurrent,
+                  )}
+                </Text>
+              </View>
+              {role.location?.trim() && (
+                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
+              )}
+              <BulletList bullets={role.bullets} />
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* ── Education ── */}
+      {hasEducation && (
+        <View style={s.section}>
+          <View style={modernSectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Education</Text>
+          </View>
+          {data.education.map((edu) => (
+            <EducationEntry key={edu.id} edu={edu} />
+          ))}
+        </View>
+      )}
+
+      {/* ── Skills ── */}
+      {hasSkills && (
+        <View style={s.section}>
+          <View style={modernSectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Skills</Text>
+          </View>
+          <Text style={s.body}>
+            {data.skills.map((sk) => toTitleCase(sk.name)).join(", ")}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Languages & Certifications ── */}
+      {(hasLanguages || hasCertifications) && (
+        <View style={s.twoCol}>
+          {hasLanguages && (
+            <View style={s.twoColItem}>
+              <View style={modernSectionHeadingWrap}>
+                <Text style={s.sectionHeading}>Languages</Text>
+              </View>
+              <Text style={s.body}>
+                {data.languages
+                  .map((lang) => formatLanguage(lang.name, lang.level))
+                  .join(" | ")}
+              </Text>
+            </View>
+          )}
+          {hasCertifications && (
+            <View style={s.twoColItem}>
+              <View style={modernSectionHeadingWrap}>
+                <Text style={s.sectionHeading}>Certifications</Text>
+              </View>
+              {data.certifications.map((cert) => (
+                <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {cert.name.trim()}
+                  </Text>
+                  <Text style={{ color: SLATE_500 }}>
+                    {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
+                    {cert.date ? ` | ${cert.date.trim()}` : ""}
+                  </Text>
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── Projects ── */}
+      {hasProjects && (
+        <View style={s.section}>
+          <View style={modernSectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Projects</Text>
+          </View>
+          {data.projects.map((project) => {
+            const showLink = shouldShowProjectLink(project.link);
+            return (
+              <View key={project.id} style={s.entryBlock} wrap={false}>
+                <View style={{ flexDirection: "row" }}>
+                  <Text style={s.entryTitle}>
+                    {project.name?.trim() || "Project"}
+                  </Text>
+                  {showLink && (
+                    <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
+                      {` | ${project.link?.trim()}`}
+                    </Text>
+                  )}
+                </View>
+                <BulletList bullets={project.bullets ?? []} />
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -1077,6 +1319,8 @@ export const CVDocument = ({
         return <ExecutivePDFLayout data={data} />;
       case "ats-clean":
         return <ATSCleanPDFLayout data={data} />;
+      case "modern":
+        return <ModernPDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }
