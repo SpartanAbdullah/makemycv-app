@@ -151,7 +151,7 @@ export const BuilderHeader = ({
             type="button"
             onClick={() => {
               const data = useCvStore.getState().data;
-              downloadCV(data, "free").catch(() => {});
+              downloadCV(data, "free", useCvStore.getState().data.settings.templateId ?? "classic").catch(() => {});
             }}
             className="rounded-full bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
           >

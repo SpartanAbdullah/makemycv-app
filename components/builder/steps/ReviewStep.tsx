@@ -28,7 +28,7 @@ export const ReviewStep = ({
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      await downloadCV(data, isPro ? "pro" : "free");
+      await downloadCV(data, isPro ? "pro" : "free", data.settings.templateId ?? "classic");
     } catch {
       setDownloadError("pdf-failed");
     } finally {
@@ -169,7 +169,25 @@ export const ReviewStep = ({
               }}
             >
               <tmpl.Thumbnail />
-              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", marginTop: 8 }}>{tmpl.name}</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8, flexWrap: "wrap" as const }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", margin: 0 }}>{tmpl.name}</p>
+                {tmpl.badge && (
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#059669",
+                    background: "#ECFDF5",
+                    border: "1px solid #A7F3D0",
+                    borderRadius: 4,
+                    padding: "1px 5px",
+                    letterSpacing: "0.04em",
+                    lineHeight: 1.5,
+                    whiteSpace: "nowrap" as const,
+                  }}>
+                    {tmpl.badge}
+                  </span>
+                )}
+              </div>
               <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{tmpl.description}</p>
             </button>
           ))}

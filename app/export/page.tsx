@@ -12,7 +12,7 @@ export default function ExportPage() {
 
   const handleDownload = () => {
     const data = useCvStore.getState().data;
-    downloadCV(data, "free").catch((err) => {
+    downloadCV(data, "free", data.settings.templateId ?? "classic").catch((err) => {
       console.error("Export PDF failed:", err);
     });
   };

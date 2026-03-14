@@ -38,6 +38,15 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
     data.personal.linkedin?.trim()
       ? { text: shortenDisplayUrl(data.personal.linkedin), href: data.personal.linkedin.trim() }
       : null,
+    data.personal.nationality?.trim()
+      ? { text: data.personal.nationality.trim() }
+      : null,
+    data.personal.drivingLicense?.trim()
+      ? { text: data.personal.drivingLicense.trim() }
+      : null,
+    data.personal.dateOfBirth?.trim()
+      ? { text: `DOB: ${data.personal.dateOfBirth.trim()}` }
+      : null,
   ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
   return (
@@ -97,7 +106,7 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
         </div>
       </header>
 
-      <div className="mt-6 grid gap-8 md:grid-cols-[2fr_1fr]">
+      <div className="mt-6 grid gap-8" style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}>
         <div className="space-y-6">
           {data.personal.summary && (
             <section>
@@ -232,7 +241,7 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
           )}
         </div>
 
-        <aside className="space-y-6">
+        <aside className="space-y-6" style={{ width: "200px", flexShrink: 0 }}>
           {data.education.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

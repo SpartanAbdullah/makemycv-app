@@ -46,6 +46,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const contactItems = [
     data.personal.email?.trim()
       ? {
+          icon: "✉️",
           text: data.personal.email.trim(),
           href: `mailto:${data.personal.email.trim()}`,
           wrapAnywhere: false,
@@ -53,6 +54,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       : null,
     data.personal.phone?.trim()
       ? {
+          icon: "📞",
           text: data.personal.phone.trim(),
           href: `tel:${data.personal.phone.trim()}`,
           wrapAnywhere: false,
@@ -60,12 +62,14 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       : null,
     data.personal.location?.trim()
       ? {
+          icon: "📍",
           text: data.personal.location.trim(),
           wrapAnywhere: false,
         }
       : null,
     data.personal.linkedin?.trim()
       ? {
+          icon: "💼",
           text: shortenDisplayUrl(data.personal.linkedin),
           href: data.personal.linkedin.trim(),
           wrapAnywhere: true,
@@ -73,21 +77,22 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       : null,
     data.personal.website?.trim()
       ? {
+          icon: "🌐",
           text: shortenDisplayUrl(data.personal.website),
           href: data.personal.website.trim(),
           wrapAnywhere: true,
         }
       : null,
     data.personal.nationality?.trim()
-      ? { text: data.personal.nationality.trim(), wrapAnywhere: false }
+      ? { icon: "🌍", text: data.personal.nationality.trim(), wrapAnywhere: false }
       : null,
     data.personal.drivingLicense?.trim()
-      ? { text: data.personal.drivingLicense.trim(), wrapAnywhere: false }
+      ? { icon: "🚗", text: data.personal.drivingLicense.trim(), wrapAnywhere: false }
       : null,
     data.personal.dateOfBirth?.trim()
-      ? { text: `DOB: ${data.personal.dateOfBirth.trim()}`, wrapAnywhere: false }
+      ? { icon: "🎂", text: `DOB: ${data.personal.dateOfBirth.trim()}`, wrapAnywhere: false }
       : null,
-  ].filter(Boolean) as Array<{ text: string; href?: string; wrapAnywhere: boolean }>;
+  ].filter(Boolean) as Array<{ icon: string; text: string; href?: string; wrapAnywhere: boolean }>;
 
   const toTitleCase = (value: string) =>
     value
@@ -131,43 +136,62 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
         </div>
       )}
       <div className="cv-content relative z-10">
-        <header className="border-b border-slate-200 pb-2">
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1fr,auto] sm:gap-4">
-                <div className="min-w-0">
-                  <h1 className="text-[30px] font-bold leading-none tracking-tight text-slate-900">{name}</h1>
-                  <p className="mt-1 text-[15px] font-medium text-slate-600">{headline}</p>
-                </div>
-                <div className="min-w-0 sm:justify-self-end sm:max-w-[320px]">
-                  {contactItems.length > 0 && (
-                    <div className="flex max-w-[320px] flex-wrap items-center justify-start gap-x-1.5 gap-y-0.5 text-[11px] leading-snug text-slate-500 sm:justify-end">
-                      {contactItems.map((item, index) => (
-                        <div key={`${item.text}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
-                          {item.href ? (
-                            <a href={item.href} className="min-w-0">
-                              <span className={item.wrapAnywhere ? "break-words [overflow-wrap:anywhere]" : ""}>
-                                {item.text}
-                              </span>
-                            </a>
-                          ) : (
-                            <span className={item.wrapAnywhere ? "min-w-0 break-words [overflow-wrap:anywhere]" : "min-w-0"}>
-                              {item.text}
-                            </span>
-                          )}
-                          {index < contactItems.length - 1 ? <span className="text-slate-300">|</span> : null}
-                        </div>
-                      ))}
+        <header className="border-b border-slate-200 pb-3 mb-4">
+          <div className="relative flex items-start">
+
+            {/* Left block: Name + Headline + Contact */}
+            <div className="flex flex-col gap-1 flex-1 min-w-0 pr-24">
+              <h1
+                className="text-[28px] font-bold leading-tight tracking-tight text-slate-900"
+                style={{ lineHeight: 1.1 }}
+              >
+                {name}
+              </h1>
+              {headline ? (
+                <p className="text-[14px] font-medium text-slate-500 mt-0.5">
+                  {headline}
+                </p>
+              ) : null}
+
+              {contactItems.length > 0 && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10.5px] leading-snug text-slate-500">
+                  {contactItems.map((item, index) => (
+                    <div key={`${item.text}-${index}`} className="inline-flex min-w-0 items-center gap-1">
+                      <span
+                        style={{ fontSize: "10px", lineHeight: 1, flexShrink: 0 }}
+                        aria-hidden="true"
+                      >
+                        {item.icon}
+                      </span>
+                      {item.href ? (
+                        <a href={item.href} className="min-w-0 hover:text-slate-700">
+                          <span className={item.wrapAnywhere ? "break-words [overflow-wrap:anywhere]" : ""}>
+                            {item.text}
+                          </span>
+                        </a>
+                      ) : (
+                        <span className={item.wrapAnywhere ? "min-w-0 break-words [overflow-wrap:anywhere]" : "min-w-0"}>
+                          {item.text}
+                        </span>
+                      )}
+                      {index < contactItems.length - 1 ? (
+                        <span className="text-slate-300 ml-1">|</span>
+                      ) : null}
                     </div>
-                  )}
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
+
+            {/* Photo: absolute top-right */}
             {data.personal.photo && data.personal.showPhoto && (
               <div
                 style={{
-                  width: 80,
-                  height: 80,
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: 76,
+                  height: 76,
                   borderRadius: "50%",
                   overflow: "hidden",
                   flexShrink: 0,
@@ -187,6 +211,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 />
               </div>
             )}
+
           </div>
         </header>
 
