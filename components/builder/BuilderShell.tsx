@@ -36,6 +36,74 @@ const STEP_META: Record<string, { icon: string; label: string; sublabel: string 
   review:         { icon: "✅", label: "Review",          sublabel: "Download & export" },
 };
 
+const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0,0,0,0.85)",
+        zIndex: 60,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflowY: "auto",
+        padding: "40px 20px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 794,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
+        <span style={{ color: "white", fontSize: 14, fontWeight: 600 }}>Preview</span>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: "rgba(255,255,255,0.08)",
+            border: "none",
+            borderRadius: 8,
+            padding: "6px 14px",
+            color: "white",
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+      <div
+        style={{
+          width: 794,
+          maxWidth: "100%",
+          minHeight: 1123,
+          backgroundColor: "white",
+          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
+          borderRadius: 4,
+          overflow: "hidden",
+          flexShrink: 0,
+        }}
+      >
+        <PreviewPanel sticky={false} />
+      </div>
+    </div>
+  );
+};
+
 export const BuilderShell = ({
   stepId,
   children,
@@ -50,8 +118,6 @@ export const BuilderShell = ({
   const hydrated = useCvStore((state) => state.hydrated);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const resetStore = useCvStore((state) => state.reset);
-  const updateSection = useCvStore((state) => state.updateSection);
-
   const [previewOpen, setPreviewOpen] = useState(false);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -95,12 +161,6 @@ export const BuilderShell = ({
     resetStore();
     clearCvStorage();
     router.push("/builder?step=personal");
-  };
-
-  // Template switching
-  const currentTemplateId = data.settings.templateId;
-  const handleTemplateChange = (id: string) => {
-    updateSection("settings", { ...data.settings, templateId: id });
   };
 
   // ---- Import flow ----
@@ -682,36 +742,6 @@ export const BuilderShell = ({
           >
             Live Preview
           </div>
-
-          {/* Template switcher pills */}
-          <div style={{ display: "flex", gap: 4 }}>
-            {["Classic", "Modern"].map((name) => (
-              <button
-                key={name}
-                type="button"
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "none",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background:
-                    currentTemplateId === name.toLowerCase()
-                      ? "#4F46E5"
-                      : "rgba(255,255,255,0.06)",
-                  color:
-                    currentTemplateId === name.toLowerCase()
-                      ? "white"
-                      : "#475569",
-                  transition: "all 150ms ease",
-                }}
-                onClick={() => handleTemplateChange(name.toLowerCase())}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Scrollable preview area */}
@@ -719,23 +749,31 @@ export const BuilderShell = ({
           style={{
             flex: 1,
             overflowY: "auto",
+            overflowX: "hidden",
             padding: 20,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
           }}
         >
           <div
             style={{
               width: "100%",
-              background: "white",
-              borderRadius: 10,
               overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-              transformOrigin: "top center",
+              position: "relative",
+              height: Math.round(1123 * (360 / 794)),
             }}
           >
-            <PreviewPanel sticky={false} />
+            <div
+              style={{
+                width: 794,
+                transformOrigin: "top left",
+                transform: `scale(${360 / 794})`,
+                background: "white",
+                borderRadius: 10,
+                overflow: "hidden",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              }}
+            >
+              <PreviewPanel sticky={false} />
+            </div>
           </div>
         </div>
       </aside>
@@ -782,59 +820,7 @@ export const BuilderShell = ({
 
       {/* ═══ Mobile: preview overlay ═══ */}
       {previewOpen && (
-        <div
-          className="xl:hidden"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 60,
-            background: "#0A0F1A",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div
-            style={{
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              borderBottom: "1px solid #1A2233",
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 600, color: "white" }}>
-              Preview
-            </span>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(false)}
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: "none",
-                borderRadius: 8,
-                padding: "6px 14px",
-                color: "white",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
-            <div
-              style={{
-                background: "white",
-                borderRadius: 8,
-                overflow: "hidden",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-              }}
-            >
-              <PreviewPanel sticky={false} />
-            </div>
-          </div>
-        </div>
+        <PreviewOverlay onClose={() => setPreviewOpen(false)} />
       )}
 
       {/* ═══ Import overlays ═══ */}

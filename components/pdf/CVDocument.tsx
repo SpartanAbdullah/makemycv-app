@@ -304,13 +304,13 @@ const s = StyleSheet.create({
     fontSize: 20,
     fontFamily: "Helvetica-Bold",
     color: "#111827",
-    letterSpacing: -0.3,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   atsHeadline: {
     fontSize: 10,
     color: "#374151",
     marginBottom: 5,
+    marginTop: 0,
   },
   atsContactLine: {
     fontSize: 8,
@@ -885,10 +885,12 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View>
       {/* ── Header ── */}
-      <Text style={s.atsName}>{name}</Text>
-      {data.personal.headline?.trim() ? (
-        <Text style={s.atsHeadline}>{data.personal.headline.trim()}</Text>
-      ) : null}
+      <View style={{ marginBottom: 4 }}>
+        <Text style={s.atsName}>{name}</Text>
+        {data.personal.headline?.trim() ? (
+          <Text style={s.atsHeadline}>{data.personal.headline.trim()}</Text>
+        ) : null}
+      </View>
       {contactParts.length > 0 && (
         <Text style={s.atsContactLine}>{contactParts.join(" · ")}</Text>
       )}
