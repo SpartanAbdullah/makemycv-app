@@ -6,6 +6,7 @@ import {
   Image,
   StyleSheet,
   Link,
+  Style,
 } from "@react-pdf/renderer";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 
@@ -360,7 +361,7 @@ const EducationEntry = ({
   headingStyle,
 }: {
   edu: CvData["education"][number];
-  headingStyle?: object;
+  headingStyle?: Style;
 }) => (
   <View style={s.entryBlock} wrap={false}>
     <View style={s.entryRow}>
