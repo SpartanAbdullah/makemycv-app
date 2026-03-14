@@ -19,13 +19,14 @@ function buildFilename(data: CvData): string {
 export async function downloadCV(
   data: CvData,
   plan: PlanTier = "free",
+  templateId: string = "classic",
 ): Promise<void> {
   try {
     const { pdf } = await import("@react-pdf/renderer");
     const { CVDocument } = await import("../components/pdf/CVDocument");
     const { createElement } = await import("react");
 
-    const doc = createElement(CVDocument, { data, plan });
+    const doc = createElement(CVDocument, { data, plan, templateId });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blob = await pdf(doc as any).toBlob();
 
