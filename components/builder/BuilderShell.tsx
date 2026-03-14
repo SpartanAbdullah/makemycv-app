@@ -696,11 +696,11 @@ export const BuilderShell = ({
           )}
           <div
             style={{
-              padding: "40px 48px",
-              maxWidth: 680,
+              padding: "40px 16px",
+              maxWidth: "100%",
               width: "100%",
-              margin: "0 auto",
             }}
+            className="sm:!px-6"
           >
             {children}
           </div>
@@ -750,7 +750,7 @@ export const BuilderShell = ({
             flex: 1,
             overflowY: "auto",
             overflowX: "hidden",
-            padding: 20,
+            padding: 12,
           }}
         >
           <div
@@ -758,14 +758,14 @@ export const BuilderShell = ({
               width: "100%",
               overflow: "hidden",
               position: "relative",
-              height: Math.round(1123 * (360 / 794)),
+              height: Math.round(1123 * (376 / 794)),
             }}
           >
             <div
               style={{
                 width: 794,
                 transformOrigin: "top left",
-                transform: `scale(${360 / 794})`,
+                transform: `scale(${376 / 794})`,
                 background: "white",
                 borderRadius: 10,
                 overflow: "hidden",

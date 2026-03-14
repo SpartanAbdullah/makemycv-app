@@ -151,7 +151,7 @@ export const ReviewStep = ({
         <p className="cv-label" style={{ marginBottom: 12, marginTop: 24 }}>
           Choose Template
         </p>
-        <div className="flex flex-row gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-stretch">
           {templates.map((tmpl) => (
             <button
               key={tmpl.id}
@@ -159,18 +159,24 @@ export const ReviewStep = ({
               onClick={() => handleTemplateChange(tmpl.id)}
               className="cv-entry-card"
               style={{
-                padding: 12,
-                textAlign: "center" as const,
                 cursor: "pointer",
-                width: "100%",
                 borderWidth: 2,
                 borderColor: currentTemplateId === tmpl.id ? "var(--brand-primary)" : undefined,
                 background: currentTemplateId === tmpl.id ? "var(--brand-primary-s)" : undefined,
               }}
             >
-              <tmpl.Thumbnail />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8, flexWrap: "wrap" as const }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", margin: 0 }}>{tmpl.name}</p>
+              <div className="flex flex-col items-center p-3 h-full">
+                {/* Thumbnail zone — fixed height */}
+                <div className="flex items-center justify-center w-full mb-3" style={{ height: 160 }}>
+                  <tmpl.Thumbnail />
+                </div>
+
+                {/* Name */}
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", margin: 0, textAlign: "center" }}>
+                  {tmpl.name}
+                </p>
+
+                {/* Badge */}
                 {tmpl.badge && (
                   <span style={{
                     fontSize: 9,
@@ -183,12 +189,17 @@ export const ReviewStep = ({
                     letterSpacing: "0.04em",
                     lineHeight: 1.5,
                     whiteSpace: "nowrap" as const,
+                    marginTop: 4,
                   }}>
                     {tmpl.badge}
                   </span>
                 )}
+
+                {/* Description — clamped to 2 lines */}
+                <p className="line-clamp-2" style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4, textAlign: "center", lineHeight: 1.4 }}>
+                  {tmpl.description}
+                </p>
               </div>
-              <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{tmpl.description}</p>
             </button>
           ))}
         </div>

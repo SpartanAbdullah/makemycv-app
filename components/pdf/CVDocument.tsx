@@ -891,7 +891,13 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View>
       {/* ── Header ── */}
-      <View style={{ flexDirection: "column", alignItems: "flex-start", marginBottom: 6 }}>
+      <View
+        style={{
+          flexDirection: "column",
+          alignItems: "flex-start",
+          marginBottom: 6,
+        }}
+      >
         <View style={{ marginBottom: 6 }}>
           <Text style={{ ...s.atsName, lineHeight: 1 }}>{name}</Text>
         </View>
@@ -1129,7 +1135,9 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
           <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, color: "#4F46E5", lineHeight: 1 }}>{name}</Text>
+            <Text style={{ ...s.name, color: "#4F46E5", lineHeight: 1 }}>
+              {name}
+            </Text>
           </View>
           {data.personal.headline?.trim() ? (
             <View style={{ marginBottom: 3 }}>
