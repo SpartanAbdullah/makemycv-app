@@ -6,8 +6,8 @@ import {
   Image,
   StyleSheet,
   Link,
-  Style,
 } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -377,7 +377,9 @@ const EducationEntry = ({
       <Text style={s.entrySubtext}>{edu.school.trim()}</Text>
     ) : null}
     {edu.notes?.trim() ? (
-      <Text style={{ ...s.entrySubtext, marginTop: 1 }}>{edu.notes.trim()}</Text>
+      <Text style={{ ...s.entrySubtext, marginTop: 1 }}>
+        {edu.notes.trim()}
+      </Text>
     ) : null}
     {edu.attested ? (
       <Text style={{ fontSize: 7.5, color: "#1E2A4A", marginTop: 2 }}>
@@ -393,7 +395,8 @@ const EducationEntry = ({
 
 const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const name =
-    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
+    "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
   const hasExperience = data.experience.length > 0;
@@ -502,7 +505,11 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                   )}
                 </View>
                 <Text style={s.entryDate}>
-                  {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  {formatDateRange(
+                    role.startDate,
+                    role.endDate,
+                    role.isCurrent,
+                  )}
                 </Text>
               </View>
               {role.location?.trim() && (
@@ -610,7 +617,8 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
 
 const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const name =
-    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
+    "Your Name";
 
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
@@ -629,7 +637,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   if (data.personal.location?.trim())
     sidebarContacts.push(`Location: ${data.personal.location.trim()}`);
   if (data.personal.linkedin?.trim())
-    sidebarContacts.push(`LinkedIn: ${shortenDisplayUrl(data.personal.linkedin)}`);
+    sidebarContacts.push(
+      `LinkedIn: ${shortenDisplayUrl(data.personal.linkedin)}`,
+    );
   if (data.personal.website?.trim())
     sidebarContacts.push(`Web: ${shortenDisplayUrl(data.personal.website)}`);
   if (data.personal.nationality?.trim())
@@ -641,7 +651,6 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
-
       {/* ── Sidebar ── */}
       <View style={s.execSidebar}>
         {/* Name */}
@@ -657,7 +666,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           <View>
             <Text style={s.execSideLabel}>CONTACT</Text>
             {sidebarContacts.map((line, i) => (
-              <Text key={i} style={s.execContactItem}>{line}</Text>
+              <Text key={i} style={s.execContactItem}>
+                {line}
+              </Text>
             ))}
           </View>
         )}
@@ -723,7 +734,6 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
       {/* ── Main column ── */}
       <View style={{ flex: 1, paddingLeft: 16 }}>
-
         {/* Summary */}
         {hasSummary && (
           <View style={s.section}>
@@ -754,7 +764,11 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                     )}
                   </View>
                   <Text style={s.entryDate}>
-                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                    {formatDateRange(
+                      role.startDate,
+                      role.endDate,
+                      role.isCurrent,
+                    )}
                   </Text>
                 </View>
                 {role.location?.trim() && (
@@ -815,7 +829,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
 const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const name =
-    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
+    "Your Name";
 
   // Contact line — plain text only, no emoji, separated by middle dot
   const contactParts: string[] = [];
@@ -913,12 +928,21 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                     paddingLeft: 6,
                   }}
                 >
-                  {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  {formatDateRange(
+                    role.startDate,
+                    role.endDate,
+                    role.isCurrent,
+                  )}
                 </Text>
               </View>
               {(role.company || role.location) && (
                 <Text
-                  style={{ fontSize: 8.25, color: "#374151", marginTop: 1, marginBottom: 3 }}
+                  style={{
+                    fontSize: 8.25,
+                    color: "#374151",
+                    marginTop: 1,
+                    marginBottom: 3,
+                  }}
                 >
                   {role.company?.trim() || ""}
                   {role.company?.trim() && role.location?.trim() ? " · " : ""}
@@ -978,7 +1002,10 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("certifications")}>Certifications</Text>
           {data.certifications.map((cert) => (
-            <Text key={cert.id} style={{ ...s.body, color: "#374151", marginBottom: 3 }}>
+            <Text
+              key={cert.id}
+              style={{ ...s.body, color: "#374151", marginBottom: 3 }}
+            >
               <Text style={{ fontFamily: "Helvetica-Bold" }}>
                 {cert.name.trim()}
               </Text>
