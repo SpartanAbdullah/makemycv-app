@@ -15,6 +15,7 @@ import { docxAdapter } from "../../lib/importers/docxAdapter";
 import { linkedinAdapter } from "../../lib/importers/linkedinAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type { CvData } from "../../lib/types/cv";
+import { UpgradeModal } from "../modals/UpgradeModal";
 
 type ImportType = "pdf" | "docx" | "linkedin";
 
@@ -118,9 +119,11 @@ export const BuilderShell = ({
   const hydrated = useCvStore((state) => state.hydrated);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const resetStore = useCvStore((state) => state.reset);
+  const isPro = useCvStore((state) => state.isPro);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   useEffect(() => {
     bindCvStorage();
@@ -533,6 +536,41 @@ export const BuilderShell = ({
             Import CV
           </button>
 
+          {!isPro && (
+            <button
+              type="button"
+              onClick={() => setUpgradeOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "8px 12px",
+                background: "rgba(79,70,229,0.08)",
+                border: "1px solid rgba(79,70,229,0.2)",
+                borderRadius: 8,
+                cursor: "pointer",
+                color: "#818CF8",
+                fontSize: 12,
+                fontWeight: 600,
+                transition: "all 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(79,70,229,0.15)";
+                e.currentTarget.style.color = "#A5B4FC";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(79,70,229,0.08)";
+                e.currentTarget.style.color = "#818CF8";
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              Upgrade to Pro
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleReset}
@@ -879,6 +917,8 @@ export const BuilderShell = ({
           onCancel={() => setImportState({ phase: "idle" })}
         />
       )}
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 };

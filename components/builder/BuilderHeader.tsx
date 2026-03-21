@@ -5,6 +5,7 @@ import { useState } from "react";
 import { LINKEDIN_IMPORT_ENABLED } from "../../lib/importers/linkedinAdapter";
 import { useCvStore } from "../../lib/store/cvStore";
 import { downloadCV } from "../../hooks/useDownloadCV";
+import { UpgradeModal } from "../modals/UpgradeModal";
 
 type ImportType = "pdf" | "docx" | "linkedin";
 
@@ -26,6 +27,21 @@ export const BuilderHeader = ({
   onExportDocx,
 }: Props) => {
   const [importMenuOpen, setImportMenuOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const handleExportPdf = () => {
+    const store = useCvStore.getState();
+    if (!store.isPro && store.hasUsedFreeDownload) {
+      setUpgradeOpen(true);
+      return;
+    }
+    const data = store.data;
+    downloadCV(data, store.isPro ? "pro" : "free", data.settings.templateId ?? "classic")
+      .then(() => {
+        if (!store.isPro) useCvStore.getState().setHasUsedFreeDownload(true);
+      })
+      .catch(() => {});
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -149,10 +165,7 @@ export const BuilderHeader = ({
           {/* Export PDF */}
           <button
             type="button"
-            onClick={() => {
-              const data = useCvStore.getState().data;
-              downloadCV(data, "free", useCvStore.getState().data.settings.templateId ?? "classic").catch(() => {});
-            }}
+            onClick={handleExportPdf}
             className="rounded-full bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
           >
             Export PDF
@@ -174,6 +187,8 @@ export const BuilderHeader = ({
           style={{ width: `${progressPct}%` }}
         />
       </div>
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </header>
   );
 };

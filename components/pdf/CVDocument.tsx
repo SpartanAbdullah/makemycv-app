@@ -250,7 +250,7 @@ const s = StyleSheet.create({
     fontSize: 32,
     fontFamily: "Helvetica-Bold",
     color: SLATE_500,
-    opacity: 0.08,
+    opacity: 0.3,
     transform: "rotate(-28deg)",
   },
 
@@ -1339,7 +1339,7 @@ export const CVDocument = ({
       <Page size="A4" style={s.page}>
         {plan === "free" && (
           <View style={s.watermarkContainer} fixed>
-            <Text style={s.watermarkText}>MakeMyCV | Free</Text>
+            <Text style={s.watermarkText}>Created with MakeMyCV.ae — Free Plan</Text>
           </View>
         )}
         {renderLayout()}

@@ -113,9 +113,13 @@ export const defaultCvData: CvData = {
 type CvStore = {
   data: CvData;
   hydrated: boolean;
+  isPro: boolean;
+  hasUsedFreeDownload: boolean;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
+  setIsPro: (value: boolean) => void;
+  setHasUsedFreeDownload: (value: boolean) => void;
   reset: () => void;
   importJson: (data: CvData) => void;
   /**
@@ -127,13 +131,34 @@ type CvStore = {
   importCvVersion: (partial: Partial<CvData>, mode: "replace" | "merge") => void;
 };
 
+const PRO_STORAGE_KEY = "makemycv:isPro";
+const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
+
+const loadProFlags = () => {
+  if (typeof window === "undefined") return { isPro: false, hasUsedFreeDownload: false };
+  return {
+    isPro: window.localStorage.getItem(PRO_STORAGE_KEY) === "true",
+    hasUsedFreeDownload: window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
+  };
+};
+
 export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
+  isPro: false,
+  hasUsedFreeDownload: false,
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
     set((state) => ({ data: { ...state.data, [key]: value } })),
+  setIsPro: (value) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
+    set({ isPro: value });
+  },
+  setHasUsedFreeDownload: (value) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
+    set({ hasUsedFreeDownload: value });
+  },
   reset: () => {
     clearCvStorage();
     set({ data: defaultCvData });
@@ -192,6 +217,8 @@ export const bindCvStorage = () => {
       .getState()
       .setData({ ...stored, skills: ensureSkillIds(stored.skills) });
   }
+  const proFlags = loadProFlags();
+  useCvStore.setState(proFlags);
   useCvStore.getState().setHydrated(true);
   const saveDebounced = debounce((data: CvData) => saveCvToStorage(data), 500);
   useCvStore.subscribe((state) => saveDebounced(state.data));

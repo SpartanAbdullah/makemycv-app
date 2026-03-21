@@ -8,6 +8,9 @@ import { NavigationButtons } from "../NavigationButtons";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
+import { UpgradeModal } from "../../modals/UpgradeModal";
+
+const LOCKED_TEMPLATES = new Set(["executive", "ats-clean"]);
 
 export const ReviewStep = ({
   onBack,
@@ -18,17 +21,25 @@ export const ReviewStep = ({
 }) => {
   const data = useCvStore((state) => state.data);
   const updateSection = useCvStore((state) => state.updateSection);
+  const isPro = useCvStore((state) => state.isPro);
+  const hasUsedFreeDownload = useCvStore((state) => state.hasUsedFreeDownload);
+  const setHasUsedFreeDownload = useCvStore((state) => state.setHasUsedFreeDownload);
   const currentTemplateId = data.settings.templateId;
-  const [isPro] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const handleExportDocx = () => exportToDocx(data);
   const handleDownloadPdf = async () => {
+    if (!isPro && hasUsedFreeDownload) {
+      setUpgradeOpen(true);
+      return;
+    }
     setIsDownloading(true);
     setDownloadError(null);
     try {
       await downloadCV(data, isPro ? "pro" : "free", data.settings.templateId ?? "classic");
+      if (!isPro) setHasUsedFreeDownload(true);
     } catch {
       setDownloadError("pdf-failed");
     } finally {
@@ -37,6 +48,10 @@ export const ReviewStep = ({
   };
 
   const handleTemplateChange = (id: string) => {
+    if (!isPro && LOCKED_TEMPLATES.has(id)) {
+      setUpgradeOpen(true);
+      return;
+    }
     updateSection("settings", { ...data.settings, templateId: id });
   };
 
@@ -152,56 +167,90 @@ export const ReviewStep = ({
           Choose Template
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-stretch">
-          {templates.map((tmpl) => (
-            <button
-              key={tmpl.id}
-              type="button"
-              onClick={() => handleTemplateChange(tmpl.id)}
-              className="cv-entry-card"
-              style={{
-                cursor: "pointer",
-                borderWidth: 2,
-                borderColor: currentTemplateId === tmpl.id ? "var(--brand-primary)" : undefined,
-                background: currentTemplateId === tmpl.id ? "var(--brand-primary-s)" : undefined,
-              }}
-            >
-              <div className="flex flex-col items-center p-3 h-full">
-                {/* Thumbnail zone — fixed height */}
-                <div className="flex items-center justify-center w-full mb-3" style={{ height: 160 }}>
-                  <tmpl.Thumbnail />
-                </div>
-
-                {/* Name */}
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", margin: 0, textAlign: "center" }}>
-                  {tmpl.name}
-                </p>
-
-                {/* Badge */}
-                {tmpl.badge && (
-                  <span style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "#059669",
-                    background: "#ECFDF5",
-                    border: "1px solid #A7F3D0",
-                    borderRadius: 4,
-                    padding: "1px 5px",
-                    letterSpacing: "0.04em",
-                    lineHeight: 1.5,
-                    whiteSpace: "nowrap" as const,
-                    marginTop: 4,
+          {templates.map((tmpl) => {
+            const isLocked = !isPro && LOCKED_TEMPLATES.has(tmpl.id);
+            return (
+              <button
+                key={tmpl.id}
+                type="button"
+                onClick={() => handleTemplateChange(tmpl.id)}
+                className="cv-entry-card"
+                style={{
+                  cursor: "pointer",
+                  borderWidth: 2,
+                  borderColor: currentTemplateId === tmpl.id ? "var(--brand-primary)" : undefined,
+                  background: currentTemplateId === tmpl.id ? "var(--brand-primary-s)" : undefined,
+                  position: "relative",
+                }}
+              >
+                {/* Lock overlay for pro-only templates */}
+                {isLocked && (
+                  <div style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    zIndex: 2,
                   }}>
-                    {tmpl.badge}
-                  </span>
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: "white",
+                      background: "#4F46E5",
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      letterSpacing: "0.04em",
+                      lineHeight: 1.4,
+                    }}>
+                      Pro
+                    </span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </div>
                 )}
 
-                {/* Description — clamped to 2 lines */}
-                <p className="line-clamp-2" style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4, textAlign: "center", lineHeight: 1.4 }}>
-                  {tmpl.description}
-                </p>
-              </div>
-            </button>
-          ))}
+                <div className="flex flex-col items-center p-3 h-full">
+                  {/* Thumbnail zone — fixed height */}
+                  <div className="flex items-center justify-center w-full mb-3" style={{ height: 160 }}>
+                    <tmpl.Thumbnail />
+                  </div>
+
+                  {/* Name */}
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", margin: 0, textAlign: "center" }}>
+                    {tmpl.name}
+                  </p>
+
+                  {/* Badge */}
+                  {tmpl.badge && (
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: "#059669",
+                      background: "#ECFDF5",
+                      border: "1px solid #A7F3D0",
+                      borderRadius: 4,
+                      padding: "1px 5px",
+                      letterSpacing: "0.04em",
+                      lineHeight: 1.5,
+                      whiteSpace: "nowrap" as const,
+                      marginTop: 4,
+                    }}>
+                      {tmpl.badge}
+                    </span>
+                  )}
+
+                  {/* Description — clamped to 2 lines */}
+                  <p className="line-clamp-2" style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4, textAlign: "center", lineHeight: 1.4 }}>
+                    {tmpl.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -234,6 +283,7 @@ export const ReviewStep = ({
                 type="button"
                 className="cv-btn-primary"
                 style={{ marginTop: 12, fontSize: 12, padding: "8px 16px" }}
+                onClick={() => setUpgradeOpen(true)}
               >
                 Coming Soon
               </button>
@@ -243,6 +293,8 @@ export const ReviewStep = ({
       )}
 
       <NavigationButtons onBack={onBack} />
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 };
