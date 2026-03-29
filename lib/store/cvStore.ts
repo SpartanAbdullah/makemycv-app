@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import {
+  getNormalizedCouponCode,
+  isValidProCoupon,
+} from "../config/coupons";
 import type {
   CvData,
   CvEducation,
@@ -110,16 +114,29 @@ export const defaultCvData: CvData = {
   },
 };
 
+type ProAccessSource = "free" | "manual" | "coupon";
+type AccessState = {
+  isPro: boolean;
+  hasUsedFreeDownload: boolean;
+  appliedCouponCode: string;
+  proAccessSource: ProAccessSource;
+};
+type ApplyCouponResult = { ok: boolean; message: string };
+
 type CvStore = {
   data: CvData;
   hydrated: boolean;
   isPro: boolean;
   hasUsedFreeDownload: boolean;
+  appliedCouponCode: string;
+  proAccessSource: ProAccessSource;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
   setIsPro: (value: boolean) => void;
   setHasUsedFreeDownload: (value: boolean) => void;
+  applyCoupon: (value: string) => ApplyCouponResult;
+  clearCoupon: () => void;
   reset: () => void;
   importJson: (data: CvData) => void;
   /**
@@ -133,12 +150,38 @@ type CvStore = {
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
 const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
+const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 
-const loadProFlags = () => {
-  if (typeof window === "undefined") return { isPro: false, hasUsedFreeDownload: false };
+const loadAccessState = (): AccessState => {
+  if (typeof window === "undefined") {
+    return {
+      isPro: false,
+      hasUsedFreeDownload: false,
+      appliedCouponCode: "",
+      proAccessSource: "free",
+    };
+  }
+
+  const storedCouponCode = getNormalizedCouponCode(
+    window.localStorage.getItem(COUPON_STORAGE_KEY) ?? "",
+  );
+  const hasCouponAccess =
+    storedCouponCode.length > 0 && isValidProCoupon(storedCouponCode);
+
+  if (storedCouponCode && !hasCouponAccess) {
+    window.localStorage.removeItem(COUPON_STORAGE_KEY);
+  }
+
+  const hasManualPro = window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
   return {
-    isPro: window.localStorage.getItem(PRO_STORAGE_KEY) === "true",
+    isPro: hasManualPro || hasCouponAccess,
     hasUsedFreeDownload: window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
+    appliedCouponCode: hasCouponAccess ? storedCouponCode : "",
+    proAccessSource: hasManualPro
+      ? "manual"
+      : hasCouponAccess
+        ? "coupon"
+        : "free",
   };
 };
 
@@ -147,17 +190,64 @@ export const useCvStore = create<CvStore>((set, get) => ({
   hydrated: false,
   isPro: false,
   hasUsedFreeDownload: false,
+  appliedCouponCode: "",
+  proAccessSource: "free",
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
     set((state) => ({ data: { ...state.data, [key]: value } })),
   setIsPro: (value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
-    set({ isPro: value });
+    const couponIsActive =
+      get().appliedCouponCode.length > 0 && isValidProCoupon(get().appliedCouponCode);
+    set({
+      isPro: value || couponIsActive,
+      proAccessSource: value ? "manual" : couponIsActive ? "coupon" : "free",
+    });
   },
   setHasUsedFreeDownload: (value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
     set({ hasUsedFreeDownload: value });
+  },
+  applyCoupon: (value) => {
+    const normalized = getNormalizedCouponCode(value);
+
+    if (!normalized) {
+      return { ok: false, message: "Enter a coupon code to unlock Pro." };
+    }
+
+    if (!isValidProCoupon(normalized)) {
+      return { ok: false, message: "That coupon code is not valid." };
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(COUPON_STORAGE_KEY, normalized);
+    }
+
+    const hasManualPro = typeof window !== "undefined"
+      && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
+
+    set({
+      isPro: true,
+      appliedCouponCode: normalized,
+      proAccessSource: hasManualPro ? "manual" : "coupon",
+    });
+
+    return { ok: true, message: "Coupon applied. Pro features are now unlocked." };
+  },
+  clearCoupon: () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(COUPON_STORAGE_KEY);
+    }
+
+    const hasManualPro = typeof window !== "undefined"
+      && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
+
+    set({
+      isPro: hasManualPro,
+      appliedCouponCode: "",
+      proAccessSource: hasManualPro ? "manual" : "free",
+    });
   },
   reset: () => {
     clearCvStorage();
@@ -217,8 +307,8 @@ export const bindCvStorage = () => {
       .getState()
       .setData({ ...stored, skills: ensureSkillIds(stored.skills) });
   }
-  const proFlags = loadProFlags();
-  useCvStore.setState(proFlags);
+  const accessState = loadAccessState();
+  useCvStore.setState(accessState);
   useCvStore.getState().setHydrated(true);
   const saveDebounced = debounce((data: CvData) => saveCvToStorage(data), 500);
   useCvStore.subscribe((state) => saveDebounced(state.data));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
@@ -24,10 +24,19 @@ export const ReviewStep = ({
   const isPro = useCvStore((state) => state.isPro);
   const hasUsedFreeDownload = useCvStore((state) => state.hasUsedFreeDownload);
   const setHasUsedFreeDownload = useCvStore((state) => state.setHasUsedFreeDownload);
+  const appliedCouponCode = useCvStore((state) => state.appliedCouponCode);
+  const proAccessSource = useCvStore((state) => state.proAccessSource);
+  const applyCoupon = useCvStore((state) => state.applyCoupon);
+  const clearCoupon = useCvStore((state) => state.clearCoupon);
   const currentTemplateId = data.settings.templateId;
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponFeedback, setCouponFeedback] = useState<{
+    type: "error" | "info";
+    text: string;
+  } | null>(null);
 
   const handleExportDocx = () => exportToDocx(data);
   const handleDownloadPdf = async () => {
@@ -53,6 +62,28 @@ export const ReviewStep = ({
       return;
     }
     updateSection("settings", { ...data.settings, templateId: id });
+  };
+
+  const handleApplyCoupon = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const result = applyCoupon(couponCode);
+
+    if (!result.ok) {
+      setCouponFeedback({ type: "error", text: result.message });
+      return;
+    }
+
+    setCouponCode("");
+    setCouponFeedback(null);
+    setUpgradeOpen(false);
+  };
+
+  const handleRemoveCoupon = () => {
+    clearCoupon();
+    setCouponFeedback({
+      type: "info",
+      text: "Coupon removed. Free plan limits now apply again.",
+    });
   };
 
   const incomplete = builderSteps.filter(
@@ -160,6 +191,111 @@ export const ReviewStep = ({
           PDF is best for job applications. DOCX is editable.
         </p>
       </div>
+
+      {(proAccessSource === "coupon" || !isPro) && (
+        <div className="cv-step-card">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="cv-label" style={{ marginBottom: 6 }}>
+                Apply Coupon
+              </p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                Use an internal testing coupon to unlock Pro without payment.
+              </p>
+            </div>
+            {proAccessSource === "coupon" && (
+              <span
+                style={{
+                  borderRadius: 999,
+                  background: "#ECFDF5",
+                  border: "1px solid #A7F3D0",
+                  color: "#047857",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "6px 10px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Pro unlocked
+              </span>
+            )}
+          </div>
+
+          {proAccessSource === "coupon" ? (
+            <div
+              style={{
+                marginTop: 16,
+                padding: "14px 16px",
+                borderRadius: "var(--radius-md)",
+                background: "#F0FDF4",
+                border: "1px solid #BBF7D0",
+              }}
+            >
+              <p style={{ fontSize: 13, color: "#166534", fontWeight: 600 }}>
+                Coupon <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{appliedCouponCode}</span> is active.
+              </p>
+              <p style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>
+                This browser now has Pro access for templates, clean PDF export, and unlimited downloads.
+              </p>
+              <button
+                type="button"
+                onClick={handleRemoveCoupon}
+                className="cv-btn-secondary"
+                style={{ marginTop: 12, fontSize: 12, padding: "8px 14px" }}
+              >
+                Remove Coupon
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleApplyCoupon} className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <input
+                id="coupon-code"
+                type="text"
+                value={couponCode}
+                onChange={(event) => {
+                  setCouponCode(event.target.value);
+                  if (couponFeedback) setCouponFeedback(null);
+                }}
+                placeholder="Enter coupon code"
+                className="cv-input"
+                style={{ flex: 1 }}
+                autoComplete="off"
+              />
+              <button
+                type="submit"
+                className="cv-btn-secondary"
+                style={{ padding: "12px 18px", whiteSpace: "nowrap" }}
+              >
+                Apply Coupon
+              </button>
+            </form>
+          )}
+
+          {couponFeedback && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: "12px 14px",
+                borderRadius: "var(--radius-md)",
+                background: couponFeedback.type === "error" ? "#FEF2F2" : "#EFF6FF",
+                border: couponFeedback.type === "error"
+                  ? "1px solid #FECACA"
+                  : "1px solid #BFDBFE",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: couponFeedback.type === "error" ? "#B91C1C" : "#1D4ED8",
+                }}
+              >
+                {couponFeedback.text}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Template Selector */}
       <div>
