@@ -12,6 +12,7 @@ import { LanguagesStep } from "../../components/builder/steps/LanguagesStep";
 import { CertificationsStep } from "../../components/builder/steps/CertificationsStep";
 import { ProjectsStep } from "../../components/builder/steps/ProjectsStep";
 import { ReviewStep } from "../../components/builder/steps/ReviewStep";
+import { ScorePanel } from "../../components/ScorePanel";
 import { builderSteps } from "../../lib/utils/steps";
 
 const stepIds = builderSteps.map((step) => step.id);
@@ -20,7 +21,10 @@ export const BuilderClient = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = searchParams.get("step") || "personal";
-  const stepId = stepIds.includes(current as never) ? current : "personal";
+  const stepId =
+    stepIds.includes(current as never) || current === "score"
+      ? current
+      : "personal";
 
   const stepIndex = useMemo(
     () => builderSteps.findIndex((step) => step.id === stepId),
@@ -88,6 +92,7 @@ export const BuilderClient = () => {
       {stepId === "review" && (
         <ReviewStep onBack={() => goToStep(prevStep || "projects")} onJump={goToStep} />
       )}
+      {stepId === "score" && <ScorePanel />}
     </BuilderShell>
   );
 };
