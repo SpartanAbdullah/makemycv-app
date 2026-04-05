@@ -341,11 +341,13 @@ export const ATSCleanTemplate = ({
                     <span
                       style={{
                         fontSize: "10px",
-                        color: "#6B7280",
+                        color: "#15803d",
                         marginLeft: "8px",
                       }}
                     >
-                      (Attested)
+                      {edu.attestingBody?.trim()
+                        ? `\u2713 Attested — ${edu.attestingBody.trim()}`
+                        : "(Attested)"}
                     </span>
                   )}
                 </div>

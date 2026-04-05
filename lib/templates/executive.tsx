@@ -503,7 +503,9 @@ export const ExecutiveTemplate = ({
                           flexShrink: 0,
                         }}
                       >
-                        ATTESTED
+                        {edu.attestingBody?.trim()
+                          ? `\u2713 ATTESTED — ${edu.attestingBody.trim()}`
+                          : "ATTESTED"}
                       </span>
                     )}
                   </div>

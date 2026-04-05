@@ -260,6 +260,11 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
                     <div className="text-xs text-slate-400">
                       {formatRange(edu.startDate, edu.endDate)}
                     </div>
+                    {edu.attested && edu.attestingBody?.trim() && (
+                      <p className="mt-0.5 text-xs font-medium text-green-700">
+                        {"\u2713"} Attested — {edu.attestingBody.trim()}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

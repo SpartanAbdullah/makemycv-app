@@ -382,8 +382,10 @@ const EducationEntry = ({
       </Text>
     ) : null}
     {edu.attested ? (
-      <Text style={{ fontSize: 7.5, color: "#1E2A4A", marginTop: 2 }}>
-        Attested
+      <Text style={{ fontSize: 7.5, color: "#15803d", marginTop: 2 }}>
+        {edu.attestingBody?.trim()
+          ? `\u2713 Attested \u2014 ${edu.attestingBody.trim()}`
+          : "Attested"}
       </Text>
     ) : null}
   </View>

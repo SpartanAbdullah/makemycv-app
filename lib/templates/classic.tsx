@@ -284,6 +284,11 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                       {edu.notes ? <span>{edu.notes.trim()}</span> : null}
                     </div>
                   )}
+                  {edu.attested && edu.attestingBody?.trim() && (
+                    <p className="mt-0.5 text-xs font-medium text-green-700">
+                      {"\u2713"} Attested — {edu.attestingBody.trim()}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
