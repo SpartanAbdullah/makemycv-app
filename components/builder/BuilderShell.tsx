@@ -19,6 +19,7 @@ import { UpgradeModal } from "../modals/UpgradeModal";
 import dynamic from "next/dynamic";
 
 const ScoreWidget = dynamic(() => import("../ScoreWidget"), { ssr: false });
+const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
 
 type ImportType = "pdf" | "docx" | "linkedin";
 
@@ -937,6 +938,9 @@ export const BuilderShell = ({
 
       {/* ═══ Score widget ═══ */}
       {stepId !== "score" && <ScoreWidget />}
+
+      {/* ═══ Dev-only AI reset ═══ */}
+      <DevResetAI />
 
       {/* ═══ Mobile: preview overlay ═══ */}
       {previewOpen && (

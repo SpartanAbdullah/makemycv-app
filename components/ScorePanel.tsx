@@ -3,7 +3,9 @@
 import { useMemo, useState, useRef, useCallback } from "react";
 import { useCvStore } from "../lib/store/cvStore";
 import { calculateScore } from "../lib/scoreEngine";
+import { hasUsedFreeAI } from "../hooks/useAIImprove";
 import type { ScoreCategory } from "../lib/scoreEngine";
+import type { AIImproveType } from "../hooks/useAIImprove";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
 
@@ -93,6 +95,26 @@ const RADIUS = 54;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 type CardLevel = 1 | 2 | 3;
+
+const AI_CTA_MAP: Record<string, { type: AIImproveType; label: string } | null> = {
+  "Work Experience": { type: "bullets", label: "\u2728 AI Generate Bullets" },
+  Skills: { type: "skills", label: "\u2728 AI Suggest Skills" },
+  "Professional Summary": { type: "summary", label: "\u2728 AI Write Summary" },
+  "ATS Compatibility": { type: "summary", label: "\u2728 AI Improve Summary" },
+  "Contact Completeness": null,
+  Education: null,
+};
+
+function triggerAIAndNavigate(
+  aiType: AIImproveType,
+  categoryName: string,
+  onSectionClick?: (name: string) => void,
+) {
+  try {
+    sessionStorage.setItem("makemycv_ai_trigger", aiType);
+  } catch { /* SSR guard */ }
+  onSectionClick?.(categoryName);
+}
 
 /* ─── Category Card ────────────────────────────────────────── */
 
@@ -211,13 +233,36 @@ function CategoryCard({
               <span>{s}</span>
             </p>
           ))}
+          {(() => {
+            const aiCta = AI_CTA_MAP[category.name];
+            if (aiCta) {
+              const used = hasUsedFreeAI(aiCta.type);
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (used) {
+                      onSectionClick?.(category.name);
+                    } else {
+                      triggerAIAndNavigate(aiCta.type, category.name, onSectionClick);
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  {used ? `${aiCta.label} \u{1F512}` : aiCta.label}
+                </button>
+              );
+            }
+            return null;
+          })()}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onSectionClick?.(category.name);
             }}
-            className="mt-2 w-full rounded-lg bg-amber-500 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
+            className="mt-1 w-full rounded-lg bg-amber-500 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
           >
             Fix This Now {"\u2192"}
           </button>
@@ -236,6 +281,29 @@ function CategoryCard({
               <span>{s}</span>
             </p>
           ))}
+          {(() => {
+            const aiCta = AI_CTA_MAP[category.name];
+            if (aiCta) {
+              const used = hasUsedFreeAI(aiCta.type);
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (used) {
+                      onSectionClick?.(category.name);
+                    } else {
+                      triggerAIAndNavigate(aiCta.type, category.name, onSectionClick);
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  {used ? `${aiCta.label} \u{1F512}` : aiCta.label}
+                </button>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 

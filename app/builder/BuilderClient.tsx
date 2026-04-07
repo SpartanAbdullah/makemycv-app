@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BuilderShell } from "../../components/builder/BuilderShell";
 import { PersonalStep } from "../../components/builder/steps/PersonalStep";
@@ -37,6 +37,24 @@ export const BuilderClient = () => {
 
   const nextStep = builderSteps[stepIndex + 1]?.id;
   const prevStep = builderSteps[stepIndex - 1]?.id;
+
+  const CATEGORY_TO_STEP: Record<string, string> = {
+    "Contact Completeness": "personal",
+    "Professional Summary": "summary",
+    "Work Experience": "experience",
+    Education: "education",
+    Skills: "skills",
+    "ATS Compatibility": "summary",
+  };
+
+  const handleSectionClick = useCallback(
+    (sectionName: string) => {
+      const targetStep = CATEGORY_TO_STEP[sectionName] || "personal";
+      goToStep(targetStep);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
     <BuilderShell stepId={stepId} onStepChange={goToStep}>
@@ -92,7 +110,7 @@ export const BuilderClient = () => {
       {stepId === "review" && (
         <ReviewStep onBack={() => goToStep(prevStep || "projects")} onJump={goToStep} />
       )}
-      {stepId === "score" && <ScorePanel />}
+      {stepId === "score" && <ScorePanel onSectionClick={handleSectionClick} />}
     </BuilderShell>
   );
 };
