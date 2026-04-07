@@ -111,6 +111,7 @@ export const defaultCvData: CvData = {
       "certifications",
       "projects",
     ],
+    photoShape: "round",
   },
 };
 

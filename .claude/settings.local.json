@@ -7,7 +7,12 @@
       "Bash(npm run build)",
       "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app -name pdfExport* -o -name *pdf* -type f)",
       "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib -name *.ts -o -name *.tsx)",
-      "Bash(grep -n \"attested\\\\|attestingBody\\\\|degreeAttested\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib/templates/*.tsx)"
+      "Bash(grep -n \"attested\\\\|attestingBody\\\\|degreeAttested\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib/templates/*.tsx)",
+      "Bash(grep -r -i reset /c/Users/MuhammadAbdullah/Desktop/makemycv-app --include=*.tsx --include=*.ts --include=*.jsx --include=*.js --exclude-dir=node_modules --exclude-dir=.next)",
+      "Bash(grep -r -i \"import.*cv\\\\|importCV\\\\|import cv\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app --include=*.tsx --include=*.ts --include=*.jsx --include=*.js --exclude-dir=node_modules --exclude-dir=.next)",
+      "Bash(grep -r -n \"Import CV\\\\|import.*json\\\\|file.*input\\\\|handleImport\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app --include=*.tsx --include=*.ts --exclude-dir=node_modules --exclude-dir=.next)",
+      "Bash(grep -r \"borderRadius\\\\|rounded-\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib/templates/*.tsx --include=*.tsx)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -109,7 +109,7 @@ export const ModernTemplate = ({
               style={{
                 width: 80,
                 height: 80,
-                borderRadius: "50%",
+                borderRadius: data.settings.photoShape === "square" ? 8 : "50%",
                 overflow: "hidden",
                 flexShrink: 0,
                 border: "2px solid #e2e8f0",

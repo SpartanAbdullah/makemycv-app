@@ -416,6 +416,83 @@ body {
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.10);
 }
 
+/* ─── Score Widget AI Border Animation ────────────────────── */
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-glow-border {
+  position: relative;
+  border-radius: 9999px;
+  padding: 2px;
+  background: transparent;
+}
+
+.ai-glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    #6366f1,
+    #8b5cf6,
+    #ec4899,
+    #f59e0b,
+    #10b981,
+    #3b82f6,
+    #6366f1
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-spin 3s linear infinite;
+}
+
+.ai-glow-border::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    #6366f140,
+    #8b5cf640,
+    #ec489940,
+    #f59e0b40,
+    #10b98140,
+    #3b82f640,
+    #6366f140
+  );
+  filter: blur(8px);
+  animation: ai-spin 3s linear infinite;
+  z-index: -1;
+}
+
+@keyframes ai-spin {
+  to {
+    --angle: 360deg;
+  }
+}
+
+/* Pause animation when score is 100 (perfect) */
+.ai-glow-border.score-perfect::before,
+.ai-glow-border.score-perfect::after {
+  animation: none;
+  background: conic-gradient(
+    from 0deg,
+    #22c55e,
+    #16a34a,
+    #22c55e
+  );
+}
+
 @media print {
   @page {
     size: A4;

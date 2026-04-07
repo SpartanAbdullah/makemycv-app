@@ -7,7 +7,8 @@ import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
 import { PhotoUpload } from "../PhotoUpload";
-import type { CvPersonal } from "../../../lib/types/cv";
+import { useImport } from "../BuilderShell";
+import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
 export const PersonalStep = ({
   onNext,
@@ -15,10 +16,17 @@ export const PersonalStep = ({
   onNext: () => void;
 }) => {
   const personal = useCvStore((state) => state.data.personal);
+  const photoShape = useCvStore((state) => state.data.settings.photoShape ?? "round");
   const updateSection = useCvStore((state) => state.updateSection);
+  const settings = useCvStore((state) => state.data.settings);
+  const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMore, setShowMore] = useState(false);
+
+  const setPhotoShape = (shape: PhotoShape) => {
+    updateSection("settings", { ...settings, photoShape: shape });
+  };
 
   const handlePhotoChange = (base64: string | undefined) => {
     const current = useCvStore.getState().data.personal;
@@ -81,14 +89,69 @@ export const PersonalStep = ({
         </p>
       </div>
 
-      {/* Photo upload */}
-      <div style={{ paddingBottom: 24, borderBottom: "1px solid var(--border-soft)", marginBottom: 8 }}>
-        <PhotoUpload
-          photo={personal.photo}
-          showPhoto={personal.showPhoto}
-          onPhotoChange={handlePhotoChange}
-          onToggleChange={handleToggleChange}
-        />
+      {/* Photo upload + Import CV side by side */}
+      <div className="pb-6 border-b border-[var(--border-soft)] mb-2">
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left: Photo upload */}
+          <div>
+            <PhotoUpload
+              photo={personal.photo}
+              showPhoto={personal.showPhoto}
+              photoShape={photoShape}
+              onPhotoChange={handlePhotoChange}
+              onToggleChange={handleToggleChange}
+            />
+          </div>
+
+          {/* Right: Import CV */}
+          <div
+            className="flex flex-col items-center justify-center h-full min-h-[120px] border-2 border-dashed border-gray-200 rounded-2xl p-4 hover:border-indigo-300 hover:bg-indigo-50 transition cursor-pointer"
+            onClick={() => handleImport("pdf")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleImport("pdf");
+              }
+            }}
+          >
+            <span className="text-3xl">📄</span>
+            <span className="text-sm font-semibold text-gray-700 mt-2">Import Existing CV</span>
+            <span className="text-xs text-gray-400 mt-1 text-center">Upload a PDF or DOCX to auto-fill</span>
+          </div>
+        </div>
+
+        {/* Photo shape toggle */}
+        {personal.photo && personal.showPhoto && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Photo Shape</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPhotoShape("round")}
+                className={`px-4 py-1.5 rounded-lg text-sm transition ${
+                  photoShape === "round"
+                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
+                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
+                }`}
+              >
+                ⬤ Round
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhotoShape("square")}
+                className={`px-4 py-1.5 rounded-lg text-sm transition ${
+                  photoShape === "square"
+                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
+                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
+                }`}
+              >
+                ■ Square
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Core fields */}

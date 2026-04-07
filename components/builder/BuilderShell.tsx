@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { StepStatus } from "./Stepper";
 import { builderSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { PreviewPanel } from "../preview/PreviewPanel";
-import { clearCvStorage } from "../../lib/utils/localStorage";
 import { MappingReview } from "../import/MappingReview";
 import { LinkedInImportModal } from "../import/LinkedInImportModal";
 import { pdfAdapter } from "../../lib/importers/pdfAdapter";
@@ -22,6 +20,18 @@ const ScoreWidget = dynamic(() => import("../ScoreWidget"), { ssr: false });
 const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
 
 type ImportType = "pdf" | "docx" | "linkedin";
+
+type ImportContextValue = {
+  handleImport: (type: ImportType) => void;
+};
+
+const ImportContext = createContext<ImportContextValue | null>(null);
+
+export const useImport = () => {
+  const ctx = useContext(ImportContext);
+  if (!ctx) throw new Error("useImport must be used inside BuilderShell");
+  return ctx;
+};
 
 type ImportState =
   | { phase: "idle" }
@@ -119,11 +129,9 @@ export const BuilderShell = ({
   children: React.ReactNode;
   onStepChange: (stepId: string) => void;
 }) => {
-  const router = useRouter();
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
-  const resetStore = useCvStore((state) => state.reset);
   const isPro = useCvStore((state) => state.isPro);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
@@ -162,13 +170,6 @@ export const BuilderShell = ({
 
   const handleStepClick = (id: string) => {
     if (statuses[id] === "done") onStepChange(id);
-  };
-
-  const handleReset = () => {
-    if (!confirm("Reset your CV data? This cannot be undone.")) return;
-    resetStore();
-    clearCvStorage();
-    router.push("/builder?step=personal");
   };
 
   // ---- Import flow ----
@@ -226,6 +227,7 @@ export const BuilderShell = ({
   };
 
   return (
+    <ImportContext.Provider value={{ handleImport }}>
     <div
       style={{
         display: "flex",
@@ -570,50 +572,6 @@ export const BuilderShell = ({
             gap: 8,
           }}
         >
-          <button
-            type="button"
-            onClick={() => handleImport("pdf")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              width: "100%",
-              padding: "8px 12px",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid #1E293B",
-              borderRadius: 8,
-              cursor: "pointer",
-              color: "#64748B",
-              fontSize: 12,
-              fontWeight: 500,
-              transition: "all 150ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-              e.currentTarget.style.color = "#94A3B8";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-              e.currentTarget.style.color = "#64748B";
-            }}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Import CV
-          </button>
-
           {!isPro && (
             <button
               type="button"
@@ -649,48 +607,6 @@ export const BuilderShell = ({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleReset}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              width: "100%",
-              padding: "8px 12px",
-              background: "transparent",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              color: "#475569",
-              fontSize: 11,
-              fontWeight: 500,
-              transition: "all 150ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#EF4444";
-              e.currentTarget.style.background = "rgba(239,68,68,0.06)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#475569";
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 .49-3.5" />
-            </svg>
-            Reset CV
-          </button>
         </div>
       </aside>
 
@@ -864,6 +780,7 @@ export const BuilderShell = ({
 
         {/* Scrollable preview area */}
         <div
+          className="relative"
           style={{
             flex: 1,
             overflowY: "auto",
@@ -893,6 +810,13 @@ export const BuilderShell = ({
               <PreviewPanel sticky={false} />
             </div>
           </div>
+
+          {/* Score widget inside preview panel */}
+          {stepId !== "score" && (
+            <div className="absolute bottom-4 left-4 z-20">
+              <ScoreWidget />
+            </div>
+          )}
         </div>
       </aside>
 
@@ -936,8 +860,7 @@ export const BuilderShell = ({
         Preview CV
       </button>
 
-      {/* ═══ Score widget ═══ */}
-      {stepId !== "score" && <ScoreWidget />}
+      {/* Score widget moved into preview panel */}
 
       {/* ═══ Dev-only AI reset ═══ */}
       <DevResetAI />
@@ -1006,5 +929,6 @@ export const BuilderShell = ({
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
+    </ImportContext.Provider>
   );
 };

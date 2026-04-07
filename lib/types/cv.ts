@@ -68,11 +68,14 @@ export type CvProject = {
   bullets: string[];
 };
 
+export type PhotoShape = "round" | "square";
+
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
   fontScale?: number;
   sectionOrder?: string[];
+  photoShape?: PhotoShape;
 };
 
 export type CvData = {

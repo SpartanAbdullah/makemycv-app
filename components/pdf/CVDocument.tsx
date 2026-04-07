@@ -479,7 +479,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           )}
         </View>
         {showPhoto && data.personal.photo && (
-          <Image src={data.personal.photo} style={s.photo} />
+          <Image src={data.personal.photo} style={{ ...s.photo, borderRadius: data.settings.photoShape === "square" ? 8 : 30 }} />
         )}
       </View>
 
