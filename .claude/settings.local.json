@@ -6,7 +6,8 @@
       "Read(//c/Users/MuhammadAbdullah/Desktop/makemycv-site/**)",
       "Bash(npm run build)",
       "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app -name pdfExport* -o -name *pdf* -type f)",
-      "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib -name *.ts -o -name *.tsx)"
+      "Bash(find /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib -name *.ts -o -name *.tsx)",
+      "Bash(grep -n \"attested\\\\|attestingBody\\\\|degreeAttested\" /c/Users/MuhammadAbdullah/Desktop/makemycv-app/lib/templates/*.tsx)"
     ]
   }
 }

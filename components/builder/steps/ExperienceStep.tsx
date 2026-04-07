@@ -9,6 +9,8 @@ import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
+import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
+import { AIResultsModal } from "../../AIResultsModal";
 import type { CvExperience } from "../../../lib/types/cv";
 
 type ExperienceForm = { experience: CvExperience[] };
@@ -48,6 +50,60 @@ export const ExperienceStep = ({
     itemIndex: number;
     bulletIndex: number;
   } | null>(null);
+
+  /* AI bullet generation */
+  const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiTargetIndex, setAiTargetIndex] = useState<number>(0);
+  const aiTriggerChecked = useRef(false);
+
+  useEffect(() => {
+    if (aiTriggerChecked.current) return;
+    aiTriggerChecked.current = true;
+    try {
+      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
+      if (trigger === "bullets") {
+        sessionStorage.removeItem("makemycv_ai_trigger");
+        if (!hasUsedFreeAI("bullets") && fields.length > 0) {
+          setAiTargetIndex(0);
+          const entry = getValues("experience.0");
+          if (entry) {
+            setAiModalOpen(true);
+            improve({
+              type: "bullets",
+              jobTitle: entry.role,
+              company: entry.company,
+              existingBullets: entry.bullets?.filter(Boolean),
+            });
+          }
+        }
+      }
+    } catch { /* SSR guard */ }
+  }, [fields.length, getValues, improve]);
+
+  const handleGenerateBullets = (index: number) => {
+    const entry = getValues(`experience.${index}`);
+    if (!entry) return;
+    setAiTargetIndex(index);
+    setAiModalOpen(true);
+    aiClear();
+    improve({
+      type: "bullets",
+      jobTitle: entry.role,
+      company: entry.company,
+      existingBullets: entry.bullets?.filter(Boolean),
+    });
+  };
+
+  const handleApplyBullets = (selected: string[]) => {
+    const currentItem = getValues(`experience.${aiTargetIndex}`);
+    if (!currentItem) return;
+    const existing = (currentItem.bullets || []).filter(Boolean);
+    const merged = [...existing, ...selected].slice(0, MAX_BULLETS);
+    update(aiTargetIndex, { ...currentItem, bullets: merged });
+    setAiModalOpen(false);
+    aiClear();
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ experience });
@@ -198,7 +254,17 @@ export const ExperienceStep = ({
                       </div>
 
                       <div className="mt-4 space-y-3">
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>Highlights</p>
+                        <div className="flex items-center justify-between">
+                          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>Highlights</p>
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateBullets(index)}
+                            className="cv-btn-secondary"
+                            style={{ fontSize: 12, padding: "5px 12px" }}
+                          >
+                            {"\u2728"} Generate Bullets
+                          </button>
+                        </div>
                         <div className="cv-tip-box">
                           Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.
                         </div>
@@ -257,6 +323,17 @@ export const ExperienceStep = ({
       </section>
 
       <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} />
+
+      <AIResultsModal
+        isOpen={aiModalOpen}
+        onClose={() => { setAiModalOpen(false); aiClear(); }}
+        type="bullets"
+        results={aiResults}
+        isLoading={aiLoading}
+        error={aiError}
+        onApply={handleApplyBullets}
+        onRetry={() => handleGenerateBullets(aiTargetIndex)}
+      />
     </form>
   );
 };

@@ -1,7 +1,12 @@
 import type { CvData } from "../types/cv";
 import { formatRange, getFullName } from "./utils";
 
-export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }) => {
+export const ModernTemplate = ({
+  data,
+}: {
+  data: CvData;
+  plan?: "free" | "pro";
+}) => {
   const name = getFullName(data) || "Your Name";
   const shouldShowProjectLink = (value?: string) => {
     const normalized = value?.trim();
@@ -26,17 +31,31 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
   };
   const contactItems = [
     data.personal.email?.trim()
-      ? { text: data.personal.email.trim(), href: `mailto:${data.personal.email.trim()}` }
+      ? {
+          text: data.personal.email.trim(),
+          href: `mailto:${data.personal.email.trim()}`,
+        }
       : null,
     data.personal.phone?.trim()
-      ? { text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` }
+      ? {
+          text: data.personal.phone.trim(),
+          href: `tel:${data.personal.phone.trim()}`,
+        }
       : null,
-    data.personal.location?.trim() ? { text: data.personal.location.trim() } : null,
+    data.personal.location?.trim()
+      ? { text: data.personal.location.trim() }
+      : null,
     data.personal.website?.trim()
-      ? { text: shortenDisplayUrl(data.personal.website), href: data.personal.website.trim() }
+      ? {
+          text: shortenDisplayUrl(data.personal.website),
+          href: data.personal.website.trim(),
+        }
       : null,
     data.personal.linkedin?.trim()
-      ? { text: shortenDisplayUrl(data.personal.linkedin), href: data.personal.linkedin.trim() }
+      ? {
+          text: shortenDisplayUrl(data.personal.linkedin),
+          href: data.personal.linkedin.trim(),
+        }
       : null,
     data.personal.nationality?.trim()
       ? { text: data.personal.nationality.trim() }
@@ -60,24 +79,30 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
             <p className="text-sm text-slate-500">
               {data.personal.headline || "Headline"}
             </p>
-        {contactItems.length > 0 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-            {contactItems.map((item, index) =>
-              item.href ? (
-                <a key={`${item.text}-${index}`} href={item.href} className="min-w-0">
-                  <span className="break-words [overflow-wrap:anywhere]">{item.text}</span>
-                </a>
-              ) : (
-                <span
-                  key={`${item.text}-${index}`}
-                  className="min-w-0 break-words [overflow-wrap:anywhere]"
-                >
-                  {item.text}
-                </span>
-              ),
+            {contactItems.length > 0 && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                {contactItems.map((item, index) =>
+                  item.href ? (
+                    <a
+                      key={`${item.text}-${index}`}
+                      href={item.href}
+                      className="min-w-0"
+                    >
+                      <span className="break-words [overflow-wrap:anywhere]">
+                        {item.text}
+                      </span>
+                    </a>
+                  ) : (
+                    <span
+                      key={`${item.text}-${index}`}
+                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                    >
+                      {item.text}
+                    </span>
+                  ),
+                )}
+              </div>
             )}
-          </div>
-        )}
           </div>
           {data.personal.photo && data.personal.showPhoto && (
             <div
@@ -106,14 +131,19 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
         </div>
       </header>
 
-      <div className="mt-6 grid gap-8" style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}>
+      <div
+        className="mt-6 grid gap-8"
+        style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}
+      >
         <div className="space-y-6">
           {data.personal.summary && (
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Profile
               </h2>
-              <p className="mt-2 text-sm text-slate-700">{data.personal.summary}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {data.personal.summary}
+              </p>
             </section>
           )}
 
@@ -124,11 +154,18 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
               </h2>
               <div className="mt-3 space-y-4">
                 {data.experience.map((role) => (
-                  <div key={role.id} className="rounded-xl border border-slate-200 p-3">
+                  <div
+                    key={role.id}
+                    className="rounded-xl border border-slate-200 p-3"
+                  >
                     <div className="flex items-center justify-between text-sm font-semibold">
                       <span>{role.role || "Role"}</span>
                       <span className="text-xs text-slate-400">
-                        {formatRange(role.startDate, role.endDate, role.isCurrent)}
+                        {formatRange(
+                          role.startDate,
+                          role.endDate,
+                          role.isCurrent,
+                        )}
                       </span>
                     </div>
                     <div className="text-xs text-slate-500">
@@ -184,11 +221,15 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
                 const [firstBullet, ...remainingBullets] = bullets;
                 const showLink = shouldShowProjectLink(project.link);
                 const titleRow = (
-                  <div className={`${index === 0 ? "mt-3 " : ""}text-sm font-semibold`}>
+                  <div
+                    className={`${index === 0 ? "mt-3 " : ""}text-sm font-semibold`}
+                  >
                     {project.name || "Project"}
                     {showLink ? (
                       <span className="[overflow-wrap:anywhere]">{` - ${project.link?.trim()}`}</span>
-                    ) : ""}
+                    ) : (
+                      ""
+                    )}
                   </div>
                 );
 
@@ -260,6 +301,11 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
                     <div className="text-xs text-slate-400">
                       {formatRange(edu.startDate, edu.endDate)}
                     </div>
+                    {edu.attested && edu.attestingBody?.trim() && (
+                      <p className="mt-0.5 text-xs font-medium text-green-700">
+                        {"\u2713"} Attested — {edu.attestingBody.trim()}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -283,10 +329,8 @@ export const ModernTemplate = ({ data }: { data: CvData; plan?: "free" | "pro" }
               </div>
             </section>
           )}
-
         </aside>
       </div>
     </div>
   );
 };
-

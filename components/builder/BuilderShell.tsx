@@ -16,6 +16,10 @@ import { linkedinAdapter } from "../../lib/importers/linkedinAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type { CvData } from "../../lib/types/cv";
 import { UpgradeModal } from "../modals/UpgradeModal";
+import dynamic from "next/dynamic";
+
+const ScoreWidget = dynamic(() => import("../ScoreWidget"), { ssr: false });
+const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
 
 type ImportType = "pdf" | "docx" | "linkedin";
 
@@ -35,6 +39,7 @@ const STEP_META: Record<string, { icon: string; label: string; sublabel: string 
   certifications: { icon: "🏅", label: "Certifications", sublabel: "Credentials" },
   projects:       { icon: "📁", label: "Projects",       sublabel: "Standout work" },
   review:         { icon: "✅", label: "Review",          sublabel: "Download & export" },
+  score:          { icon: "📊", label: "CV Score",        sublabel: "Score & suggestions" },
 };
 
 const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
@@ -480,6 +485,79 @@ export const BuilderShell = ({
               </button>
             );
           })}
+
+          {/* Score nav item */}
+          <div style={{ padding: "8px 0 0", marginTop: 4, borderTop: "1px solid #1E293B" }}>
+            <button
+              type="button"
+              onClick={() => onStepChange("score")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                width: "100%",
+                padding: "10px 16px",
+                background: stepId === "score" ? "rgba(79,70,229,0.18)" : "transparent",
+                border: "none",
+                borderRadius: 10,
+                cursor: "pointer",
+                textAlign: "left" as const,
+                transition: "background 150ms ease",
+                position: "relative" as const,
+              }}
+            >
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 16,
+                  background: stepId === "score"
+                    ? "rgba(99,102,241,0.25)"
+                    : "rgba(251,191,36,0.12)",
+                  flexShrink: 0,
+                  transition: "background 150ms ease",
+                }}
+              >
+                <span style={{ fontSize: 15 }}>📊</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: stepId === "score" ? 600 : 500,
+                    color: stepId === "score" ? "#FFFFFF" : "#94A3B8",
+                    lineHeight: 1.2,
+                    transition: "color 150ms ease",
+                  }}
+                >
+                  CV Score
+                </div>
+                {stepId === "score" && (
+                  <div style={{ fontSize: 10, color: "#6366F1", marginTop: 2, lineHeight: 1 }}>
+                    Score &amp; suggestions
+                  </div>
+                )}
+              </div>
+              {stepId === "score" && (
+                <div
+                  style={{
+                    position: "absolute" as const,
+                    left: 0,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 3,
+                    height: 24,
+                    background: "#6366F1",
+                    borderRadius: "0 3px 3px 0",
+                  }}
+                />
+              )}
+            </button>
+          </div>
         </nav>
 
         {/* Bottom actions */}
@@ -706,7 +784,9 @@ export const BuilderShell = ({
               fontWeight: 500,
             }}
           >
-            Step {currentStepIndex + 1} / {totalSteps}
+            {currentStepIndex >= 0
+              ? `Step ${currentStepIndex + 1} / ${totalSteps}`
+              : "Score"}
           </span>
         </div>
 
@@ -855,6 +935,12 @@ export const BuilderShell = ({
         </svg>
         Preview CV
       </button>
+
+      {/* ═══ Score widget ═══ */}
+      {stepId !== "score" && <ScoreWidget />}
+
+      {/* ═══ Dev-only AI reset ═══ */}
+      <DevResetAI />
 
       {/* ═══ Mobile: preview overlay ═══ */}
       {previewOpen && (

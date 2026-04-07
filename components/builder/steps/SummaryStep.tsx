@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { summarySchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
+import { AIResultsModal } from "../../AIResultsModal";
 
 type SummaryForm = { summary: string };
 
@@ -31,11 +33,54 @@ export const SummaryStep = ({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<SummaryForm>({
     resolver: zodResolver(summarySchema),
     defaultValues: { summary },
   });
+
+  /* AI summary writer */
+  const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const aiTriggerChecked = useRef(false);
+
+  const fireAISummary = () => {
+    const store = useCvStore.getState().data;
+    setAiModalOpen(true);
+    aiClear();
+    improve({
+      type: "summary",
+      headline: store.personal.headline,
+      experienceRoles: store.experience.map((r) => ({
+        title: r.role,
+        company: r.company,
+        bullets: r.bullets.filter(Boolean),
+      })),
+      existingSummary: store.personal.summary,
+    });
+  };
+
+  useEffect(() => {
+    if (aiTriggerChecked.current) return;
+    aiTriggerChecked.current = true;
+    try {
+      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
+      if (trigger === "summary") {
+        sessionStorage.removeItem("makemycv_ai_trigger");
+        if (!hasUsedFreeAI("summary")) fireAISummary();
+      }
+    } catch { /* SSR guard */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleApplySummary = (selected: string[]) => {
+    if (selected[0]) {
+      setValue("summary", selected[0], { shouldDirty: true });
+    }
+    setAiModalOpen(false);
+    aiClear();
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ summary });
@@ -91,6 +136,16 @@ export const SummaryStep = ({
               {...register("summary")}
             />
           </Field>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={fireAISummary}
+              className="cv-btn-secondary"
+              style={{ fontSize: 12, padding: "5px 12px" }}
+            >
+              {"\u2728"} Write My Summary with AI
+            </button>
+          </div>
         </div>
 
         <div className="cv-tip-box" style={{ marginTop: 16 }}>
@@ -103,6 +158,17 @@ export const SummaryStep = ({
         onNext={handleSubmit(onNext)}
         showSkip
         onSkip={onSkip}
+      />
+
+      <AIResultsModal
+        isOpen={aiModalOpen}
+        onClose={() => { setAiModalOpen(false); aiClear(); }}
+        type="summary"
+        results={aiResults}
+        isLoading={aiLoading}
+        error={aiError}
+        onApply={handleApplySummary}
+        onRetry={fireAISummary}
       />
     </form>
   );
