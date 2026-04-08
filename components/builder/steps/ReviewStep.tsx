@@ -10,7 +10,7 @@ import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
 import { UpgradeModal } from "../../modals/UpgradeModal";
 
-const LOCKED_TEMPLATES = new Set(["executive", "ats-clean"]);
+const LOCKED_TEMPLATES = new Set(["executive", "ats-clean", "exec-split", "corp-sidebar"]);
 
 export const ReviewStep = ({
   onBack,
@@ -302,7 +302,7 @@ export const ReviewStep = ({
         <p className="cv-label" style={{ marginBottom: 12, marginTop: 24 }}>
           Choose Template
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-stretch">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-stretch">
           {templates.map((tmpl) => {
             const isLocked = !isPro && LOCKED_TEMPLATES.has(tmpl.id);
             return (
@@ -350,9 +350,25 @@ export const ReviewStep = ({
                 )}
 
                 <div className="flex flex-col items-center p-3 h-full">
-                  {/* Thumbnail zone — fixed height */}
-                  <div className="flex items-center justify-center w-full mb-3" style={{ height: 160 }}>
-                    <tmpl.Thumbnail />
+                  {/* Live mini-preview — scaled-down real template */}
+                  <div
+                    className="w-full mb-3 overflow-hidden rounded-md border border-slate-200"
+                    style={{ height: 160, position: "relative" }}
+                  >
+                    <div
+                      style={{
+                        transform: "scale(0.18)",
+                        transformOrigin: "top left",
+                        width: "794px",
+                        height: "1123px",
+                        pointerEvents: "none",
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                      }}
+                    >
+                      <tmpl.Render data={data} plan={isPro ? "pro" : "free"} />
+                    </div>
                   </div>
 
                   {/* Name */}
