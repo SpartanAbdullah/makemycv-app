@@ -9,6 +9,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { CvData, PlanTier } from "../../lib/types/cv";
+import { formatLanguageLevel } from "../../lib/language";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -32,17 +33,7 @@ const formatDateRange = (start?: string, end?: string, isCurrent?: boolean) => {
 };
 
 const formatLanguage = (name: string, level?: string) => {
-  const normalized = level?.toLowerCase();
-  const prettyLevel =
-    normalized === "beginner"
-      ? "Conversational"
-      : normalized === "intermediate"
-        ? "Professional"
-        : normalized === "advanced"
-          ? "Fluent"
-          : normalized
-            ? toTitleCase(normalized)
-            : "";
+  const prettyLevel = level ? formatLanguageLevel(level) : "";
   return `${toTitleCase(name)}${prettyLevel ? ` (${prettyLevel})` : ""}`;
 };
 
@@ -1012,7 +1003,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           <Text style={{ ...s.body, color: "#374151" }}>
             {data.languages
               .map((lang) =>
-                lang.level ? `${lang.name} (${lang.level})` : lang.name,
+                lang.level ? `${lang.name} (${formatLanguageLevel(lang.level)})` : lang.name,
               )
               .join(" · ")}
           </Text>

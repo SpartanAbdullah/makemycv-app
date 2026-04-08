@@ -7,6 +7,8 @@ import { summarySchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { FieldError } from "../../FieldError";
+import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 
@@ -39,6 +41,8 @@ export const SummaryStep = ({
     resolver: zodResolver(summarySchema),
     defaultValues: { summary },
   });
+
+  const [summaryWarning, setSummaryWarning] = useState<string | null>(null);
 
   /* AI summary writer */
   const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
@@ -134,8 +138,34 @@ export const SummaryStep = ({
               className="cv-input cv-textarea"
               placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
               {...register("summary")}
+              onBlur={(e) => {
+                register("summary").onBlur(e);
+                const cleaned = sanitizePlainText(e.target.value);
+                if (cleaned !== e.target.value) {
+                  setValue("summary", cleaned, { shouldDirty: true });
+                }
+                setSummaryWarning(validateSummaryLength(cleaned));
+              }}
             />
           </Field>
+          {(() => {
+            const currentSummary = watch("summary") ?? "";
+            const wordCount = currentSummary.split(/\s+/).filter(Boolean).length;
+            const countColor =
+              wordCount === 0
+                ? "text-gray-400"
+                : wordCount < 30
+                  ? "text-red-500"
+                  : wordCount > 120
+                    ? "text-amber-500"
+                    : "text-green-600";
+            return (
+              <p className={`mt-1 text-xs ${countColor}`}>
+                {wordCount} words {"\u00B7"} Recommended: 30{"\u2013"}120
+              </p>
+            );
+          })()}
+          <FieldError message={summaryWarning} type="warning" />
           <div className="mt-3 flex justify-end">
             <button
               type="button"

@@ -8,6 +8,18 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { NavigationButtons } from "../NavigationButtons";
 import { PhotoUpload } from "../PhotoUpload";
 import { useImport } from "../BuilderShell";
+import { FieldError } from "../../FieldError";
+import {
+  sanitizeName,
+  sanitizeEmail,
+  sanitizePhone,
+  sanitizeJobTitle,
+  sanitizeLocation,
+  sanitizeURL,
+  validateEmail,
+  validateLinkedIn,
+  validateURL,
+} from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
 export const PersonalStep = ({
@@ -23,6 +35,10 @@ export const PersonalStep = ({
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMore, setShowMore] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+
+  const setFieldError = (field: string, error: string | null) =>
+    setFieldErrors((prev) => ({ ...prev, [field]: error }));
 
   const setPhotoShape = (shape: PhotoShape) => {
     updateSection("settings", { ...settings, photoShape: shape });
@@ -43,6 +59,7 @@ export const PersonalStep = ({
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
@@ -162,9 +179,13 @@ export const PersonalStep = ({
             className="cv-input"
             placeholder="e.g. Muhammad"
             {...register("firstName")}
+            onChange={(e) => {
+              e.target.value = sanitizeName(e.target.value);
+              register("firstName").onChange(e);
+            }}
           />
           {errors.firstName?.message && (
-            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.firstName.message}</p>
+            <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
           )}
         </div>
 
@@ -174,9 +195,13 @@ export const PersonalStep = ({
             className="cv-input"
             placeholder="e.g. Al-Rashidi"
             {...register("lastName")}
+            onChange={(e) => {
+              e.target.value = sanitizeName(e.target.value);
+              register("lastName").onChange(e);
+            }}
           />
           {errors.lastName?.message && (
-            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.lastName.message}</p>
+            <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
           )}
         </div>
 
@@ -186,6 +211,10 @@ export const PersonalStep = ({
             className="cv-input"
             placeholder="e.g. Dubai, UAE"
             {...register("location")}
+            onChange={(e) => {
+              e.target.value = sanitizeLocation(e.target.value);
+              register("location").onChange(e);
+            }}
           />
         </div>
 
@@ -195,9 +224,13 @@ export const PersonalStep = ({
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
             {...register("headline")}
+            onChange={(e) => {
+              e.target.value = sanitizeJobTitle(e.target.value);
+              register("headline").onChange(e);
+            }}
           />
           {errors.headline?.message && (
-            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.headline.message}</p>
+            <p className="mt-1 text-xs text-red-500">{errors.headline.message}</p>
           )}
         </div>
 
@@ -207,6 +240,10 @@ export const PersonalStep = ({
             className="cv-input"
             placeholder="+971 50 123 4567"
             {...register("phone")}
+            onChange={(e) => {
+              e.target.value = sanitizePhone(e.target.value);
+              register("phone").onChange(e);
+            }}
           />
         </div>
 
@@ -214,13 +251,21 @@ export const PersonalStep = ({
           <label className="cv-label">EMAIL (MANDATORY)</label>
           <input
             className="cv-input"
-            type="email"
             placeholder="yourname@email.com"
             {...register("email")}
+            onChange={(e) => {
+              e.target.value = sanitizeEmail(e.target.value);
+              register("email").onChange(e);
+            }}
+            onBlur={(e) => {
+              register("email").onBlur(e);
+              setFieldError("email", validateEmail(e.target.value));
+            }}
           />
           {errors.email?.message && (
-            <p style={{ marginTop: 4, fontSize: 12, color: "var(--status-error)" }}>{errors.email.message}</p>
+            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
           )}
+          <FieldError message={fieldErrors.email ?? null} />
         </div>
       </div>
 
@@ -263,7 +308,14 @@ export const PersonalStep = ({
                 className="cv-input"
                 placeholder="linkedin.com/in/yourname"
                 {...register("linkedin")}
+                onBlur={(e) => {
+                  register("linkedin").onBlur(e);
+                  const url = sanitizeURL(e.target.value);
+                  if (url !== e.target.value) setValue("linkedin", url, { shouldDirty: true });
+                  setFieldError("linkedin", validateLinkedIn(url));
+                }}
               />
+              <FieldError message={fieldErrors.linkedin ?? null} type="warning" />
             </div>
             <div>
               <label className="cv-label">WEBSITE</label>
@@ -271,7 +323,14 @@ export const PersonalStep = ({
                 className="cv-input"
                 placeholder="www.yourportfolio.com"
                 {...register("website")}
+                onBlur={(e) => {
+                  register("website").onBlur(e);
+                  const url = sanitizeURL(e.target.value);
+                  if (url !== e.target.value) setValue("website", url, { shouldDirty: true });
+                  setFieldError("website", validateURL(url));
+                }}
               />
+              <FieldError message={fieldErrors.website ?? null} type="warning" />
             </div>
             <div>
               <label className="cv-label">NATIONALITY</label>
@@ -279,6 +338,10 @@ export const PersonalStep = ({
                 className="cv-input"
                 placeholder="e.g. Emirati, Pakistani, Indian"
                 {...register("nationality")}
+                onChange={(e) => {
+                  e.target.value = sanitizeName(e.target.value);
+                  register("nationality").onChange(e);
+                }}
               />
             </div>
             <div>
@@ -287,6 +350,10 @@ export const PersonalStep = ({
                 className="cv-input"
                 placeholder="e.g. United Arab Emirates"
                 {...register("country")}
+                onChange={(e) => {
+                  e.target.value = sanitizeLocation(e.target.value);
+                  register("country").onChange(e);
+                }}
               />
             </div>
             <div>

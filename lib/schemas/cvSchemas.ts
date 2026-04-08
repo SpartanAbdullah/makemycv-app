@@ -74,7 +74,18 @@ export const languagesSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string().min(1, "Language is required"),
-      level: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+      level: z
+        .enum([
+          "elementary",
+          "conversational",
+          "professional",
+          "full_professional",
+          "native",
+          "beginner",
+          "intermediate",
+          "advanced",
+        ])
+        .optional(),
     })
   ),
 });

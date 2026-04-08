@@ -1,4 +1,5 @@
 import type { CvData } from "../types/cv";
+import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
 
 export const ModernTemplate = ({
@@ -192,7 +193,7 @@ export const ModernTemplate = ({
                 {data.languages.map((lang) => (
                   <li key={lang.id}>
                     {lang.name}
-                    {lang.level ? ` - ${lang.level}` : ""}
+                    {lang.level ? ` - ${formatLanguageLevel(lang.level)}` : ""}
                   </li>
                 ))}
               </ul>

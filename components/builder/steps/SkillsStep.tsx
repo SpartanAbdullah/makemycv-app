@@ -9,6 +9,7 @@ import { createId } from "../../../lib/utils/id";
 import { NavigationButtons } from "../NavigationButtons";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
+import { sanitizeSkill } from "../../../lib/sanitize";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
 type SkillsForm = { skills: CvSkill[] };
@@ -223,7 +224,7 @@ export const SkillsStep = ({
             placeholder="e.g. Project Management, SAP, AutoCAD"
             value={inputValue}
             onChange={(e) => {
-              setInputValue(e.target.value);
+              setInputValue(sanitizeSkill(e.target.value));
               setDuplicateWarning(false);
             }}
             onKeyDown={(e) => {

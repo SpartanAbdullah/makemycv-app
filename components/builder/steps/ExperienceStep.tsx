@@ -11,6 +11,12 @@ import { NavigationButtons } from "../NavigationButtons";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
+import {
+  sanitizeJobTitle,
+  sanitizeCompanyName,
+  sanitizeLocation,
+  sanitizePlainText,
+} from "../../../lib/sanitize";
 import type { CvExperience } from "../../../lib/types/cv";
 
 type ExperienceForm = { experience: CvExperience[] };
@@ -233,10 +239,26 @@ export const ExperienceStep = ({
                       </div>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
                         <Field label="Job Title" error={errors.experience?.[index]?.role?.message}>
-                          <input className="cv-input" placeholder="e.g. Operations Manager" {...register(`experience.${index}.role`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. Operations Manager"
+                            {...register(`experience.${index}.role`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeJobTitle(e.target.value);
+                              register(`experience.${index}.role`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <Field label="Employer / Company" error={errors.experience?.[index]?.company?.message}>
-                          <input className="cv-input" placeholder="e.g. Interior360 General Trading LLC" {...register(`experience.${index}.company`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. Interior360 General Trading LLC"
+                            {...register(`experience.${index}.company`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeCompanyName(e.target.value);
+                              register(`experience.${index}.company`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <Field label="Start date" error={errors.experience?.[index]?.startDate?.message}>
                           <input className="cv-input" placeholder="e.g. Jan 2024" {...register(`experience.${index}.startDate`)} />
@@ -245,7 +267,15 @@ export const ExperienceStep = ({
                           <input className="cv-input" placeholder="e.g. Mar 2026" {...register(`experience.${index}.endDate`)} />
                         </Field>
                         <Field label="City">
-                          <input className="cv-input" placeholder="e.g. Dubai" {...register(`experience.${index}.location`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. Dubai"
+                            {...register(`experience.${index}.location`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeLocation(e.target.value);
+                              register(`experience.${index}.location`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-body)" }}>
                           <input type="checkbox" {...register(`experience.${index}.isCurrent`)} />
@@ -277,6 +307,11 @@ export const ExperienceStep = ({
                                 className="cv-input flex-1"
                                 {...register(`experience.${index}.bullets.${bulletIndex}`)}
                                 onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
+                                onBlur={(e) => {
+                                  register(`experience.${index}.bullets.${bulletIndex}`).onBlur(e);
+                                  const cleaned = sanitizePlainText(e.target.value);
+                                  if (cleaned !== e.target.value) e.target.value = cleaned;
+                                }}
                               />
                               <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>

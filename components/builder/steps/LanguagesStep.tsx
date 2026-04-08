@@ -1,15 +1,119 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { languagesSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
-import type { CvLanguage } from "../../../lib/types/cv";
+import { LANGUAGE_LEVELS } from "../../../lib/language";
+import { sanitizeLanguageName } from "../../../lib/sanitize";
+import type { CvLanguage, LanguageLevel } from "../../../lib/types/cv";
 
 type LanguagesForm = { languages: CvLanguage[] };
+
+/* ── Custom proficiency dropdown ── */
+
+const LevelDropdown = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: LanguageLevel) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (ref.current && !ref.current.contains(e.target as Node)) {
+      setOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.addEventListener("click", handleClickOutside, true);
+    }
+    return () => document.removeEventListener("click", handleClickOutside, true);
+  }, [open, handleClickOutside]);
+
+  const selected = LANGUAGE_LEVELS.find((l) => l.value === value);
+  // Map legacy values to display labels
+  const displayLabel =
+    selected?.label ??
+    (value === "beginner"
+      ? "Elementary"
+      : value === "intermediate"
+        ? "Conversational"
+        : value === "advanced"
+          ? "Professional Working"
+          : "");
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-left flex justify-between items-center hover:border-indigo-300 focus:ring-2 focus:ring-indigo-300 focus:outline-none bg-white transition"
+      >
+        <span className={displayLabel ? "text-gray-800" : "text-gray-400"}>
+          {displayLabel || "Select proficiency level"}
+        </span>
+        <svg
+          className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden">
+          {LANGUAGE_LEVELS.map((level) => {
+            const isSelected = level.value === value;
+            return (
+              <button
+                key={level.value}
+                type="button"
+                onClick={() => {
+                  onChange(level.value);
+                  setOpen(false);
+                }}
+                className={`w-full px-4 py-3 text-left cursor-pointer transition flex items-center justify-between ${
+                  isSelected
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "hover:bg-indigo-50"
+                }`}
+              >
+                <div>
+                  <p
+                    className={`text-sm ${
+                      isSelected ? "font-semibold text-indigo-700" : "font-medium text-gray-800"
+                    }`}
+                  >
+                    {level.label}
+                  </p>
+                  <p className="text-xs text-gray-400">{level.description}</p>
+                </div>
+                {isSelected && (
+                  <span className="text-indigo-600 text-sm font-bold ml-2 shrink-0">
+                    {"\u2713"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Languages step ── */
 
 export const LanguagesStep = ({
   onNext,
@@ -31,6 +135,7 @@ export const LanguagesStep = ({
     control,
     watch,
     reset,
+    setValue,
     formState: { isDirty },
   } = useForm<LanguagesForm>({
     resolver: zodResolver(languagesSchema),
@@ -77,7 +182,7 @@ export const LanguagesStep = ({
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="flex items-center justify-between">
           <h2 className="cv-step-heading">Languages</h2>
           <span className="cv-badge-optional">Optional</span>
         </div>
@@ -89,7 +194,7 @@ export const LanguagesStep = ({
           <button
             type="button"
             onClick={() =>
-              append({ id: crypto.randomUUID(), name: "", level: "intermediate" })
+              append({ id: crypto.randomUUID(), name: "", level: "conversational" })
             }
             className="cv-btn-ghost"
           >
@@ -100,15 +205,23 @@ export const LanguagesStep = ({
           {fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
               <Field label="Language">
-                <input className="cv-input" placeholder="e.g. Arabic" {...register(`languages.${index}.name`)} />
+                <input
+                  className="cv-input"
+                  placeholder="e.g. Arabic"
+                  {...register(`languages.${index}.name`)}
+                  onChange={(e) => {
+                    e.target.value = sanitizeLanguageName(e.target.value);
+                    register(`languages.${index}.name`).onChange(e);
+                  }}
+                />
               </Field>
               <Field label="Level">
-                <select className="cv-select" {...register(`languages.${index}.level`)}>
-                  <option value="" disabled>Select level</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
+                <LevelDropdown
+                  value={watch(`languages.${index}.level`) ?? ""}
+                  onChange={(val) =>
+                    setValue(`languages.${index}.level`, val, { shouldDirty: true })
+                  }
+                />
               </Field>
               <button
                 type="button"

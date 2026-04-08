@@ -1,5 +1,6 @@
 import type { CvData, CvSkill, PlanTier } from "../types/cv";
 import { formatDateRange } from "../utils/format";
+import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 
 export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: PlanTier }) => {
@@ -104,24 +105,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       })
       .join(" ");
 
-  const normalizeLevel = (level?: string) => (level ? toTitleCase(level) : "");
-
   const formatSkill = (skill: CvSkill) => toTitleCase(skill.name);
-
-  const formatLanguage = (name: string, level?: string) => {
-    const normalized = level?.toLowerCase();
-    const prettyLevel =
-      normalized === "beginner"
-        ? "Conversational"
-        : normalized === "intermediate"
-          ? "Professional"
-          : normalized === "advanced"
-            ? "Fluent"
-            : normalized
-              ? toTitleCase(normalized)
-              : "";
-    return `${toTitleCase(name)}${prettyLevel ? ` (${prettyLevel})` : ""}`;
-  };
 
   return (
     <div className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[11.5px] leading-[1.45] text-slate-700">
@@ -313,7 +297,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 </div>
                 <p className={`mt-2 ${bodyClass}`}>
                   {data.languages
-                    .map((lang) => formatLanguage(lang.name, normalizeLevel(lang.level)))
+                    .map((lang) => `${toTitleCase(lang.name)}${lang.level ? ` (${formatLanguageLevel(lang.level)})` : ""}`)
                     .join(" | ")}
                 </p>
               </div>
