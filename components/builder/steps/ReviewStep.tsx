@@ -33,6 +33,7 @@ export const ReviewStep = ({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponFeedback, setCouponFeedback] = useState<{
     type: "error" | "info";
     text: string;
@@ -64,9 +65,11 @@ export const ReviewStep = ({
     updateSection("settings", { ...data.settings, templateId: id });
   };
 
-  const handleApplyCoupon = (event: FormEvent<HTMLFormElement>) => {
+  const handleApplyCoupon = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const result = applyCoupon(couponCode);
+    setIsApplyingCoupon(true);
+    const result = await applyCoupon(couponCode);
+    setIsApplyingCoupon(false);
 
     if (!result.ok) {
       setCouponFeedback({ type: "error", text: result.message });
@@ -74,7 +77,7 @@ export const ReviewStep = ({
     }
 
     setCouponCode("");
-    setCouponFeedback(null);
+    setCouponFeedback({ type: "info", text: result.message });
     setUpgradeOpen(false);
   };
 
@@ -82,7 +85,7 @@ export const ReviewStep = ({
     clearCoupon();
     setCouponFeedback({
       type: "info",
-      text: "Coupon removed. Free plan limits now apply again.",
+      text: "Promo removed from this browser. Reapplying may fail if the code has already reached its usage limit.",
     });
   };
 
@@ -197,10 +200,10 @@ export const ReviewStep = ({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="cv-label" style={{ marginBottom: 6 }}>
-                Apply Coupon
+                Apply Promo
               </p>
               <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                Use an internal testing coupon to unlock Pro without payment.
+                Use an internal testing promo code to unlock Pro without payment.
               </p>
             </div>
             {proAccessSource === "coupon" && (
@@ -232,7 +235,7 @@ export const ReviewStep = ({
               }}
             >
               <p style={{ fontSize: 13, color: "#166534", fontWeight: 600 }}>
-                Coupon <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{appliedCouponCode}</span> is active.
+                Promo <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{appliedCouponCode}</span> is active.
               </p>
               <p style={{ fontSize: 12, color: "#166534", marginTop: 4 }}>
                 This browser now has Pro access for templates, clean PDF export, and unlimited downloads.
@@ -243,30 +246,32 @@ export const ReviewStep = ({
                 className="cv-btn-secondary"
                 style={{ marginTop: 12, fontSize: 12, padding: "8px 14px" }}
               >
-                Remove Coupon
+                Remove Promo
               </button>
             </div>
           ) : (
             <form onSubmit={handleApplyCoupon} className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
-                id="coupon-code"
+                id="promo-code"
                 type="text"
                 value={couponCode}
                 onChange={(event) => {
                   setCouponCode(event.target.value);
                   if (couponFeedback) setCouponFeedback(null);
                 }}
-                placeholder="Enter coupon code"
+                placeholder="Enter promo code"
                 className="cv-input"
                 style={{ flex: 1 }}
                 autoComplete="off"
+                disabled={isApplyingCoupon}
               />
               <button
                 type="submit"
                 className="cv-btn-secondary"
                 style={{ padding: "12px 18px", whiteSpace: "nowrap" }}
+                disabled={isApplyingCoupon}
               >
-                Apply Coupon
+                {isApplyingCoupon ? "Applying..." : "Apply Promo"}
               </button>
             </form>
           )}
