@@ -1,5 +1,6 @@
 import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
+import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -280,7 +281,7 @@ export const ExecutiveTemplate = ({
                   style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.7 }}
                 >
                   {lang.name}
-                  {lang.level ? ` (${lang.level})` : ""}
+                  {lang.level ? ` (${formatLanguageLevel(lang.level)})` : ""}
                 </div>
               ))}
             </div>

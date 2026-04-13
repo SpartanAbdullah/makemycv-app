@@ -8,6 +8,10 @@ import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import {
+  sanitizeCompanyName,
+  sanitizeJobTitle,
+} from "../../../lib/sanitize";
 import type { CvEducation } from "../../../lib/types/cv";
 
 const ATTESTING_BODIES = [
@@ -152,13 +156,37 @@ export const EducationStep = ({
                       </div>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
                         <Field label="Degree / Qualification" error={errors.education?.[index]?.degree?.message}>
-                          <input className="cv-input" placeholder="e.g. Bachelor of Business Administration" {...register(`education.${index}.degree`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. Bachelor of Business Administration"
+                            {...register(`education.${index}.degree`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeJobTitle(e.target.value);
+                              register(`education.${index}.degree`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <Field label="School / University" error={errors.education?.[index]?.school?.message}>
-                          <input className="cv-input" placeholder="e.g. American University of Sharjah" {...register(`education.${index}.school`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. American University of Sharjah"
+                            {...register(`education.${index}.school`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeCompanyName(e.target.value);
+                              register(`education.${index}.school`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <Field label="Field of study">
-                          <input className="cv-input" placeholder="e.g. Finance" {...register(`education.${index}.field`)} />
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. Finance"
+                            {...register(`education.${index}.field`)}
+                            onChange={(e) => {
+                              e.target.value = sanitizeJobTitle(e.target.value);
+                              register(`education.${index}.field`).onChange(e);
+                            }}
+                          />
                         </Field>
                         <Field label="Start year" error={errors.education?.[index]?.startDate?.message}>
                           <input className="cv-input" placeholder="e.g. 2018" {...register(`education.${index}.startDate`)} />

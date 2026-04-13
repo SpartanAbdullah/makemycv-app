@@ -2,6 +2,8 @@ import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { ATSCleanTemplate } from "./ats-clean";
 import { ClassicTemplate } from "./classic";
+import { CorpSidebarTemplate } from "./corp-sidebar";
+import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
 import { ModernTemplate } from "./modern";
 
@@ -97,6 +99,58 @@ const ATSCleanThumb = () => (
   </div>
 );
 
+const ExecSplitThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+    {/* Dark header */}
+    <div className="bg-[#1B2A4A] p-2 flex-shrink-0">
+      <div className="h-2 w-20 rounded bg-white/40" />
+      <div className="h-1.5 w-14 rounded bg-white/20 mt-1" />
+      <div className="h-1 w-full rounded bg-white/10 mt-1" />
+    </div>
+    {/* Two-column body */}
+    <div className="flex flex-1 p-1.5 gap-1.5 bg-white">
+      <div className="flex-1 space-y-1.5">
+        <div className="h-1 w-10 rounded bg-[#1B2A4A]/40" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+        <div className="h-1 w-5/6 rounded bg-slate-200" />
+        <div className="h-1 w-8 rounded bg-[#1B2A4A]/40 mt-1" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+      </div>
+      <div className="w-8 flex-shrink-0 space-y-1.5">
+        <div className="h-1 w-full rounded bg-slate-300" />
+        <div className="h-1 w-4/5 rounded bg-slate-200" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+      </div>
+    </div>
+  </div>
+);
+
+const CorpSidebarThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 overflow-hidden flex">
+    {/* Light left content */}
+    <div className="flex-1 p-2 space-y-1.5 bg-white">
+      <div className="h-2 w-16 rounded bg-slate-800" />
+      <div className="h-1 w-10 rounded bg-slate-400" />
+      <div className="h-px w-full bg-slate-800 mt-1" />
+      <div className="h-1 w-full rounded bg-slate-200 mt-1" />
+      <div className="h-1 w-5/6 rounded bg-slate-200" />
+      <div className="h-1 w-12 rounded bg-slate-400 mt-1" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="h-1 w-4/5 rounded bg-slate-200" />
+    </div>
+    {/* Dark right sidebar */}
+    <div className="w-12 bg-[#0F172A] p-1.5 flex flex-col gap-1.5 flex-shrink-0">
+      <div className="h-1 w-full rounded bg-white/20" />
+      <div className="h-1 w-4/5 rounded bg-white/15" />
+      <div className="h-1 w-full rounded bg-white/15" />
+      <div className="mt-1 h-1 w-full rounded bg-white/20" />
+      <div className="h-1 w-3/5 rounded bg-white/15" />
+      <div className="mt-1 h-1 w-full rounded bg-white/20" />
+      <div className="h-1 w-4/5 rounded bg-white/15" />
+    </div>
+  </div>
+);
+
 export const templates: TemplateDefinition[] = [
   {
     id: "classic",
@@ -126,6 +180,20 @@ export const templates: TemplateDefinition[] = [
     badge: "ATS Optimised",
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
+  },
+  {
+    id: "exec-split",
+    name: "Executive Split",
+    description: "Dark header with two-column body for senior professionals.",
+    Thumbnail: ExecSplitThumb,
+    Render: ExecSplitTemplate,
+  },
+  {
+    id: "corp-sidebar",
+    name: "Corporate",
+    description: "Right dark sidebar with structured left content area.",
+    Thumbnail: CorpSidebarThumb,
+    Render: CorpSidebarTemplate,
   },
 ];
 

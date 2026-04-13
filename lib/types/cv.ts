@@ -1,4 +1,13 @@
 export type SkillLevel = "beginner" | "intermediate" | "advanced";
+export type LanguageLevel =
+  | "elementary"
+  | "conversational"
+  | "professional"
+  | "full_professional"
+  | "native"
+  | "beginner"
+  | "intermediate"
+  | "advanced";
 export type PlanTier = "free" | "pro";
 
 export type CvPersonal = {
@@ -51,7 +60,7 @@ export type CvSkill = {
 export type CvLanguage = {
   id: string;
   name: string;
-  level?: SkillLevel;
+  level?: LanguageLevel;
 };
 
 export type CvCertification = {
@@ -68,11 +77,14 @@ export type CvProject = {
   bullets: string[];
 };
 
+export type PhotoShape = "round" | "square";
+
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
   fontScale?: number;
   sectionOrder?: string[];
+  photoShape?: PhotoShape;
 };
 
 export type CvData = {

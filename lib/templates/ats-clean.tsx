@@ -1,4 +1,5 @@
 import type { CvData, PlanTier } from "../types/cv";
+import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -422,7 +423,7 @@ export const ATSCleanTemplate = ({
             {data.languages
               .map((lang) =>
                 lang.level
-                  ? `${lang.name} (${lang.level})`
+                  ? `${lang.name} (${formatLanguageLevel(lang.level)})`
                   : lang.name,
               )
               .join(", ")}

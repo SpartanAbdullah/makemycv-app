@@ -1,4 +1,5 @@
 import type { CvData } from "../types/cv";
+import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
 
 export const ModernTemplate = ({
@@ -109,7 +110,7 @@ export const ModernTemplate = ({
               style={{
                 width: 80,
                 height: 80,
-                borderRadius: "50%",
+                borderRadius: data.settings.photoShape === "square" ? 8 : "50%",
                 overflow: "hidden",
                 flexShrink: 0,
                 border: "2px solid #e2e8f0",
@@ -192,7 +193,7 @@ export const ModernTemplate = ({
                 {data.languages.map((lang) => (
                   <li key={lang.id}>
                     {lang.name}
-                    {lang.level ? ` - ${lang.level}` : ""}
+                    {lang.level ? ` - ${formatLanguageLevel(lang.level)}` : ""}
                   </li>
                 ))}
               </ul>

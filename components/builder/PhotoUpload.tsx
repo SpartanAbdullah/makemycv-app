@@ -9,6 +9,7 @@ import {
 interface PhotoUploadProps {
   photo?: string;
   showPhoto?: boolean;
+  photoShape?: "round" | "square";
   onPhotoChange: (base64: string | undefined) => void;
   onToggleChange: (show: boolean) => void;
 }
@@ -16,6 +17,7 @@ interface PhotoUploadProps {
 export function PhotoUpload({
   photo,
   showPhoto = false,
+  photoShape = "round",
   onPhotoChange,
   onToggleChange,
 }: PhotoUploadProps) {
@@ -66,7 +68,7 @@ export function PhotoUpload({
       <div className="flex items-start gap-4">
         {/* Photo preview or placeholder */}
         <div
-          className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
+          className={`flex-shrink-0 w-20 h-20 ${photoShape === "round" ? "rounded-full" : "rounded-xl"} overflow-hidden border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all`}
           onClick={() => inputRef.current?.click()}
           role="button"
           tabIndex={0}

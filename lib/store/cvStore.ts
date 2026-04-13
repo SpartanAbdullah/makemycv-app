@@ -111,6 +111,7 @@ export const defaultCvData: CvData = {
       "certifications",
       "projects",
     ],
+    photoShape: "round",
   },
 };
 
@@ -135,7 +136,7 @@ type CvStore = {
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
   setIsPro: (value: boolean) => void;
   setHasUsedFreeDownload: (value: boolean) => void;
-  applyCoupon: (value: string) => ApplyCouponResult;
+  applyCoupon: (value: string) => Promise<ApplyCouponResult>;
   clearCoupon: () => void;
   reset: () => void;
   importJson: (data: CvData) => void;
@@ -209,31 +210,62 @@ export const useCvStore = create<CvStore>((set, get) => ({
     if (typeof window !== "undefined") window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
     set({ hasUsedFreeDownload: value });
   },
-  applyCoupon: (value) => {
+  applyCoupon: async (value) => {
     const normalized = getNormalizedCouponCode(value);
 
     if (!normalized) {
-      return { ok: false, message: "Enter a coupon code to unlock Pro." };
+      return { ok: false, message: "Enter a promo code to unlock Pro." };
     }
 
     if (!isValidProCoupon(normalized)) {
-      return { ok: false, message: "That coupon code is not valid." };
+      return { ok: false, message: "That promo code is not valid." };
     }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(COUPON_STORAGE_KEY, normalized);
+    try {
+      const response = await fetch("/api/coupons/apply", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ code: normalized }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { code?: string; message?: string }
+        | null;
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          message: payload?.message ?? "We couldn't apply that promo right now. Please try again.",
+        };
+      }
+
+      const appliedCode = getNormalizedCouponCode(payload?.code ?? normalized);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(COUPON_STORAGE_KEY, appliedCode);
+      }
+
+      const hasManualPro = typeof window !== "undefined"
+        && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
+
+      set({
+        isPro: true,
+        appliedCouponCode: appliedCode,
+        proAccessSource: hasManualPro ? "manual" : "coupon",
+      });
+
+      return {
+        ok: true,
+        message: payload?.message ?? "Promo applied. Pro features are now unlocked.",
+      };
+    } catch {
+      return {
+        ok: false,
+        message: "We couldn't apply that promo right now. Please try again.",
+      };
     }
-
-    const hasManualPro = typeof window !== "undefined"
-      && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
-
-    set({
-      isPro: true,
-      appliedCouponCode: normalized,
-      proAccessSource: hasManualPro ? "manual" : "coupon",
-    });
-
-    return { ok: true, message: "Coupon applied. Pro features are now unlocked." };
   },
   clearCoupon: () => {
     if (typeof window !== "undefined") {
