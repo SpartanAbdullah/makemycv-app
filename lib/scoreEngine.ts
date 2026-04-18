@@ -174,21 +174,6 @@ const CATEGORY_META: Record<
   },
 };
 
-// --- Issue copy (mode-aware) ---
-
-type CopyBuilder = (ctx: {
-  pass: boolean;
-  mode: ScoreMode;
-  extras?: Record<string, string | number>;
-}) => { title: string; description: string; actionable: string };
-
-function copy(
-  builder: CopyBuilder,
-  ctx: Parameters<CopyBuilder>[0],
-): { title: string; description: string; actionable: string } {
-  return builder(ctx);
-}
-
 // Short helper to build a SubSignal in one line.
 function sig(
   id: string,
