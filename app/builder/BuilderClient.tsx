@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BuilderShell } from "../../components/builder/BuilderShell";
+import ImportFromReportBanner from "../../components/builder/ImportFromReportBanner";
 import { PersonalStep } from "../../components/builder/steps/PersonalStep";
 import { SummaryStep } from "../../components/builder/steps/SummaryStep";
 import { ExperienceStep } from "../../components/builder/steps/ExperienceStep";
@@ -57,7 +58,9 @@ export const BuilderClient = () => {
   );
 
   return (
-    <BuilderShell stepId={stepId} onStepChange={goToStep}>
+    <>
+      <ImportFromReportBanner />
+      <BuilderShell stepId={stepId} onStepChange={goToStep}>
       {stepId === "personal" && (
         <PersonalStep onNext={() => goToStep(nextStep || "summary")} />
       )}
@@ -111,6 +114,7 @@ export const BuilderClient = () => {
         <ReviewStep onBack={() => goToStep(prevStep || "projects")} onJump={goToStep} />
       )}
       {stepId === "score" && <ScorePanel onSectionClick={handleSectionClick} />}
-    </BuilderShell>
+      </BuilderShell>
+    </>
   );
 };
