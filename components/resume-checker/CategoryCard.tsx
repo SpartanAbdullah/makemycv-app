@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { CheckerCategory } from "@/lib/resumeChecker/types";
+import type { ScoreCategory, ScoreSeverity } from "@/lib/resumeChecker/types";
 import IssueCard from "./IssueCard";
 
 const statusChip: Record<
-  CheckerCategory["status"],
+  ScoreSeverity,
   { bg: string; text: string; label: string }
 > = {
   good: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Good" },
@@ -17,7 +17,7 @@ export default function CategoryCard({
   category,
   defaultOpen = true,
 }: {
-  category: CheckerCategory;
+  category: ScoreCategory;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -26,7 +26,7 @@ export default function CategoryCard({
 
   return (
     <section
-      id={`category-${category.category}`}
+      id={`category-${category.id}`}
       className="overflow-hidden rounded-xl border border-slate-200 bg-white"
     >
       <button
@@ -38,7 +38,7 @@ export default function CategoryCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-display text-xl font-semibold text-slate-900">
-              {category.label}
+              {category.name}
             </h2>
             <span
               className={`${chip.bg} ${chip.text} rounded-full px-2.5 py-0.5 text-xs font-medium`}

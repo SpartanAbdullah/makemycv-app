@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { parseCvText } from "@/lib/resumeChecker/parse";
-import { computeCheckerScore } from "@/lib/scoreEngine";
+import { computeScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
 import type { StoredReport } from "@/lib/resumeChecker/types";
 
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   }
 
   const { cv, parseSignals, rawText: storedRawText } = result;
-  const score = computeCheckerScore(cv, parseSignals);
+  const score = computeScore(cv, { mode: "checker", parseSignals });
 
   const reportId = nanoid(16);
   const createdAt = Date.now();

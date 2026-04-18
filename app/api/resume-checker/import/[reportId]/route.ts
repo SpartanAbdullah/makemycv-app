@@ -24,5 +24,11 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ cv: stored.cv });
+  // parseSignals travel alongside the CV so the Builder can produce a
+  // score with parity to the Checker's report (the 10 conditional points
+  // score out of 100 in both places instead of dropping out in builder mode).
+  return NextResponse.json({
+    cv: stored.cv,
+    parseSignals: stored.parseSignals,
+  });
 }

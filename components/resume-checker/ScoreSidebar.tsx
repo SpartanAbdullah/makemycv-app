@@ -2,24 +2,31 @@
 
 import { useState } from "react";
 import type {
-  CheckerCategory,
-  CheckerScoreResult,
+  ScoreCategory,
+  ScoreReport,
+  ScoreSeverity,
 } from "@/lib/resumeChecker/types";
 import FixInBuilderButton from "./FixInBuilderButton";
 
-const statusRing: Record<CheckerScoreResult["status"], string> = {
+function totalStatus(total: number): ScoreSeverity {
+  if (total >= 85) return "good";
+  if (total >= 60) return "review";
+  return "error";
+}
+
+const statusRing: Record<ScoreSeverity, string> = {
   good: "ring-emerald-400 text-emerald-700",
   review: "ring-amber-400 text-amber-700",
   error: "ring-red-400 text-red-700",
 };
 
-const dotColor: Record<CheckerCategory["status"], string> = {
+const dotColor: Record<ScoreSeverity, string> = {
   good: "bg-emerald-500",
   review: "bg-amber-500",
   error: "bg-red-500",
 };
 
-const severityLabel: Record<CheckerCategory["status"], string> = {
+const severityLabel: Record<ScoreSeverity, string> = {
   good: "Good",
   review: "Review",
   error: "Fix",
@@ -29,9 +36,11 @@ export default function ScoreSidebar({
   score,
   reportId,
 }: {
-  score: CheckerScoreResult;
+  score: ScoreReport;
   reportId: string;
 }) {
+  const issueCount = score.issueCounts.error + score.issueCounts.review;
+  const overall = totalStatus(score.total);
   return (
     <aside className="lg:sticky lg:top-6 lg:self-start">
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -39,7 +48,7 @@ export default function ScoreSidebar({
           Your score
         </div>
         <div
-          className={`mb-2 inline-flex items-baseline font-display text-5xl font-bold tabular-nums ring-2 ring-offset-4 rounded-xl px-3 py-1 ${statusRing[score.status]}`}
+          className={`mb-2 inline-flex items-baseline font-display text-5xl font-bold tabular-nums ring-2 ring-offset-4 rounded-xl px-3 py-1 ${statusRing[overall]}`}
         >
           {score.total}
           <span className="ml-1 text-2xl font-semibold text-slate-400">
@@ -47,14 +56,14 @@ export default function ScoreSidebar({
           </span>
         </div>
         <div className="mt-2 text-sm text-slate-600">
-          {score.issueCount === 0
+          {issueCount === 0
             ? "No issues found."
-            : `${score.issueCount} issue${score.issueCount > 1 ? "s" : ""} to address.`}
+            : `${issueCount} issue${issueCount > 1 ? "s" : ""} to address.`}
         </div>
 
         <div className="mt-6 space-y-1">
           {score.categories.map((cat) => (
-            <CategoryRow key={cat.category} cat={cat} />
+            <CategoryRow key={cat.id} cat={cat} />
           ))}
         </div>
 
@@ -70,7 +79,7 @@ export default function ScoreSidebar({
   );
 }
 
-function CategoryRow({ cat }: { cat: CheckerCategory }) {
+function CategoryRow({ cat }: { cat: ScoreCategory }) {
   const [open, setOpen] = useState(false);
   const bad = cat.issues.filter((i) => i.severity !== "good");
 
@@ -82,7 +91,7 @@ function CategoryRow({ cat }: { cat: CheckerCategory }) {
           setOpen((v) => !v);
           // jump to the main card too
           if (typeof document !== "undefined") {
-            const el = document.getElementById(`category-${cat.category}`);
+            const el = document.getElementById(`category-${cat.id}`);
             if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }}
@@ -95,7 +104,7 @@ function CategoryRow({ cat }: { cat: CheckerCategory }) {
             aria-hidden
           />
           <span className="truncate text-sm font-medium text-slate-800">
-            {cat.label}
+            {cat.name}
           </span>
           <span className="ml-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
             {severityLabel[cat.status]}

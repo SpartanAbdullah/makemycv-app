@@ -4,11 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCvStore } from "@/lib/store/cvStore";
 import type { CvData } from "@/lib/types/cv";
+import type { ParseSignals } from "@/lib/resumeChecker/types";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "fetching" }
-  | { kind: "confirm"; imported: CvData }
+  | {
+      kind: "confirm";
+      imported: CvData;
+      importedSignals: ParseSignals | null;
+    }
   | { kind: "imported"; replaced: boolean }
   | { kind: "error"; message: string };
 
@@ -34,6 +39,7 @@ export default function ImportFromReportBanner() {
   const hydrated = useCvStore((s) => s.hydrated);
   const currentData = useCvStore((s) => s.data);
   const importCvVersion = useCvStore((s) => s.importCvVersion);
+  const setParseSignals = useCvStore((s) => s.setParseSignals);
 
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const hasRunRef = useRef(false);
@@ -69,7 +75,10 @@ export default function ImportFromReportBanner() {
           stripParam();
           return;
         }
-        const payload = (await res.json()) as { cv?: CvData };
+        const payload = (await res.json()) as {
+          cv?: CvData;
+          parseSignals?: ParseSignals;
+        };
         if (!payload.cv) {
           if (cancelled) return;
           setPhase({ kind: "error", message: "Report returned no CV data." });
@@ -78,12 +87,19 @@ export default function ImportFromReportBanner() {
         }
         if (cancelled) return;
 
+        const importedSignals: ParseSignals | null =
+          payload.parseSignals ?? null;
         const hadContent = hasUserContent(currentData);
         if (hadContent) {
-          setPhase({ kind: "confirm", imported: payload.cv });
+          setPhase({
+            kind: "confirm",
+            imported: payload.cv,
+            importedSignals,
+          });
         } else {
           importCvVersion(payload.cv, "replace");
-          setPhase({ kind: "imported", replaced: false });
+          setParseSignals(importedSignals);
+          setPhase({ kind: "imported", replaced: true });
           stripParam();
         }
       } catch {
@@ -143,6 +159,7 @@ export default function ImportFromReportBanner() {
             type="button"
             onClick={() => {
               importCvVersion(phase.imported, "replace");
+              setParseSignals(phase.importedSignals);
               setPhase({ kind: "imported", replaced: true });
               stripParam();
             }}
