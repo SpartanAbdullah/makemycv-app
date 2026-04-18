@@ -4,7 +4,7 @@ import { useMemo, useState, useRef, useCallback } from "react";
 import { useCvStore } from "../lib/store/cvStore";
 import { calculateScore } from "../lib/scoreEngine";
 import { hasUsedFreeAI } from "../hooks/useAIImprove";
-import type { ScoreCategory } from "../lib/scoreEngine";
+import type { LegacyScoreCategory as ScoreCategory } from "../lib/scoreEngine";
 import type { AIImproveType } from "../hooks/useAIImprove";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
