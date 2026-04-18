@@ -11,6 +11,7 @@ import type {
   CvSkill,
   SkillLevel,
 } from "../types/cv";
+import type { ParseSignals } from "../resumeChecker/types";
 import {
   clearCvStorage,
   debounce,
@@ -18,6 +19,8 @@ import {
   saveCvToStorage,
 } from "../utils/localStorage";
 import { createId } from "../utils/id";
+
+const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
 
 const createEmptyExperience = (): CvExperience => ({
   id: crypto.randomUUID(),
@@ -131,6 +134,12 @@ type CvStore = {
   hasUsedFreeDownload: boolean;
   appliedCouponCode: string;
   proAccessSource: ProAccessSource;
+  /**
+   * Parse signals from the ATS Checker — travel with a CV imported via
+   * /api/resume-checker/import/:reportId and are used by computeScore to
+   * produce a checker-parity score in the Builder. null for hand-entered CVs.
+   */
+  parseSignals: ParseSignals | null;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
@@ -147,6 +156,8 @@ type CvStore = {
    * Importing always saves to localStorage (versioning via timestamp).
    */
   importCvVersion: (partial: Partial<CvData>, mode: "replace" | "merge") => void;
+  /** Set (or clear with null) parseSignals. Persists to localStorage. */
+  setParseSignals: (signals: ParseSignals | null) => void;
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
@@ -193,6 +204,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
   hasUsedFreeDownload: false,
   appliedCouponCode: "",
   proAccessSource: "free",
+  parseSignals: null,
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
@@ -283,9 +295,25 @@ export const useCvStore = create<CvStore>((set, get) => ({
   },
   reset: () => {
     clearCvStorage();
-    set({ data: defaultCvData });
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
+    }
+    set({ data: defaultCvData, parseSignals: null });
   },
   importJson: (data) => set({ data }),
+  setParseSignals: (signals) => {
+    if (typeof window !== "undefined") {
+      if (signals) {
+        window.localStorage.setItem(
+          PARSE_SIGNALS_STORAGE_KEY,
+          JSON.stringify(signals),
+        );
+      } else {
+        window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
+      }
+    }
+    set({ parseSignals: signals });
+  },
   importCvVersion: (partial, mode) => {
     const current = get().data;
     let next: CvData;
@@ -341,6 +369,20 @@ export const bindCvStorage = () => {
   }
   const accessState = loadAccessState();
   useCvStore.setState(accessState);
+
+  // Hydrate parseSignals from localStorage (travels with a Checker import).
+  try {
+    const rawSignals = window.localStorage.getItem(PARSE_SIGNALS_STORAGE_KEY);
+    if (rawSignals) {
+      const parsed = JSON.parse(rawSignals) as ParseSignals;
+      if (parsed && typeof parsed === "object" && "hasTables" in parsed) {
+        useCvStore.setState({ parseSignals: parsed });
+      }
+    }
+  } catch {
+    // Malformed — ignore, leave as null.
+  }
+
   useCvStore.getState().setHydrated(true);
   const saveDebounced = debounce((data: CvData) => saveCvToStorage(data), 500);
   useCvStore.subscribe((state) => saveDebounced(state.data));

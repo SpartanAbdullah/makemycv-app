@@ -39,18 +39,13 @@ export const BuilderClient = () => {
   const nextStep = builderSteps[stepIndex + 1]?.id;
   const prevStep = builderSteps[stepIndex - 1]?.id;
 
-  const CATEGORY_TO_STEP: Record<string, string> = {
-    "Contact Completeness": "personal",
-    "Professional Summary": "summary",
-    "Work Experience": "experience",
-    Education: "education",
-    Skills: "skills",
-    "ATS Compatibility": "summary",
-  };
-
+  // ScorePanel now hands us an already-resolved builder step id (via its
+  // internal CATEGORY_TO_STEP table). We just forward it to the router.
   const handleSectionClick = useCallback(
-    (sectionName: string) => {
-      const targetStep = CATEGORY_TO_STEP[sectionName] || "personal";
+    (stepTarget: string) => {
+      const targetStep = stepIds.includes(stepTarget as never)
+        ? stepTarget
+        : "personal";
       goToStep(targetStep);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
