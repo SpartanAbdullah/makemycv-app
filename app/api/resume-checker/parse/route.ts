@@ -1,9 +1,14 @@
 // POST /api/resume-checker/parse
-// multipart/form-data { file: PDF }  →  { reportId }
+// application/json { rawText: string, fileName?: string }  →  { reportId }
+//
+// PDF text is extracted client-side (see components/resume-checker/UploadDropzone
+// and lib/importers/pdfAdapter.extractPdfTextInBrowser). This route only sees
+// plain text, so it stays lightweight and avoids server-side pdfjs which is
+// brittle under Next.js Turbopack.
 
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { parseCvPdf } from "@/lib/resumeChecker/parse";
+import { parseCvText } from "@/lib/resumeChecker/parse";
 import { computeCheckerScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
 import type { StoredReport } from "@/lib/resumeChecker/types";
@@ -11,72 +16,65 @@ import type { StoredReport } from "@/lib/resumeChecker/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_TEXT_LENGTH = 100_000;
+const MIN_TEXT_LENGTH = 200;
 
 export async function POST(request: Request) {
   const requestId = nanoid(10);
 
-  let formData: FormData;
+  let body: unknown;
   try {
-    formData = await request.formData();
+    body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid form data", requestId },
+      { error: "Invalid JSON body", requestId },
       { status: 400 },
     );
   }
 
-  const file = formData.get("file");
-  if (!file || !(file instanceof File)) {
+  const rawText =
+    body && typeof body === "object" && "rawText" in body
+      ? (body as { rawText: unknown }).rawText
+      : undefined;
+
+  if (typeof rawText !== "string" || rawText.length === 0) {
     return NextResponse.json(
-      { error: "No file uploaded. Attach a PDF under the 'file' field.", requestId },
+      { error: "No text provided", requestId },
       { status: 400 },
     );
   }
 
-  if (file.type && file.type !== "application/pdf") {
+  if (rawText.length < MIN_TEXT_LENGTH) {
     return NextResponse.json(
-      { error: "Only PDF files are supported.", requestId },
-      { status: 400 },
+      {
+        error:
+          "CV text is too short. If your PDF is a scanned image, export a text-based version.",
+        requestId,
+      },
+      { status: 422 },
     );
   }
 
-  if (file.size === 0) {
+  if (rawText.length > MAX_TEXT_LENGTH) {
     return NextResponse.json(
-      { error: "The uploaded file is empty.", requestId },
+      {
+        error: `CV text is too long. Maximum is ${MAX_TEXT_LENGTH.toLocaleString()} characters.`,
+        requestId,
+      },
       { status: 400 },
     );
   }
-
-  if (file.size > MAX_SIZE_BYTES) {
-    return NextResponse.json(
-      { error: "File is too large. Maximum size is 5MB.", requestId },
-      { status: 400 },
-    );
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
 
   let result;
   try {
-    result = await parseCvPdf(buffer);
+    result = await parseCvText(rawText);
   } catch (err) {
     const e = err as { kind?: string; message?: string };
     if (e?.kind === "too-short") {
       return NextResponse.json(
         {
           error:
-            "We couldn't read this PDF. If it's a scanned image, export a text-based version and try again.",
-          requestId,
-        },
-        { status: 422 },
-      );
-    }
-    if (e?.kind === "pdf-failed") {
-      return NextResponse.json(
-        {
-          error:
-            "This PDF looks corrupted or encrypted. Try re-saving it from the original source.",
+            "We couldn't read enough text from this CV. Try a different PDF.",
           requestId,
         },
         { status: 422 },
@@ -98,7 +96,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { cv, parseSignals, rawText } = result;
+  const { cv, parseSignals, rawText: storedRawText } = result;
   const score = computeCheckerScore(cv, parseSignals);
 
   const reportId = nanoid(16);
@@ -108,7 +106,7 @@ export async function POST(request: Request) {
     parseSignals,
     score,
     createdAt,
-    rawText, // server-only — never returned to client
+    rawText: storedRawText, // server-only — never returned to client
   };
 
   try {

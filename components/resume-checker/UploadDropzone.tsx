@@ -2,11 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { extractPdfTextInBrowser } from "@/lib/importers/pdfAdapter";
 
-type Phase = "idle" | "reading" | "checking" | "scoring" | "long" | "error";
+type Phase =
+  | "idle"
+  | "extracting"
+  | "reading"
+  | "checking"
+  | "scoring"
+  | "long"
+  | "error";
 
 const PHASE_COPY: Record<Phase, string> = {
   idle: "",
+  extracting: "Reading PDF in browser…",
   reading: "Reading your CV…",
   checking: "Checking against ATS rules…",
   scoring: "Scoring…",
@@ -66,15 +75,34 @@ export default function UploadDropzone() {
 
       setError(null);
       setFileName(file.name);
-      setPhase("reading");
+      setPhase("extracting");
 
-      const formData = new FormData();
-      formData.append("file", file);
+      let rawText: string;
+      try {
+        rawText = await extractPdfTextInBrowser(file);
+      } catch {
+        setError(
+          "We couldn't read this PDF. Try re-saving it from the original source.",
+        );
+        setPhase("error");
+        return;
+      }
+
+      if (rawText.trim().length < 200) {
+        setError(
+          "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
+        );
+        setPhase("error");
+        return;
+      }
+
+      setPhase("reading");
 
       try {
         const res = await fetch("/api/resume-checker/parse", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawText, fileName: file.name }),
         });
 
         if (!res.ok) {

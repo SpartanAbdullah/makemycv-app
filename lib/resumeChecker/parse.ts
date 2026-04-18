@@ -1,6 +1,6 @@
 // CV parsing pipeline for the /resume-checker flow.
 //
-//   Buffer → pdfjs-dist (Node legacy build) → raw text
+//   rawText (extracted client-side via pdfAdapter.extractPdfTextInBrowser)
 //        ↓
 //   Claude Haiku → JSON (ParsedDocument shape + _parseSignals)
 //        ↓
@@ -9,6 +9,8 @@
 //   returns { cv, parseSignals, rawText }
 //
 // Server-only. Never import this file from a client component.
+// PDF text extraction happens in the browser — see pdfAdapter.ts — to avoid
+// the Next.js Turbopack + pdfjs worker incompatibility.
 
 import { z } from "zod";
 import type { CvData } from "../types/cv";
@@ -181,7 +183,10 @@ Return only the JSON object.`;
 // --- Helpers ---
 
 function extractJsonObject(text: string): unknown {
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+  const cleaned = text
+    .replace(/```(?:json)?\s*/g, "")
+    .replace(/```/g, "")
+    .trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("No JSON object found");
@@ -198,34 +203,6 @@ function emptySignals(
     spellingIssues: [],
     extractionConfidence: confidence,
   };
-}
-
-// --- PDF → text (pdfjs-dist legacy build, server-side) ---
-
-export async function extractPdfText(buffer: Buffer): Promise<{
-  text: string;
-  pageCount: number;
-}> {
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const uint8 = new Uint8Array(buffer);
-  const loadingTask = pdfjsLib.getDocument({
-    data: uint8,
-    useSystemFonts: false,
-    disableFontFace: true,
-    isEvalSupported: false,
-  });
-  const pdf = await loadingTask.promise;
-
-  let fullText = "";
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ("str" in item ? (item as { str: string }).str : ""))
-      .join(" ");
-    fullText += pageText + "\n";
-  }
-  return { text: fullText.trim(), pageCount: pdf.numPages };
 }
 
 // --- Claude call ---
@@ -325,7 +302,6 @@ async function callClaude(rawText: string): Promise<{
 
 export type ParseError =
   | { kind: "too-short"; textLength: number }
-  | { kind: "pdf-failed"; message: string }
   | { kind: "claude-failed"; message: string };
 
 export type ParseResult = {
@@ -336,20 +312,10 @@ export type ParseResult = {
 };
 
 /**
- * Parse a PDF buffer into a scored-ready CvData object.
+ * Parse pre-extracted CV text into a scored-ready CvData object.
  * Throws ParseError-shaped objects with `.kind`; callers should handle them as 4xx/5xx.
  */
-export async function parseCvPdf(buffer: Buffer): Promise<ParseResult> {
-  let rawText = "";
-  try {
-    const { text } = await extractPdfText(buffer);
-    rawText = text;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "PDF parse failed";
-    const e: ParseError = { kind: "pdf-failed", message };
-    throw e;
-  }
-
+export async function parseCvText(rawText: string): Promise<ParseResult> {
   if (rawText.length < 200) {
     const e: ParseError = { kind: "too-short", textLength: rawText.length };
     throw e;
