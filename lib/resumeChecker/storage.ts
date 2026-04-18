@@ -23,7 +23,7 @@ function kvConfigured(): boolean {
   );
 }
 
-function useInMemory(): boolean {
+function shouldUseInMemory(): boolean {
   return process.env.NODE_ENV === "development" && !kvConfigured();
 }
 
@@ -49,7 +49,7 @@ export async function saveReport(
   report: StoredReport,
 ): Promise<void> {
   const key = `report:${reportId}`;
-  if (useInMemory()) {
+  if (shouldUseInMemory()) {
     devSet(key, report);
     return;
   }
@@ -64,7 +64,7 @@ export async function saveReport(
 
 export async function getReport(reportId: string): Promise<StoredReport | null> {
   const key = `report:${reportId}`;
-  if (useInMemory()) {
+  if (shouldUseInMemory()) {
     return devGet(key);
   }
   if (!kvConfigured()) return null;
