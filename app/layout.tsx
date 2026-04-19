@@ -36,17 +36,14 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.makemycv.ae"),
-
   title: {
-    default: "MakeMyCV — Free CV Builder for UAE Jobs",
+    default: "MakeMyCV - Free CV Builder for UAE Jobs",
     template: "%s | MakeMyCV",
   },
-
   description:
     "Build a professional, ATS-friendly CV in minutes. " +
     "Designed for the UAE job market. Free templates, " +
     "instant PDF export, no sign-up required.",
-
   keywords: [
     "CV builder UAE",
     "resume builder Dubai",
@@ -57,25 +54,15 @@ export const metadata: Metadata = {
     "CV template Dubai",
     "makemycv",
   ],
-
   authors: [{ name: "MakeMyCV", url: "https://makemycv.ae" }],
   creator: "MakeMyCV",
   publisher: "MakeMyCV",
-
-  alternates: {
-    canonical: "https://app.makemycv.ae",
-    languages: {
-      "en-AE": "https://app.makemycv.ae",
-      en: "https://app.makemycv.ae",
-    },
-  },
-
   openGraph: {
     type: "website",
     locale: "en_AE",
     url: "https://app.makemycv.ae",
     siteName: "MakeMyCV",
-    title: "MakeMyCV — Free CV Builder for UAE Jobs",
+    title: "MakeMyCV - Free CV Builder for UAE Jobs",
     description:
       "Build a professional, ATS-friendly CV in minutes. " +
       "Designed for the UAE job market. Free, instant PDF export.",
@@ -84,41 +71,36 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MakeMyCV — CV Builder for UAE Job Seekers",
+        alt: "MakeMyCV - CV Builder for UAE Job Seekers",
       },
     ],
   },
-
   twitter: {
     card: "summary_large_image",
-    title: "MakeMyCV — Free CV Builder for UAE Jobs",
+    title: "MakeMyCV - Free CV Builder for UAE Jobs",
     description:
       "ATS-friendly CVs built for the UAE job market. " +
       "Free, fast, no sign-up needed.",
     images: ["/og-image.png"],
     creator: "@makemycv",
   },
-
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
     googleBot: {
-      index: true,
-      follow: true,
+      index: false,
+      follow: false,
       "max-video-preview": -1,
       "max-image-preview": "large",
       "max-snippet": -1,
     },
   },
-
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon-16x16.png",
     apple: "/apple-touch-icon.png",
   },
-
   manifest: "/site.webmanifest",
-
   category: "productivity",
 };
 
@@ -128,8 +110,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable}`}>
-      <body className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} antialiased`}>
+    <html
+      lang="en"
+      className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable}`}
+    >
+      <body
+        className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} antialiased`}
+      >
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

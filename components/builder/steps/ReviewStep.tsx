@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
@@ -9,6 +9,52 @@ import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
 import { UpgradeModal } from "../../modals/UpgradeModal";
+
+// Native A4 at ~96dpi. Our templates render into this exact box.
+const A4_W = 794;
+const A4_H = 1123;
+
+/**
+ * A4-portrait thumbnail: the outer box enforces the 1:1.414 aspect ratio
+ * and scales the full-size template into it via transform: scale(cardWidth/794).
+ * The scale is recomputed via ResizeObserver so the thumbnail stays crisp
+ * across breakpoints and grid-width changes.
+ */
+function TemplateThumb({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.3);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / A4_W);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="relative w-full overflow-hidden rounded-md border border-slate-200 bg-white aspect-[1/1.414]"
+    >
+      <div
+        className="absolute left-0 top-0 origin-top-left pointer-events-none"
+        style={{
+          width: A4_W,
+          height: A4_H,
+          transform: `scale(${scale})`,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const LOCKED_TEMPLATES = new Set(["executive", "ats-clean", "exec-split", "corp-sidebar"]);
 
@@ -307,7 +353,7 @@ export const ReviewStep = ({
         <p className="cv-label" style={{ marginBottom: 12, marginTop: 24 }}>
           Choose Template
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
           {templates.map((tmpl) => {
             const isLocked = !isPro && LOCKED_TEMPLATES.has(tmpl.id);
             return (
@@ -355,25 +401,11 @@ export const ReviewStep = ({
                 )}
 
                 <div className="flex flex-col items-center p-3 h-full">
-                  {/* Live mini-preview — scaled-down real template */}
-                  <div
-                    className="w-full mb-3 overflow-hidden rounded-md border border-slate-200"
-                    style={{ height: 160, position: "relative" }}
-                  >
-                    <div
-                      style={{
-                        transform: "scale(0.18)",
-                        transformOrigin: "top left",
-                        width: "794px",
-                        height: "1123px",
-                        pointerEvents: "none",
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                      }}
-                    >
+                  {/* Live mini-preview — true A4 portrait, content scaled to fit. */}
+                  <div className="w-full mb-3">
+                    <TemplateThumb>
                       <tmpl.Render data={data} plan={isPro ? "pro" : "free"} />
-                    </div>
+                    </TemplateThumb>
                   </div>
 
                   {/* Name */}

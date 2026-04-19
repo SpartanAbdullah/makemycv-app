@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { BuilderClient } from "./BuilderClient";
 
 export const metadata: Metadata = {
-  title: "Build Your CV — MakeMyCV",
+  title: "Build Your CV",
   description:
     "Step-by-step CV builder for UAE jobs. " +
     "Add your experience, education, and skills. " +

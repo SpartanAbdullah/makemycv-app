@@ -811,58 +811,56 @@ export const BuilderShell = ({
             </div>
           </div>
 
-          {/* Score widget inside preview panel */}
-          {stepId !== "score" && (
-            <div className="absolute bottom-4 left-4 z-20">
-              <ScoreWidget />
-            </div>
-          )}
         </div>
       </aside>
 
-      {/* ═══ Mobile: floating preview button ═══ */}
-      <button
-        type="button"
-        className="xl:hidden"
-        onClick={() => setPreviewOpen(true)}
-        style={{
-          position: "fixed",
-          bottom: 20,
-          right: 20,
-          zIndex: 50,
-          background: "var(--brand-primary)",
-          color: "white",
-          border: "none",
-          borderRadius: 50,
-          padding: "12px 20px",
-          fontSize: 13,
-          fontWeight: 600,
-          boxShadow: "0 4px 20px rgba(79,70,229,0.4)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {/* ═══ Floating controls — bottom-right of the viewport ═══
+          Score pill (left) + Preview CV button (right), same flex row.
+          Hidden states:
+            - Score pill on stepId === "score" (full ScorePanel is open)
+            - Preview CV on xl+ (desktop panel already visible)
+          If both are hidden (score step on desktop) the flex container
+          renders nothing. */}
+      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3">
+        {stepId !== "score" && <ScoreWidget />}
+
+        <button
+          type="button"
+          className="xl:hidden"
+          onClick={() => setPreviewOpen(true)}
+          style={{
+            background: "var(--brand-primary)",
+            color: "white",
+            border: "none",
+            borderRadius: 50,
+            padding: "12px 20px",
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(79,70,229,0.4)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
         >
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        Preview CV
-      </button>
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Preview CV
+        </button>
+      </div>
 
-      {/* Score widget moved into preview panel */}
-
-      {/* ═══ Dev-only AI reset ═══ */}
+      {/* ═══ Dev-only AI reset (bottom-left) ═══ */}
       <DevResetAI />
 
       {/* ═══ Mobile: preview overlay ═══ */}

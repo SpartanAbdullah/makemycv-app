@@ -1,8 +1,5 @@
 import { create } from "zustand";
-import {
-  getNormalizedCouponCode,
-  isValidProCoupon,
-} from "../config/coupons";
+import { getNormalizedCouponCode, isValidProCoupon } from "../config/coupons";
 import type {
   CvData,
   CvEducation,
@@ -11,6 +8,7 @@ import type {
   CvSkill,
   SkillLevel,
 } from "../types/cv";
+import type { ParseSignals } from "../resumeChecker/types";
 import {
   clearCvStorage,
   debounce,
@@ -18,6 +16,8 @@ import {
   saveCvToStorage,
 } from "../utils/localStorage";
 import { createId } from "../utils/id";
+
+const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
 
 const createEmptyExperience = (): CvExperience => ({
   id: crypto.randomUUID(),
@@ -48,7 +48,11 @@ const createEmptyProject = (): CvProject => ({
 });
 
 const toSkillLevel = (value: unknown): SkillLevel | undefined => {
-  if (value === "beginner" || value === "intermediate" || value === "advanced") {
+  if (
+    value === "beginner" ||
+    value === "intermediate" ||
+    value === "advanced"
+  ) {
     return value;
   }
   return undefined;
@@ -73,7 +77,9 @@ const ensureSkillIds = (input: unknown): CvSkill[] => {
 
     const maybeId = (item as { id?: unknown }).id;
     const id =
-      typeof maybeId === "string" && maybeId.trim().length > 0 ? maybeId : createId();
+      typeof maybeId === "string" && maybeId.trim().length > 0
+        ? maybeId
+        : createId();
     const level = toSkillLevel((item as { level?: unknown }).level);
 
     return level ? [{ id, name, level }] : [{ id, name }];
@@ -131,6 +137,12 @@ type CvStore = {
   hasUsedFreeDownload: boolean;
   appliedCouponCode: string;
   proAccessSource: ProAccessSource;
+  /**
+   * Parse signals from the ATS Checker — travel with a CV imported via
+   * /api/resume-checker/import/:reportId and are used by computeScore to
+   * produce a checker-parity score in the Builder. null for hand-entered CVs.
+   */
+  parseSignals: ParseSignals | null;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
@@ -146,7 +158,12 @@ type CvStore = {
    * mode "merge":   appends arrays and fills empty personal fields only.
    * Importing always saves to localStorage (versioning via timestamp).
    */
-  importCvVersion: (partial: Partial<CvData>, mode: "replace" | "merge") => void;
+  importCvVersion: (
+    partial: Partial<CvData>,
+    mode: "replace" | "merge",
+  ) => void;
+  /** Set (or clear with null) parseSignals. Persists to localStorage. */
+  setParseSignals: (signals: ParseSignals | null) => void;
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
@@ -176,7 +193,8 @@ const loadAccessState = (): AccessState => {
   const hasManualPro = window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
   return {
     isPro: hasManualPro || hasCouponAccess,
-    hasUsedFreeDownload: window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
+    hasUsedFreeDownload:
+      window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
     appliedCouponCode: hasCouponAccess ? storedCouponCode : "",
     proAccessSource: hasManualPro
       ? "manual"
@@ -193,21 +211,25 @@ export const useCvStore = create<CvStore>((set, get) => ({
   hasUsedFreeDownload: false,
   appliedCouponCode: "",
   proAccessSource: "free",
+  parseSignals: null,
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
     set((state) => ({ data: { ...state.data, [key]: value } })),
   setIsPro: (value) => {
-    if (typeof window !== "undefined") window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
+    if (typeof window !== "undefined")
+      window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
     const couponIsActive =
-      get().appliedCouponCode.length > 0 && isValidProCoupon(get().appliedCouponCode);
+      get().appliedCouponCode.length > 0 &&
+      isValidProCoupon(get().appliedCouponCode);
     set({
       isPro: value || couponIsActive,
       proAccessSource: value ? "manual" : couponIsActive ? "coupon" : "free",
     });
   },
   setHasUsedFreeDownload: (value) => {
-    if (typeof window !== "undefined") window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
+    if (typeof window !== "undefined")
+      window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
     set({ hasUsedFreeDownload: value });
   },
   applyCoupon: async (value) => {
@@ -230,14 +252,17 @@ export const useCvStore = create<CvStore>((set, get) => ({
         body: JSON.stringify({ code: normalized }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { code?: string; message?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        code?: string;
+        message?: string;
+      } | null;
 
       if (!response.ok) {
         return {
           ok: false,
-          message: payload?.message ?? "We couldn't apply that promo right now. Please try again.",
+          message:
+            payload?.message ??
+            "We couldn't apply that promo right now. Please try again.",
         };
       }
 
@@ -247,8 +272,9 @@ export const useCvStore = create<CvStore>((set, get) => ({
         window.localStorage.setItem(COUPON_STORAGE_KEY, appliedCode);
       }
 
-      const hasManualPro = typeof window !== "undefined"
-        && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
+      const hasManualPro =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
 
       set({
         isPro: true,
@@ -258,7 +284,8 @@ export const useCvStore = create<CvStore>((set, get) => ({
 
       return {
         ok: true,
-        message: payload?.message ?? "Promo applied. Pro features are now unlocked.",
+        message:
+          payload?.message ?? "Promo applied. Pro features are now unlocked.",
       };
     } catch {
       return {
@@ -272,8 +299,9 @@ export const useCvStore = create<CvStore>((set, get) => ({
       window.localStorage.removeItem(COUPON_STORAGE_KEY);
     }
 
-    const hasManualPro = typeof window !== "undefined"
-      && window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
+    const hasManualPro =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
 
     set({
       isPro: hasManualPro,
@@ -283,9 +311,25 @@ export const useCvStore = create<CvStore>((set, get) => ({
   },
   reset: () => {
     clearCvStorage();
-    set({ data: defaultCvData });
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
+    }
+    set({ data: defaultCvData, parseSignals: null });
   },
   importJson: (data) => set({ data }),
+  setParseSignals: (signals) => {
+    if (typeof window !== "undefined") {
+      if (signals) {
+        window.localStorage.setItem(
+          PARSE_SIGNALS_STORAGE_KEY,
+          JSON.stringify(signals),
+        );
+      } else {
+        window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
+      }
+    }
+    set({ parseSignals: signals });
+  },
   importCvVersion: (partial, mode) => {
     const current = get().data;
     let next: CvData;
@@ -306,14 +350,11 @@ export const useCvStore = create<CvStore>((set, get) => ({
             Object.entries(partial.personal ?? {}).filter(
               ([k, v]) =>
                 v !== "" &&
-                current.personal[k as keyof typeof current.personal] === ""
-            )
+                current.personal[k as keyof typeof current.personal] === "",
+            ),
           ),
         },
-        experience: [
-          ...current.experience,
-          ...(partial.experience ?? []),
-        ],
+        experience: [...current.experience, ...(partial.experience ?? [])],
         education: [...current.education, ...(partial.education ?? [])],
         skills: [...current.skills, ...(partial.skills ?? [])],
         languages: [...current.languages, ...(partial.languages ?? [])],
@@ -341,6 +382,20 @@ export const bindCvStorage = () => {
   }
   const accessState = loadAccessState();
   useCvStore.setState(accessState);
+
+  // Hydrate parseSignals from localStorage (travels with a Checker import).
+  try {
+    const rawSignals = window.localStorage.getItem(PARSE_SIGNALS_STORAGE_KEY);
+    if (rawSignals) {
+      const parsed = JSON.parse(rawSignals) as ParseSignals;
+      if (parsed && typeof parsed === "object" && "hasTables" in parsed) {
+        useCvStore.setState({ parseSignals: parsed });
+      }
+    }
+  } catch {
+    // Malformed — ignore, leave as null.
+  }
+
   useCvStore.getState().setHydrated(true);
   const saveDebounced = debounce((data: CvData) => saveCvToStorage(data), 500);
   useCvStore.subscribe((state) => saveDebounced(state.data));

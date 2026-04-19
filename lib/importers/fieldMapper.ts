@@ -2,9 +2,44 @@
 // The result is shown in MappingReview for user confirmation before merging.
 
 import type { CvData } from "../types/cv";
-import type { ParsedDocument } from "./adapter";
+import type { ParsedDocument, ParsedExperience } from "./adapter";
 import { createId } from "../utils/id";
 import { defaultCvData } from "../store/cvStore";
+
+/**
+ * Seed a professional headline when the parser didn't produce one.
+ *
+ * Heuristic (in order):
+ *   1. Use experience[0].role if that entry is marked isCurrent.
+ *   2. Otherwise pick the most recent experience — a missing endDate reads
+ *      as "still there", else the entry with the latest endDate string.
+ *   3. If no experience exists, leave headline blank (don't invent).
+ *
+ * We never concat role + company — recruiters read the headline as a
+ * target job-title, not a past-role sentence.
+ */
+function seedHeadline(experience: ParsedExperience[] | undefined): string {
+  if (!experience || experience.length === 0) return "";
+
+  const currentRole = experience.find(
+    (e) => e.isCurrent && (e.role ?? "").trim(),
+  );
+  if (currentRole?.role) return currentRole.role.trim();
+
+  // Prefer an entry without an endDate (implicit "current").
+  const openEnded = experience.find(
+    (e) => (e.role ?? "").trim() && !e.endDate,
+  );
+  if (openEnded?.role) return openEnded.role.trim();
+
+  // Fall back to the most recent endDate lexical-compare (YYYY-MM sorts correctly).
+  const withEnd = experience
+    .filter((e) => (e.role ?? "").trim() && (e.endDate ?? "").trim())
+    .sort((a, b) => (b.endDate ?? "").localeCompare(a.endDate ?? ""));
+  if (withEnd[0]?.role) return withEnd[0].role.trim();
+
+  return experience[0].role?.trim() ?? "";
+}
 
 export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
   const result: Partial<CvData> = {};
@@ -21,7 +56,7 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       linkedin: parsed.contact?.linkedin ?? "",
       website: parsed.contact?.website ?? "",
       summary: parsed.summary ?? "",
-      headline: "",
+      headline: seedHeadline(parsed.experience),
     };
   }
 

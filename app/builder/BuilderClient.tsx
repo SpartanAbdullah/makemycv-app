@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BuilderShell } from "../../components/builder/BuilderShell";
+import ImportFromReportBanner from "../../components/builder/ImportFromReportBanner";
 import { PersonalStep } from "../../components/builder/steps/PersonalStep";
 import { SummaryStep } from "../../components/builder/steps/SummaryStep";
 import { ExperienceStep } from "../../components/builder/steps/ExperienceStep";
@@ -38,18 +39,13 @@ export const BuilderClient = () => {
   const nextStep = builderSteps[stepIndex + 1]?.id;
   const prevStep = builderSteps[stepIndex - 1]?.id;
 
-  const CATEGORY_TO_STEP: Record<string, string> = {
-    "Contact Completeness": "personal",
-    "Professional Summary": "summary",
-    "Work Experience": "experience",
-    Education: "education",
-    Skills: "skills",
-    "ATS Compatibility": "summary",
-  };
-
+  // ScorePanel now hands us an already-resolved builder step id (via its
+  // internal CATEGORY_TO_STEP table). We just forward it to the router.
   const handleSectionClick = useCallback(
-    (sectionName: string) => {
-      const targetStep = CATEGORY_TO_STEP[sectionName] || "personal";
+    (stepTarget: string) => {
+      const targetStep = stepIds.includes(stepTarget as never)
+        ? stepTarget
+        : "personal";
       goToStep(targetStep);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,7 +53,9 @@ export const BuilderClient = () => {
   );
 
   return (
-    <BuilderShell stepId={stepId} onStepChange={goToStep}>
+    <>
+      <ImportFromReportBanner />
+      <BuilderShell stepId={stepId} onStepChange={goToStep}>
       {stepId === "personal" && (
         <PersonalStep onNext={() => goToStep(nextStep || "summary")} />
       )}
@@ -111,6 +109,7 @@ export const BuilderClient = () => {
         <ReviewStep onBack={() => goToStep(prevStep || "projects")} onJump={goToStep} />
       )}
       {stepId === "score" && <ScorePanel onSectionClick={handleSectionClick} />}
-    </BuilderShell>
+      </BuilderShell>
+    </>
   );
 };
