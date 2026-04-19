@@ -36,8 +36,15 @@ export default function ScoreWidget() {
   const isPerfect = result.total === 100;
   const gradeLabel = GRADE_LABEL[result.grade];
 
+  // Pinned bottom-right, above the "Preview CV" floating button (which sits at
+  // { bottom: 20px, right: 20px, z:50 } on <xl breakpoints). We stack ~12px
+  // above it, matching its right edge, at the same z-index. On xl+ the
+  // Preview CV button is hidden and the pill sits alone in the same spot —
+  // unaffected by any banner that pushes builder content down.
   return (
-    <div className={`ai-glow-border${isPerfect ? " score-perfect" : ""}`}>
+    <div
+      className={`fixed bottom-[74px] right-5 z-50 ai-glow-border${isPerfect ? " score-perfect" : ""}`}
+    >
       <button
         type="button"
         onClick={() => router.push("/builder?step=score")}

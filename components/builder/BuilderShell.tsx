@@ -811,14 +811,13 @@ export const BuilderShell = ({
             </div>
           </div>
 
-          {/* Score widget inside preview panel */}
-          {stepId !== "score" && (
-            <div className="absolute bottom-4 left-4 z-20">
-              <ScoreWidget />
-            </div>
-          )}
         </div>
       </aside>
+
+      {/* Score widget — pinned to the viewport (bottom-right), stacked above
+          the floating "Preview CV" button. Hidden on the /builder?step=score
+          view where the full ScorePanel renders. */}
+      {stepId !== "score" && <ScoreWidget />}
 
       {/* ═══ Mobile: floating preview button ═══ */}
       <button
