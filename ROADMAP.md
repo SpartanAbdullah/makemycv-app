@@ -14,7 +14,6 @@ Source of truth for shipped features, active work, and backlog. Update on every 
 
 ## 🟡 In active pipeline (agreed, not yet started)
 
-- [ ] ATS Checker report page — visual polish (match Enhancv product-feel, fix "vibe-coded" feel)
 - [ ] Marketing site — `makemycv.ae/resume-checker` SEO landing page (separate repo: `makemycv-site`)
 
 ---
@@ -23,6 +22,7 @@ Source of truth for shipped features, active work, and backlog. Update on every 
 
 - [ ] Store schema versioning — bump `storeVersion` number; on app load, if stored version is older than current, wipe CV state. Prevents stale-localStorage-after-refactor bugs.
 - [ ] Weight tuning with real CVs — test 3–5 real CVs against the scoring engine, adjust weights if anything scores incorrectly. Only tested with founder's CV so far.
+- [ ] Collect real social proof (stats, testimonials, hired-at logos) and add to upload page hero + report page. Needs: real analytics for stats, Google Form for testimonial consent, verified hiring data for logos.
 
 ---
 
@@ -68,6 +68,9 @@ Source of truth for shipped features, active work, and backlog. Update on every 
 - [x] 2026-04-19 — Score pill repositioning (bottom-right, paired with Preview CV)
 - [x] 2026-04-19 — Reset All Counters moved bottom-left with hardened dev-only gate
 - [x] 2026-04-19 — Template thumbnails fixed on Review step (A4 portrait, 2-col desktop / 1-col mobile)
+- [x] 2026-04-19 — Design tokens (brand, severity, paper, shadows) in globals.css + tailwind.config.ts
+- [x] 2026-04-19 — Upload page visual polish (Stripe-style, split-screen with example report preview)
+- [x] 2026-04-19 — Report page visual polish (Enhancv-dense, score ring, severity-coded cards, premium Fix-in-Builder CTA)
 
 ---
 

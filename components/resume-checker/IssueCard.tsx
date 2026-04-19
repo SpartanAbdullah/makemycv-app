@@ -2,11 +2,10 @@ import type { CheckerIssue } from "@/lib/resumeChecker/types";
 
 const severityConfig = {
   good: {
-    border: "border-l-emerald-500",
-    bg: "bg-emerald-50",
-    tagBg: "bg-emerald-100",
-    tagText: "text-emerald-700",
-    label: "Working",
+    borderLeft: "border-l-severity-good",
+    tint: "bg-severity-good-bg/40",
+    iconBg: "bg-severity-good-bg",
+    iconText: "text-severity-good",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -14,11 +13,10 @@ const severityConfig = {
     ),
   },
   review: {
-    border: "border-l-amber-500",
-    bg: "bg-amber-50",
-    tagBg: "bg-amber-100",
-    tagText: "text-amber-800",
-    label: "Review",
+    borderLeft: "border-l-severity-review",
+    tint: "bg-severity-review-bg/50",
+    iconBg: "bg-severity-review-bg",
+    iconText: "text-severity-review",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 3.5h.01M4.93 19h14.14a2 2 0 001.74-3L13.74 4a2 2 0 00-3.48 0L3.2 16a2 2 0 001.73 3z" />
@@ -26,14 +24,14 @@ const severityConfig = {
     ),
   },
   error: {
-    border: "border-l-red-500",
-    bg: "bg-red-50",
-    tagBg: "bg-red-100",
-    tagText: "text-red-700",
-    label: "Fix",
+    borderLeft: "border-l-severity-error",
+    tint: "bg-severity-error-bg/50",
+    iconBg: "bg-severity-error-bg",
+    iconText: "text-severity-error",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 9l-6 6M9 9l6 6" />
       </svg>
     ),
   },
@@ -41,33 +39,63 @@ const severityConfig = {
 
 export default function IssueCard({ issue }: { issue: CheckerIssue }) {
   const cfg = severityConfig[issue.severity];
+
+  // "Good" severity → compact "what's working" row, no fix needed
+  if (issue.severity === "good") {
+    return (
+      <div
+        className={`flex items-center gap-3 rounded-lg border border-l-4 border-line ${cfg.borderLeft} ${cfg.tint} px-4 py-3`}
+      >
+        <div
+          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${cfg.iconBg} ${cfg.iconText}`}
+          aria-hidden
+        >
+          {cfg.icon}
+        </div>
+        <div className="min-w-0 flex-1 text-sm">
+          <span className="font-medium text-slate-900">{issue.title}</span>
+          {issue.description && (
+            <span className="ml-2 text-slate-600">{issue.description}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`flex gap-3 rounded-lg border border-slate-200 border-l-4 ${cfg.border} ${cfg.bg} p-4`}
+      className={`flex gap-3 rounded-lg border border-l-4 border-line ${cfg.borderLeft} ${cfg.tint} p-4`}
     >
       <div
-        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${cfg.tagBg} ${cfg.tagText}`}
+        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${cfg.iconBg} ${cfg.iconText}`}
         aria-hidden
       >
         {cfg.icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h4 className="text-sm font-semibold text-slate-900">{issue.title}</h4>
-          <span
-            className={`rounded-full ${cfg.tagBg} ${cfg.tagText} px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide`}
-          >
-            {cfg.label}
-          </span>
-        </div>
+        <h4 className="text-sm font-semibold text-slate-900">{issue.title}</h4>
         {issue.description && (
-          <p className="mt-1 text-sm text-slate-700">{issue.description}</p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            {issue.description}
+          </p>
         )}
         {issue.actionable && (
-          <p className="mt-2 text-sm text-slate-600">
-            <span className="font-medium text-slate-800">How to fix: </span>
-            {issue.actionable}
-          </p>
+          <div className="mt-3 flex items-start gap-2 rounded-md bg-paper px-3 py-2 text-sm">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              aria-hidden
+              className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-blue"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+            <div className="min-w-0">
+              <span className="font-semibold text-brand-blue">How to fix: </span>
+              <span className="text-slate-700">{issue.actionable}</span>
+            </div>
+          </div>
         )}
       </div>
     </div>

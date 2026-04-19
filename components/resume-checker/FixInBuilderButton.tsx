@@ -8,8 +8,6 @@ export default function FixInBuilderButton({ reportId }: { reportId: string }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
-    // We don't fetch import here — the builder does it on mount via the query param.
-    // Keeping the click client-side just gives us a loading state for the navigation.
     setLoading(true);
     router.push(`/builder?importedFrom=${reportId}`);
   };
@@ -19,9 +17,28 @@ export default function FixInBuilderButton({ reportId }: { reportId: string }) {
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-70"
+      className="group flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-sm font-bold text-white shadow-cta transition hover:-translate-y-0.5 hover:shadow-cta-hover disabled:translate-y-0 disabled:opacity-75"
+      style={{
+        backgroundImage: "linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-dark) 100%)",
+      }}
     >
-      {loading ? "Opening builder…" : "Fix in Builder — $5 →"}
+      {loading ? (
+        "Opening builder…"
+      ) : (
+        <>
+          Fix in Builder — $5
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            aria-hidden
+            className="h-4 w-4 transition group-hover:translate-x-0.5"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+        </>
+      )}
     </button>
   );
 }

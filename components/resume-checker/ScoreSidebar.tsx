@@ -7,29 +7,18 @@ import type {
   ScoreSeverity,
 } from "@/lib/resumeChecker/types";
 import FixInBuilderButton from "./FixInBuilderButton";
-
-function totalStatus(total: number): ScoreSeverity {
-  if (total >= 85) return "good";
-  if (total >= 60) return "review";
-  return "error";
-}
-
-const statusRing: Record<ScoreSeverity, string> = {
-  good: "ring-emerald-400 text-emerald-700",
-  review: "ring-amber-400 text-amber-700",
-  error: "ring-red-400 text-red-700",
-};
+import ScoreRing from "./ScoreRing";
 
 const dotColor: Record<ScoreSeverity, string> = {
-  good: "bg-emerald-500",
-  review: "bg-amber-500",
-  error: "bg-red-500",
+  good: "bg-severity-good",
+  review: "bg-severity-review",
+  error: "bg-severity-error",
 };
 
-const severityLabel: Record<ScoreSeverity, string> = {
-  good: "Good",
-  review: "Review",
-  error: "Fix",
+const severityTextColor: Record<ScoreSeverity, string> = {
+  good: "text-severity-good",
+  review: "text-severity-review",
+  error: "text-severity-error",
 };
 
 export default function ScoreSidebar({
@@ -39,39 +28,42 @@ export default function ScoreSidebar({
   score: ScoreReport;
   reportId: string;
 }) {
-  const issueCount = score.issueCounts.error + score.issueCounts.review;
-  const overall = totalStatus(score.total);
+  const { error: errCount, review: revCount, good: goodCount } = score.issueCounts;
+
   return (
-    <aside className="lg:sticky lg:top-6 lg:self-start">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="mb-4 text-sm font-medium uppercase tracking-wide text-slate-500">
-          Your score
-        </div>
-        <div
-          className={`mb-2 inline-flex items-baseline font-display text-5xl font-bold tabular-nums ring-2 ring-offset-4 rounded-xl px-3 py-1 ${statusRing[overall]}`}
-        >
-          {score.total}
-          <span className="ml-1 text-2xl font-semibold text-slate-400">
-            /100
-          </span>
-        </div>
-        <div className="mt-2 text-sm text-slate-600">
-          {issueCount === 0
-            ? "No issues found."
-            : `${issueCount} issue${issueCount > 1 ? "s" : ""} to address.`}
+    <aside className="lg:sticky lg:top-20 lg:self-start">
+      <div className="rounded-2xl border border-line bg-paper p-6 shadow-sm-soft">
+        <div className="flex flex-col items-center">
+          <ScoreRing score={score.total} grade={score.grade} />
         </div>
 
-        <div className="mt-6 space-y-1">
-          {score.categories.map((cat) => (
-            <CategoryRow key={cat.id} cat={cat} />
-          ))}
+        {/* Issue count chips */}
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <IssueChip count={errCount} tone="error" label={errCount === 1 ? "error" : "errors"} />
+          <IssueChip count={revCount} tone="review" label="to review" />
+          <IssueChip count={goodCount} tone="good" label="strong" />
         </div>
 
-        <div className="mt-6 border-t border-slate-100 pt-5">
+        {/* Category rows */}
+        <div className="mt-6 border-t border-line pt-4">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Breakdown
+          </div>
+          <div className="space-y-0.5">
+            {score.categories.map((cat) => (
+              <CategoryRow key={cat.id} cat={cat} />
+            ))}
+          </div>
+        </div>
+
+        {/* Premium CTA */}
+        <div className="mt-6 border-t border-line pt-5">
           <FixInBuilderButton reportId={reportId} />
-          <p className="mt-3 text-center text-xs text-slate-500">
-            All issues above are free to view. The $5 covers the polished CV
-            rebuild + PDF export.
+          <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-500">
+            All report insights are free. Builder unlocks cost $5.
+          </p>
+          <p className="mt-1 text-center text-[11px] leading-relaxed text-slate-500">
+            No subscription. No trial.
           </p>
         </div>
       </div>
@@ -79,23 +71,51 @@ export default function ScoreSidebar({
   );
 }
 
+function IssueChip({
+  count,
+  tone,
+  label,
+}: {
+  count: number;
+  tone: ScoreSeverity;
+  label: string;
+}) {
+  const active = count > 0;
+  const base = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium";
+  const toneClass = active
+    ? tone === "error"
+      ? "bg-severity-error-bg text-severity-error"
+      : tone === "review"
+        ? "bg-severity-review-bg text-severity-review"
+        : "bg-severity-good-bg text-severity-good"
+    : "bg-paper-2 text-slate-400";
+  const dotClass = active ? dotColor[tone] : "bg-slate-300";
+
+  return (
+    <span className={`${base} ${toneClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} aria-hidden />
+      {count} {label}
+    </span>
+  );
+}
+
 function CategoryRow({ cat }: { cat: ScoreCategory }) {
   const [open, setOpen] = useState(false);
   const bad = cat.issues.filter((i) => i.severity !== "good");
+  const hasDetails = bad.length > 0;
 
   return (
-    <div className="rounded-lg border border-transparent hover:border-slate-100">
+    <div className="rounded-lg">
       <button
         type="button"
         onClick={() => {
           setOpen((v) => !v);
-          // jump to the main card too
           if (typeof document !== "undefined") {
             const el = document.getElementById(`category-${cat.id}`);
             if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }}
-        className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-paper-2"
         aria-expanded={open}
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -106,24 +126,29 @@ function CategoryRow({ cat }: { cat: ScoreCategory }) {
           <span className="truncate text-sm font-medium text-slate-800">
             {cat.name}
           </span>
-          <span className="ml-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-            {severityLabel[cat.status]}
-          </span>
         </span>
         <span className="flex items-center gap-2">
-          <span className="text-sm font-semibold tabular-nums text-slate-900">
+          <span
+            className={`text-sm font-semibold tabular-nums ${severityTextColor[cat.status]}`}
+          >
             {cat.score}%
           </span>
-          <span
-            aria-hidden
-            className={`text-xs text-slate-400 transition ${open ? "rotate-180" : ""}`}
-          >
-            ▾
-          </span>
+          {hasDetails && (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+              className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+            </svg>
+          )}
         </span>
       </button>
-      {open && bad.length > 0 && (
-        <ul className="mb-2 ml-6 space-y-1 border-l border-slate-200 pl-3 text-xs text-slate-600">
+      {open && hasDetails && (
+        <ul className="mb-2 ml-6 space-y-1 border-l border-line pl-3 text-xs text-slate-600">
           {bad.map((i) => (
             <li key={i.id} className="leading-relaxed">
               {i.title}
