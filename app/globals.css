@@ -87,6 +87,45 @@
   --accent: var(--brand-primary);
   --accent-2: #d66a3a;
   --ring: rgba(79, 70, 229, 0.2);
+
+  /* ─── Checker / marketing polish tokens (v3) ───────────────
+     Used on /resume-checker and report pages. Unifies with
+     makemycv-site marketing brief. Do NOT refactor unrelated
+     components to these — migrate inline only when touched. */
+
+  /* Brand */
+  --brand-blue: #2563EB;
+  --brand-blue-dark: #1D4ED8;
+  --brand-ink: #0A0F1E;
+  --brand-deep: #111827;
+
+  /* Severity */
+  --severity-error: #DC2626;
+  --severity-error-bg: #FEF2F2;
+  --severity-error-border: #FECACA;
+  --severity-review: #D97706;
+  --severity-review-bg: #FFFBEB;
+  --severity-review-border: #FDE68A;
+  --severity-good: #059669;
+  --severity-good-bg: #ECFDF5;
+  --severity-good-border: #A7F3D0;
+
+  /* Surfaces */
+  --paper: #FFFFFF;
+  --paper-2: #F8FAFC;
+  --line: #E2E8F0;
+  --line-strong: #CBD5E1;
+
+  /* Shadows (soft / CTA) */
+  --shadow-sm-soft: 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-md-soft: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
+  --shadow-cta: 0 6px 20px rgba(37, 99, 235, 0.35);
+  --shadow-cta-hover: 0 10px 28px rgba(37, 99, 235, 0.45);
+
+  /* Radii */
+  --radius-card: 16px;
+  --radius-pill: 999px;
 }
 
 @theme inline {
@@ -94,6 +133,33 @@
   --color-foreground: var(--text-heading);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
+
+  /* Checker polish tokens exposed as Tailwind utilities */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-dark: var(--brand-blue-dark);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-deep: var(--brand-deep);
+
+  --color-severity-error: var(--severity-error);
+  --color-severity-error-bg: var(--severity-error-bg);
+  --color-severity-error-border: var(--severity-error-border);
+  --color-severity-review: var(--severity-review);
+  --color-severity-review-bg: var(--severity-review-bg);
+  --color-severity-review-border: var(--severity-review-border);
+  --color-severity-good: var(--severity-good);
+  --color-severity-good-bg: var(--severity-good-bg);
+  --color-severity-good-border: var(--severity-good-border);
+
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --shadow-sm-soft: var(--shadow-sm-soft);
+  --shadow-md-soft: var(--shadow-md-soft);
+  --shadow-lg-soft: var(--shadow-lg-soft);
+  --shadow-cta: var(--shadow-cta);
+  --shadow-cta-hover: var(--shadow-cta-hover);
 }
 
 body {
