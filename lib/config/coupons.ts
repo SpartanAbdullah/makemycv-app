@@ -24,7 +24,7 @@ const defineCoupon = (
 export const PRO_COUPONS: readonly ProCouponDefinition[] = [
   defineCoupon("EARLY-ACCESS", 10),
   defineCoupon("MARY AN", 10),
-  defineCoupon("MAKEMYCVPRO", 2),
+  defineCoupon("MAKEMYCVPRO", 10),
 
   // Add internal or testing promo codes here.
   // Matching is case-insensitive and ignores extra spaces around the code.
