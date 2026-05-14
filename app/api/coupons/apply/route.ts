@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { redeemCoupon } from "@/lib/server/couponRedemptions";
+import { getProCouponDefinition } from "@/lib/config/coupons";
 
 const applyCouponSchema = z.object({
   code: z.string().trim().min(1).max(100),
@@ -21,20 +21,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await redeemCoupon(parsed.data.code);
-
-    if (!result.ok) {
+    const coupon = getProCouponDefinition(parsed.data.code);
+    if (!coupon) {
       return NextResponse.json(
-        { message: result.message },
-        { status: result.status },
+        { message: "That promo code is not valid." },
+        { status: 404 },
       );
     }
 
     return NextResponse.json({
-      code: result.code,
-      maxUses: result.maxUses,
-      remainingUses: result.remainingUses,
-      message: result.message,
+      code: coupon.code,
+      message: "Promo applied. Pro features are now unlocked.",
     });
   } catch {
     return NextResponse.json(
