@@ -20,19 +20,31 @@ export default function ShareButton() {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+      aria-live="polite"
+      className="inline-flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="h-4 w-4"
-        aria-hidden
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342a3 3 0 100-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-      </svg>
-      {copied ? "Link copied" : "Share report"}
+      {copied ? (
+        <>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4 text-severity-good" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-severity-good">Copied!</span>
+        </>
+      ) : (
+        <>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="h-4 w-4"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342a3 3 0 100-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+          </svg>
+          Share report
+        </>
+      )}
     </button>
   );
 }
