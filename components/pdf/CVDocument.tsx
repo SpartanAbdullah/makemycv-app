@@ -246,13 +246,20 @@ const s = StyleSheet.create({
   },
 
   /* ── Executive sidebar ──────────────────────────────────── */
+  /* Negative margins extend the navy panel to the page top/bottom/left
+     edges, escaping the page-level 36pt/30pt padding so the sidebar bleeds
+     edge-to-edge (matches the live preview). Width and padding mirror the
+     live template's 200px sidebar with 28px/20px padding. */
   execSidebar: {
     width: 150,
     backgroundColor: "#1E2A4A",
-    paddingTop: 20,
-    paddingBottom: 20,
-    paddingLeft: 14,
-    paddingRight: 14,
+    marginTop: -36,
+    marginBottom: -36,
+    marginLeft: -30,
+    paddingTop: 21,
+    paddingBottom: 21,
+    paddingLeft: 15,
+    paddingRight: 15,
     flexShrink: 0,
   },
   execName: {
@@ -751,7 +758,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       </View>
 
       {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 16 }}>
+      <View style={{ flex: 1, paddingLeft: 20 }}>
         {/* Summary */}
         {hasSummary && (
           <View style={s.section}>
