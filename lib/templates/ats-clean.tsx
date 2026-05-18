@@ -90,6 +90,7 @@ export const ATSCleanTemplate = ({
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
+  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
 
   // Determine which section is rendered first (for marginTop: 0)
   const firstSection = hasSummary
@@ -126,42 +127,78 @@ export const ATSCleanTemplate = ({
       <div>
         <div
           style={{
-            fontSize: "26px",
-            fontWeight: 700,
-            color: "#111827",
-            letterSpacing: "-0.3px",
-            marginBottom: "2px",
-            lineHeight: 1.2,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "16px",
           }}
         >
-          {name}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "26px",
+                fontWeight: 700,
+                color: "#111827",
+                letterSpacing: "-0.3px",
+                marginBottom: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {name}
+            </div>
+
+            {headline && (
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "#374151",
+                  marginBottom: "8px",
+                }}
+              >
+                {headline}
+              </div>
+            )}
+
+            {contactParts.length > 0 && (
+              <div
+                style={{
+                  fontSize: "10.5px",
+                  color: "#6B7280",
+                  marginBottom: "4px",
+                  lineHeight: 1.55,
+                }}
+              >
+                {contactParts.join(" · ")}
+              </div>
+            )}
+          </div>
+
+          {showPhoto && data.personal.photo && (
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                flexShrink: 0,
+                borderRadius:
+                  data.settings.photoShape === "square" ? 6 : "50%",
+                overflow: "hidden",
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={data.personal.photo}
+                alt={name}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            </div>
+          )}
         </div>
-
-        {headline && (
-          <div
-            style={{
-              fontSize: "13px",
-              fontWeight: 500,
-              color: "#374151",
-              marginBottom: "8px",
-            }}
-          >
-            {headline}
-          </div>
-        )}
-
-        {contactParts.length > 0 && (
-          <div
-            style={{
-              fontSize: "10.5px",
-              color: "#6B7280",
-              marginBottom: "4px",
-              lineHeight: 1.55,
-            }}
-          >
-            {contactParts.join(" · ")}
-          </div>
-        )}
 
         <div
           style={{
