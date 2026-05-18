@@ -626,6 +626,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const hasExperience = data.experience.length > 0;
   const hasEducation = data.education.length > 0;
   const hasProjects = data.projects.length > 0;
+  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
 
   // Build sidebar contact lines — plain text label prefixes (no emoji — unreliable in react-pdf)
   const sidebarContacts: string[] = [];
@@ -652,6 +653,24 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
     <View style={{ flexDirection: "row", flex: 1 }}>
       {/* ── Sidebar ── */}
       <View style={s.execSidebar}>
+        {/* Photo */}
+        {showPhoto && data.personal.photo && (
+          <View style={{ marginBottom: 12 }}>
+            <Image
+              src={data.personal.photo}
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius:
+                  data.settings.photoShape === "square" ? 6 : 32,
+                objectFit: "cover",
+                borderWidth: 1.5,
+                borderColor: "rgba(255,255,255,0.2)",
+              }}
+            />
+          </View>
+        )}
+
         {/* Name */}
         <Text style={s.execName}>{name}</Text>
 
@@ -857,6 +876,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
+  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
 
   // atsSectionHeading already has marginTop: 16 baked in.
   // Override first section to marginTop: 0 via inline style.
@@ -886,25 +906,42 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Header ── */}
       <View
         style={{
-          flexDirection: "column",
+          flexDirection: "row",
           alignItems: "flex-start",
           marginBottom: 6,
+          gap: 12,
         }}
       >
-        <View style={{ marginBottom: 6 }}>
-          <Text style={{ ...s.atsName, lineHeight: 1 }}>{name}</Text>
-        </View>
-        {data.personal.headline?.trim() ? (
-          <View style={{ marginBottom: 4 }}>
-            <Text style={{ ...s.atsHeadline, lineHeight: 1.2 }}>
-              {data.personal.headline.trim()}
-            </Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ marginBottom: 6 }}>
+            <Text style={{ ...s.atsName, lineHeight: 1 }}>{name}</Text>
           </View>
-        ) : null}
+          {data.personal.headline?.trim() ? (
+            <View style={{ marginBottom: 4 }}>
+              <Text style={{ ...s.atsHeadline, lineHeight: 1.2 }}>
+                {data.personal.headline.trim()}
+              </Text>
+            </View>
+          ) : null}
+          {contactParts.length > 0 && (
+            <Text style={s.atsContactLine}>{contactParts.join(" · ")}</Text>
+          )}
+        </View>
+        {showPhoto && data.personal.photo && (
+          <Image
+            src={data.personal.photo}
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius:
+                data.settings.photoShape === "square" ? 4 : 27,
+              objectFit: "cover",
+              borderWidth: 0.75,
+              borderColor: "#E5E7EB",
+            }}
+          />
+        )}
       </View>
-      {contactParts.length > 0 && (
-        <Text style={s.atsContactLine}>{contactParts.join(" · ")}</Text>
-      )}
       <View style={s.atsDivider} />
 
       {/* ── Summary ── */}
@@ -1083,6 +1120,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
+  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
 
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
@@ -1161,6 +1199,16 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             </View>
           )}
         </View>
+        {showPhoto && data.personal.photo && (
+          <Image
+            src={data.personal.photo}
+            style={{
+              ...s.photo,
+              borderRadius:
+                data.settings.photoShape === "square" ? 8 : 30,
+            }}
+          />
+        )}
       </View>
 
       {/* ── Summary ── */}
