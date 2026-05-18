@@ -33,6 +33,8 @@ export const ExperienceStep = ({
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const {
     register,
@@ -47,10 +49,28 @@ export const ExperienceStep = ({
     defaultValues: { experience },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove, update, move } = useFieldArray({
     control,
     name: "experience",
   });
+
+  // Keep the currently-open card's index in sync when items move.
+  const adjustOpenIndexForMove = (from: number, to: number) => {
+    setOpenIndex((prev) => {
+      if (prev === null) return prev;
+      if (prev === from) return to;
+      if (from < prev && to >= prev) return prev - 1;
+      if (from > prev && to <= prev) return prev + 1;
+      return prev;
+    });
+  };
+
+  const reorder = (from: number, to: number) => {
+    if (from === to) return;
+    if (to < 0 || to >= fields.length) return;
+    move(from, to);
+    adjustOpenIndexForMove(from, to);
+  };
 
   const [focusedBullet, setFocusedBullet] = useState<{
     itemIndex: number;
@@ -187,7 +207,7 @@ export const ExperienceStep = ({
           <span className="cv-badge-required">Required</span>
         </div>
         <p className="cv-step-subtitle">
-          Add your most impactful roles first. Use bullet points with results.
+          Add your most impactful roles first. Drag the handle to reorder. Use bullet points with results.
         </p>
 
         <div className="mt-6">
@@ -202,34 +222,171 @@ export const ExperienceStep = ({
           >
             {fields.map((field, index) => {
               const isOpen = openIndex === index;
+              const isDragging = draggingIndex === index;
+              const isDropTarget =
+                dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
               const role = watch(`experience.${index}.role`) || "";
               const company = watch(`experience.${index}.company`) || "";
               const startDate = watch(`experience.${index}.startDate`) || "";
               const endDate = watch(`experience.${index}.endDate`) || "";
               const summaryLine = [role, company, [startDate, endDate].filter(Boolean).join(" - ")].filter(Boolean).join(" | ");
+              const canMoveUp = index > 0;
+              const canMoveDown = index < fields.length - 1;
 
               return (
-                <div key={field.id} className="cv-entry-card">
-                  <button
-                    type="button"
-                    onClick={() => setOpenIndex(isOpen ? null : index)}
-                    className="flex w-full items-center justify-between px-5 py-3.5 text-left"
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }} className="truncate">
-                      {summaryLine || `Role ${index + 1}`}
-                    </span>
-                    <svg
-                      className={`h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                      style={{ color: "var(--text-faint)" }}
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                <div
+                  key={field.id}
+                  className="cv-entry-card"
+                  onDragOver={(e) => {
+                    if (draggingIndex === null || draggingIndex === index) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverIndex !== index) setDragOverIndex(index);
+                  }}
+                  onDragLeave={(e) => {
+                    // Only clear when the pointer leaves the card entirely, not
+                    // when it moves over a child element.
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    if (dragOverIndex === index) setDragOverIndex(null);
+                  }}
+                  onDrop={(e) => {
+                    if (draggingIndex === null) return;
+                    e.preventDefault();
+                    const from = draggingIndex;
+                    reorder(from, index);
+                    setDraggingIndex(null);
+                    setDragOverIndex(null);
+                  }}
+                  style={{
+                    opacity: isDragging ? 0.4 : 1,
+                    transform: isDropTarget ? "translateY(-1px)" : undefined,
+                    boxShadow: isDropTarget
+                      ? "0 0 0 2px var(--brand-primary)"
+                      : undefined,
+                    transition: "opacity 150ms, box-shadow 150ms",
+                  }}
+                >
+                  <div className="flex w-full items-center px-2 py-3.5">
+                    {/* Drag handle */}
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      aria-label={`Drag role ${index + 1} to reorder`}
+                      title="Drag to reorder"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggingIndex(index);
+                        e.dataTransfer.effectAllowed = "move";
+                        try {
+                          e.dataTransfer.setData("text/plain", String(index));
+                        } catch {
+                          /* some browsers throw on unsupported types */
+                        }
+                      }}
+                      onDragEnd={() => {
+                        setDraggingIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        marginRight: 4,
+                        color: "var(--text-faint)",
+                        cursor: "grab",
+                        flexShrink: 0,
+                        userSelect: "none",
+                      }}
+                      onMouseDown={(e) => {
+                        (e.currentTarget as HTMLElement).style.cursor = "grabbing";
+                      }}
+                      onMouseUp={(e) => {
+                        (e.currentTarget as HTMLElement).style.cursor = "grab";
+                      }}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <circle cx="9" cy="6" r="1.6" />
+                        <circle cx="15" cy="6" r="1.6" />
+                        <circle cx="9" cy="12" r="1.6" />
+                        <circle cx="15" cy="12" r="1.6" />
+                        <circle cx="9" cy="18" r="1.6" />
+                        <circle cx="15" cy="18" r="1.6" />
+                      </svg>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setOpenIndex(isOpen ? null : index)}
+                      className="flex flex-1 items-center justify-between px-2 text-left min-w-0"
+                    >
+                      <span
+                        style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }}
+                        className="truncate"
+                      >
+                        {summaryLine || `Role ${index + 1}`}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        style={{ color: "var(--text-faint)" }}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
 
                   {isOpen && (
                     <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => reorder(index, index - 1)}
+                            disabled={!canMoveUp}
+                            aria-label="Move role up"
+                            title="Move up"
+                            className="cv-btn-secondary"
+                            style={{
+                              fontSize: 12,
+                              padding: "5px 9px",
+                              opacity: canMoveUp ? 1 : 0.4,
+                              cursor: canMoveUp ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M18 15l-6-6-6 6" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reorder(index, index + 1)}
+                            disabled={!canMoveDown}
+                            aria-label="Move role down"
+                            title="Move down"
+                            className="cv-btn-secondary"
+                            style={{
+                              fontSize: 12,
+                              padding: "5px 9px",
+                              opacity: canMoveDown ? 1 : 0.4,
+                              cursor: canMoveDown ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M6 9l6 6 6-6" />
+                            </svg>
+                          </button>
+                        </div>
                         {fields.length > 1 && (
                           <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>

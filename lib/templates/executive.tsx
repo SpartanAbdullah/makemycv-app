@@ -134,6 +134,8 @@ export const ExecutiveTemplate = ({
   const hasExperience = data.experience.length > 0;
   const hasEducation = data.education.length > 0;
   const hasProjects = data.projects.length > 0;
+  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const photoSize = 88;
 
   return (
     <div
@@ -159,6 +161,33 @@ export const ExecutiveTemplate = ({
           boxSizing: "border-box" as const,
         }}
       >
+        {/* Photo */}
+        {showPhoto && data.personal.photo && (
+          <div
+            style={{
+              width: photoSize,
+              height: photoSize,
+              borderRadius:
+                data.settings.photoShape === "square" ? 8 : "50%",
+              overflow: "hidden",
+              border: "2px solid rgba(255,255,255,0.2)",
+              marginBottom: "16px",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={data.personal.photo}
+              alt={`${firstName} ${lastName}`}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
+        )}
+
         {/* Name block */}
         <div
           style={{
