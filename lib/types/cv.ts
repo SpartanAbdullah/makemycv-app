@@ -26,6 +26,10 @@ export type CvPersonal = {
   country?: string;
   dateOfBirth?: string;
   drivingLicense?: string;
+  // UAE-essentials block on the Contact step. Both are optional strings so
+  // imported CVs (PDF/DOCX/LinkedIn) that don't carry these still validate.
+  visaStatus?: string;
+  availability?: string;
 };
 
 export type CvExperience = {

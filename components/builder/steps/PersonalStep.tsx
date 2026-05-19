@@ -5,9 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
-import { NavigationButtons } from "../NavigationButtons";
 import { PhotoUpload } from "../PhotoUpload";
+import { TodaysTipCard } from "../TodaysTipCard";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
+import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import {
   sanitizeName,
@@ -22,20 +25,22 @@ import {
 } from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
-export const PersonalStep = ({
-  onNext,
-}: {
-  onNext: () => void;
-}) => {
+const ICON_INPUT_PAD = 40;
+
+export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const personal = useCvStore((state) => state.data.personal);
-  const photoShape = useCvStore((state) => state.data.settings.photoShape ?? "round");
+  const photoShape = useCvStore(
+    (state) => state.data.settings.photoShape ?? "round",
+  );
   const updateSection = useCvStore((state) => state.updateSection);
   const settings = useCvStore((state) => state.data.settings);
   const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMore, setShowMore] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string | null>
+  >({});
 
   const setFieldError = (field: string, error: string | null) =>
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
@@ -78,7 +83,6 @@ export const PersonalStep = ({
     const subscription = watch((value) => {
       const nextSerialized = JSON.stringify(value);
       if (nextSerialized === lastSerializedRef.current) return;
-
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (nextSerialized !== lastSerializedRef.current) {
@@ -93,88 +97,124 @@ export const PersonalStep = ({
     };
   }, [watch, updateSection]);
 
+  const initials = `${personal.firstName?.charAt(0) ?? ""}${
+    personal.lastName?.charAt(0) ?? ""
+  }`;
+
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      {/* Heading */}
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      {/* Step badge */}
+      <div className="cv-step-badge">
+        <UAEDot size={13} />
+        STEP 01 · CONTACT
+      </div>
+
+      {/* Hero heading */}
       <div>
-        <h1 className="cv-step-heading">
-          Please enter your{" "}
-          <span className="accent">contact</span> info
+        <h1
+          className="cv-step-heading"
+          style={{ fontSize: 36, marginTop: 4 }}
+        >
+          Let&apos;s start with how recruiters reach you.
         </h1>
         <p className="cv-step-subtitle">
-          Add your phone number and email so recruiters can reach you.
+          In the UAE, recruiters open with your phone and visa status. Make sure
+          both are crisp before anything else.
         </p>
       </div>
 
-      {/* Photo upload + Import CV side by side */}
-      <div className="pb-6 border-b border-[var(--border-soft)] mb-2">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Left: Photo upload */}
-          <div>
-            <PhotoUpload
-              photo={personal.photo}
-              showPhoto={personal.showPhoto}
-              photoShape={photoShape}
-              onPhotoChange={handlePhotoChange}
-              onToggleChange={handleToggleChange}
-            />
-          </div>
-
-          {/* Right: Import CV */}
-          <div
-            className="flex flex-col items-center justify-center h-full min-h-[120px] border-2 border-dashed border-gray-200 rounded-2xl p-4 hover:border-indigo-300 hover:bg-indigo-50 transition cursor-pointer"
-            onClick={() => handleImport("pdf")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleImport("pdf");
-              }
-            }}
-          >
-            <span className="text-3xl">📄</span>
-            <span className="text-sm font-semibold text-gray-700 mt-2">Import Existing CV</span>
-            <span className="text-xs text-gray-400 mt-1 text-center">Upload a PDF or DOCX to auto-fill</span>
-          </div>
-        </div>
-
-        {/* Photo shape toggle */}
-        {personal.photo && personal.showPhoto && (
-          <div className="mt-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Photo Shape</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPhotoShape("round")}
-                className={`px-4 py-1.5 rounded-lg text-sm transition ${
-                  photoShape === "round"
-                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
-                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
-                }`}
-              >
-                ⬤ Round
-              </button>
-              <button
-                type="button"
-                onClick={() => setPhotoShape("square")}
-                className={`px-4 py-1.5 rounded-lg text-sm transition ${
-                  photoShape === "square"
-                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
-                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
-                }`}
-              >
-                ■ Square
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Import row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 10,
+        }}
+      >
+        <ImportButton
+          icon="upload"
+          label="Import existing CV (PDF / DOCX)"
+          onClick={() => handleImport("pdf")}
+        />
+        <ImportButton
+          icon="linkedin"
+          label="Import from LinkedIn"
+          onClick={() => handleImport("linkedin")}
+        />
       </div>
 
-      {/* Core fields */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="cv-label">FIRST NAME (MANDATORY)</label>
+      {/* OR divider */}
+      <div
+        style={{
+          position: "relative",
+          textAlign: "center",
+          margin: "8px 0 4px",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: 0,
+            right: 0,
+            height: 1,
+            background: "var(--ff-line)",
+          }}
+        />
+        <span
+          style={{
+            position: "relative",
+            background: "var(--ff-paper)",
+            padding: "0 14px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--ff-faint)",
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+          }}
+        >
+          Or fill by hand
+        </span>
+      </div>
+
+      {/* Photo + Today's Tip side-by-side */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.1fr 1fr",
+          gap: 12,
+        }}
+        className="ff-photo-tip-grid"
+      >
+        <PhotoUpload
+          photo={personal.photo}
+          showPhoto={personal.showPhoto}
+          photoShape={photoShape}
+          onPhotoChange={handlePhotoChange}
+          onToggleChange={handleToggleChange}
+          onShapeChange={setPhotoShape}
+          initials={initials}
+        />
+        <TodaysTipCard stepId="personal" />
+      </div>
+
+      {/* Core fields grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 14,
+        }}
+        className="ff-core-fields"
+      >
+        <Field
+          label="First name"
+          required
+          error={errors.firstName?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Muhammad"
@@ -184,13 +224,12 @@ export const PersonalStep = ({
               register("firstName").onChange(e);
             }}
           />
-          {errors.firstName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">LAST NAME (MANDATORY)</label>
+        </Field>
+        <Field
+          label="Last name"
+          required
+          error={errors.lastName?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Al-Rashidi"
@@ -200,26 +239,12 @@ export const PersonalStep = ({
               register("lastName").onChange(e);
             }}
           />
-          {errors.lastName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">CITY</label>
-          <input
-            className="cv-input"
-            placeholder="e.g. Dubai, UAE"
-            {...register("location")}
-            onChange={(e) => {
-              e.target.value = sanitizeLocation(e.target.value);
-              register("location").onChange(e);
-            }}
-          />
-        </div>
-
-        <div>
-          <label className="cv-label">HEADLINE / JOB TITLE</label>
+        </Field>
+        <Field
+          label="Headline"
+          hint="Mirrors the role you want, not the one you held."
+          error={errors.headline?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
@@ -229,29 +254,41 @@ export const PersonalStep = ({
               register("headline").onChange(e);
             }}
           />
-          {errors.headline?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.headline.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">PHONE (MANDATORY)</label>
+        </Field>
+        <Field label="City" leftIcon="pin">
+          <input
+            className="cv-input"
+            placeholder="e.g. Dubai, UAE"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
+            {...register("location")}
+            onChange={(e) => {
+              e.target.value = sanitizeLocation(e.target.value);
+              register("location").onChange(e);
+            }}
+          />
+        </Field>
+        <Field label="Phone" leftIcon="phone" required>
           <input
             className="cv-input"
             placeholder="+971 50 123 4567"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("phone")}
             onChange={(e) => {
               e.target.value = sanitizePhone(e.target.value);
               register("phone").onChange(e);
             }}
           />
-        </div>
-
-        <div>
-          <label className="cv-label">EMAIL (MANDATORY)</label>
+        </Field>
+        <Field
+          label="Email"
+          leftIcon="mail"
+          required
+          error={errors.email?.message}
+        >
           <input
             className="cv-input"
             placeholder="yourname@email.com"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("email")}
             onChange={(e) => {
               e.target.value = sanitizeEmail(e.target.value);
@@ -262,25 +299,113 @@ export const PersonalStep = ({
               setFieldError("email", validateEmail(e.target.value));
             }}
           />
-          {errors.email?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
-          )}
           <FieldError message={fieldErrors.email ?? null} />
-        </div>
+        </Field>
       </div>
 
-      {/* Add more details */}
+      {/* UAE Essentials block */}
+      <section
+        style={{
+          padding: 18,
+          background: "var(--ff-accent-soft)",
+          border: "1px solid rgba(14,124,74,0.30)",
+          borderRadius: 14,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <UAEDot size={13} />
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--ff-accent-dark)",
+            }}
+          >
+            UAE essentials
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-accent)",
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              marginLeft: "auto",
+            }}
+          >
+            +8 pts
+          </span>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 12,
+          }}
+          className="ff-uae-grid"
+        >
+          <Field label="Visa status">
+            <select className="cv-select" {...register("visaStatus")}>
+              <option value="">Select status…</option>
+              <option value="UAE National">UAE National</option>
+              <option value="GCC National">GCC National</option>
+              <option value="Family sponsorship">Family sponsorship</option>
+              <option value="Employment visa">Employment visa</option>
+              <option value="Golden Visa">Golden Visa</option>
+              <option value="Green Visa">Green Visa</option>
+              <option value="Freelance permit">Freelance permit</option>
+              <option value="Investor visa">Investor visa</option>
+              <option value="Visit visa">Visit visa</option>
+              <option value="Cancelled / transferable">
+                Cancelled / transferable
+              </option>
+            </select>
+          </Field>
+          <Field label="Availability">
+            <select className="cv-select" {...register("availability")}>
+              <option value="">Select availability…</option>
+              <option value="Immediate">Immediate</option>
+              <option value="2 weeks notice">2 weeks notice</option>
+              <option value="30 days notice">30 days notice</option>
+              <option value="60 days notice">60 days notice</option>
+              <option value="90 days notice">90 days notice</option>
+            </select>
+          </Field>
+          <Field label="UAE driving licence">
+            <select className="cv-select" {...register("drivingLicense")}>
+              <option value="">Select…</option>
+              <option value="Light Vehicle">Light Vehicle</option>
+              <option value="Heavy Vehicle">Heavy Vehicle</option>
+              <option value="Motorcycle">Motorcycle</option>
+              <option value="International licence">
+                International licence
+              </option>
+              <option value="None">None</option>
+            </select>
+          </Field>
+        </div>
+      </section>
+
+      {/* More details expander */}
       <div>
         <button
           type="button"
           onClick={() => setShowMore((v) => !v)}
           style={{
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            gap: 6,
+            gap: 8,
             fontSize: 13,
             fontWeight: 600,
-            color: "var(--brand-primary)",
+            color: "var(--ff-accent-dark)",
             background: "none",
             border: "none",
             cursor: "pointer",
@@ -295,45 +420,64 @@ export const PersonalStep = ({
               transform: showMore ? "rotate(45deg)" : "none",
             }}
           >
-            +
+            <Icon name="plus" size={13} />
           </span>
           {showMore ? "Hide extra details" : "Add more details"}
         </button>
 
         {showMore && (
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <label className="cv-label">LINKEDIN</label>
+          <div
+            style={{
+              marginTop: 16,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 14,
+            }}
+            className="ff-core-fields"
+          >
+            <Field
+              label="LinkedIn"
+              optional
+              leftIcon="linkedin"
+            >
               <input
                 className="cv-input"
                 placeholder="linkedin.com/in/yourname"
+                style={{ paddingLeft: ICON_INPUT_PAD }}
                 {...register("linkedin")}
                 onBlur={(e) => {
                   register("linkedin").onBlur(e);
                   const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value) setValue("linkedin", url, { shouldDirty: true });
+                  if (url !== e.target.value)
+                    setValue("linkedin", url, { shouldDirty: true });
                   setFieldError("linkedin", validateLinkedIn(url));
                 }}
               />
-              <FieldError message={fieldErrors.linkedin ?? null} type="warning" />
-            </div>
-            <div>
-              <label className="cv-label">WEBSITE</label>
+              <FieldError
+                message={fieldErrors.linkedin ?? null}
+                type="warning"
+              />
+            </Field>
+            <Field label="Website" optional leftIcon="globe">
               <input
                 className="cv-input"
                 placeholder="www.yourportfolio.com"
+                style={{ paddingLeft: ICON_INPUT_PAD }}
                 {...register("website")}
                 onBlur={(e) => {
                   register("website").onBlur(e);
                   const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value) setValue("website", url, { shouldDirty: true });
+                  if (url !== e.target.value)
+                    setValue("website", url, { shouldDirty: true });
                   setFieldError("website", validateURL(url));
                 }}
               />
-              <FieldError message={fieldErrors.website ?? null} type="warning" />
-            </div>
-            <div>
-              <label className="cv-label">NATIONALITY</label>
+              <FieldError
+                message={fieldErrors.website ?? null}
+                type="warning"
+              />
+            </Field>
+            <Field label="Nationality" optional>
               <input
                 className="cv-input"
                 placeholder="e.g. Emirati, Pakistani, Indian"
@@ -343,9 +487,8 @@ export const PersonalStep = ({
                   register("nationality").onChange(e);
                 }}
               />
-            </div>
-            <div>
-              <label className="cv-label">COUNTRY</label>
+            </Field>
+            <Field label="Country" optional>
               <input
                 className="cv-input"
                 placeholder="e.g. United Arab Emirates"
@@ -355,36 +498,88 @@ export const PersonalStep = ({
                   register("country").onChange(e);
                 }}
               />
-            </div>
-            <div>
-              <label className="cv-label">DATE OF BIRTH</label>
+            </Field>
+            <Field label="Date of birth" optional>
               <input
                 className="cv-input"
                 placeholder="e.g. 15/03/1990"
                 {...register("dateOfBirth")}
               />
-            </div>
-            <div>
-              <label className="cv-label">DRIVING LICENSE</label>
-              <input
-                className="cv-input"
-                placeholder="e.g. UAE Light Vehicle License"
-                {...register("drivingLicense")}
-              />
-            </div>
+            </Field>
           </div>
         )}
       </div>
 
-      {/* ATS tip */}
-      <div className="cv-tip-box">
-        ATS tip: Match the contact details you use on job applications.
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 4,
+        }}
+      >
+        <button
+          type="submit"
+          className="cv-btn-primary"
+          style={{ padding: "12px 26px" }}
+        >
+          Continue
+          <Icon name="chevron-right" size={14} strokeWidth={2.5} />
+        </button>
       </div>
 
-      {/* Navigation */}
-      <NavigationButtons
-        onNext={handleSubmit(onNext)}
-      />
+      <style>{`
+        @media (max-width: 900px) {
+          .ff-photo-tip-grid { grid-template-columns: 1fr !important; }
+          .ff-core-fields { grid-template-columns: 1fr !important; }
+          .ff-uae-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </form>
   );
 };
+
+/* ─── Helpers ─── */
+const ImportButton = ({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: "upload" | "linkedin";
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      width: "100%",
+      fontFamily: "var(--font-body)",
+      fontSize: 13,
+      color: "var(--ff-ink)",
+      background: "var(--ff-card)",
+      border: "1px dashed var(--ff-line-strong)",
+      padding: "13px 16px",
+      borderRadius: 12,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      cursor: "pointer",
+      fontWeight: 500,
+      transition: "border-color 120ms, background 120ms, color 120ms",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.borderColor = "var(--ff-accent)";
+      e.currentTarget.style.color = "var(--ff-accent-dark)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = "var(--ff-line-strong)";
+      e.currentTarget.style.color = "var(--ff-ink)";
+    }}
+  >
+    <Icon name={icon} size={14} />
+    {label}
+  </button>
+);

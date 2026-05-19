@@ -11,6 +11,9 @@ import { FieldError } from "../../FieldError";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
+import { TodaysTipCard } from "../TodaysTipCard";
 
 type SummaryForm = { summary: string };
 
@@ -121,18 +124,30 @@ export const SummaryStep = ({
   }, [watch, updateSection]);
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="cv-step-heading">Tell Us About Yourself</h2>
-          <span className="cv-badge-optional">Optional</span>
-        </div>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      <div className="cv-step-badge">
+        <UAEDot size={13} />
+        STEP 02 · SUMMARY
+      </div>
+      <div>
+        <h1
+          className="cv-step-heading"
+          style={{ fontSize: 34, marginTop: 8 }}
+        >
+          Tell us about yourself.
+        </h1>
         <p className="cv-step-subtitle">
-          Write a short professional summary that highlights your strengths and career goals. This appears at the top of your CV.
+          Two to three lines. Lead with years of experience, industry, and one
+          quantified result. Adjectives are forgettable; numbers are not.
         </p>
+      </div>
 
-        <div className="mt-6">
-          <Field label="Summary" error={errors.summary?.message}>
+      <div className="ff-summary-grid">
+        <section className="cv-step-card">
+          <Field label="Professional summary" error={errors.summary?.message}>
             <textarea
               rows={6}
               className="cv-input cv-textarea"
@@ -173,15 +188,13 @@ export const SummaryStep = ({
               className="cv-btn-secondary"
               style={{ fontSize: 12, padding: "5px 12px" }}
             >
-              {"\u2728"} Write My Summary with AI
+              <Icon name="sparkle" size={13} />
+              Write my summary with AI
             </button>
           </div>
-        </div>
-
-        <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Aim for 2-3 short sentences. Include keywords from the job description — recruiters in the UAE often use automated screening.
-        </div>
-      </section>
+        </section>
+        <TodaysTipCard stepId="summary" />
+      </div>
 
       <NavigationButtons
         onBack={onBack}
@@ -189,6 +202,17 @@ export const SummaryStep = ({
         showSkip
         onSkip={onSkip}
       />
+
+      <style>{`
+        .ff-summary-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        @media (min-width: 900px) {
+          .ff-summary-grid { grid-template-columns: 1.4fr 1fr; align-items: start; }
+        }
+      `}</style>
 
       <AIResultsModal
         isOpen={aiModalOpen}

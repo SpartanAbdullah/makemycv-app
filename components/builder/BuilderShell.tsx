@@ -1,10 +1,16 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { StepStatus } from "./Stepper";
+import Link from "next/link";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { StepStatus } from "./Stepper";
+import { StepBeads } from "./StepBeads";
+import { UAEDot } from "./UAEDot";
+import { Icon } from "./Icon";
 import { builderSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
+import { useUiStore } from "../../lib/store/uiStore";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import { MappingReview } from "../import/MappingReview";
 import { LinkedInImportModal } from "../import/LinkedInImportModal";
@@ -14,9 +20,11 @@ import { linkedinAdapter } from "../../lib/importers/linkedinAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type { CvData } from "../../lib/types/cv";
 import { UpgradeModal } from "../modals/UpgradeModal";
+import { templates, getTemplateById } from "../../lib/templates";
+import { downloadCV } from "../../hooks/useDownloadCV";
+import { computeScore } from "../../lib/scoreEngine";
 import dynamic from "next/dynamic";
 
-const ScoreWidget = dynamic(() => import("../ScoreWidget"), { ssr: false });
 const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
 
 type ImportType = "pdf" | "docx" | "linkedin";
@@ -39,19 +47,7 @@ type ImportState =
   | { phase: "review"; source: string; parsed: ParsedDocument }
   | { phase: "linkedin-input" };
 
-const STEP_META: Record<string, { icon: string; label: string; sublabel: string }> = {
-  personal:       { icon: "👤", label: "Contact",        sublabel: "Name, email, phone" },
-  summary:        { icon: "✍️", label: "Summary",        sublabel: "Professional bio" },
-  experience:     { icon: "💼", label: "Experience",     sublabel: "Work history" },
-  education:      { icon: "🎓", label: "Education",      sublabel: "Degrees & diplomas" },
-  skills:         { icon: "⚡", label: "Skills",         sublabel: "Your expertise" },
-  languages:      { icon: "🌐", label: "Languages",      sublabel: "Spoken languages" },
-  certifications: { icon: "🏅", label: "Certifications", sublabel: "Credentials" },
-  projects:       { icon: "📁", label: "Projects",       sublabel: "Standout work" },
-  review:         { icon: "✅", label: "Review",          sublabel: "Download & export" },
-  score:          { icon: "📊", label: "CV Score",        sublabel: "Score & suggestions" },
-};
-
+/* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
 const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -65,13 +61,13 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0,0,0,0.85)",
+        backgroundColor: "rgba(11,15,12,0.78)",
         zIndex: 60,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         overflowY: "auto",
-        padding: "40px 20px",
+        padding: "32px 16px",
       }}
     >
       <div
@@ -82,19 +78,22 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 16,
+          color: "white",
         }}
       >
-        <span style={{ color: "white", fontSize: 14, fontWeight: 600 }}>Preview</span>
+        <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--font-display)" }}>
+          Live preview
+        </span>
         <button
           type="button"
           onClick={onClose}
           style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "none",
-            borderRadius: 8,
+            background: "rgba(255,255,255,0.10)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: 999,
             padding: "6px 14px",
             color: "white",
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 500,
             cursor: "pointer",
           }}
@@ -109,7 +108,7 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
           minHeight: 1123,
           backgroundColor: "white",
           boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-          borderRadius: 4,
+          borderRadius: 6,
           overflow: "hidden",
           flexShrink: 0,
         }}
@@ -120,6 +119,486 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
+/* ─── TopBar — 64px, logo + autosave + score chip + actions ── */
+const TopBar = ({
+  cvName,
+  score,
+  scoreDelta,
+  onTemplates,
+  onDownload,
+  onScoreClick,
+  isDownloading,
+}: {
+  cvName: string;
+  score: number;
+  scoreDelta?: number;
+  onTemplates: () => void;
+  onDownload: () => void;
+  onScoreClick: () => void;
+  isDownloading: boolean;
+}) => {
+  // Time since last save — local to the component since it ticks every 15s.
+  const [savedAgo, setSavedAgo] = useState("just now");
+  useEffect(() => {
+    const t = setInterval(() => {
+      setSavedAgo("just now");
+    }, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div
+      style={{
+        height: "var(--topbar-h)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 28px",
+        background: "var(--ff-card)",
+        borderBottom: "1px solid var(--ff-line)",
+        flexShrink: 0,
+        position: "relative",
+        zIndex: 10,
+      }}
+    >
+      {/* Left — logo + auto-save chip */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+        <Link
+          href="/"
+          style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}
+        >
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              background: "var(--ff-ink)",
+              color: "var(--ff-paper)",
+              display: "grid",
+              placeItems: "center",
+              fontFamily: "var(--font-display)",
+              fontSize: 16,
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
+          >
+            m
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 17,
+              color: "var(--ff-ink)",
+              letterSpacing: "-0.02em",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            makemycv
+            <span style={{ color: "var(--ff-accent)" }}>.</span>
+            <span
+              style={{
+                color: "var(--ff-muted)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                marginLeft: 1,
+              }}
+            >
+              ae
+            </span>
+          </div>
+        </Link>
+        <div
+          className="hidden md:block"
+          style={{
+            width: 1,
+            height: 18,
+            background: "var(--ff-line)",
+            margin: "0 4px",
+            flexShrink: 0,
+          }}
+        />
+        <span
+          className="hidden md:inline"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--ff-muted)",
+            letterSpacing: "0.06em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {cvName} · auto-saved {savedAgo}
+        </span>
+      </div>
+
+      {/* Right — score chip + templates + download */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={onScoreClick}
+          aria-label={`CV Score: ${score} out of 100`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "5px 5px 5px 12px",
+            background: "var(--ff-paper)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 999,
+            cursor: "pointer",
+            transition: "border-color 120ms",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor =
+              "var(--ff-line-strong)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor =
+              "var(--ff-line)";
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.12em",
+              fontWeight: 600,
+            }}
+          >
+            SCORE
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 15,
+              color: "var(--ff-ink)",
+              fontWeight: 600,
+            }}
+          >
+            {score}
+          </span>
+          {scoreDelta !== undefined && scoreDelta !== 0 && (
+            <span
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 10,
+                color: "var(--ff-accent-dark)",
+                background: "var(--ff-accent-soft)",
+                padding: "3px 7px",
+                borderRadius: 999,
+                fontWeight: 600,
+              }}
+            >
+              {scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onTemplates}
+          className="hidden sm:inline-flex"
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "var(--ff-ink)",
+            background: "transparent",
+            border: "1px solid var(--ff-line)",
+            padding: "7px 14px",
+            borderRadius: 999,
+            cursor: "pointer",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          Templates
+        </button>
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={isDownloading}
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "white",
+            background: "var(--ff-ink)",
+            border: "none",
+            padding: "7px 16px",
+            borderRadius: 999,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            cursor: isDownloading ? "wait" : "pointer",
+            opacity: isDownloading ? 0.7 : 1,
+            fontWeight: 500,
+          }}
+        >
+          {isDownloading ? (
+            <>
+              <span
+                style={{
+                  width: 11,
+                  height: 11,
+                  border: "2px solid rgba(255,255,255,0.4)",
+                  borderTopColor: "white",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              Preparing…
+            </>
+          ) : (
+            <>
+              <Icon name="download" size={13} />
+              Download
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Right preview drawer (xl+ only) ─────────────────────── */
+const PreviewDrawer = ({
+  templateId,
+  onPrevTemplate,
+  onNextTemplate,
+  onFullscreen,
+  onDownload,
+  isDownloading,
+}: {
+  templateId: string;
+  onPrevTemplate: () => void;
+  onNextTemplate: () => void;
+  onFullscreen: () => void;
+  onDownload: () => void;
+  isDownloading: boolean;
+}) => {
+  const template = getTemplateById(templateId);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: "var(--drawer-gap)",
+        top: "calc(var(--topbar-h) + var(--progressbar-h) + 12px)",
+        bottom: "var(--drawer-gap)",
+        width: "var(--drawer-w)",
+        background: "var(--ff-card)",
+        border: "1px solid var(--ff-line)",
+        borderRadius: 18,
+        boxShadow: "var(--shadow-drawer)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        zIndex: 5,
+      }}
+    >
+      {/* Drawer header */}
+      <div
+        style={{
+          padding: "14px 20px",
+          borderBottom: "1px solid var(--ff-line)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 16,
+              color: "var(--ff-ink)",
+              fontWeight: 600,
+            }}
+          >
+            Live preview
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.06em",
+              marginTop: 2,
+              textTransform: "uppercase",
+            }}
+          >
+            {template.name} · A4 · auto-fit
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            type="button"
+            onClick={onPrevTemplate}
+            aria-label="Previous template"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-left" size={13} color="var(--ff-muted)" />
+          </button>
+          <button
+            type="button"
+            onClick={onNextTemplate}
+            aria-label="Next template"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-right" size={13} color="var(--ff-muted)" />
+          </button>
+        </div>
+      </div>
+
+      {/* Drawer body — scrollable CV render area */}
+      <DrawerPreviewBody />
+
+      {/* Drawer footer */}
+      <div
+        style={{
+          padding: 12,
+          borderTop: "1px solid var(--ff-line)",
+          display: "flex",
+          gap: 8,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onFullscreen}
+          style={{
+            flex: 1,
+            fontFamily: "var(--font-body)",
+            fontSize: 12.5,
+            color: "var(--ff-ink)",
+            background: "var(--ff-paper)",
+            border: "1px solid var(--ff-line)",
+            padding: "9px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 500,
+          }}
+        >
+          Open fullscreen
+        </button>
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={isDownloading}
+          style={{
+            flex: 1,
+            fontFamily: "var(--font-body)",
+            fontSize: 12.5,
+            color: "white",
+            background: "var(--ff-accent)",
+            border: "none",
+            padding: "9px",
+            borderRadius: 8,
+            fontWeight: 600,
+            cursor: isDownloading ? "wait" : "pointer",
+            opacity: isDownloading ? 0.7 : 1,
+          }}
+        >
+          {isDownloading ? "Preparing…" : "Download PDF"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* Preview body — scales the 794-px-wide PreviewPanel to fit the drawer width
+ * and uses two ResizeObservers so the outer scroll height matches the actual
+ * CV content height after scaling (the CV grows past A4 height for long CVs).
+ *
+ *   wrapRef:    drawer body — measures available width → derives scale
+ *   contentRef: inner 794-wide CV → measures rendered scrollHeight to size
+ *               the spacer so the scrollbar reflects scaled content height. */
+const A4_W = 794;
+const DrawerPreviewBody = () => {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.55);
+  const [contentHeight, setContentHeight] = useState(1123);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / A4_W);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const update = () => {
+      const h = el.scrollHeight;
+      if (h > 0) setContentHeight(h);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        flex: 1,
+        background: "white",
+        overflowY: "auto",
+        overflowX: "hidden",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: contentHeight * scale,
+          position: "relative",
+        }}
+      >
+        <div
+          ref={contentRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: A4_W,
+            transformOrigin: "top left",
+            transform: `scale(${scale})`,
+            background: "white",
+          }}
+        >
+          <PreviewPanel sticky={false} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const drawerChevronBtn: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 8,
+  border: "1px solid var(--ff-line)",
+  background: "var(--ff-paper)",
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
+  padding: 0,
+};
+
+/* ─── BuilderShell ─────────────────────────────────────────── */
 export const BuilderShell = ({
   stepId,
   children,
@@ -129,14 +608,22 @@ export const BuilderShell = ({
   children: React.ReactNode;
   onStepChange: (stepId: string) => void;
 }) => {
+  const router = useRouter();
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const isPro = useCvStore((state) => state.isPro);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const hasUsedFreeDownload = useCvStore((state) => state.hasUsedFreeDownload);
+  const setHasUsedFreeDownload = useCvStore((state) => state.setHasUsedFreeDownload);
+  const parseSignals = useCvStore((state) => state.parseSignals);
+  const updateSection = useCvStore((state) => state.updateSection);
+  const previewOpen = useUiStore((s) => s.previewDrawerOpen);
+  const setPreviewOpen = useUiStore((s) => s.setPreviewDrawerOpen);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     bindCvStorage();
@@ -164,12 +651,55 @@ export const BuilderShell = ({
     return result;
   }, [data, stepId]);
 
-  const doneCount = builderSteps.filter((s) => statuses[s.id] === "done").length;
-  const totalSteps = builderSteps.length;
-  const currentStepIndex = builderSteps.findIndex((s) => s.id === stepId);
+  // Score — computed live, shown in the TopBar.
+  const score = useMemo(
+    () =>
+      computeScore(data, {
+        mode: "builder",
+        parseSignals: parseSignals ?? undefined,
+      }).total,
+    [data, parseSignals],
+  );
 
-  const handleStepClick = (id: string) => {
-    if (statuses[id] === "done") onStepChange(id);
+  const cvName =
+    (data.personal.firstName?.trim() || data.personal.lastName?.trim())
+      ? `${data.personal.firstName?.trim() ?? ""} ${data.personal.lastName?.trim() ?? ""}`
+          .trim()
+          .split(" ")[0] + "'s CV"
+      : "Untitled CV";
+
+  // ---- Template cycling (drawer chevrons) ----
+  const handleCycleTemplate = (direction: 1 | -1) => {
+    const idx = templates.findIndex((t) => t.id === data.settings.templateId);
+    const nextIdx =
+      (((idx >= 0 ? idx : 0) + direction) % templates.length + templates.length) %
+      templates.length;
+    updateSection("settings", {
+      ...data.settings,
+      templateId: templates[nextIdx].id,
+    });
+  };
+
+  // ---- Download (TopBar + drawer) ----
+  const handleDownload = async () => {
+    if (!isPro && hasUsedFreeDownload) {
+      setUpgradeOpen(true);
+      return;
+    }
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadCV(
+        data,
+        isPro ? "pro" : "free",
+        data.settings.templateId ?? "classic",
+      );
+      if (!isPro) setHasUsedFreeDownload(true);
+    } catch {
+      setDownloadError("Couldn't generate PDF. Try again or export as DOCX.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // ---- Import flow ----
@@ -191,7 +721,10 @@ export const BuilderShell = ({
       return;
     }
 
-    const accept = type === "pdf" ? ".pdf,application/pdf" : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const accept =
+      type === "pdf"
+        ? ".pdf,application/pdf"
+        : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const source = type === "pdf" ? "PDF" : "DOCX";
     const adapter = type === "pdf" ? pdfAdapter : docxAdapter;
 
@@ -202,7 +735,9 @@ export const BuilderShell = ({
         setImportState({ phase: "review", source, parsed });
       } catch {
         setImportState({ phase: "idle" });
-        setErrorMsg(`Could not parse ${source}. Please check the file and try again.`);
+        setErrorMsg(
+          `Could not parse ${source}. Please check the file and try again.`,
+        );
       }
     });
   };
@@ -214,7 +749,9 @@ export const BuilderShell = ({
       setImportState({ phase: "review", source: "LinkedIn", parsed });
     } catch {
       setImportState({ phase: "idle" });
-      setErrorMsg("Could not parse LinkedIn profile text. Please paste the full profile text.");
+      setErrorMsg(
+        "Could not parse LinkedIn profile text. Please paste the full profile text.",
+      );
     }
   };
 
@@ -226,422 +763,96 @@ export const BuilderShell = ({
     setImportState({ phase: "idle" });
   };
 
+  const stepIsReview = stepId === "review";
+  const stepIsScore = stepId === "score";
+
   return (
     <ImportContext.Provider value={{ handleImport }}>
-    <div
-      style={{
-        display: "flex",
-        height: "100dvh",
-        width: "100%",
-        overflow: "hidden",
-        fontFamily: "var(--font-body)",
-        background: "var(--surface-page)",
-      }}
-    >
-      {/* ═══ SIDEBAR ═══ */}
-      <aside
-        className="hidden lg:flex"
+      <div
         style={{
-          width: "var(--sidebar-w)",
-          flexShrink: 0,
-          background: "var(--sidebar-bg)",
+          display: "flex",
           flexDirection: "column",
+          height: "100dvh",
+          width: "100%",
           overflow: "hidden",
-          position: "relative",
+          fontFamily: "var(--font-body)",
+          background: "var(--ff-paper)",
         }}
       >
-        {/* Logo area */}
+        <TopBar
+          cvName={cvName}
+          score={score}
+          onTemplates={() => onStepChange("review")}
+          onDownload={handleDownload}
+          onScoreClick={() => router.push("/builder?step=score")}
+          isDownloading={isDownloading}
+        />
+
+        {/* Progress bar — step beads + UAE-optimised pill */}
         <div
           style={{
-            padding: "0 20px",
-            height: 64,
             display: "flex",
             alignItems: "center",
-            borderBottom: "1px solid #1E293B",
+            gap: 14,
+            padding: "12px 28px",
+            background: "var(--ff-card)",
+            borderBottom: "1px solid var(--ff-line)",
             flexShrink: 0,
+            minHeight: "var(--progressbar-h)",
+            overflowX: "auto",
           }}
         >
+          <StepBeads
+            steps={builderSteps}
+            statuses={statuses}
+            currentId={stepId}
+            onStepClick={(id) => onStepChange(id)}
+          />
           <div
+            className="hidden md:inline-flex"
             style={{
-              width: 32,
-              height: 32,
-              background: "linear-gradient(135deg, #4F46E5, #6366F1)",
-              borderRadius: 8,
-              display: "flex",
+              marginLeft: "auto",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: 800,
-              color: "white",
-              letterSpacing: "-0.02em",
-              marginRight: 10,
+              gap: 8,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
               flexShrink: 0,
             }}
           >
-            M
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "white",
-                letterSpacing: "-0.01em",
-                lineHeight: 1.1,
-              }}
-            >
-              MakeMyCV
-            </div>
-            <div
-              style={{
-                fontSize: 10,
-                color: "#475569",
-                letterSpacing: "0.04em",
-                textTransform: "uppercase" as const,
-              }}
-            >
-              UAE Builder
-            </div>
+            <UAEDot size={11} />
+            UAE-Optimised
           </div>
         </div>
 
-        {/* Step navigation */}
-        <nav
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 8px",
-            position: "relative",
-          }}
-        >
-          {/* Progress summary */}
-          <div
-            style={{
-              padding: "0 8px 16px",
-              borderBottom: "1px solid #1E293B",
-              marginBottom: 12,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                textTransform: "uppercase" as const,
-                letterSpacing: "0.08em",
-                color: "#334155",
-                fontWeight: 600,
-                marginBottom: 8,
-              }}
-            >
-              Your Progress
-            </div>
-            <div
-              style={{
-                height: 4,
-                background: "#1E293B",
-                borderRadius: 4,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${(doneCount / totalSteps) * 100}%`,
-                  background: "linear-gradient(90deg, #4F46E5, #6366F1)",
-                  borderRadius: 4,
-                  transition: "width 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
-              />
-            </div>
-            <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
-              {doneCount} of {totalSteps} steps complete
-            </div>
-          </div>
-
-          {/* Nav items */}
-          {builderSteps.map((step, idx) => {
-            const status = statuses[step.id];
-            const isActive = step.id === stepId;
-            const isDone = status === "done";
-            const meta = STEP_META[step.id];
-
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => handleStepClick(step.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  width: "100%",
-                  padding: "10px 16px",
-                  background: isActive
-                    ? "rgba(79,70,229,0.18)"
-                    : "transparent",
-                  border: "none",
-                  borderRadius: 10,
-                  cursor: isDone || isActive ? "pointer" : "default",
-                  textAlign: "left" as const,
-                  transition: "background 150ms ease",
-                  marginBottom: 2,
-                  position: "relative" as const,
-                }}
-              >
-                {/* Icon block */}
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 16,
-                    background: isActive
-                      ? "rgba(99,102,241,0.25)"
-                      : isDone
-                        ? "rgba(16,185,129,0.15)"
-                        : "rgba(255,255,255,0.04)",
-                    flexShrink: 0,
-                    transition: "background 150ms ease",
-                  }}
-                >
-                  {isDone ? (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M2.5 7L5.5 10L11.5 4"
-                        stroke="#10B981"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  ) : (
-                    <span style={{ fontSize: 15 }}>{meta?.icon}</span>
-                  )}
-                </div>
-
-                {/* Labels */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: isActive ? 600 : 500,
-                      color: isActive ? "#FFFFFF" : isDone ? "#94A3B8" : "#475569",
-                      lineHeight: 1.2,
-                      transition: "color 150ms ease",
-                    }}
-                  >
-                    {meta?.label}
-                  </div>
-                  {isActive && (
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#6366F1",
-                        marginTop: 2,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {meta?.sublabel}
-                    </div>
-                  )}
-                </div>
-
-                {/* Step number badge (inactive incomplete) */}
-                {!isDone && !isActive && (
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.06)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 9,
-                      color: "#475569",
-                      fontWeight: 600,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {idx + 1}
-                  </div>
-                )}
-
-                {/* Active indicator bar */}
-                {isActive && (
-                  <div
-                    style={{
-                      position: "absolute" as const,
-                      left: 0,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 3,
-                      height: 24,
-                      background: "#6366F1",
-                      borderRadius: "0 3px 3px 0",
-                    }}
-                  />
-                )}
-              </button>
-            );
-          })}
-
-          {/* Score nav item */}
-          <div style={{ padding: "8px 0 0", marginTop: 4, borderTop: "1px solid #1E293B" }}>
-            <button
-              type="button"
-              onClick={() => onStepChange("score")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                width: "100%",
-                padding: "10px 16px",
-                background: stepId === "score" ? "rgba(79,70,229,0.18)" : "transparent",
-                border: "none",
-                borderRadius: 10,
-                cursor: "pointer",
-                textAlign: "left" as const,
-                transition: "background 150ms ease",
-                position: "relative" as const,
-              }}
-            >
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  background: stepId === "score"
-                    ? "rgba(99,102,241,0.25)"
-                    : "rgba(251,191,36,0.12)",
-                  flexShrink: 0,
-                  transition: "background 150ms ease",
-                }}
-              >
-                <span style={{ fontSize: 15 }}>📊</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: stepId === "score" ? 600 : 500,
-                    color: stepId === "score" ? "#FFFFFF" : "#94A3B8",
-                    lineHeight: 1.2,
-                    transition: "color 150ms ease",
-                  }}
-                >
-                  CV Score
-                </div>
-                {stepId === "score" && (
-                  <div style={{ fontSize: 10, color: "#6366F1", marginTop: 2, lineHeight: 1 }}>
-                    Score &amp; suggestions
-                  </div>
-                )}
-              </div>
-              {stepId === "score" && (
-                <div
-                  style={{
-                    position: "absolute" as const,
-                    left: 0,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: 3,
-                    height: 24,
-                    background: "#6366F1",
-                    borderRadius: "0 3px 3px 0",
-                  }}
-                />
-              )}
-            </button>
-          </div>
-        </nav>
-
-        {/* Bottom actions */}
-        <div
-          style={{
-            padding: "12px 16px",
-            borderTop: "1px solid #1E293B",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {!isPro && (
-            <button
-              type="button"
-              onClick={() => setUpgradeOpen(true)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "8px 12px",
-                background: "rgba(79,70,229,0.08)",
-                border: "1px solid rgba(79,70,229,0.2)",
-                borderRadius: 8,
-                cursor: "pointer",
-                color: "#818CF8",
-                fontSize: 12,
-                fontWeight: 600,
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(79,70,229,0.15)";
-                e.currentTarget.style.color = "#A5B4FC";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(79,70,229,0.08)";
-                e.currentTarget.style.color = "#818CF8";
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              Upgrade to Pro
-            </button>
-          )}
-
-        </div>
-      </aside>
-
-      {/* ═══ FORM AREA ═══ */}
-      <main
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--surface-page)",
-          overflowY: "auto",
-          minWidth: 0,
-        }}
-      >
         {/* Error bar */}
-        {errorMsg && (
+        {(errorMsg || downloadError) && (
           <div
             style={{
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              background: "#FEF2F2",
-              borderBottom: "1px solid #FECACA",
+              background: "#FBEFED",
+              borderBottom: "1px solid #F2D2CE",
               padding: "10px 24px",
             }}
           >
-            <p style={{ fontSize: 13, color: "#B91C1C", fontWeight: 500 }}>{errorMsg}</p>
+            <p style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}>
+              {errorMsg ?? downloadError}
+            </p>
             <button
               type="button"
-              onClick={() => setErrorMsg(null)}
+              onClick={() => {
+                setErrorMsg(null);
+                setDownloadError(null);
+              }}
               style={{
                 background: "none",
                 border: "none",
-                color: "#F87171",
+                color: "var(--ff-red)",
                 fontSize: 12,
                 cursor: "pointer",
                 textDecoration: "underline",
@@ -653,280 +864,195 @@ export const BuilderShell = ({
           </div>
         )}
 
-        {/* Mobile step indicator */}
+        {/* ── MAIN AREA ─────────────────────────────────────── */}
         <div
-          className="lg:hidden"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 20px",
-            background: "var(--surface-card)",
-            borderBottom: "1px solid var(--border-soft)",
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 26,
-                height: 26,
-                background: "linear-gradient(135deg, #4F46E5, #6366F1)",
-                borderRadius: 6,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 800,
-                color: "white",
-              }}
-            >
-              M
-            </div>
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--text-heading)",
-              }}
-            >
-              {STEP_META[stepId]?.label}
-            </span>
-          </div>
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--text-muted)",
-              fontWeight: 500,
-            }}
-          >
-            {currentStepIndex >= 0
-              ? `Step ${currentStepIndex + 1} / ${totalSteps}`
-              : "Score"}
-          </span>
-        </div>
-
-        {/* Thin progress bar (mobile only) */}
-        <div
-          className="lg:hidden"
-          style={{ height: 2, background: "var(--border-soft)" }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: `${((currentStepIndex + 1) / totalSteps) * 100}%`,
-              background: "linear-gradient(90deg, #4F46E5, #6366F1)",
-              transition: "width 400ms ease",
-            }}
-          />
-        </div>
-
-        {/* Scrollable form content */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          {!hydrated && (
-            <div style={{ padding: "32px 48px", fontSize: 14, color: "var(--text-faint)" }}>
-              Loading your saved CV...
-            </div>
-          )}
-          <div
-            style={{
-              padding: "40px 16px",
-              maxWidth: "100%",
-              width: "100%",
-            }}
-            className="sm:!px-6"
-          >
-            {children}
-          </div>
-        </div>
-      </main>
-
-      {/* ═══ PREVIEW PANEL ═══ */}
-      <aside
-        className="hidden xl:flex"
-        style={{
-          width: 400,
-          flexShrink: 0,
-          background: "#0A0F1A",
-          borderLeft: "1px solid #1A2233",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Preview header */}
-        <div
-          style={{
-            padding: "0 20px",
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #1A2233",
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase" as const,
-              color: "#334155",
-            }}
-          >
-            Live Preview
-          </div>
-        </div>
-
-        {/* Scrollable preview area */}
-        <div
-          className="relative"
           style={{
             flex: 1,
-            overflowY: "auto",
-            overflowX: "hidden",
-            padding: 12,
+            position: "relative",
+            display: "flex",
+            overflow: "hidden",
           }}
         >
+          <main
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              overflowY: "auto",
+              overflowX: "hidden",
+            }}
+          >
+            {!hydrated && (
+              <div
+                style={{
+                  padding: "28px 36px",
+                  fontSize: 14,
+                  color: "var(--ff-faint)",
+                }}
+              >
+                Loading your saved CV...
+              </div>
+            )}
+
+            {/* Form column — anchored left on xl+, full-width on smaller */}
+            <div
+              className={
+                stepIsReview || stepIsScore
+                  ? "ff-form-column ff-form-column-review"
+                  : "ff-form-column"
+              }
+            >
+              {children}
+            </div>
+          </main>
+
+          {/* Preview drawer — xl+ only, hidden on review/score steps */}
+          {!stepIsReview && !stepIsScore && (
+            <div className="hidden xl:block" style={{ pointerEvents: "auto" }}>
+              <PreviewDrawer
+                templateId={data.settings.templateId}
+                onPrevTemplate={() => handleCycleTemplate(-1)}
+                onNextTemplate={() => handleCycleTemplate(1)}
+                onFullscreen={() => setPreviewOpen(true)}
+                onDownload={handleDownload}
+                isDownloading={isDownloading}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Floating "Preview CV" pill — lg and below */}
+        {!stepIsReview && !stepIsScore && (
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="xl:hidden"
+            style={{
+              position: "fixed",
+              right: 20,
+              bottom: 20,
+              zIndex: 50,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "12px 20px",
+              background: "var(--ff-ink)",
+              color: "white",
+              border: "none",
+              borderRadius: 999,
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              fontWeight: 600,
+              boxShadow: "0 14px 30px rgba(11,15,12,0.20)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="eye" size={14} />
+            Preview CV
+          </button>
+        )}
+
+        {/* Dev AI reset (dev-only) */}
+        <DevResetAI />
+
+        {/* Mobile preview overlay */}
+        {previewOpen && <PreviewOverlay onClose={() => setPreviewOpen(false)} />}
+
+        {/* Import overlays */}
+        {importState.phase === "parsing" && (
           <div
             style={{
-              width: "100%",
-              overflow: "hidden",
-              position: "relative",
-              height: Math.round(1123 * (376 / 794)),
+              position: "fixed",
+              inset: 0,
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--surface-overlay)",
             }}
           >
             <div
               style={{
-                width: 794,
-                transformOrigin: "top left",
-                transform: `scale(${376 / 794})`,
-                background: "white",
-                borderRadius: 10,
-                overflow: "hidden",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+                background: "var(--ff-card)",
+                borderRadius: 14,
+                border: "1px solid var(--ff-line)",
+                padding: "32px 40px",
+                textAlign: "center",
+                boxShadow: "var(--shadow-xl)",
               }}
             >
-              <PreviewPanel sticky={false} />
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  border: "4px solid var(--ff-line)",
+                  borderTopColor: "var(--ff-accent)",
+                  borderRadius: "50%",
+                  margin: "0 auto 12px",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "var(--ff-ink-2)",
+                }}
+              >
+                Parsing {importState.source}...
+              </p>
             </div>
           </div>
+        )}
 
-        </div>
-      </aside>
+        {importState.phase === "linkedin-input" && (
+          <LinkedInImportModal
+            onSubmit={handleLinkedInSubmit}
+            onCancel={() => setImportState({ phase: "idle" })}
+          />
+        )}
 
-      {/* ═══ Floating controls — bottom-right of the viewport ═══
-          Score pill (left) + Preview CV button (right), same flex row.
-          Hidden states:
-            - Score pill on stepId === "score" (full ScorePanel is open)
-            - Preview CV on xl+ (desktop panel already visible)
-          If both are hidden (score step on desktop) the flex container
-          renders nothing. */}
-      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3">
-        {stepId !== "score" && <ScoreWidget />}
+        {importState.phase === "review" && (
+          <MappingReview
+            source={importState.source}
+            parsed={importState.parsed}
+            onConfirm={handleImportConfirm}
+            onCancel={() => setImportState({ phase: "idle" })}
+          />
+        )}
 
-        <button
-          type="button"
-          className="xl:hidden"
-          onClick={() => setPreviewOpen(true)}
-          style={{
-            background: "var(--brand-primary)",
-            color: "white",
-            border: "none",
-            borderRadius: 50,
-            padding: "12px 20px",
-            fontSize: 13,
-            fontWeight: 600,
-            boxShadow: "0 4px 20px rgba(79,70,229,0.4)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          Preview CV
-        </button>
+        <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+
+        {/* Inline style block — keeps the responsive form-column rules close
+            to the layout that uses them. */}
+        <style>{`
+          .ff-form-column {
+            width: 100%;
+            max-width: 100%;
+            padding: 32px 24px 32px;
+          }
+          @media (min-width: 768px) {
+            .ff-form-column { padding: 32px 36px 32px; }
+          }
+          @media (min-width: 1024px) {
+            .ff-form-column { padding: 36px 40px 36px; max-width: 860px; }
+          }
+          @media (min-width: 1280px) {
+            .ff-form-column {
+              padding: 36px 28px 32px 40px;
+              max-width: 860px;
+              margin-right: calc(var(--drawer-w) + var(--drawer-gap) + 28px);
+            }
+            .ff-form-column-review {
+              max-width: 1180px;
+              margin-right: 0;
+              padding: 36px 40px 32px 40px;
+            }
+          }
+          .cv-bead-strip::-webkit-scrollbar { display: none; }
+        `}</style>
       </div>
-
-      {/* ═══ Dev-only AI reset (bottom-left) ═══ */}
-      <DevResetAI />
-
-      {/* ═══ Mobile: preview overlay ═══ */}
-      {previewOpen && (
-        <PreviewOverlay onClose={() => setPreviewOpen(false)} />
-      )}
-
-      {/* ═══ Import overlays ═══ */}
-      {importState.phase === "parsing" && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "var(--surface-overlay)",
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface-card)",
-              borderRadius: "var(--radius-xl)",
-              border: "1px solid var(--border-soft)",
-              padding: "32px 40px",
-              textAlign: "center" as const,
-              boxShadow: "var(--shadow-xl)",
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                border: "4px solid var(--border-soft)",
-                borderTopColor: "var(--brand-primary)",
-                borderRadius: "50%",
-                margin: "0 auto 12px",
-                animation: "spin 1s linear infinite",
-              }}
-            />
-            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-body)" }}>
-              Parsing {importState.source}...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {importState.phase === "linkedin-input" && (
-        <LinkedInImportModal
-          onSubmit={handleLinkedInSubmit}
-          onCancel={() => setImportState({ phase: "idle" })}
-        />
-      )}
-
-      {importState.phase === "review" && (
-        <MappingReview
-          source={importState.source}
-          parsed={importState.parsed}
-          onConfirm={handleImportConfirm}
-          onCancel={() => setImportState({ phase: "idle" })}
-        />
-      )}
-
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
-    </div>
     </ImportContext.Provider>
   );
 };

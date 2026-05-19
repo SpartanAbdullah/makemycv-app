@@ -5,21 +5,40 @@ import {
   resizeAndCropToSquare,
   validateImageFile,
 } from "../../lib/utils/imageUtils";
+import type { PhotoShape } from "../../lib/types/cv";
 
 interface PhotoUploadProps {
   photo?: string;
   showPhoto?: boolean;
-  photoShape?: "round" | "square";
+  photoShape?: PhotoShape;
   onPhotoChange: (base64: string | undefined) => void;
   onToggleChange: (show: boolean) => void;
+  onShapeChange: (shape: PhotoShape) => void;
+  /** Optional fallback initials shown in the placeholder when no photo is set. */
+  initials?: string;
 }
 
+/**
+ * Profile photo card — Focus Flow variant.
+ *
+ * Layout:
+ *   ┌──────────────────────────────────────────────────────┐
+ *   │ [photo 68px]   Profile photo  (optional)              │
+ *   │                Change · Remove                        │
+ *   │                JPG, PNG, WebP — max 5MB               │
+ *   ├──────────────────────────────────────────────────────┤
+ *   │ Show photo on CV                          [toggle]    │
+ *   │ Photo shape                          [Round · Square] │
+ *   └──────────────────────────────────────────────────────┘
+ */
 export function PhotoUpload({
   photo,
   showPhoto = false,
   photoShape = "round",
   onPhotoChange,
   onToggleChange,
+  onShapeChange,
+  initials,
 }: PhotoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -30,16 +49,13 @@ export function PhotoUpload({
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setError(null);
-
     const validationError = validateImageFile(file);
     if (validationError) {
       setError(validationError);
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
-
     setIsProcessing(true);
     try {
       const base64 = await resizeAndCropToSquare(file, 200);
@@ -59,128 +75,277 @@ export function PhotoUpload({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  return (
-    <div className="flex flex-col gap-3">
-      <label className="block text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-        Profile Photo (Optional)
-      </label>
+  const radius = photoShape === "round" ? "50%" : "14px";
+  const trimmedInitials = (initials ?? "").trim().slice(0, 2).toUpperCase();
 
-      <div className="flex items-start gap-4">
-        {/* Photo preview or placeholder */}
-        <div
-          className={`flex-shrink-0 w-20 h-20 ${photoShape === "round" ? "rounded-full" : "rounded-xl"} overflow-hidden border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all`}
+  return (
+    <div
+      style={{
+        padding: 18,
+        background: "var(--ff-card)",
+        border: "1px solid var(--ff-line)",
+        borderRadius: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+      }}
+    >
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        <button
+          type="button"
           onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              inputRef.current?.click();
-            }
+          aria-label={photo ? "Change profile photo" : "Upload profile photo"}
+          style={{
+            width: 68,
+            height: 68,
+            borderRadius: radius,
+            overflow: "hidden",
+            background: trimmedInitials
+              ? "var(--ff-accent-soft)"
+              : "var(--ff-sunken)",
+            border: photo
+              ? "1px solid var(--ff-line)"
+              : "1px dashed var(--ff-line-strong)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            padding: 0,
+            transition: "border-color 120ms, background 120ms",
           }}
-          aria-label="Upload photo"
         >
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photo}
-              alt="Profile photo preview"
-              className="w-full h-full object-cover"
+              alt="Profile preview"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : isProcessing ? (
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-[9px] text-slate-400">Processing...</span>
-            </div>
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                border: "2px solid var(--ff-line-strong)",
+                borderTopColor: "var(--ff-accent)",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+              }}
+            />
+          ) : trimmedInitials ? (
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--ff-accent-dark)",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {trimmedInitials}
+            </span>
           ) : (
-            <div className="flex flex-col items-center gap-1 text-center px-1">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-slate-400"
-              >
-                <path
-                  d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span className="text-[9px] text-slate-400 leading-tight">
-                Click to upload
-              </span>
-            </div>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                color: "var(--ff-faint)",
+                letterSpacing: "0.12em",
+              }}
+            >
+              PHOTO
+            </span>
           )}
-        </div>
+        </button>
 
-        {/* Controls */}
-        <div className="flex flex-col gap-2 flex-1">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={isProcessing}
-            className="text-sm font-semibold text-[#2563eb] hover:text-blue-700 transition-colors text-left disabled:opacity-50"
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 15,
+              color: "var(--ff-ink)",
+              fontWeight: 600,
+            }}
           >
-            {photo ? "Change photo" : "Upload photo"}
-          </button>
-
-          {photo && (
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <div
-                role="checkbox"
-                aria-checked={showPhoto}
-                tabIndex={0}
-                onClick={() => onToggleChange(!showPhoto)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onToggleChange(!showPhoto);
-                  }
-                }}
-                className={`relative w-9 h-5 rounded-full transition-colors duration-200 cursor-pointer ${
-                  showPhoto ? "bg-[#2563eb]" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                    showPhoto ? "translate-x-4" : "translate-x-0.5"
-                  }`}
-                />
-              </div>
-              <span className="text-xs text-slate-600 font-medium">
-                Show photo on CV
-              </span>
-            </label>
-          )}
-
-          {photo && (
+            Profile photo
+            <span
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 11,
+                color: "var(--ff-faint)",
+                fontWeight: 500,
+                marginLeft: 6,
+              }}
+            >
+              optional
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 14,
+              marginTop: 8,
+              fontFamily: "var(--font-body)",
+              fontSize: 12.5,
+              fontWeight: 600,
+              alignItems: "center",
+            }}
+          >
             <button
               type="button"
-              onClick={handleRemove}
-              className="text-xs text-red-400 hover:text-red-600 transition-colors text-left w-fit"
+              onClick={() => inputRef.current?.click()}
+              disabled={isProcessing}
+              style={{
+                color: "var(--ff-accent-dark)",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: isProcessing ? "wait" : "pointer",
+                fontWeight: 600,
+              }}
             >
-              Remove photo
+              {photo ? "Change photo" : "Upload photo"}
             </button>
-          )}
-
-          <p className="text-[10px] text-slate-400 leading-snug">
-            JPG, PNG or WebP &middot; Max 5MB
+            {photo && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                style={{
+                  color: "var(--ff-red)",
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: 11,
+              color: "var(--ff-muted)",
+              marginTop: 8,
+              lineHeight: 1.45,
+            }}
+          >
+            JPG, PNG or WebP · max 5MB
             <br />
             Auto-cropped to square.
-          </p>
+          </div>
         </div>
       </div>
 
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && (
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--ff-red)",
+            marginTop: -6,
+          }}
+        >
+          {error}
+        </p>
+      )}
 
-      <p className="text-[10px] text-slate-400 leading-snug bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-        <strong>UAE tip:</strong> Photos are accepted by most UAE employers.
-        Toggle off for applications to international companies with blind hiring
-        policies.
-      </p>
+      {/* Show on CV toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 12,
+          borderTop: "1px solid var(--ff-line)",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "var(--ff-ink-2)",
+          }}
+        >
+          Show photo on CV
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showPhoto}
+          onClick={() => onToggleChange(!showPhoto)}
+          style={{
+            width: 36,
+            height: 21,
+            borderRadius: 999,
+            background: showPhoto ? "var(--ff-accent)" : "var(--ff-line-strong)",
+            position: "relative",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+            transition: "background 150ms",
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 3,
+              left: showPhoto ? 18 : 3,
+              width: 15,
+              height: 15,
+              borderRadius: "50%",
+              background: "white",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.20)",
+              transition: "left 150ms",
+            }}
+          />
+        </button>
+      </div>
+
+      {/* Photo shape segmented */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "var(--ff-ink-2)",
+          }}
+        >
+          Photo shape
+        </span>
+        <div
+          style={{
+            display: "flex",
+            gap: 3,
+            padding: 3,
+            background: "var(--ff-paper)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 8,
+          }}
+        >
+          <ShapeBtn
+            active={photoShape === "round"}
+            onClick={() => onShapeChange("round")}
+            label="Round"
+            shape="round"
+          />
+          <ShapeBtn
+            active={photoShape === "square"}
+            onClick={() => onShapeChange("square")}
+            label="Square"
+            shape="square"
+          />
+        </div>
+      </div>
 
       <input
         ref={inputRef}
@@ -194,3 +359,48 @@ export function PhotoUpload({
     </div>
   );
 }
+
+const ShapeBtn = ({
+  active,
+  onClick,
+  label,
+  shape,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  shape: "round" | "square";
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    style={{
+      fontFamily: "var(--font-body)",
+      fontSize: 11.5,
+      padding: "4px 12px",
+      borderRadius: 5,
+      background: active ? "var(--ff-ink)" : "transparent",
+      color: active ? "white" : "var(--ff-muted)",
+      fontWeight: active ? 600 : 500,
+      border: "none",
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5,
+      transition: "background 120ms, color 120ms",
+    }}
+  >
+    <span
+      aria-hidden
+      style={{
+        width: 9,
+        height: 9,
+        borderRadius: shape === "round" ? "50%" : "2px",
+        background: active ? "white" : "var(--ff-muted)",
+        display: "inline-block",
+      }}
+    />
+    {label}
+  </button>
+);

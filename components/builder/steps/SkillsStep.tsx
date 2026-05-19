@@ -10,6 +10,8 @@ import { NavigationButtons } from "../NavigationButtons";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill } from "../../../lib/sanitize";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
 type SkillsForm = { skills: CvSkill[] };
@@ -205,22 +207,32 @@ export const SkillsStep = ({
         : "text-green-600";
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div className="flex items-center justify-between">
-          <h2 className="cv-step-heading">Skills</h2>
-          <span className="cv-badge-required">Required</span>
-        </div>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      <div className="cv-step-badge">
+        <UAEDot size={13} />
+        STEP 05 · SKILLS
+      </div>
+      <div>
+        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
+          What are you good at?
+        </h1>
         <p className="cv-step-subtitle">
-          Add key skills and adjust proficiency if needed. Aim for 6-10 skills
-          that match the job description.
+          Ten to twenty focused skills. Mirror the wording from the job
+          description — &ldquo;stakeholder management&rdquo; and &ldquo;client
+          liaison&rdquo; aren&apos;t the same string to an ATS.
         </p>
+      </div>
 
+      <section className="cv-step-card">
         {/* Input row */}
-        <div className="mt-6 mb-6 flex w-full items-center gap-2">
+        <div style={{ display: "flex", gap: 8 }}>
           <input
             type="text"
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="cv-input"
+            style={{ flex: 1 }}
             placeholder="e.g. Project Management, SAP, AutoCAD"
             value={inputValue}
             onChange={(e) => {
@@ -237,7 +249,8 @@ export const SkillsStep = ({
           <button
             type="button"
             onClick={handleAddSkill}
-            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            className="cv-btn-primary"
+            style={{ padding: "13px 22px" }}
           >
             Add
           </button>
@@ -245,8 +258,8 @@ export const SkillsStep = ({
 
         {/* Duplicate warning */}
         {duplicateWarning && (
-          <p className="-mt-4 mb-2 text-xs font-medium text-amber-600">
-            {"\u26A0\uFE0F"} This skill is already in your list
+          <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-warn)", fontWeight: 500 }}>
+            This skill is already in your list.
           </p>
         )}
 
@@ -254,18 +267,27 @@ export const SkillsStep = ({
         <button
           type="button"
           onClick={fireAISuggest}
-          className="mb-4 w-full rounded-xl border-2 border-dashed border-indigo-300 py-2.5 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50"
+          className="cv-btn-accent-outline"
+          style={{ width: "100%", padding: "11px", marginTop: 12, marginBottom: 14 }}
         >
-          {"\u2728"} Suggest Skills for My Profile
+          <Icon name="sparkle" size={13} />
+          Suggest skills for my profile
         </button>
 
         {/* Skills pills — draggable */}
         {fields.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">
+          <p
+            style={{
+              padding: "24px 0",
+              textAlign: "center",
+              fontSize: 13,
+              color: "var(--ff-faint)",
+            }}
+          >
             No skills added yet. Type above or let AI suggest some.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {fields.map((field, i) => (
               <div
                 key={field.id}
@@ -274,20 +296,22 @@ export const SkillsStep = ({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(i)}
                 onDragEnd={() => setDraggedIndex(null)}
-                className={`flex cursor-grab items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium select-none transition-all duration-150 active:cursor-grabbing ${
-                  draggedIndex === i
-                    ? "scale-95 border-2 border-dashed border-indigo-400 bg-indigo-100 opacity-40"
-                    : "border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-                }`}
+                className="cv-skill-chip"
+                style={{
+                  cursor: "grab",
+                  opacity: draggedIndex === i ? 0.4 : 1,
+                  borderStyle: draggedIndex === i ? "dashed" : "solid",
+                  userSelect: "none",
+                }}
               >
-                <span className="mr-0.5 text-xs text-indigo-300">
+                <span style={{ fontSize: 11, color: "var(--ff-accent)" }}>
                   {"\u283F"}
                 </span>
                 {field.name}
                 <button
                   type="button"
                   onClick={() => removeSkill(i)}
-                  className="ml-1 text-xs font-bold text-indigo-300 transition hover:text-red-500"
+                  className="cv-skill-chip-remove"
                   aria-label={`Remove ${field.name}`}
                 >
                   {"\u00D7"}
@@ -298,19 +322,26 @@ export const SkillsStep = ({
         )}
 
         {/* Skill count helper */}
-        <p className="mt-3 text-xs text-gray-400">
-          <span className={countColor}>{fields.length}</span>
-          {" "}skill{fields.length !== 1 ? "s" : ""} added {"\u00B7"} Aim for
-          6{"\u2013"}10 for best ATS results
+        <p
+          style={{
+            marginTop: 12,
+            fontSize: 12,
+            color: "var(--ff-muted)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          <span className={countColor} style={{ fontWeight: 600 }}>
+            {fields.length}
+          </span>{" "}
+          skill{fields.length !== 1 ? "s" : ""} {"\u00B7"} aim for 10{"\u2013"}20
+          for best ATS results
         </p>
 
         {errors.skills?.message && (
-          <p className="mt-2 text-xs text-red-500">{errors.skills?.message}</p>
+          <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-red)" }}>
+            {errors.skills?.message}
+          </p>
         )}
-
-        <div className="cv-tip-box mt-4">
-          ATS tip: Keep skill names consistent with job descriptions.
-        </div>
       </section>
 
       <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} />

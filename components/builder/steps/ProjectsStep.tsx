@@ -9,6 +9,8 @@ import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 import type { CvProject } from "../../../lib/types/cv";
 
 type ProjectsForm = { projects: CvProject[] };
@@ -114,22 +116,35 @@ export const ProjectsStep = ({
   };
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="cv-step-heading">Projects</h2>
-          <span className="cv-badge-optional">Optional</span>
-        </div>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      <div className="cv-step-badge">
+        <UAEDot size={13} />
+        STEP 08 · PROJECTS
+      </div>
+      <div>
+        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
+          Anything you built that&apos;s worth showing?
+        </h1>
         <p className="cv-step-subtitle">
-          Highlight personal or professional projects that match the role.
+          Name the tools — &ldquo;Power BI&rdquo;, &ldquo;Salesforce&rdquo; — and quantify the outcome. Tools are what ATS systems search.
         </p>
+      </div>
 
-        <div className="mt-6">
+      <section className="cv-step-card">
+        <div>
           <Repeater
             title="Projects"
             action={
-              <button type="button" onClick={() => append(createEmptyItems.project())} className="cv-btn-ghost">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              <button
+                type="button"
+                onClick={() => append(createEmptyItems.project())}
+                className="cv-btn-ghost"
+                style={{ width: "auto", padding: "10px 14px" }}
+              >
+                <Icon name="plus" size={14} />
                 Add project
               </button>
             }
@@ -142,7 +157,7 @@ export const ProjectsStep = ({
                   </h4>
                   {fields.length > 1 && (
                     <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                      <Icon name="trash" size={12} />
                       Remove
                     </button>
                   )}
@@ -174,7 +189,7 @@ export const ProjectsStep = ({
                           onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
                         />
                         <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                          <Icon name="trash" size={12} />
                           Remove
                         </button>
                       </div>
@@ -205,9 +220,6 @@ export const ProjectsStep = ({
           </Repeater>
         </div>
 
-        <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Use project titles that clearly convey scope and tools. Mention technologies, budgets, or team sizes where relevant.
-        </div>
       </section>
 
       <NavigationButtons

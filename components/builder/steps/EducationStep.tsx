@@ -13,6 +13,8 @@ import {
   sanitizeJobTitle,
 } from "../../../lib/sanitize";
 import type { CvEducation } from "../../../lib/types/cv";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 
 const ATTESTING_BODIES = [
   "MOFA \u2013 UAE Ministry of Foreign Affairs",
@@ -97,17 +99,26 @@ export const EducationStep = ({
   };
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="cv-step-heading">Education</h2>
-          <span className="cv-badge-required">Required</span>
-        </div>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      <div className="cv-step-badge">
+        <UAEDot size={13} />
+        STEP 04 · EDUCATION
+      </div>
+      <div>
+        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
+          Where did you study?
+        </h1>
         <p className="cv-step-subtitle">
-          Add your most recent education first.
+          Most recent first. Note attestation status — UAE government roles
+          almost always check this before the shortlist.
         </p>
+      </div>
 
-        <div className="mt-6">
+      <section className="cv-step-card">
+        <div>
           <Repeater
             title="Education entries"
             action={
@@ -292,11 +303,11 @@ export const EducationStep = ({
         )}
 
         <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Include graduation dates. If your degree was earned outside the UAE, note whether it has been attested by MOFA or the relevant emirate authority.
+          <Icon name="sparkle" size={11} style={{ verticalAlign: "-2px" }} /> Include graduation dates. If your degree was earned outside the UAE, note whether it has been attested by MOFA or the relevant emirate authority.
         </div>
       </section>
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} />
+      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} nextLabel="Continue to Skills" />
     </form>
   );
 };

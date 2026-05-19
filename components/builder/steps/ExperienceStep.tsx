@@ -6,11 +6,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
-import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import { Icon } from "../Icon";
+import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
-import { AIResultsModal } from "../../AIResultsModal";
 import {
   sanitizeJobTitle,
   sanitizeCompanyName,
@@ -32,7 +32,7 @@ export const ExperienceStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -54,7 +54,6 @@ export const ExperienceStep = ({
     name: "experience",
   });
 
-  // Keep the currently-open card's index in sync when items move.
   const adjustOpenIndexForMove = (from: number, to: number) => {
     setOpenIndex((prev) => {
       if (prev === null) return prev;
@@ -77,12 +76,21 @@ export const ExperienceStep = ({
     bulletIndex: number;
   } | null>(null);
 
-  /* AI bullet generation */
-  const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
-  const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [aiTargetIndex, setAiTargetIndex] = useState<number>(0);
+  /* ── Inline AI suggestions, per role index ── */
+  const {
+    improve,
+    results: aiResults,
+    isLoading: aiLoading,
+    error: aiError,
+    clearResults: aiClear,
+  } = useAIImprove();
+  const [aiActiveIndex, setAiActiveIndex] = useState<number | null>(null);
+  // Suggestions queue per role. Accepting merges into bullets[]; rejecting
+  // drops the suggestion from the queue.
+  const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
   const aiTriggerChecked = useRef(false);
 
+  // Auto-trigger if the user came in from the score panel.
   useEffect(() => {
     if (aiTriggerChecked.current) return;
     aiTriggerChecked.current = true;
@@ -91,27 +99,32 @@ export const ExperienceStep = ({
       if (trigger === "bullets") {
         sessionStorage.removeItem("makemycv_ai_trigger");
         if (!hasUsedFreeAI("bullets") && fields.length > 0) {
-          setAiTargetIndex(0);
-          const entry = getValues("experience.0");
-          if (entry) {
-            setAiModalOpen(true);
-            improve({
-              type: "bullets",
-              jobTitle: entry.role,
-              company: entry.company,
-              existingBullets: entry.bullets?.filter(Boolean),
-            });
-          }
+          handleGenerateBullets(0);
         }
       }
-    } catch { /* SSR guard */ }
-  }, [fields.length, getValues, improve]);
+    } catch {
+      /* SSR guard */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the hook returns results, route them into the active role's queue.
+  useEffect(() => {
+    if (aiActiveIndex === null) return;
+    if (aiLoading) return;
+    if (aiResults.length === 0) return;
+    setSuggestions((prev) => ({
+      ...prev,
+      [aiActiveIndex]: [...(prev[aiActiveIndex] ?? []), ...aiResults],
+    }));
+    aiClear();
+    setAiActiveIndex(null);
+  }, [aiResults, aiLoading, aiActiveIndex, aiClear]);
 
   const handleGenerateBullets = (index: number) => {
     const entry = getValues(`experience.${index}`);
     if (!entry) return;
-    setAiTargetIndex(index);
-    setAiModalOpen(true);
+    setAiActiveIndex(index);
     aiClear();
     improve({
       type: "bullets",
@@ -121,14 +134,23 @@ export const ExperienceStep = ({
     });
   };
 
-  const handleApplyBullets = (selected: string[]) => {
-    const currentItem = getValues(`experience.${aiTargetIndex}`);
-    if (!currentItem) return;
-    const existing = (currentItem.bullets || []).filter(Boolean);
-    const merged = [...existing, ...selected].slice(0, MAX_BULLETS);
-    update(aiTargetIndex, { ...currentItem, bullets: merged });
-    setAiModalOpen(false);
-    aiClear();
+  const acceptSuggestion = (index: number, suggestion: string) => {
+    const entry = getValues(`experience.${index}`);
+    if (!entry) return;
+    const existing = (entry.bullets || []).filter(Boolean);
+    if (existing.length >= MAX_BULLETS) return;
+    update(index, { ...entry, bullets: [...existing, suggestion] });
+    setSuggestions((prev) => ({
+      ...prev,
+      [index]: (prev[index] ?? []).filter((s) => s !== suggestion),
+    }));
+  };
+
+  const rejectSuggestion = (index: number, suggestion: string) => {
+    setSuggestions((prev) => ({
+      ...prev,
+      [index]: (prev[index] ?? []).filter((s) => s !== suggestion),
+    }));
   };
 
   useEffect(() => {
@@ -147,7 +169,6 @@ export const ExperienceStep = ({
         );
         const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
-
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           if (nextSerialized !== lastSerializedRef.current) {
@@ -189,8 +210,15 @@ export const ExperienceStep = ({
     if (split.length <= 1) return;
     const before = currentBullets.slice(0, focusedBullet.bulletIndex);
     const after = currentBullets.slice(focusedBullet.bulletIndex + 1);
-    const availableSlots = Math.max(1, MAX_BULLETS - before.length - after.length);
-    const next = [...before, ...split.slice(0, availableSlots), ...after];
+    const availableSlots = Math.max(
+      1,
+      MAX_BULLETS - before.length - after.length,
+    );
+    const next = [
+      ...before,
+      ...split.slice(0, availableSlots),
+      ...after,
+    ];
     update(index, { ...currentItem, bullets: next.length ? next : [""] });
   };
 
@@ -199,333 +227,831 @@ export const ExperienceStep = ({
     setOpenIndex(fields.length);
   };
 
+  const improveAllWithAI = () => {
+    if (fields.length === 0) return;
+    handleGenerateBullets(0);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="cv-step-heading">Work Experience</h2>
-          <span className="cv-badge-required">Required</span>
-        </div>
-        <p className="cv-step-subtitle">
-          Add your most impactful roles first. Drag the handle to reorder. Use bullet points with results.
-        </p>
-
-        <div className="mt-6">
-          <Repeater
-            title="Roles"
-            action={
-              <button type="button" onClick={handleAddRole} className="cv-btn-ghost">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                Add Employment
-              </button>
-            }
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+      {/* Step badge + heading + Improve all button */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div className="cv-step-badge">
+            <UAEDot size={13} />
+            STEP 03 · EXPERIENCE
+          </div>
+          <h1
+            className="cv-step-heading"
+            style={{ fontSize: 34, marginTop: 8 }}
           >
-            {fields.map((field, index) => {
-              const isOpen = openIndex === index;
-              const isDragging = draggingIndex === index;
-              const isDropTarget =
-                dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
-              const role = watch(`experience.${index}.role`) || "";
-              const company = watch(`experience.${index}.company`) || "";
-              const startDate = watch(`experience.${index}.startDate`) || "";
-              const endDate = watch(`experience.${index}.endDate`) || "";
-              const summaryLine = [role, company, [startDate, endDate].filter(Boolean).join(" - ")].filter(Boolean).join(" | ");
-              const canMoveUp = index > 0;
-              const canMoveDown = index < fields.length - 1;
+            Where have you worked?
+          </h1>
+          <p className="cv-step-subtitle">
+            Add your most impactful roles first. Drag to reorder. Pull out the
+            results, not the duties.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={improveAllWithAI}
+          disabled={aiLoading || fields.length === 0}
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "white",
+            background: "var(--ff-ink)",
+            border: "none",
+            padding: "10px 16px",
+            borderRadius: 10,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: aiLoading ? "wait" : "pointer",
+            opacity: aiLoading ? 0.7 : 1,
+            fontWeight: 600,
+          }}
+        >
+          <Icon name="sparkle" size={13} />
+          {aiLoading ? "Generating…" : "Improve all with AI"}
+        </button>
+      </div>
 
-              return (
-                <div
-                  key={field.id}
-                  className="cv-entry-card"
-                  onDragOver={(e) => {
-                    if (draggingIndex === null || draggingIndex === index) return;
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    if (dragOverIndex !== index) setDragOverIndex(index);
-                  }}
-                  onDragLeave={(e) => {
-                    // Only clear when the pointer leaves the card entirely, not
-                    // when it moves over a child element.
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    if (dragOverIndex === index) setDragOverIndex(null);
-                  }}
-                  onDrop={(e) => {
-                    if (draggingIndex === null) return;
-                    e.preventDefault();
-                    const from = draggingIndex;
-                    reorder(from, index);
-                    setDraggingIndex(null);
-                    setDragOverIndex(null);
-                  }}
-                  style={{
-                    opacity: isDragging ? 0.4 : 1,
-                    transform: isDropTarget ? "translateY(-1px)" : undefined,
-                    boxShadow: isDropTarget
-                      ? "0 0 0 2px var(--brand-primary)"
-                      : undefined,
-                    transition: "opacity 150ms, box-shadow 150ms",
-                  }}
-                >
-                  <div className="flex w-full items-center px-2 py-3.5">
-                    {/* Drag handle */}
-                    <span
-                      role="button"
-                      tabIndex={-1}
-                      aria-label={`Drag role ${index + 1} to reorder`}
-                      title="Drag to reorder"
-                      draggable
-                      onDragStart={(e) => {
-                        setDraggingIndex(index);
-                        e.dataTransfer.effectAllowed = "move";
-                        try {
-                          e.dataTransfer.setData("text/plain", String(index));
-                        } catch {
-                          /* some browsers throw on unsupported types */
-                        }
-                      }}
-                      onDragEnd={() => {
-                        setDraggingIndex(null);
-                        setDragOverIndex(null);
-                      }}
+      {/* Roles list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {fields.map((field, index) => {
+          const isOpen = openIndex === index;
+          const isDragging = draggingIndex === index;
+          const isDropTarget =
+            dragOverIndex === index &&
+            draggingIndex !== null &&
+            draggingIndex !== index;
+          const role = watch(`experience.${index}.role`) || "";
+          const company = watch(`experience.${index}.company`) || "";
+          const startDate = watch(`experience.${index}.startDate`) || "";
+          const endDate = watch(`experience.${index}.endDate`) || "";
+          const isCurrent =
+            watch(`experience.${index}.isCurrent`) || false;
+          const location = watch(`experience.${index}.location`) || "";
+          const summarySubLine = [
+            company,
+            location,
+            [startDate, isCurrent ? "Present" : endDate]
+              .filter(Boolean)
+              .join(" – "),
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const canMoveUp = index > 0;
+          const canMoveDown = index < fields.length - 1;
+          const bullets = watch(`experience.${index}.bullets`) || [""];
+          const filledBullets = bullets.filter(Boolean).length;
+          const roleSuggestions = suggestions[index] ?? [];
+
+          return (
+            <ExpandRoleCard
+              key={field.id}
+              isOpen={isOpen}
+              isDragging={isDragging}
+              isDropTarget={isDropTarget}
+              onClick={() => setOpenIndex(isOpen ? null : index)}
+              onDragStart={() => setDraggingIndex(index)}
+              onDragOver={(e) => {
+                if (draggingIndex === null || draggingIndex === index) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (dragOverIndex !== index) setDragOverIndex(index);
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                if (dragOverIndex === index) setDragOverIndex(null);
+              }}
+              onDrop={(e) => {
+                if (draggingIndex === null) return;
+                e.preventDefault();
+                const from = draggingIndex;
+                reorder(from, index);
+                setDraggingIndex(null);
+                setDragOverIndex(null);
+              }}
+              onDragEnd={() => {
+                setDraggingIndex(null);
+                setDragOverIndex(null);
+              }}
+              title={role || `Role ${index + 1}`}
+              subline={summarySubLine}
+              isCurrent={isCurrent}
+            >
+              {isOpen && (
+                <div style={{ padding: 22, borderTop: "1px solid var(--ff-line)" }}>
+                  {/* Actions row */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <CardIconBtn
+                        onClick={() => reorder(index, index - 1)}
+                        disabled={!canMoveUp}
+                        label="Move up"
+                      >
+                        <Icon name="chevron-left" size={12} />
+                      </CardIconBtn>
+                      <CardIconBtn
+                        onClick={() => reorder(index, index + 1)}
+                        disabled={!canMoveDown}
+                        label="Move down"
+                      >
+                        <Icon name="chevron-right" size={12} />
+                      </CardIconBtn>
+                    </div>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="cv-btn-danger"
+                      >
+                        <Icon name="trash" size={12} />
+                        Remove role
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Fields grid */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                      marginBottom: 16,
+                    }}
+                    className="ff-exp-fields"
+                  >
+                    <Field
+                      label="Job title"
+                      error={errors.experience?.[index]?.role?.message}
+                    >
+                      <input
+                        className="cv-input"
+                        placeholder="e.g. Operations Manager"
+                        {...register(`experience.${index}.role`)}
+                        onChange={(e) => {
+                          e.target.value = sanitizeJobTitle(e.target.value);
+                          register(`experience.${index}.role`).onChange(e);
+                        }}
+                      />
+                    </Field>
+                    <Field
+                      label="Company"
+                      error={errors.experience?.[index]?.company?.message}
+                    >
+                      <input
+                        className="cv-input"
+                        placeholder="e.g. Emaar Properties"
+                        {...register(`experience.${index}.company`)}
+                        onChange={(e) => {
+                          e.target.value = sanitizeCompanyName(e.target.value);
+                          register(`experience.${index}.company`).onChange(e);
+                        }}
+                      />
+                    </Field>
+                    <Field
+                      label="Start"
+                      error={errors.experience?.[index]?.startDate?.message}
+                    >
+                      <input
+                        className="cv-input"
+                        placeholder="e.g. Jan 2024"
+                        {...register(`experience.${index}.startDate`)}
+                      />
+                    </Field>
+                    <Field label="End">
+                      <input
+                        className="cv-input"
+                        placeholder={isCurrent ? "Present" : "e.g. Mar 2026"}
+                        disabled={isCurrent}
+                        {...register(`experience.${index}.endDate`)}
+                      />
+                    </Field>
+                    <Field label="City">
+                      <input
+                        className="cv-input"
+                        placeholder="e.g. Dubai"
+                        {...register(`experience.${index}.location`)}
+                        onChange={(e) => {
+                          e.target.value = sanitizeLocation(e.target.value);
+                          register(`experience.${index}.location`).onChange(e);
+                        }}
+                      />
+                    </Field>
+                    <label
                       style={{
-                        display: "inline-flex",
+                        display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        width: 28,
-                        height: 28,
-                        marginRight: 4,
-                        color: "var(--text-faint)",
-                        cursor: "grab",
-                        flexShrink: 0,
-                        userSelect: "none",
-                      }}
-                      onMouseDown={(e) => {
-                        (e.currentTarget as HTMLElement).style.cursor = "grabbing";
-                      }}
-                      onMouseUp={(e) => {
-                        (e.currentTarget as HTMLElement).style.cursor = "grab";
+                        gap: 8,
+                        fontSize: 14,
+                        color: "var(--ff-ink-2)",
+                        marginTop: 28,
                       }}
                     >
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <circle cx="9" cy="6" r="1.6" />
-                        <circle cx="15" cy="6" r="1.6" />
-                        <circle cx="9" cy="12" r="1.6" />
-                        <circle cx="15" cy="12" r="1.6" />
-                        <circle cx="9" cy="18" r="1.6" />
-                        <circle cx="15" cy="18" r="1.6" />
-                      </svg>
-                    </span>
+                      <input
+                        type="checkbox"
+                        {...register(`experience.${index}.isCurrent`)}
+                        style={{ accentColor: "var(--ff-accent)" }}
+                      />
+                      I currently work here
+                    </label>
+                  </div>
 
+                  {/* Achievements header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "var(--ff-ink)",
+                      }}
+                    >
+                      Achievements
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 10,
+                        color: "var(--ff-muted)",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {filledBullets} of {MAX_BULLETS}
+                    </div>
+                  </div>
+
+                  <div className="cv-tip-box" style={{ marginBottom: 10 }}>
+                    Start each line with an action verb and quantify the impact
+                    (% , AED, headcount, project count).
+                  </div>
+
+                  {/* Bullets list */}
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
+                    {bullets.map((_, bulletIndex) => (
+                      <BulletRow
+                        key={bulletIndex}
+                        showMarker
+                      >
+                        <textarea
+                          rows={2}
+                          placeholder="Describe an achievement, not a duty."
+                          className="cv-input cv-textarea"
+                          style={{ minHeight: 56 }}
+                          {...register(
+                            `experience.${index}.bullets.${bulletIndex}`,
+                          )}
+                          onFocus={() =>
+                            setFocusedBullet({
+                              itemIndex: index,
+                              bulletIndex,
+                            })
+                          }
+                          onBlur={(e) => {
+                            register(
+                              `experience.${index}.bullets.${bulletIndex}`,
+                            ).onBlur(e);
+                            const cleaned = sanitizePlainText(e.target.value);
+                            if (cleaned !== e.target.value)
+                              e.target.value = cleaned;
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeBullet(index, bulletIndex)}
+                          className="cv-btn-danger"
+                          aria-label="Remove bullet"
+                          style={{ alignSelf: "center" }}
+                        >
+                          <Icon name="trash" size={12} />
+                        </button>
+                      </BulletRow>
+                    ))}
+
+                    {/* AI suggestions */}
+                    {roleSuggestions.map((s) => (
+                      <SuggestionBullet
+                        key={s}
+                        text={s}
+                        onAccept={() => acceptSuggestion(index, s)}
+                        onReject={() => rejectSuggestion(index, s)}
+                      />
+                    ))}
+
+                    {/* Loading state for active AI generation on this role */}
+                    {aiLoading && aiActiveIndex === index && (
+                      <SuggestionLoading />
+                    )}
+
+                    {aiError && aiActiveIndex === index && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "var(--ff-red)",
+                          padding: "8px 0",
+                        }}
+                      >
+                        {aiError === "FREE_LIMIT_REACHED"
+                          ? "You've used your free AI bullet generation. Upgrade to Pro to keep going."
+                          : aiError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Add / Generate buttons */}
+                  <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                     <button
                       type="button"
-                      onClick={() => setOpenIndex(isOpen ? null : index)}
-                      className="flex flex-1 items-center justify-between px-2 text-left min-w-0"
+                      onClick={() => addBullet(index)}
+                      className="cv-btn-ghost"
+                      disabled={filledBullets >= MAX_BULLETS}
                     >
-                      <span
-                        style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }}
-                        className="truncate"
-                      >
-                        {summaryLine || `Role ${index + 1}`}
-                      </span>
-                      <svg
-                        className={`h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                        style={{ color: "var(--text-faint)" }}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <Icon name="plus" size={13} />
+                      Add bullet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateBullets(index)}
+                      disabled={aiLoading && aiActiveIndex === index}
+                      className="cv-btn-accent-outline"
+                      style={{ flex: 1 }}
+                    >
+                      <Icon name="sparkle" size={13} />
+                      {aiLoading && aiActiveIndex === index
+                        ? "Generating…"
+                        : "Generate more"}
                     </button>
                   </div>
 
-                  {isOpen && (
-                    <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => reorder(index, index - 1)}
-                            disabled={!canMoveUp}
-                            aria-label="Move role up"
-                            title="Move up"
-                            className="cv-btn-secondary"
-                            style={{
-                              fontSize: 12,
-                              padding: "5px 9px",
-                              opacity: canMoveUp ? 1 : 0.4,
-                              cursor: canMoveUp ? "pointer" : "not-allowed",
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M18 15l-6-6-6 6" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => reorder(index, index + 1)}
-                            disabled={!canMoveDown}
-                            aria-label="Move role down"
-                            title="Move down"
-                            className="cv-btn-secondary"
-                            style={{
-                              fontSize: 12,
-                              padding: "5px 9px",
-                              opacity: canMoveDown ? 1 : 0.4,
-                              cursor: canMoveDown ? "pointer" : "not-allowed",
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M6 9l6 6 6-6" />
-                            </svg>
-                          </button>
-                        </div>
-                        {fields.length > 1 && (
-                          <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        <Field label="Job Title" error={errors.experience?.[index]?.role?.message}>
-                          <input
-                            className="cv-input"
-                            placeholder="e.g. Operations Manager"
-                            {...register(`experience.${index}.role`)}
-                            onChange={(e) => {
-                              e.target.value = sanitizeJobTitle(e.target.value);
-                              register(`experience.${index}.role`).onChange(e);
-                            }}
-                          />
-                        </Field>
-                        <Field label="Employer / Company" error={errors.experience?.[index]?.company?.message}>
-                          <input
-                            className="cv-input"
-                            placeholder="e.g. Interior360 General Trading LLC"
-                            {...register(`experience.${index}.company`)}
-                            onChange={(e) => {
-                              e.target.value = sanitizeCompanyName(e.target.value);
-                              register(`experience.${index}.company`).onChange(e);
-                            }}
-                          />
-                        </Field>
-                        <Field label="Start date" error={errors.experience?.[index]?.startDate?.message}>
-                          <input className="cv-input" placeholder="e.g. Jan 2024" {...register(`experience.${index}.startDate`)} />
-                        </Field>
-                        <Field label="End date">
-                          <input className="cv-input" placeholder="e.g. Mar 2026" {...register(`experience.${index}.endDate`)} />
-                        </Field>
-                        <Field label="City">
-                          <input
-                            className="cv-input"
-                            placeholder="e.g. Dubai"
-                            {...register(`experience.${index}.location`)}
-                            onChange={(e) => {
-                              e.target.value = sanitizeLocation(e.target.value);
-                              register(`experience.${index}.location`).onChange(e);
-                            }}
-                          />
-                        </Field>
-                        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-body)" }}>
-                          <input type="checkbox" {...register(`experience.${index}.isCurrent`)} />
-                          I currently work here
-                        </label>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>Highlights</p>
-                          <button
-                            type="button"
-                            onClick={() => handleGenerateBullets(index)}
-                            className="cv-btn-secondary"
-                            style={{ fontSize: 12, padding: "5px 12px" }}
-                          >
-                            {"\u2728"} Generate Bullets
-                          </button>
-                        </div>
-                        <div className="cv-tip-box">
-                          Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.
-                        </div>
-                        {(watch(`experience.${index}.bullets`) || []).map((_, bulletIndex) => (
-                          <div key={bulletIndex} className="space-y-1">
-                            <div className="flex items-start gap-2">
-                              <textarea
-                                rows={2}
-                                placeholder="Describe your responsibilities and achievements..."
-                                className="cv-input flex-1"
-                                {...register(`experience.${index}.bullets.${bulletIndex}`)}
-                                onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
-                                onBlur={(e) => {
-                                  register(`experience.${index}.bullets.${bulletIndex}`).onBlur(e);
-                                  const cleaned = sanitizePlainText(e.target.value);
-                                  if (cleaned !== e.target.value) e.target.value = cleaned;
-                                }}
-                              />
-                              <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                                Remove
-                              </button>
-                            </div>
-                            {(watch(`experience.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
-                              <p style={{ fontSize: 12, color: "var(--status-warning)" }}>
-                                Consider splitting into 2 bullets for readability.
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }}>
-                            Add bullet
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => splitFocusedBullet(index)}
-                            disabled={!focusedBullet || focusedBullet.itemIndex !== index}
-                            className="cv-btn-secondary"
-                            style={{ fontSize: 12, padding: "6px 14px", opacity: (!focusedBullet || focusedBullet.itemIndex !== index) ? 0.5 : 1 }}
-                          >
-                            Split pasted text
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                  {focusedBullet?.itemIndex === index && (
+                    <button
+                      type="button"
+                      onClick={() => splitFocusedBullet(index)}
+                      style={{
+                        marginTop: 10,
+                        fontFamily: "var(--font-body)",
+                        fontSize: 12,
+                        color: "var(--ff-muted)",
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: 0,
+                      }}
+                    >
+                      Split pasted text into bullets
+                    </button>
                   )}
                 </div>
-              );
-            })}
-          </Repeater>
-        </div>
+              )}
+            </ExpandRoleCard>
+          );
+        })}
+      </div>
 
-        {errors.experience?.message && (
-          <p style={{ marginTop: 12, fontSize: 12, color: "var(--status-error)" }}>{errors.experience?.message}</p>
-        )}
+      {/* Add another role */}
+      <button
+        type="button"
+        onClick={handleAddRole}
+        className="cv-btn-ghost"
+        style={{ padding: "13px" }}
+      >
+        <Icon name="plus" size={14} />
+        Add another role
+      </button>
 
-        <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Lead each bullet with an action verb (Led, Managed, Delivered) and quantify impact (%, AED, headcount). UAE recruiters scan for measurable results.
-        </div>
-      </section>
+      {errors.experience?.message && (
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--ff-red)",
+          }}
+        >
+          {errors.experience?.message}
+        </p>
+      )}
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} />
-
-      <AIResultsModal
-        isOpen={aiModalOpen}
-        onClose={() => { setAiModalOpen(false); aiClear(); }}
-        type="bullets"
-        results={aiResults}
-        isLoading={aiLoading}
-        error={aiError}
-        onApply={handleApplyBullets}
-        onRetry={() => handleGenerateBullets(aiTargetIndex)}
+      <NavigationButtons
+        onBack={onBack}
+        onNext={handleSubmit(onNext)}
+        nextLabel="Continue to Education"
       />
+
+      <style>{`
+        @media (max-width: 720px) {
+          .ff-exp-fields { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </form>
   );
 };
+
+/* ─── Role card (header + expand body) ───────────────────── */
+const ExpandRoleCard = ({
+  isOpen,
+  isDragging,
+  isDropTarget,
+  onClick,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  title,
+  subline,
+  isCurrent,
+  children,
+}: {
+  isOpen: boolean;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  onClick: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  title: string;
+  subline: string;
+  isCurrent: boolean;
+  children: React.ReactNode;
+}) => (
+  <div
+    className="cv-entry-card"
+    onDragOver={onDragOver}
+    onDragLeave={onDragLeave}
+    onDrop={onDrop}
+    style={{
+      borderRadius: 16,
+      opacity: isDragging ? 0.5 : 1,
+      transform: isDropTarget ? "translateY(-1px)" : undefined,
+      boxShadow: isDropTarget
+        ? "0 0 0 2px var(--ff-accent)"
+        : undefined,
+      transition: "opacity 150ms, box-shadow 150ms, transform 150ms",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "14px 18px",
+      }}
+    >
+      <span
+        role="button"
+        tabIndex={-1}
+        aria-label="Drag to reorder"
+        draggable
+        onDragStart={(e) => {
+          onDragStart();
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={onDragEnd}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 22,
+          height: 22,
+          color: "var(--ff-faint)",
+          cursor: "grab",
+          flexShrink: 0,
+          userSelect: "none",
+        }}
+      >
+        <Icon name="drag" size={14} />
+      </span>
+
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          display: "flex",
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "space-between",
+          textAlign: "left",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          minWidth: 0,
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: isOpen ? 19 : 15,
+              fontWeight: 600,
+              color: "var(--ff-ink)",
+              letterSpacing: "-0.01em",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {title}
+          </div>
+          {subline && (
+            <div
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 12.5,
+                color: "var(--ff-muted)",
+                marginTop: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {subline}
+            </div>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexShrink: 0,
+            marginLeft: 12,
+          }}
+        >
+          {isCurrent && (
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--ff-accent)",
+                background: "var(--ff-accent-soft)",
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontWeight: 600,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              ● Current
+            </span>
+          )}
+          <span
+            style={{
+              transition: "transform 150ms",
+              transform: isOpen ? "rotate(180deg)" : "none",
+              color: "var(--ff-muted)",
+              display: "inline-flex",
+            }}
+          >
+            <Icon name="chevron-down" size={14} />
+          </span>
+        </div>
+      </button>
+    </div>
+    {children}
+  </div>
+);
+
+const CardIconBtn = ({
+  onClick,
+  disabled,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+    style={{
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      background: "var(--ff-paper)",
+      border: "1px solid var(--ff-line)",
+      display: "grid",
+      placeItems: "center",
+      color: "var(--ff-muted)",
+      cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.4 : 1,
+      padding: 0,
+    }}
+  >
+    {children}
+  </button>
+);
+
+const BulletRow = ({
+  showMarker,
+  children,
+}: {
+  showMarker: boolean;
+  children: React.ReactNode;
+}) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      padding: "10px 12px",
+      background: "var(--ff-card)",
+      border: "1px solid var(--ff-line)",
+      borderRadius: 10,
+    }}
+  >
+    {showMarker && (
+      <span
+        style={{
+          width: 4,
+          height: 4,
+          borderRadius: "50%",
+          background: "var(--ff-ink)",
+          marginTop: 14,
+          flexShrink: 0,
+        }}
+      />
+    )}
+    <div style={{ flex: 1, display: "flex", gap: 8 }}>{children}</div>
+  </div>
+);
+
+const SuggestionBullet = ({
+  text,
+  onAccept,
+  onReject,
+}: {
+  text: string;
+  onAccept: () => void;
+  onReject: () => void;
+}) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      padding: "12px 14px",
+      background: "#F4FAF6",
+      border: "1px dashed rgba(14,124,74,0.55)",
+      borderRadius: 10,
+      animation: "tip-enter 250ms ease both",
+    }}
+  >
+    <span
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: 6,
+        background: "var(--ff-accent)",
+        color: "white",
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+        marginTop: 1,
+      }}
+    >
+      <Icon name="sparkle" size={11} />
+    </span>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: "var(--ff-accent-dark)",
+          letterSpacing: "0.1em",
+          marginBottom: 4,
+          fontWeight: 600,
+          textTransform: "uppercase",
+        }}
+      >
+        AI suggestion · +4 pts
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: 14,
+          color: "var(--ff-ink)",
+          lineHeight: 1.5,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={onAccept}
+        aria-label="Accept suggestion"
+        title="Accept"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "var(--ff-accent)",
+          border: "none",
+          color: "white",
+          display: "grid",
+          placeItems: "center",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        <Icon name="check" size={13} strokeWidth={3} />
+      </button>
+      <button
+        type="button"
+        onClick={onReject}
+        aria-label="Reject suggestion"
+        title="Reject"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "var(--ff-card)",
+          border: "1px solid var(--ff-line)",
+          color: "var(--ff-muted)",
+          display: "grid",
+          placeItems: "center",
+          cursor: "pointer",
+          fontSize: 14,
+          padding: 0,
+        }}
+      >
+        <Icon name="x" size={13} />
+      </button>
+    </div>
+  </div>
+);
+
+const SuggestionLoading = () => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 14px",
+      background: "#F4FAF6",
+      border: "1px dashed rgba(14,124,74,0.40)",
+      borderRadius: 10,
+    }}
+  >
+    <span
+      style={{
+        width: 14,
+        height: 14,
+        border: "2px solid var(--ff-line-strong)",
+        borderTopColor: "var(--ff-accent)",
+        borderRadius: "50%",
+        animation: "spin 1s linear infinite",
+      }}
+    />
+    <span
+      style={{
+        fontFamily: "var(--font-body)",
+        fontSize: 13,
+        color: "var(--ff-accent-dark)",
+        fontWeight: 500,
+      }}
+    >
+      Claude is writing UAE-specific bullets…
+    </span>
+  </div>
+);
+
