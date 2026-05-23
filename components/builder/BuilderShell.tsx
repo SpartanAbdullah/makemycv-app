@@ -279,7 +279,11 @@ const PreviewDrawer = ({
       style={{
         position: "absolute",
         right: "var(--drawer-gap)",
-        top: "calc(var(--topbar-h) + var(--progressbar-h) + 12px)",
+        // The drawer is absolute inside MAIN AREA which already sits below the
+        // TopBar + ProgressBar — so we only need a small breathing gap here,
+        // not the full topbar+progressbar offset (that was the old bug that
+        // pushed the drawer ~134px too low).
+        top: "var(--drawer-gap)",
         bottom: "var(--drawer-gap)",
         width: "var(--drawer-w)",
         background: "var(--ff-card)",
