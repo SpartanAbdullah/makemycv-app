@@ -1,7 +1,9 @@
 import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange, getFullName } from "./utils";
+import { formatRange } from "./utils";
+import { getEssentialChips } from "../utils/essentials";
+import { resolveTheme } from "./theme";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,14 +48,16 @@ const SidebarLabel = ({ children }: { children: React.ReactNode }) => (
 const RightHeading = ({
   children,
   isFirst = false,
+  accent = "#1E2A4A",
 }: {
   children: React.ReactNode;
   isFirst?: boolean;
+  accent?: string;
 }) => (
   <div
     style={{
       marginTop: isFirst ? 0 : "20px",
-      borderBottom: "1px solid #1E2A4A",
+      borderBottom: `1px solid ${accent}`,
       paddingBottom: "3px",
       marginBottom: "8px",
     }}
@@ -63,7 +67,7 @@ const RightHeading = ({
         fontSize: "10px",
         fontWeight: 700,
         letterSpacing: "0.08em",
-        color: "#1E2A4A",
+        color: accent,
         textTransform: "uppercase" as const,
       }}
     >
@@ -83,6 +87,7 @@ export const ExecutiveTemplate = ({
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
+  const theme = resolveTheme(data.settings, "#1E2A4A");
 
   const contactItems = [
     data.personal.email?.trim()
@@ -116,16 +121,12 @@ export const ExecutiveTemplate = ({
           href: data.personal.website.trim(),
         }
       : null,
-    data.personal.nationality?.trim()
-      ? { icon: "🌍", text: data.personal.nationality.trim() }
-      : null,
-    data.personal.drivingLicense?.trim()
-      ? { icon: "🚗", text: data.personal.drivingLicense.trim() }
-      : null,
     data.personal.dateOfBirth?.trim()
       ? { icon: "🎂", text: `DOB: ${data.personal.dateOfBirth.trim()}` }
       : null,
   ].filter(Boolean) as Array<{ icon: string; text: string; href?: string }>;
+
+  const essentialChips = getEssentialChips(data.personal);
 
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
@@ -134,7 +135,9 @@ export const ExecutiveTemplate = ({
   const hasExperience = data.experience.length > 0;
   const hasEducation = data.education.length > 0;
   const hasProjects = data.projects.length > 0;
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
   const photoSize = 88;
 
   return (
@@ -145,7 +148,7 @@ export const ExecutiveTemplate = ({
         width: "794px",
         minHeight: "1123px",
         backgroundColor: "#ffffff",
-        fontFamily: "inherit",
+        fontFamily: theme.fontFamily,
         fontSize: "11px",
       }}
     >
@@ -154,7 +157,7 @@ export const ExecutiveTemplate = ({
         style={{
           width: "200px",
           flexShrink: 0,
-          backgroundColor: "#1E2A4A",
+          backgroundColor: theme.accent,
           minHeight: "100%",
           padding: "28px 20px",
           overflow: "hidden",
@@ -268,6 +271,36 @@ export const ExecutiveTemplate = ({
           </div>
         )}
 
+        {/* Personal */}
+        {essentialChips.length > 0 && (
+          <div style={{ marginTop: "20px" }}>
+            <SidebarLabel>Personal</SidebarLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {essentialChips.map((chip) => (
+                <div
+                  key={chip.label}
+                  style={{
+                    fontSize: "10px",
+                    color: "#CBD5E1",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "#94A3B8",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {chip.label}:
+                  </span>{" "}
+                  {chip.value}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Skills */}
         {hasSkills && (
           <div style={{ marginTop: "20px" }}>
@@ -364,7 +397,7 @@ export const ExecutiveTemplate = ({
         {/* Summary */}
         {hasSummary && (
           <section>
-            <RightHeading isFirst>Summary</RightHeading>
+            <RightHeading isFirst accent={theme.accent}>Summary</RightHeading>
             <p
               style={{
                 fontSize: "11px",
@@ -381,7 +414,7 @@ export const ExecutiveTemplate = ({
         {/* Experience */}
         {hasExperience && (
           <section>
-            <RightHeading isFirst={!hasSummary}>Experience</RightHeading>
+            <RightHeading isFirst={!hasSummary} accent={theme.accent}>Experience</RightHeading>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -467,7 +500,7 @@ export const ExecutiveTemplate = ({
         {/* Education */}
         {hasEducation && (
           <section>
-            <RightHeading isFirst={!hasSummary && !hasExperience}>
+            <RightHeading isFirst={!hasSummary && !hasExperience} accent={theme.accent}>
               Education
             </RightHeading>
             <div
@@ -561,6 +594,7 @@ export const ExecutiveTemplate = ({
           <section>
             <RightHeading
               isFirst={!hasSummary && !hasExperience && !hasEducation}
+              accent={theme.accent}
             >
               Projects
             </RightHeading>

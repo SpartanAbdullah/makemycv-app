@@ -5,6 +5,7 @@ import ScoreSidebar from "@/components/resume-checker/ScoreSidebar";
 import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
+import { Logo } from "@/components/Logo";
 
 export const runtime = "nodejs";
 
@@ -81,17 +82,10 @@ export default async function ReportPage({
       {/* Sticky top bar */}
       <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6">
-          <Link
-            href="/resume-checker"
-            className="flex items-center gap-2 font-display text-sm font-semibold text-slate-900"
-          >
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-blue/10 text-brand-blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.6 4.6a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </span>
-            MakeMyCV · ATS Checker
-          </Link>
+          <div className="flex items-center gap-3">
+            <Logo variant="horizontal" height={28} href="/resume-checker" />
+            <span className="hidden text-xs text-slate-500 sm:inline">· ATS Checker</span>
+          </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-slate-500 sm:inline">
               Report <span className="font-mono text-slate-700">{shortReportId(reportId)}</span> · available 24h

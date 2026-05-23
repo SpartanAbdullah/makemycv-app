@@ -81,12 +81,15 @@ export type CvProject = {
   bullets: string[];
 };
 
-export type PhotoShape = "round" | "square";
+export type PhotoShape = "round" | "square" | "hidden";
+
+export type CvFontFamily = "sans" | "display" | "serif";
 
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
   fontScale?: number;
+  fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
 };

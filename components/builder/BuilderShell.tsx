@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { StepStatus } from "./Stepper";
@@ -23,6 +22,9 @@ import { UpgradeModal } from "../modals/UpgradeModal";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { computeScore } from "../../lib/scoreEngine";
+import type { ScoreReport } from "../../lib/resumeChecker/types";
+import { ScoreChip } from "./ScoreChip";
+import { Logo } from "../Logo";
 import dynamic from "next/dynamic";
 
 const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
@@ -122,19 +124,15 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
 /* ─── TopBar — 64px, logo + autosave + score chip + actions ── */
 const TopBar = ({
   cvName,
-  score,
-  scoreDelta,
+  scoreReport,
   onTemplates,
   onDownload,
-  onScoreClick,
   isDownloading,
 }: {
   cvName: string;
-  score: number;
-  scoreDelta?: number;
+  scoreReport: ScoreReport;
   onTemplates: () => void;
   onDownload: () => void;
-  onScoreClick: () => void;
   isDownloading: boolean;
 }) => {
   // Time since last save — local to the component since it ticks every 15s.
@@ -163,51 +161,7 @@ const TopBar = ({
     >
       {/* Left — logo + auto-save chip */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-        <Link
-          href="/"
-          style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}
-        >
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 7,
-              background: "var(--ff-ink)",
-              color: "var(--ff-paper)",
-              display: "grid",
-              placeItems: "center",
-              fontFamily: "var(--font-display)",
-              fontSize: 16,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
-            m
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 17,
-              color: "var(--ff-ink)",
-              letterSpacing: "-0.02em",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
-          >
-            makemycv
-            <span style={{ color: "var(--ff-accent)" }}>.</span>
-            <span
-              style={{
-                color: "var(--ff-muted)",
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                marginLeft: 1,
-              }}
-            >
-              ae
-            </span>
-          </div>
-        </Link>
+        <Logo variant="horizontal" height={32} />
         <div
           className="hidden md:block"
           style={{
@@ -236,67 +190,7 @@ const TopBar = ({
 
       {/* Right — score chip + templates + download */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <button
-          type="button"
-          onClick={onScoreClick}
-          aria-label={`CV Score: ${score} out of 100`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "5px 5px 5px 12px",
-            background: "var(--ff-paper)",
-            border: "1px solid var(--ff-line)",
-            borderRadius: 999,
-            cursor: "pointer",
-            transition: "border-color 120ms",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor =
-              "var(--ff-line-strong)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor =
-              "var(--ff-line)";
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--ff-muted)",
-              letterSpacing: "0.12em",
-              fontWeight: 600,
-            }}
-          >
-            SCORE
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 15,
-              color: "var(--ff-ink)",
-              fontWeight: 600,
-            }}
-          >
-            {score}
-          </span>
-          {scoreDelta !== undefined && scoreDelta !== 0 && (
-            <span
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: 10,
-                color: "var(--ff-accent-dark)",
-                background: "var(--ff-accent-soft)",
-                padding: "3px 7px",
-                borderRadius: 999,
-                fontWeight: 600,
-              }}
-            >
-              {scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
-            </span>
-          )}
-        </button>
+        <ScoreChip report={scoreReport} />
         <button
           type="button"
           onClick={onTemplates}
@@ -651,13 +545,13 @@ export const BuilderShell = ({
     return result;
   }, [data, stepId]);
 
-  // Score — computed live, shown in the TopBar.
-  const score = useMemo(
+  // Score report — computed live, shown in the TopBar (number + popover).
+  const scoreReport: ScoreReport = useMemo(
     () =>
       computeScore(data, {
         mode: "builder",
         parseSignals: parseSignals ?? undefined,
-      }).total,
+      }),
     [data, parseSignals],
   );
 
@@ -781,10 +675,9 @@ export const BuilderShell = ({
       >
         <TopBar
           cvName={cvName}
-          score={score}
+          scoreReport={scoreReport}
           onTemplates={() => onStepChange("review")}
           onDownload={handleDownload}
-          onScoreClick={() => router.push("/builder?step=score")}
           isDownloading={isDownloading}
         />
 
@@ -1040,14 +933,14 @@ export const BuilderShell = ({
           }
           @media (min-width: 1280px) {
             .ff-form-column {
-              padding: 36px 28px 32px 40px;
-              max-width: 860px;
+              padding: 28px 24px 28px 40px;
+              max-width: var(--form-max);
               margin-right: calc(var(--drawer-w) + var(--drawer-gap) + 28px);
             }
             .ff-form-column-review {
               max-width: 1180px;
               margin-right: 0;
-              padding: 36px 40px 32px 40px;
+              padding: 28px 40px 28px 40px;
             }
           }
           .cv-bead-strip::-webkit-scrollbar { display: none; }

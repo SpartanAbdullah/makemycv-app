@@ -6,6 +6,7 @@ import { TemplateCard } from "../../components/templates/TemplateCard";
 import { PreviewPanel } from "../../components/preview/PreviewPanel";
 import { templates } from "../../lib/templates";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
+import { Logo } from "../../components/Logo";
 
 export function TemplatesClient() {
   const templateId = useCvStore((state) => state.data.settings.templateId);
@@ -24,9 +25,12 @@ export function TemplatesClient() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#ffffff,_#f8f6f2)]">
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Templates</p>
-            <h1 className="font-display text-3xl font-semibold">Choose your layout</h1>
+          <div className="flex items-center gap-5">
+            <Logo variant="horizontal" height={28} href="/builder" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Templates</p>
+              <h1 className="font-display text-2xl font-semibold">Choose your layout</h1>
+            </div>
           </div>
           <Link
             href="/builder?step=review"

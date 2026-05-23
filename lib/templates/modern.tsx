@@ -1,6 +1,8 @@
 import type { CvData } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
+import { getEssentialChips } from "../utils/essentials";
+import { resolveTheme } from "./theme";
 
 export const ModernTemplate = ({
   data,
@@ -9,6 +11,7 @@ export const ModernTemplate = ({
   plan?: "free" | "pro";
 }) => {
   const name = getFullName(data) || "Your Name";
+  const theme = resolveTheme(data.settings, "#1e5b54");
   const shouldShowProjectLink = (value?: string) => {
     const normalized = value?.trim();
     if (!normalized) return false;
@@ -58,19 +61,18 @@ export const ModernTemplate = ({
           href: data.personal.linkedin.trim(),
         }
       : null,
-    data.personal.nationality?.trim()
-      ? { text: data.personal.nationality.trim() }
-      : null,
-    data.personal.drivingLicense?.trim()
-      ? { text: data.personal.drivingLicense.trim() }
-      : null,
     data.personal.dateOfBirth?.trim()
       ? { text: `DOB: ${data.personal.dateOfBirth.trim()}` }
       : null,
   ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
+  const essentialChips = getEssentialChips(data.personal);
+
   return (
-    <div className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed">
+    <div
+      className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed"
+      style={{ fontFamily: theme.fontFamily }}
+    >
       <header className="border-b border-slate-200 pb-4">
         <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
           <div style={{ flex: 1, minWidth: 0 }} className="flex flex-col gap-2">
@@ -104,8 +106,23 @@ export const ModernTemplate = ({
                 )}
               </div>
             )}
+            {essentialChips.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {essentialChips.map((chip) => (
+                  <span
+                    key={chip.label}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] leading-snug text-slate-700"
+                  >
+                    <span className="font-semibold uppercase tracking-wider text-emerald-700 text-[9px]">
+                      {chip.label}
+                    </span>
+                    <span>{chip.value}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {data.personal.photo && data.personal.showPhoto && (
+          {data.personal.photo && data.personal.showPhoto && theme.photoVisible && (
             <div
               style={{
                 width: 80,

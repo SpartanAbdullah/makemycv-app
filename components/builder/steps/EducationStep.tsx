@@ -10,7 +10,9 @@ import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import {
   sanitizeCompanyName,
+  sanitizeCompanyNameLive,
   sanitizeJobTitle,
+  sanitizeJobTitleLive,
 } from "../../../lib/sanitize";
 import type { CvEducation } from "../../../lib/types/cv";
 import { UAEDot } from "../UAEDot";
@@ -103,19 +105,6 @@ export const EducationStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 04 · EDUCATION
-      </div>
-      <div>
-        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
-          Where did you study?
-        </h1>
-        <p className="cv-step-subtitle">
-          Most recent first. Note attestation status — UAE government roles
-          almost always check this before the shortlist.
-        </p>
-      </div>
 
       <section className="cv-step-card">
         <div>
@@ -172,8 +161,13 @@ export const EducationStep = ({
                             placeholder="e.g. Bachelor of Business Administration"
                             {...register(`education.${index}.degree`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeJobTitleLive(e.target.value);
+                              register(`education.${index}.degree`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
+                              register(`education.${index}.degree`).onBlur(e);
                             }}
                           />
                         </Field>
@@ -183,8 +177,13 @@ export const EducationStep = ({
                             placeholder="e.g. American University of Sharjah"
                             {...register(`education.${index}.school`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeCompanyNameLive(e.target.value);
+                              register(`education.${index}.school`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeCompanyName(e.target.value);
                               register(`education.${index}.school`).onChange(e);
+                              register(`education.${index}.school`).onBlur(e);
                             }}
                           />
                         </Field>
@@ -194,8 +193,13 @@ export const EducationStep = ({
                             placeholder="e.g. Finance"
                             {...register(`education.${index}.field`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeJobTitleLive(e.target.value);
+                              register(`education.${index}.field`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.field`).onChange(e);
+                              register(`education.${index}.field`).onBlur(e);
                             }}
                           />
                         </Field>

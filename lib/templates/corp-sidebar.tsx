@@ -1,6 +1,8 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
+import { getEssentialChips } from "../utils/essentials";
+import { resolveTheme } from "./theme";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +74,7 @@ export const CorpSidebarTemplate = ({
 }) => {
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
+  const theme = resolveTheme(data.settings, "#0F172A");
 
   const contactItems: Array<{ label: string; value: string }> = [];
   if (data.personal.email?.trim())
@@ -93,21 +96,13 @@ export const CorpSidebarTemplate = ({
       label: "Web",
       value: shortenDisplayUrl(data.personal.website),
     });
-  if (data.personal.nationality?.trim())
-    contactItems.push({
-      label: "Nationality",
-      value: data.personal.nationality.trim(),
-    });
-  if (data.personal.drivingLicense?.trim())
-    contactItems.push({
-      label: "License",
-      value: data.personal.drivingLicense.trim(),
-    });
   if (data.personal.dateOfBirth?.trim())
     contactItems.push({
       label: "DOB",
       value: data.personal.dateOfBirth.trim(),
     });
+
+  const essentialChips = getEssentialChips(data.personal);
 
   const hasSummary = Boolean(data.personal.summary?.trim());
   const hasExperience = data.experience.length > 0;
@@ -117,7 +112,9 @@ export const CorpSidebarTemplate = ({
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
 
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   return (
     <div
@@ -127,7 +124,7 @@ export const CorpSidebarTemplate = ({
         width: "794px",
         minHeight: "1123px",
         backgroundColor: "#ffffff",
-        fontFamily: "inherit",
+        fontFamily: theme.fontFamily,
         fontSize: "11px",
       }}
     >
@@ -167,7 +164,7 @@ export const CorpSidebarTemplate = ({
           )}
           <div
             style={{
-              borderBottom: "2px solid #0F172A",
+              borderBottom: `2px solid ${theme.accent}`,
               marginTop: "10px",
             }}
           />
@@ -460,7 +457,7 @@ export const CorpSidebarTemplate = ({
         style={{
           width: "220px",
           flexShrink: 0,
-          backgroundColor: "#0F172A",
+          backgroundColor: theme.accent,
           minHeight: "100%",
           padding: "36px 20px",
           boxSizing: "border-box" as const,
@@ -534,6 +531,46 @@ export const CorpSidebarTemplate = ({
                     }}
                   >
                     {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Personal */}
+        {essentialChips.length > 0 && (
+          <div>
+            <SidebarHeading>Personal</SidebarHeading>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
+              }}
+            >
+              {essentialChips.map((chip) => (
+                <div key={chip.label}>
+                  <div
+                    style={{
+                      fontSize: "8px",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.4)",
+                      textTransform: "uppercase" as const,
+                      letterSpacing: "0.05em",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {chip.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: "#CBD5E1",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {chip.value}
                   </div>
                 </div>
               ))}

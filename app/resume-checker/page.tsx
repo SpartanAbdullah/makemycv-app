@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import UploadDropzone from "@/components/resume-checker/UploadDropzone";
 import ExampleReportPreview from "@/components/resume-checker/ExampleReportPreview";
+import { Logo } from "@/components/Logo";
 
 export const metadata: Metadata = {
   title: "Free ATS Resume Checker for UAE Jobs | MakeMyCV",
@@ -105,6 +106,9 @@ export default function ResumeCheckerPage() {
           }}
         />
         <div className="relative mx-auto max-w-5xl px-6 text-center">
+          <div className="mb-8 flex justify-center">
+            <Logo variant="white" height={32} href="/" />
+          </div>
           <div className="mb-4 inline-flex rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/80">
             Free · No sign-up · UAE-focused
           </div>

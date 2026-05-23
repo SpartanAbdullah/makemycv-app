@@ -26,10 +26,13 @@ export async function resizeAndCropToSquare(
           return;
         }
 
-        // Center-crop: take the largest square from the center
+        // Crop to largest square. Bias the vertical anchor toward the top of
+        // the source image so headshots keep the head in frame (typical photo
+        // has the face in the upper third). Horizontally still center-cropped.
         const srcSize = Math.min(img.width, img.height);
         const srcX = (img.width - srcSize) / 2;
-        const srcY = (img.height - srcSize) / 2;
+        const verticalSlack = img.height - srcSize;
+        const srcY = Math.min(verticalSlack / 2, img.height * 0.08);
 
         ctx.drawImage(
           img,

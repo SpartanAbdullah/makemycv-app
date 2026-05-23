@@ -1,39 +1,49 @@
-// ─── SANITIZERS (silent auto-correct, return cleaned string) ───
+// ─── SANITIZERS ───
+// Each field has two variants:
+//   sanitizeXxxLive(value)  — runs on every keystroke; strips invalid characters
+//                             only. Preserves trailing space and consecutive
+//                             spaces so the user can type naturally.
+//   sanitizeXxx(value)      — runs on blur / submit; full clean (trim + collapse
+//                             consecutive whitespace + strip invalid chars).
 
 export function sanitizeEmail(value: string): string {
   return value.replace(/\s/g, "").toLowerCase();
 }
+export const sanitizeEmailLive = sanitizeEmail;
 
+export function sanitizeNameLive(value: string): string {
+  return value.replace(/[^\p{L}\s\-'.]/gu, "");
+}
 export function sanitizeName(value: string): string {
-  return value
-    .trim()
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\p{L}\s\-'.]/gu, "");
+  return sanitizeNameLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
+export function sanitizePhoneLive(value: string): string {
+  return value.replace(/[^0-9+() \-]/g, "");
+}
 export function sanitizePhone(value: string): string {
-  return value.replace(/[^0-9+() \-]/g, "").trim();
+  return sanitizePhoneLive(value).trim();
 }
 
+export function sanitizeJobTitleLive(value: string): string {
+  return value.replace(/[^\p{L}\d\s\-,&./]/gu, "");
+}
 export function sanitizeJobTitle(value: string): string {
-  return value
-    .trim()
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\p{L}\d\s\-,&./]/gu, "");
+  return sanitizeJobTitleLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
+export function sanitizeCompanyNameLive(value: string): string {
+  return value.replace(/[^\p{L}\d\s\-,.&()']/gu, "");
+}
 export function sanitizeCompanyName(value: string): string {
-  return value
-    .trim()
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\p{L}\d\s\-,.&()']/gu, "");
+  return sanitizeCompanyNameLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
+export function sanitizeLocationLive(value: string): string {
+  return value.replace(/[^\p{L}\d\s,\-.]/gu, "");
+}
 export function sanitizeLocation(value: string): string {
-  return value
-    .trim()
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\p{L}\d\s,\-.]/gu, "");
+  return sanitizeLocationLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
 export function sanitizeURL(value: string): string {
@@ -43,25 +53,28 @@ export function sanitizeURL(value: string): string {
   }
   return trimmed;
 }
+export const sanitizeURLLive = (value: string) => value.replace(/\s/g, "");
 
+export function sanitizeSkillLive(value: string): string {
+  return value.replace(/[^\p{L}\d\s\-+#.&()/]/gu, "");
+}
 export function sanitizeSkill(value: string): string {
-  return value
-    .trim()
-    .replace(/[^\p{L}\d\s\-+#.&()/]/gu, "")
-    .replace(/\s{2,}/g, " ");
+  return sanitizeSkillLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
-export function sanitizePlainText(value: string): string {
+export function sanitizePlainTextLive(value: string): string {
   return value
     .replace(/[^\S\n\t]/g, " ")
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+export function sanitizePlainText(value: string): string {
+  return sanitizePlainTextLive(value).replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export function sanitizeYear(value: string): string {
   return value.replace(/[^0-9]/g, "").slice(0, 4);
 }
+export const sanitizeYearLive = sanitizeYear;
 
 export function sanitizeGrade(value: string): string {
   let result = "";
@@ -76,12 +89,13 @@ export function sanitizeGrade(value: string): string {
   }
   return result;
 }
+export const sanitizeGradeLive = sanitizeGrade;
 
+export function sanitizeLanguageNameLive(value: string): string {
+  return value.replace(/[^\p{L}\s\-]/gu, "");
+}
 export function sanitizeLanguageName(value: string): string {
-  return value
-    .trim()
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\p{L}\s\-]/gu, "");
+  return sanitizeLanguageNameLive(value).replace(/\s{2,}/g, " ").trim();
 }
 
 // ─── VALIDATORS (return error string or null) ───

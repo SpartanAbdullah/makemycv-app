@@ -9,8 +9,7 @@ import { createId } from "../../../lib/utils/id";
 import { NavigationButtons } from "../NavigationButtons";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
-import { sanitizeSkill } from "../../../lib/sanitize";
-import { UAEDot } from "../UAEDot";
+import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
 import { Icon } from "../Icon";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
@@ -211,21 +210,6 @@ export const SkillsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 05 · SKILLS
-      </div>
-      <div>
-        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
-          What are you good at?
-        </h1>
-        <p className="cv-step-subtitle">
-          Ten to twenty focused skills. Mirror the wording from the job
-          description — &ldquo;stakeholder management&rdquo; and &ldquo;client
-          liaison&rdquo; aren&apos;t the same string to an ATS.
-        </p>
-      </div>
-
       <section className="cv-step-card">
         {/* Input row */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -236,8 +220,11 @@ export const SkillsStep = ({
             placeholder="e.g. Project Management, SAP, AutoCAD"
             value={inputValue}
             onChange={(e) => {
-              setInputValue(sanitizeSkill(e.target.value));
+              setInputValue(sanitizeSkillLive(e.target.value));
               setDuplicateWarning(false);
+            }}
+            onBlur={(e) => {
+              setInputValue(sanitizeSkill(e.target.value));
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && inputValue.trim() !== "") {

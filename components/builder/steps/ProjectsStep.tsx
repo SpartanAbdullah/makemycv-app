@@ -9,7 +9,6 @@ import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import type { CvProject } from "../../../lib/types/cv";
 
@@ -120,19 +119,6 @@ export const ProjectsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 08 · PROJECTS
-      </div>
-      <div>
-        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
-          Anything you built that&apos;s worth showing?
-        </h1>
-        <p className="cv-step-subtitle">
-          Name the tools — &ldquo;Power BI&rdquo;, &ldquo;Salesforce&rdquo; — and quantify the outcome. Tools are what ATS systems search.
-        </p>
-      </div>
-
       <section className="cv-step-card">
         <div>
           <Repeater

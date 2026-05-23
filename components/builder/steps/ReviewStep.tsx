@@ -17,7 +17,9 @@ import { templates } from "../../../lib/templates";
 import { computeScore } from "../../../lib/scoreEngine";
 import { UpgradeModal } from "../../modals/UpgradeModal";
 import { Icon } from "../Icon";
-import { UAEDot } from "../UAEDot";
+import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
+import { CustomizePanel } from "../CustomizePanel";
+import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -81,39 +83,6 @@ function TemplateThumb({ children }: { children: ReactNode }) {
   );
 }
 
-/* ─── Animated number counter ───────────────────────────── */
-function useAnimatedNumber(target: number, duration = 600) {
-  const [value, setValue] = useState(target);
-  const startRef = useRef<number | null>(null);
-  const fromRef = useRef(target);
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    fromRef.current = value;
-    startRef.current = null;
-    const tick = (t: number) => {
-      if (startRef.current === null) startRef.current = t;
-      const elapsed = t - startRef.current;
-      const pct = Math.min(1, elapsed / duration);
-      // ease-out-cubic
-      const eased = 1 - Math.pow(1 - pct, 3);
-      const next = Math.round(
-        fromRef.current + (target - fromRef.current) * eased,
-      );
-      setValue(next);
-      if (pct < 1) {
-        rafRef.current = requestAnimationFrame(tick);
-      }
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
-
-  return value;
-}
 
 /* ─── Review step ───────────────────────────────────────── */
 export const ReviewStep = ({
@@ -140,6 +109,7 @@ export const ReviewStep = ({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponFeedback, setCouponFeedback] = useState<{
@@ -262,12 +232,6 @@ export const ReviewStep = ({
       style={{ display: "flex", flexDirection: "column", gap: 24 }}
       className="ff-review-root"
     >
-      {/* Header row */}
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 09 · REVIEW
-      </div>
-
       {/* Two-column grid: left = hero + score + actions; right = templates */}
       <div className="ff-review-grid">
         {/* ── Left ───────────────────────────────────────── */}
@@ -676,8 +640,10 @@ export const ReviewStep = ({
           )}
         </div>
 
-        {/* ── Right: templates ─────────────────────────────── */}
-        <div>
+        {/* ── Right: customize panel + templates ───────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <CustomizePanel />
+
           <div
             style={{
               display: "flex",
@@ -768,6 +734,7 @@ export const ReviewStep = ({
                     selected={isSelected}
                     locked={isLocked}
                     onClick={() => handleTemplateChange(tmpl.id)}
+                    onPreview={() => setPreviewTemplateId(tmpl.id)}
                   >
                     <TemplateThumb>
                       <tmpl.Render
@@ -802,6 +769,21 @@ export const ReviewStep = ({
       </div>
 
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+
+      <TemplatePreviewModal
+        templateId={previewTemplateId}
+        open={previewTemplateId !== null}
+        onClose={() => setPreviewTemplateId(null)}
+        onSelect={(id) => {
+          handleTemplateChange(id);
+          setPreviewTemplateId(null);
+        }}
+        onDownload={(id) => {
+          handleTemplateChange(id);
+          setPreviewTemplateId(null);
+          handleDownloadPdf();
+        }}
+      />
 
       <style>{`
         .ff-review-grid {
@@ -912,6 +894,7 @@ const TemplateCard = ({
   selected,
   locked,
   onClick,
+  onPreview,
   children,
 }: {
   name: string;
@@ -920,11 +903,19 @@ const TemplateCard = ({
   selected: boolean;
   locked: boolean;
   onClick: () => void;
+  onPreview?: () => void;
   children: ReactNode;
 }) => (
-  <button
-    type="button"
+  <div
+    role="button"
+    tabIndex={0}
     onClick={onClick}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    }}
     aria-pressed={selected}
     style={{
       position: "relative",
@@ -940,6 +931,35 @@ const TemplateCard = ({
         "background var(--transition-base), border-color var(--transition-base)",
     }}
   >
+    {onPreview && (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview();
+        }}
+        aria-label={`Open ${name} full preview`}
+        title="Open full preview"
+        style={{
+          position: "absolute",
+          bottom: 12,
+          right: 12,
+          zIndex: 3,
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "var(--ff-ink)",
+          color: "white",
+          border: "none",
+          display: "grid",
+          placeItems: "center",
+          cursor: "pointer",
+          opacity: 0.92,
+        }}
+      >
+        <Icon name="search" size={13} />
+      </button>
+    )}
     {badge && (
       <span
         style={{
@@ -1043,5 +1063,5 @@ const TemplateCard = ({
     >
       {description}
     </p>
-  </button>
+  </div>
 );

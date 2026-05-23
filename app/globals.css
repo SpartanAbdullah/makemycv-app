@@ -108,6 +108,16 @@
   --font-body:    'Inter', var(--font-inter), system-ui, sans-serif;
   --font-serif:   'Instrument Serif', Georgia, 'Times New Roman', serif;
   --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Brand wordmark — Poppins (loaded via next/font in app/layout.tsx). */
+  --font-brand:   var(--font-poppins), 'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
+
+  /* ─── Brand tokens (May 2026 handoff) ──────────────────────
+     Source of truth for marketing surfaces, social cards, and
+     anywhere the makemycv.ae mark appears in UI. */
+  --brand-navy:    #1B2A4A;
+  --brand-gold:    #C49A48;
+  --brand-gold-lt: #D4A95A;
+  --brand-cream:   #F4EEE0;
 
   /* Transitions */
   --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -117,9 +127,9 @@
   /* Builder shell metrics */
   --topbar-h:     64px;
   --progressbar-h:58px;
-  --drawer-w:     460px;
+  --drawer-w:     clamp(460px, 48vw, 820px);
   --drawer-gap:   24px;
-  --form-max:     860px;
+  --form-max:     clamp(540px, 44vw, 780px);
   /* Legacy alias — old sidebar width; left for backward-compat. */
   --sidebar-w:    220px;
 
@@ -187,6 +197,14 @@
   --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-ink: var(--brand-ink);
   --color-brand-deep: var(--brand-deep);
+
+  /* makemycv.ae brand tokens (May 2026 handoff) — Tailwind utilities
+     bg-brand-navy / text-brand-gold etc. */
+  --color-brand-navy:    var(--brand-navy);
+  --color-brand-gold:    var(--brand-gold);
+  --color-brand-gold-lt: var(--brand-gold-lt);
+  --color-brand-cream:   var(--brand-cream);
+  --font-brand:          var(--font-brand);
 
   --color-severity-error: var(--severity-error);
   --color-severity-error-bg: var(--severity-error-bg);

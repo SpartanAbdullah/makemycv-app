@@ -11,7 +11,6 @@ import { FieldError } from "../../FieldError";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import { TodaysTipCard } from "../TodaysTipCard";
 
@@ -128,22 +127,6 @@ export const SummaryStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 02 · SUMMARY
-      </div>
-      <div>
-        <h1
-          className="cv-step-heading"
-          style={{ fontSize: 34, marginTop: 8 }}
-        >
-          Tell us about yourself.
-        </h1>
-        <p className="cv-step-subtitle">
-          Two to three lines. Lead with years of experience, industry, and one
-          quantified result. Adjectives are forgettable; numbers are not.
-        </p>
-      </div>
 
       <div className="ff-summary-grid">
         <section className="cv-step-card">

@@ -13,8 +13,11 @@ import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
+  sanitizeJobTitleLive,
   sanitizeCompanyName,
+  sanitizeCompanyNameLive,
   sanitizeLocation,
+  sanitizeLocationLive,
   sanitizePlainText,
 } from "../../../lib/sanitize";
 import type { CvExperience } from "../../../lib/types/cv";
@@ -237,32 +240,8 @@ export const ExperienceStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Step badge + heading + Improve all button */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <div className="cv-step-badge">
-            <UAEDot size={13} />
-            STEP 03 · EXPERIENCE
-          </div>
-          <h1
-            className="cv-step-heading"
-            style={{ fontSize: 34, marginTop: 8 }}
-          >
-            Where have you worked?
-          </h1>
-          <p className="cv-step-subtitle">
-            Add your most impactful roles first. Drag to reorder. Pull out the
-            results, not the duties.
-          </p>
-        </div>
+      {/* Improve all button */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           type="button"
           onClick={improveAllWithAI}
@@ -411,8 +390,13 @@ export const ExperienceStep = ({
                         placeholder="e.g. Operations Manager"
                         {...register(`experience.${index}.role`)}
                         onChange={(e) => {
+                          e.target.value = sanitizeJobTitleLive(e.target.value);
+                          register(`experience.${index}.role`).onChange(e);
+                        }}
+                        onBlur={(e) => {
                           e.target.value = sanitizeJobTitle(e.target.value);
                           register(`experience.${index}.role`).onChange(e);
+                          register(`experience.${index}.role`).onBlur(e);
                         }}
                       />
                     </Field>
@@ -425,8 +409,13 @@ export const ExperienceStep = ({
                         placeholder="e.g. Emaar Properties"
                         {...register(`experience.${index}.company`)}
                         onChange={(e) => {
+                          e.target.value = sanitizeCompanyNameLive(e.target.value);
+                          register(`experience.${index}.company`).onChange(e);
+                        }}
+                        onBlur={(e) => {
                           e.target.value = sanitizeCompanyName(e.target.value);
                           register(`experience.${index}.company`).onChange(e);
+                          register(`experience.${index}.company`).onBlur(e);
                         }}
                       />
                     </Field>
@@ -454,8 +443,13 @@ export const ExperienceStep = ({
                         placeholder="e.g. Dubai"
                         {...register(`experience.${index}.location`)}
                         onChange={(e) => {
+                          e.target.value = sanitizeLocationLive(e.target.value);
+                          register(`experience.${index}.location`).onChange(e);
+                        }}
+                        onBlur={(e) => {
                           e.target.value = sanitizeLocation(e.target.value);
                           register(`experience.${index}.location`).onChange(e);
+                          register(`experience.${index}.location`).onBlur(e);
                         }}
                       />
                     </Field>

@@ -10,6 +10,8 @@ import {
 import type { Style } from "@react-pdf/types";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
+import { getEssentialChips } from "../../lib/utils/essentials";
+import { resolveTheme } from "../../lib/templates/theme";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -430,14 +432,14 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
       text: shortenDisplayUrl(data.personal.website),
       href: data.personal.website.trim(),
     });
-  if (data.personal.nationality?.trim())
-    contacts.push({ text: data.personal.nationality.trim() });
-  if (data.personal.drivingLicense?.trim())
-    contacts.push({ text: data.personal.drivingLicense.trim() });
   if (data.personal.dateOfBirth?.trim())
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const essentialChips = getEssentialChips(data.personal);
+  const theme = resolveTheme(data.settings, "#1e5b54");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   return (
     <View>
@@ -470,6 +472,38 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                   )}
                   {i < contacts.length - 1 && (
                     <Text style={s.contactSep}>|</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          {essentialChips.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 3,
+              }}
+            >
+              {essentialChips.map((chip, i) => (
+                <View
+                  key={chip.label}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      color: "#0F172A",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {chip.label}:
+                  </Text>
+                  <Text style={{ fontSize: 9, color: "#475569", marginLeft: 2 }}>
+                    {chip.value}
+                  </Text>
+                  {i < essentialChips.length - 1 && (
+                    <Text style={{ ...s.contactSep, color: "#CBD5E1" }}>·</Text>
                   )}
                 </View>
               ))}
@@ -633,7 +667,10 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const hasExperience = data.experience.length > 0;
   const hasEducation = data.education.length > 0;
   const hasProjects = data.projects.length > 0;
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const theme = resolveTheme(data.settings, "#1E2A4A");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   // Build sidebar contact lines — plain text label prefixes (no emoji — unreliable in react-pdf)
   const sidebarContacts: string[] = [];
@@ -649,17 +686,15 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
     );
   if (data.personal.website?.trim())
     sidebarContacts.push(`Web: ${shortenDisplayUrl(data.personal.website)}`);
-  if (data.personal.nationality?.trim())
-    sidebarContacts.push(`Nationality: ${data.personal.nationality.trim()}`);
-  if (data.personal.drivingLicense?.trim())
-    sidebarContacts.push(`DL: ${data.personal.drivingLicense.trim()}`);
   if (data.personal.dateOfBirth?.trim())
     sidebarContacts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
+
+  const essentialChips = getEssentialChips(data.personal);
 
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
       {/* ── Sidebar ── */}
-      <View style={s.execSidebar}>
+      <View style={{ ...s.execSidebar, backgroundColor: theme.accent }}>
         {/* Photo */}
         {showPhoto && data.personal.photo && (
           <View style={{ marginBottom: 12 }}>
@@ -693,6 +728,18 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             {sidebarContacts.map((line, i) => (
               <Text key={i} style={s.execContactItem}>
                 {line}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* Personal */}
+        {essentialChips.length > 0 && (
+          <View>
+            <Text style={s.execSideLabel}>PERSONAL</Text>
+            {essentialChips.map((chip) => (
+              <Text key={chip.label} style={s.execContactItem}>
+                {chip.label}: {chip.value}
               </Text>
             ))}
           </View>
@@ -869,12 +916,13 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
     contactParts.push(shortenDisplayUrl(data.personal.linkedin));
   if (data.personal.website?.trim())
     contactParts.push(shortenDisplayUrl(data.personal.website));
-  if (data.personal.nationality?.trim())
-    contactParts.push(data.personal.nationality.trim());
-  if (data.personal.drivingLicense?.trim())
-    contactParts.push(`DL: ${data.personal.drivingLicense.trim()}`);
   if (data.personal.dateOfBirth?.trim())
     contactParts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
+
+  const essentialChips = getEssentialChips(data.personal);
+  const essentialsLine = essentialChips
+    .map((c) => `${c.label}: ${c.value}`)
+    .join(" · ");
 
   const hasSummary = Boolean(data.personal.summary?.trim());
   const hasExperience = data.experience.length > 0;
@@ -883,7 +931,10 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const theme = resolveTheme(data.settings, "#111827");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   // atsSectionHeading already has marginTop: 16 baked in.
   // Override first section to marginTop: 0 via inline style.
@@ -933,6 +984,11 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           {contactParts.length > 0 && (
             <Text style={s.atsContactLine}>{contactParts.join(" · ")}</Text>
           )}
+          {essentialsLine && (
+            <Text style={{ ...s.atsContactLine, color: "#374151", marginTop: 2 }}>
+              {essentialsLine}
+            </Text>
+          )}
         </View>
         {showPhoto && data.personal.photo && (
           <Image
@@ -949,7 +1005,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           />
         )}
       </View>
-      <View style={s.atsDivider} />
+      <View style={{ ...s.atsDivider, borderBottomColor: theme.accent }} />
 
       {/* ── Summary ── */}
       {hasSummary && (
@@ -1127,7 +1183,10 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const theme = resolveTheme(data.settings, "#4F46E5");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
@@ -1153,16 +1212,14 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
       text: shortenDisplayUrl(data.personal.website),
       href: data.personal.website.trim(),
     });
-  if (data.personal.nationality?.trim())
-    contacts.push({ text: data.personal.nationality.trim() });
-  if (data.personal.drivingLicense?.trim())
-    contacts.push({ text: data.personal.drivingLicense.trim() });
   if (data.personal.dateOfBirth?.trim())
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
+  const essentialChips = getEssentialChips(data.personal);
+
   const modernSectionHeadingWrap: Style = {
     borderLeftWidth: 3,
-    borderLeftColor: "#4F46E5",
+    borderLeftColor: theme.accent,
     paddingLeft: 8,
     marginBottom: 6,
   };
@@ -1173,7 +1230,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
           <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, color: "#4F46E5", lineHeight: 1 }}>
+            <Text style={{ ...s.name, color: theme.accent, lineHeight: 1 }}>
               {name}
             </Text>
           </View>
@@ -1200,6 +1257,32 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   )}
                   {i < contacts.length - 1 && (
                     <Text style={s.contactSep}>|</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          {essentialChips.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 3,
+              }}
+            >
+              {essentialChips.map((chip, i) => (
+                <View
+                  key={chip.label}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
+                    {chip.label}:
+                  </Text>
+                  <Text style={{ fontSize: 9, color: "#374151", marginLeft: 2 }}>
+                    {chip.value}
+                  </Text>
+                  {i < essentialChips.length - 1 && (
+                    <Text style={{ ...s.contactSep, color: "#C7D2FE" }}>·</Text>
                   )}
                 </View>
               ))}
@@ -1382,21 +1465,21 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
     contactParts.push(shortenDisplayUrl(data.personal.linkedin));
   if (data.personal.website?.trim())
     contactParts.push(shortenDisplayUrl(data.personal.website));
-  if (data.personal.nationality?.trim())
-    contactParts.push(data.personal.nationality.trim());
-  if (data.personal.drivingLicense?.trim())
-    contactParts.push(`DL: ${data.personal.drivingLicense.trim()}`);
   if (data.personal.dateOfBirth?.trim())
     contactParts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
 
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const essentialChips = getEssentialChips(data.personal);
+  const theme = resolveTheme(data.settings, "#1B2A4A");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   return (
     <View>
       {/* ── Dark Header ── */}
       <View
         style={{
-          backgroundColor: "#1B2A4A",
+          backgroundColor: theme.accent,
           marginTop: -36,
           marginLeft: -30,
           marginRight: -30,
@@ -1443,6 +1526,46 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
             >
               {contactParts.join("  \u00B7  ")}
             </Text>
+          )}
+          {essentialChips.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 5,
+              }}
+            >
+              {essentialChips.map((chip) => (
+                <View
+                  key={chip.label}
+                  style={{
+                    flexDirection: "row",
+                    backgroundColor: "rgba(255,255,255,0.10)",
+                    borderRadius: 8,
+                    paddingTop: 1,
+                    paddingBottom: 1,
+                    paddingLeft: 5,
+                    paddingRight: 6,
+                    marginRight: 4,
+                    marginBottom: 2,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color: "#94A3B8",
+                      fontFamily: "Helvetica-Bold",
+                      marginRight: 3,
+                    }}
+                  >
+                    {chip.label}
+                  </Text>
+                  <Text style={{ fontSize: 7, color: "#E2E8F0" }}>
+                    {chip.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
           )}
         </View>
         {showPhoto && data.personal.photo && (
@@ -1655,23 +1778,17 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
       label: "Web",
       value: shortenDisplayUrl(data.personal.website),
     });
-  if (data.personal.nationality?.trim())
-    sidebarContacts.push({
-      label: "Nationality",
-      value: data.personal.nationality.trim(),
-    });
-  if (data.personal.drivingLicense?.trim())
-    sidebarContacts.push({
-      label: "License",
-      value: data.personal.drivingLicense.trim(),
-    });
   if (data.personal.dateOfBirth?.trim())
     sidebarContacts.push({
       label: "DOB",
       value: data.personal.dateOfBirth.trim(),
     });
 
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const essentialChips = getEssentialChips(data.personal);
+  const theme = resolveTheme(data.settings, "#0F172A");
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
@@ -1796,7 +1913,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         style={{
           width: 155,
           flexShrink: 0,
-          backgroundColor: "#0F172A",
+          backgroundColor: theme.accent,
           marginTop: -36,
           marginBottom: -36,
           marginRight: -30,
@@ -1847,6 +1964,30 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 </Text>
                 <Text style={{ ...s.execContactItem, fontSize: 7.5 }}>
                   {item.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Personal */}
+        {essentialChips.length > 0 && (
+          <View>
+            <Text style={s.execSideLabel}>PERSONAL</Text>
+            {essentialChips.map((chip) => (
+              <View key={chip.label} style={{ marginBottom: 3 }}>
+                <Text
+                  style={{
+                    fontSize: 6,
+                    fontFamily: "Helvetica-Bold",
+                    color: "rgba(255,255,255,0.35)",
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  {chip.label.toUpperCase()}
+                </Text>
+                <Text style={{ ...s.execContactItem, fontSize: 7.5 }}>
+                  {chip.value}
                 </Text>
               </View>
             ))}

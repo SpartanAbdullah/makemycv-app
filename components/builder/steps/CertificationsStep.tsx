@@ -80,20 +80,6 @@ export const CertificationsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 07 · CERTIFICATIONS
-      </div>
-      <div>
-        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
-          Any certifications worth surfacing?
-        </h1>
-        <p className="cv-step-subtitle">
-          Lead with the last three years. UAE recruiters look hardest for PMP,
-          NEBOSH, CFA, CIPD and DHA / DOH credentials.
-        </p>
-      </div>
-
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <button

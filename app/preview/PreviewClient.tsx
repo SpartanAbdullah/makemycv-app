@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
+import { Logo } from "../../components/Logo";
 
 export const PreviewClient = () => {
   const data = useCvStore((state) => state.data);
@@ -20,9 +21,12 @@ export const PreviewClient = () => {
     <div className="min-h-screen bg-slate-100">
       <div className="mx-auto max-w-5xl px-6 py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Preview</p>
-            <h1 className="font-display text-3xl font-semibold">Full-screen view</h1>
+          <div className="flex items-center gap-5">
+            <Logo variant="horizontal" height={28} href="/builder" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Preview</p>
+              <h1 className="font-display text-2xl font-semibold">Full-screen view</h1>
+            </div>
           </div>
           <Link
             href="/builder?step=review"

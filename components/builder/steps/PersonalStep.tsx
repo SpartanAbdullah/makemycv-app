@@ -14,10 +14,14 @@ import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import {
   sanitizeName,
+  sanitizeNameLive,
   sanitizeEmail,
   sanitizePhone,
+  sanitizePhoneLive,
   sanitizeJobTitle,
+  sanitizeJobTitleLive,
   sanitizeLocation,
+  sanitizeLocationLive,
   sanitizeURL,
   validateEmail,
   validateLinkedIn,
@@ -106,25 +110,6 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Step badge */}
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 01 · CONTACT
-      </div>
-
-      {/* Hero heading */}
-      <div>
-        <h1
-          className="cv-step-heading"
-          style={{ fontSize: 36, marginTop: 4 }}
-        >
-          Let&apos;s start with how recruiters reach you.
-        </h1>
-        <p className="cv-step-subtitle">
-          In the UAE, recruiters open with your phone and visa status. Make sure
-          both are crisp before anything else.
-        </p>
-      </div>
 
       {/* Import row */}
       <div
@@ -220,8 +205,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             placeholder="e.g. Muhammad"
             {...register("firstName")}
             onChange={(e) => {
+              e.target.value = sanitizeNameLive(e.target.value);
+              register("firstName").onChange(e);
+            }}
+            onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("firstName").onChange(e);
+              register("firstName").onBlur(e);
             }}
           />
         </Field>
@@ -235,8 +225,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             placeholder="e.g. Al-Rashidi"
             {...register("lastName")}
             onChange={(e) => {
+              e.target.value = sanitizeNameLive(e.target.value);
+              register("lastName").onChange(e);
+            }}
+            onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("lastName").onChange(e);
+              register("lastName").onBlur(e);
             }}
           />
         </Field>
@@ -250,8 +245,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             placeholder="e.g. Senior Operations Manager"
             {...register("headline")}
             onChange={(e) => {
+              e.target.value = sanitizeJobTitleLive(e.target.value);
+              register("headline").onChange(e);
+            }}
+            onBlur={(e) => {
               e.target.value = sanitizeJobTitle(e.target.value);
               register("headline").onChange(e);
+              register("headline").onBlur(e);
             }}
           />
         </Field>
@@ -262,8 +262,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("location")}
             onChange={(e) => {
+              e.target.value = sanitizeLocationLive(e.target.value);
+              register("location").onChange(e);
+            }}
+            onBlur={(e) => {
               e.target.value = sanitizeLocation(e.target.value);
               register("location").onChange(e);
+              register("location").onBlur(e);
             }}
           />
         </Field>
@@ -274,8 +279,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("phone")}
             onChange={(e) => {
+              e.target.value = sanitizePhoneLive(e.target.value);
+              register("phone").onChange(e);
+            }}
+            onBlur={(e) => {
               e.target.value = sanitizePhone(e.target.value);
               register("phone").onChange(e);
+              register("phone").onBlur(e);
             }}
           />
         </Field>
@@ -483,8 +493,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
                 placeholder="e.g. Emirati, Pakistani, Indian"
                 {...register("nationality")}
                 onChange={(e) => {
+                  e.target.value = sanitizeNameLive(e.target.value);
+                  register("nationality").onChange(e);
+                }}
+                onBlur={(e) => {
                   e.target.value = sanitizeName(e.target.value);
                   register("nationality").onChange(e);
+                  register("nationality").onBlur(e);
                 }}
               />
             </Field>
@@ -494,8 +509,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
                 placeholder="e.g. United Arab Emirates"
                 {...register("country")}
                 onChange={(e) => {
+                  e.target.value = sanitizeLocationLive(e.target.value);
+                  register("country").onChange(e);
+                }}
+                onBlur={(e) => {
                   e.target.value = sanitizeLocation(e.target.value);
                   register("country").onChange(e);
+                  register("country").onBlur(e);
                 }}
               />
             </Field>

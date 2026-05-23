@@ -1,7 +1,7 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans, Poppins } from "next/font/google";
 
 const sora = localFont({
   src: [
@@ -32,6 +32,14 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   display: "swap",
   weight: ["500", "600", "700", "800"],
+});
+
+// Brand wordmark font — Poppins, per the May 2026 brand handoff.
+const poppins = Poppins({
+  subsets: ["latin"],
+  variable: "--font-poppins",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -96,12 +104,28 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon-16x16.png",
-    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   manifest: "/site.webmanifest",
+  appleWebApp: {
+    title: "makemycv",
+    capable: true,
+    statusBarStyle: "default",
+  },
   category: "productivity",
+};
+
+// Next.js 14+ recommends a separate viewport export for themeColor.
+export const viewport: Viewport = {
+  themeColor: "#1B2A4A",
 };
 
 export default function RootLayout({
@@ -112,10 +136,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable}`}
+      className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} ${poppins.variable}`}
     >
       <body
-        className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} antialiased`}
+        className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} ${poppins.variable} antialiased`}
       >
         <script
           type="application/ld+json"

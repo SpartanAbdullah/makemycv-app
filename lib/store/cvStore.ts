@@ -108,6 +108,7 @@ export const defaultCvData: CvData = {
     templateId: "classic",
     accentColor: "#1e5b54",
     fontScale: 1,
+    fontFamily: "sans",
     sectionOrder: [
       "summary",
       "experience",

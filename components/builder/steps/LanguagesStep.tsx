@@ -8,12 +8,87 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
-import { sanitizeLanguageName } from "../../../lib/sanitize";
+import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
 import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import type { CvLanguage, LanguageLevel } from "../../../lib/types/cv";
 
 type LanguagesForm = { languages: CvLanguage[] };
+
+/* ── Suggested-language chips (UAE-relevant) ───────────────────────────── */
+
+const COMMON_LANGUAGES = [
+  "English",
+  "Arabic",
+  "Urdu",
+  "Hindi",
+  "Tagalog",
+  "Malayalam",
+  "Tamil",
+  "French",
+  "Russian",
+];
+
+const SuggestionChips = ({
+  current,
+  onAdd,
+}: {
+  current: string[];
+  onAdd: (name: string) => void;
+}) => {
+  const taken = new Set(current.map((n) => n.trim().toLowerCase()));
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "var(--ff-muted)",
+          textTransform: "uppercase",
+          marginBottom: 8,
+        }}
+      >
+        Quick add
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {COMMON_LANGUAGES.map((lang) => {
+          const isAdded = taken.has(lang.toLowerCase());
+          return (
+            <button
+              key={lang}
+              type="button"
+              onClick={() => {
+                if (!isAdded) onAdd(lang);
+              }}
+              disabled={isAdded}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 12,
+                padding: "5px 12px",
+                borderRadius: 999,
+                border: isAdded
+                  ? "1px solid var(--ff-accent-soft)"
+                  : "1px solid var(--ff-line)",
+                background: isAdded ? "var(--ff-accent-soft)" : "white",
+                color: isAdded ? "var(--ff-accent-dark)" : "var(--ff-ink)",
+                cursor: isAdded ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                transition: "border-color 120ms, background 120ms",
+                opacity: isAdded ? 0.75 : 1,
+              }}
+            >
+              {isAdded ? "✓ " : "+ "}
+              {lang}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 /* ── Custom proficiency dropdown ── */
 
@@ -186,22 +261,20 @@ export const LanguagesStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      <div className="cv-step-badge">
-        <UAEDot size={13} />
-        STEP 06 · LANGUAGES
-      </div>
-      <div>
-        <h1 className="cv-step-heading" style={{ fontSize: 34, marginTop: 8 }}>
-          Which languages do you speak?
-        </h1>
-        <p className="cv-step-subtitle">
-          Arabic and English are reliably searched. Use clear labels — Native,
-          Fluent, Professional — not numeric bands.
-        </p>
-      </div>
-
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Suggested languages — common in the UAE labour market */}
+          <SuggestionChips
+            current={fields.map((f) => f.name)}
+            onAdd={(name) =>
+              append({
+                id: crypto.randomUUID(),
+                name,
+                level: "conversational",
+              })
+            }
+          />
+
           <button
             type="button"
             onClick={() =>
@@ -225,8 +298,13 @@ export const LanguagesStep = ({
                   placeholder="e.g. Arabic"
                   {...register(`languages.${index}.name`)}
                   onChange={(e) => {
+                    e.target.value = sanitizeLanguageNameLive(e.target.value);
+                    register(`languages.${index}.name`).onChange(e);
+                  }}
+                  onBlur={(e) => {
                     e.target.value = sanitizeLanguageName(e.target.value);
                     register(`languages.${index}.name`).onChange(e);
+                    register(`languages.${index}.name`).onBlur(e);
                   }}
                 />
               </Field>
