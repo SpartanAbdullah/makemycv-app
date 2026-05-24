@@ -296,63 +296,59 @@ const PreviewDrawer = ({
         zIndex: 5,
       }}
     >
-      {/* Drawer header */}
+      {/* Drawer body — scrollable CV render area (fills the drawer top-to-footer
+          so users see as much of their CV as possible while editing). */}
+      <DrawerPreviewBody />
+
+      {/* Floating template-cycle pill — overlaid on the top-right of the
+          preview so navigation stays accessible without stealing vertical
+          space from the CV render. */}
       <div
         style={{
-          padding: "14px 20px",
-          borderBottom: "1px solid var(--ff-line)",
+          position: "absolute",
+          top: 12,
+          right: 12,
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          flexShrink: 0,
+          gap: 4,
+          padding: "4px 6px 4px 10px",
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(6px)",
+          border: "1px solid var(--ff-line)",
+          borderRadius: 999,
+          boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
+          zIndex: 6,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 16,
-              color: "var(--ff-ink)",
-              fontWeight: 600,
-            }}
-          >
-            Live preview
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--ff-muted)",
-              letterSpacing: "0.06em",
-              marginTop: 2,
-              textTransform: "uppercase",
-            }}
-          >
-            {template.name} · A4 · auto-fit
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button
-            type="button"
-            onClick={onPrevTemplate}
-            aria-label="Previous template"
-            style={drawerChevronBtn}
-          >
-            <Icon name="chevron-left" size={13} color="var(--ff-muted)" />
-          </button>
-          <button
-            type="button"
-            onClick={onNextTemplate}
-            aria-label="Next template"
-            style={drawerChevronBtn}
-          >
-            <Icon name="chevron-right" size={13} color="var(--ff-muted)" />
-          </button>
-        </div>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9.5,
+            color: "var(--ff-muted)",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            marginRight: 4,
+          }}
+        >
+          {template.name}
+        </span>
+        <button
+          type="button"
+          onClick={onPrevTemplate}
+          aria-label="Previous template"
+          style={drawerChevronBtn}
+        >
+          <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
+        </button>
+        <button
+          type="button"
+          onClick={onNextTemplate}
+          aria-label="Next template"
+          style={drawerChevronBtn}
+        >
+          <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
+        </button>
       </div>
-
-      {/* Drawer body — scrollable CV render area */}
-      <DrawerPreviewBody />
 
       {/* Drawer footer */}
       <div
