@@ -568,13 +568,22 @@ const MobilePreviewView = () => {
   );
 };
 
-/* ─── Mobile Edit | Preview toggle (xl-) ─────────────────────
+/* ─── Mobile Edit | Preview toggle (below the desktop breakpoint) ──
  *
  * Replaces the old floating "Preview CV" pill. A clear segmented control:
  * one tap to switch between editing the form and previewing the scaled CV.
  * Fixed at the bottom of the viewport so it stays reachable while scrolling
- * either view. Hidden on xl+ via Tailwind (side-by-side layout is used
- * there — no toggle needed). */
+ * either view.
+ *
+ * Visibility: `inline-flex xl:hidden` — at the desktop breakpoint (xl,
+ * 1280 px, the same line where the side-by-side preview turns on) the
+ * `xl:hidden` rule sets `display: none` and the toggle drops out.
+ *
+ * CRITICAL: `display` MUST live on the className, not in the inline `style`
+ * prop. Inline styles win over Tailwind's media-queried rules (Tailwind
+ * utilities are not `!important` by default), so an inline `display:
+ * inline-flex` would silently override `xl:hidden` and keep the toggle
+ * visible on desktop — which was the original bug. Don't reintroduce it. */
 const MobileViewToggle = ({
   value,
   onChange,
@@ -583,7 +592,7 @@ const MobileViewToggle = ({
   onChange: (next: "edit" | "preview") => void;
 }) => (
   <div
-    className="xl:hidden"
+    className="inline-flex xl:hidden"
     role="tablist"
     aria-label="Switch between editing and previewing your CV"
     style={{
@@ -592,7 +601,6 @@ const MobileViewToggle = ({
       bottom: 20,
       transform: "translateX(-50%)",
       zIndex: 50,
-      display: "inline-flex",
       padding: 4,
       background: "var(--ff-ink)",
       borderRadius: 999,

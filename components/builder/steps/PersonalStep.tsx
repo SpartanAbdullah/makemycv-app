@@ -155,17 +155,23 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       </div>
 
       {/*
-        Mobile-only reorder: on viewports below `md` (Tailwind 768px), the
-        identity fields render ABOVE the photo + tip card so the primary task
-        (filling your name + contact) is what the user sees first. On md+ the
-        original DOM order is restored, so the desktop layout is unchanged.
+        Mobile reorder: below the desktop breakpoint (Tailwind `xl` = 1280 px,
+        same line at which the side-by-side preview turns on in BuilderShell),
+        the identity fields render ABOVE the photo + tip card so the primary
+        task (filling your name + contact) is what the user sees first. On
+        xl+ the original DOM order is restored — desktop layout is unchanged.
 
-        `flex-col-reverse` reverses the visual order of the two children below
-        without touching the DOM order; `md:flex-col` flips back at md and up.
-        Pure Tailwind, zero JS, SSR-safe.
+        The breakpoint MUST stay synchronised with BuilderShell's "desktop
+        line" (xl = 1280 px) — the toggle, the mobile preview view, and this
+        form reorder all switch together at that boundary so there's no
+        viewport band where the chrome is in mixed-mode.
+
+        `flex-col-reverse` reverses the visual order of the two children
+        below without touching the DOM order; `xl:flex-col` flips back at
+        xl and up. Pure Tailwind, zero JS, SSR-safe.
       */}
       <div
-        className="flex flex-col-reverse md:flex-col"
+        className="flex flex-col-reverse xl:flex-col"
         style={{ gap: 22 }}
       >
         {/* Photo + Today's Tip side-by-side (renders SECOND on mobile) */}
