@@ -296,61 +296,14 @@ const PreviewDrawer = ({
         zIndex: 5,
       }}
     >
-      {/* Drawer body — scrollable CV render area (fills the drawer top-to-footer
-          so users see as much of their CV as possible while editing). */}
+      {/* Drawer body — scrollable CV render area. Fills the drawer top-to-footer
+          so users see as much of their CV as possible while editing. The body
+          itself clips ~28px off the rendered CV's top so the template's own
+          page padding doesn't waste vertical space in the preview (the actual
+          exported PDF still keeps the full margin). */}
       <DrawerPreviewBody />
 
-      {/* Floating template-cycle pill — overlaid on the top-right of the
-          preview so navigation stays accessible without stealing vertical
-          space from the CV render. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          padding: "4px 6px 4px 10px",
-          background: "rgba(255,255,255,0.92)",
-          backdropFilter: "blur(6px)",
-          border: "1px solid var(--ff-line)",
-          borderRadius: 999,
-          boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
-          zIndex: 6,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 9.5,
-            color: "var(--ff-muted)",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            marginRight: 4,
-          }}
-        >
-          {template.name}
-        </span>
-        <button
-          type="button"
-          onClick={onPrevTemplate}
-          aria-label="Previous template"
-          style={drawerChevronBtn}
-        >
-          <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
-        </button>
-        <button
-          type="button"
-          onClick={onNextTemplate}
-          aria-label="Next template"
-          style={drawerChevronBtn}
-        >
-          <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
-        </button>
-      </div>
-
-      {/* Drawer footer */}
+      {/* Drawer footer — template cycler + action buttons. */}
       <div
         style={{
           padding: 12,
@@ -358,8 +311,52 @@ const PreviewDrawer = ({
           display: "flex",
           gap: 8,
           flexShrink: 0,
+          alignItems: "center",
         }}
       >
+        {/* Template cycler */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "3px 4px 3px 10px",
+            background: "var(--ff-paper)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 999,
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginRight: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {template.name}
+          </span>
+          <button
+            type="button"
+            onClick={onPrevTemplate}
+            aria-label="Previous template"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
+          </button>
+          <button
+            type="button"
+            onClick={onNextTemplate}
+            aria-label="Next template"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
+          </button>
+        </div>
         <button
           type="button"
           onClick={onFullscreen}
@@ -376,7 +373,7 @@ const PreviewDrawer = ({
             fontWeight: 500,
           }}
         >
-          Open fullscreen
+          Fullscreen
         </button>
         <button
           type="button"
@@ -443,6 +440,12 @@ const DrawerPreviewBody = () => {
     return () => ro.disconnect();
   }, []);
 
+  // Crop a small strip off the top of the rendered CV so the template's own
+  // page padding (e.g. Classic's py-12) doesn't waste vertical space in the
+  // preview. The exported PDF still keeps the full margin — this is preview-
+  // only cosmetics.
+  const TOP_CROP = 28;
+
   return (
     <div
       ref={wrapRef}
@@ -457,7 +460,7 @@ const DrawerPreviewBody = () => {
       <div
         style={{
           width: "100%",
-          height: contentHeight * scale,
+          height: Math.max(0, contentHeight * scale - TOP_CROP),
           position: "relative",
         }}
       >
@@ -465,7 +468,7 @@ const DrawerPreviewBody = () => {
           ref={contentRef}
           style={{
             position: "absolute",
-            top: 0,
+            top: -TOP_CROP,
             left: 0,
             width: A4_W,
             transformOrigin: "top left",
@@ -938,7 +941,10 @@ export const BuilderShell = ({
               margin-right: calc(var(--drawer-w) + var(--drawer-gap) + 28px);
             }
             .ff-form-column-review {
-              max-width: 1180px;
+              /* Review step has no preview drawer, so it can use the whole
+                 page width — capped so the 3-column grid (hero | templates |
+                 customize) has enough room on wide displays. */
+              max-width: clamp(1180px, 96vw, 1640px);
               margin-right: 0;
               padding: 28px 40px 28px 40px;
             }

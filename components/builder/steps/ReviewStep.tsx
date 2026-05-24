@@ -232,10 +232,14 @@ export const ReviewStep = ({
       style={{ display: "flex", flexDirection: "column", gap: 24 }}
       className="ff-review-root"
     >
-      {/* Two-column grid: left = hero + score + actions; right = templates */}
+      {/* Responsive grid (1 / 2 / 3 columns) — see <style> at the bottom of
+          this component. Areas: hero | templates | customize. */}
       <div className="ff-review-grid">
-        {/* ── Left ───────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        {/* ── Left: hero + score + actions ───────────────── */}
+        <div
+          className="ff-review-hero"
+          style={{ display: "flex", flexDirection: "column", gap: 22 }}
+        >
           <div>
             <h1
               className="cv-step-heading"
@@ -640,16 +644,16 @@ export const ReviewStep = ({
           )}
         </div>
 
-        {/* ── Right: customize panel + templates ───────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <CustomizePanel />
-
+        {/* ── Middle: choose a template ─────────────────────── */}
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          className="ff-review-templates"
+        >
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: 14,
               gap: 12,
               flexWrap: "wrap",
             }}
@@ -747,6 +751,11 @@ export const ReviewStep = ({
               })}
           </div>
         </div>
+
+        {/* ── Right: customize panel ────────────────────────── */}
+        <div className="ff-review-customize">
+          <CustomizePanel />
+        </div>
       </div>
 
       {/* Back nav */}
@@ -786,20 +795,48 @@ export const ReviewStep = ({
       />
 
       <style>{`
+        /* Stacked on mobile: hero → templates → customize. */
         .ff-review-grid {
           display: grid;
           grid-template-columns: 1fr;
+          grid-template-areas: "hero" "templates" "customize";
           gap: 28px;
         }
+        .ff-review-hero      { grid-area: hero; }
+        .ff-review-templates { grid-area: templates; }
+        .ff-review-customize { grid-area: customize; }
+
+        /* 2 columns at 1200px+: hero | templates, with customize beneath
+           templates (still in the right rail). */
         @media (min-width: 1200px) {
-          .ff-review-grid { grid-template-columns: 1fr 1.3fr; gap: 32px; }
+          .ff-review-grid {
+            grid-template-columns: 1fr 1.4fr;
+            grid-template-areas:
+              "hero templates"
+              "hero customize";
+            gap: 28px 32px;
+          }
         }
+
+        /* 3 columns at 1500px+: hero | templates | customize. Fills the empty
+           right rail on wide displays. */
+        @media (min-width: 1500px) {
+          .ff-review-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+            grid-template-areas: "hero templates customize";
+            gap: 32px;
+          }
+        }
+
         .ff-templates-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 14px;
         }
-        @media (min-width: 880px) {
+        /* On the 3-col layout the templates column is narrower — keep it
+           2-up there, expand to 3-up only on the 2-col layout where the
+           templates rail is wider. */
+        @media (min-width: 880px) and (max-width: 1499px) {
           .ff-templates-grid { grid-template-columns: 1fr 1fr 1fr; }
         }
       `}</style>
