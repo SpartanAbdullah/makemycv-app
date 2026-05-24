@@ -111,25 +111,14 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
 
-      {/* Import row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 10,
-        }}
-      >
-        <ImportButton
-          icon="upload"
-          label="Import existing CV (PDF / DOCX)"
-          onClick={() => handleImport("pdf")}
-        />
-        <ImportButton
-          icon="linkedin"
-          label="Import from LinkedIn"
-          onClick={() => handleImport("linkedin")}
-        />
-      </div>
+      {/* Import row — PDF/DOCX is the only working source, so it takes the
+          full-width primary slot. LinkedIn paste-import was a dead placeholder
+          (see git history for removal). */}
+      <ImportButton
+        icon="upload"
+        label="Import existing CV (PDF / DOCX)"
+        onClick={() => handleImport("pdf")}
+      />
 
       {/* OR divider */}
       <div

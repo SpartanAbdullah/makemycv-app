@@ -12,10 +12,8 @@ import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import { MappingReview } from "../import/MappingReview";
-import { LinkedInImportModal } from "../import/LinkedInImportModal";
 import { pdfAdapter } from "../../lib/importers/pdfAdapter";
 import { docxAdapter } from "../../lib/importers/docxAdapter";
-import { linkedinAdapter } from "../../lib/importers/linkedinAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type { CvData } from "../../lib/types/cv";
 import { UpgradeModal } from "../modals/UpgradeModal";
@@ -29,7 +27,7 @@ import dynamic from "next/dynamic";
 
 const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
 
-type ImportType = "pdf" | "docx" | "linkedin";
+type ImportType = "pdf" | "docx";
 
 type ImportContextValue = {
   handleImport: (type: ImportType) => void;
@@ -46,8 +44,7 @@ export const useImport = () => {
 type ImportState =
   | { phase: "idle" }
   | { phase: "parsing"; source: string }
-  | { phase: "review"; source: string; parsed: ParsedDocument }
-  | { phase: "linkedin-input" };
+  | { phase: "review"; source: string; parsed: ParsedDocument };
 
 /* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
 const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
@@ -788,11 +785,6 @@ export const BuilderShell = ({
   };
 
   const handleImport = async (type: ImportType) => {
-    if (type === "linkedin") {
-      setImportState({ phase: "linkedin-input" });
-      return;
-    }
-
     const accept =
       type === "pdf"
         ? ".pdf,application/pdf"
@@ -812,19 +804,6 @@ export const BuilderShell = ({
         );
       }
     });
-  };
-
-  const handleLinkedInSubmit = async (text: string) => {
-    setImportState({ phase: "parsing", source: "LinkedIn" });
-    try {
-      const parsed = await linkedinAdapter.parse(text);
-      setImportState({ phase: "review", source: "LinkedIn", parsed });
-    } catch {
-      setImportState({ phase: "idle" });
-      setErrorMsg(
-        "Could not parse LinkedIn profile text. Please paste the full profile text.",
-      );
-    }
   };
 
   const handleImportConfirm = (
@@ -1075,13 +1054,6 @@ export const BuilderShell = ({
               </p>
             </div>
           </div>
-        )}
-
-        {importState.phase === "linkedin-input" && (
-          <LinkedInImportModal
-            onSubmit={handleLinkedInSubmit}
-            onCancel={() => setImportState({ phase: "idle" })}
-          />
         )}
 
         {importState.phase === "review" && (

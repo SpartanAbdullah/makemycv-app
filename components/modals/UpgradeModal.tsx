@@ -2,6 +2,13 @@
 
 import { useEffect } from "react";
 
+/**
+ * Pro unlock price (USD). One-time payment, never a subscription, not
+ * per-download. Update this single constant when the final figure is set.
+ * Keep formatting (`$X`) consistent with the surrounding copy.
+ */
+export const PRO_PRICE_USD = 5;
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -96,12 +103,13 @@ export const UpgradeModal = ({ open, onClose }: Props) => {
 
         {/* Benefits */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-          <BenefitRow text="Clean PDF download — no watermark" />
-          <BenefitRow text="All 4 professional templates" />
-          <BenefitRow text="ATS-optimized formats included" />
+          <BenefitRow text="Clean PDF downloads — no watermark" />
+          <BenefitRow text="All 6 professional templates" />
+          <BenefitRow text="ATS-optimised formats included" />
+          <BenefitRow text="Unlimited edits and re-downloads" />
         </div>
 
-        {/* Pricing */}
+        {/* Pricing — one-time unlock, never per-download, never recurring. */}
         <div style={{
           textAlign: "center",
           padding: "16px 0",
@@ -110,10 +118,13 @@ export const UpgradeModal = ({ open, onClose }: Props) => {
           marginBottom: 20,
         }}>
           <p style={{ fontSize: 32, fontWeight: 800, color: "#0F172A", margin: 0 }}>
-            $5 <span style={{ fontSize: 14, fontWeight: 500, color: "#64748B" }}>per download</span>
+            ${PRO_PRICE_USD}{" "}
+            <span style={{ fontSize: 14, fontWeight: 500, color: "#64748B" }}>
+              one-time
+            </span>
           </p>
           <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>
-            One-time payment. No subscription.
+            Pay once, unlock Pro forever. No subscription, no per-download fees.
           </p>
         </div>
 
