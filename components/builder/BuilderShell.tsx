@@ -483,6 +483,160 @@ const DrawerPreviewBody = () => {
   );
 };
 
+/* ─── Mobile preview view (xl-) ─────────────────────────────
+ *
+ * Used when the mobile Edit | Preview toggle is set to "preview".
+ * Renders the SAME A4 template as the desktop drawer, scaled via CSS
+ * `transform: scale()` to fit the viewport width — so the preview matches
+ * what the printed PDF will look like (NOT a reflowed mobile layout).
+ *
+ * Sizing is measured client-side in useEffect (ResizeObserver), with a
+ * safe SSR default of scale=0.45 so the first paint never mismatches the
+ * server-rendered HTML. */
+const MobilePreviewView = () => {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.45);
+  const [contentHeight, setContentHeight] = useState(1123);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / A4_W);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const update = () => {
+      const h = el.scrollHeight;
+      if (h > 0) setContentHeight(h);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+        overflowX: "hidden",
+        background: "var(--ff-sunken, #F1F2F0)",
+        // Leave room at the bottom for the floating Edit|Preview toggle.
+        padding: "16px 16px 96px",
+      }}
+    >
+      <div
+        ref={wrapRef}
+        style={{
+          width: "100%",
+          background: "white",
+          boxShadow: "0 10px 30px rgba(11,15,12,0.10)",
+          borderRadius: 6,
+          overflow: "hidden",
+          position: "relative",
+          height: contentHeight * scale,
+          flexShrink: 0,
+        }}
+      >
+        <div
+          ref={contentRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: A4_W,
+            transformOrigin: "top left",
+            transform: `scale(${scale})`,
+            background: "white",
+          }}
+        >
+          <PreviewPanel sticky={false} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Mobile Edit | Preview toggle (xl-) ─────────────────────
+ *
+ * Replaces the old floating "Preview CV" pill. A clear segmented control:
+ * one tap to switch between editing the form and previewing the scaled CV.
+ * Fixed at the bottom of the viewport so it stays reachable while scrolling
+ * either view. Hidden on xl+ via Tailwind (side-by-side layout is used
+ * there — no toggle needed). */
+const MobileViewToggle = ({
+  value,
+  onChange,
+}: {
+  value: "edit" | "preview";
+  onChange: (next: "edit" | "preview") => void;
+}) => (
+  <div
+    className="xl:hidden"
+    role="tablist"
+    aria-label="Switch between editing and previewing your CV"
+    style={{
+      position: "fixed",
+      left: "50%",
+      bottom: 20,
+      transform: "translateX(-50%)",
+      zIndex: 50,
+      display: "inline-flex",
+      padding: 4,
+      background: "var(--ff-ink)",
+      borderRadius: 999,
+      boxShadow: "0 14px 30px rgba(11,15,12,0.30)",
+      gap: 2,
+    }}
+  >
+    {(["edit", "preview"] as const).map((v) => {
+      const active = v === value;
+      return (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          onClick={() => onChange(v)}
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            fontWeight: 600,
+            padding: "8px 18px",
+            borderRadius: 999,
+            border: "none",
+            background: active ? "white" : "transparent",
+            color: active ? "var(--ff-ink)" : "rgba(255,255,255,0.78)",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            textTransform: "capitalize",
+            transition: "background 120ms, color 120ms",
+          }}
+        >
+          <Icon name={v === "edit" ? "edit" : "eye"} size={13} />
+          {v === "edit" ? "Edit" : "Preview"}
+        </button>
+      );
+    })}
+  </div>
+);
+
 const drawerChevronBtn: React.CSSProperties = {
   width: 28,
   height: 28,
@@ -521,6 +675,27 @@ export const BuilderShell = ({
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
+  // which is also what the server renders — keeps SSR hydration safe.
+  // Desktop (xl+) ignores this state entirely: the side-by-side layout is
+  // applied via CSS (Tailwind responsive utilities) so this never affects
+  // the desktop UI even if the value is "preview".
+  const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
+
+  // If the viewport grows to xl+ (e.g. user rotates a tablet), reset to
+  // "edit" so the mobile-only preview view is not left dangling in memory.
+  // Client-only via useEffect — no window access at render time.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const onChange = () => {
+      if (mq.matches) setMobileView("edit");
+    };
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     bindCvStorage();
@@ -769,39 +944,64 @@ export const BuilderShell = ({
             overflow: "hidden",
           }}
         >
-          <main
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              minWidth: 0,
-              overflowY: "auto",
-              overflowX: "hidden",
-            }}
+          {/*
+            On mobile, when the Edit | Preview toggle is set to "preview" we
+            hide the form so the scaled preview can take the full viewport.
+            On xl+ the form is always visible (desktop side-by-side layout).
+            `display: contents` keeps <main> a direct flex child of MAIN AREA
+            for layout purposes — the wrapper has no box of its own.
+          */}
+          <div
+            className={
+              mobileView === "preview" && !stepIsReview && !stepIsScore
+                ? "hidden xl:contents"
+                : "contents"
+            }
           >
-            {!hydrated && (
-              <div
-                style={{
-                  padding: "28px 36px",
-                  fontSize: 14,
-                  color: "var(--ff-faint)",
-                }}
-              >
-                Loading your saved CV...
-              </div>
-            )}
-
-            {/* Form column — anchored left on xl+, full-width on smaller */}
-            <div
-              className={
-                stepIsReview || stepIsScore
-                  ? "ff-form-column ff-form-column-review"
-                  : "ff-form-column"
-              }
+            <main
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                minWidth: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
             >
-              {children}
+              {!hydrated && (
+                <div
+                  style={{
+                    padding: "28px 36px",
+                    fontSize: 14,
+                    color: "var(--ff-faint)",
+                  }}
+                >
+                  Loading your saved CV...
+                </div>
+              )}
+
+              {/* Form column — anchored left on xl+, full-width on smaller */}
+              <div
+                className={
+                  stepIsReview || stepIsScore
+                    ? "ff-form-column ff-form-column-review"
+                    : "ff-form-column"
+                }
+              >
+                {children}
+              </div>
+            </main>
+          </div>
+
+          {/* Mobile preview view (xl-) — scaled A4 CV that matches the export.
+              Only mounted when toggled on, AND only on steps that have a
+              preview at all (not review/score, which have their own layouts).
+              `xl:hidden` ensures desktop never shows it. */}
+          {mobileView === "preview" && !stepIsReview && !stepIsScore && (
+            <div className="contents xl:hidden">
+              <MobilePreviewView />
             </div>
-          </main>
+          )}
 
           {/* Preview drawer — xl+ only, hidden on review/score steps */}
           {!stepIsReview && !stepIsScore && (
@@ -818,35 +1018,10 @@ export const BuilderShell = ({
           )}
         </div>
 
-        {/* Floating "Preview CV" pill — lg and below */}
+        {/* Mobile Edit | Preview toggle — replaces the old floating pill.
+            Hidden on xl+ via Tailwind (side-by-side handles desktop). */}
         {!stepIsReview && !stepIsScore && (
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(true)}
-            className="xl:hidden"
-            style={{
-              position: "fixed",
-              right: 20,
-              bottom: 20,
-              zIndex: 50,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "12px 20px",
-              background: "var(--ff-ink)",
-              color: "white",
-              border: "none",
-              borderRadius: 999,
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              fontWeight: 600,
-              boxShadow: "0 14px 30px rgba(11,15,12,0.20)",
-              cursor: "pointer",
-            }}
-          >
-            <Icon name="eye" size={14} />
-            Preview CV
-          </button>
+          <MobileViewToggle value={mobileView} onChange={setMobileView} />
         )}
 
         {/* Dev AI reset (dev-only) */}

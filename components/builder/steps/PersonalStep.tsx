@@ -165,36 +165,50 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
         </span>
       </div>
 
-      {/* Photo + Today's Tip side-by-side */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.1fr 1fr",
-          gap: 12,
-        }}
-        className="ff-photo-tip-grid"
-      >
-        <PhotoUpload
-          photo={personal.photo}
-          showPhoto={personal.showPhoto}
-          photoShape={photoShape}
-          onPhotoChange={handlePhotoChange}
-          onToggleChange={handleToggleChange}
-          onShapeChange={setPhotoShape}
-          initials={initials}
-        />
-        <TodaysTipCard stepId="personal" />
-      </div>
+      {/*
+        Mobile-only reorder: on viewports below `md` (Tailwind 768px), the
+        identity fields render ABOVE the photo + tip card so the primary task
+        (filling your name + contact) is what the user sees first. On md+ the
+        original DOM order is restored, so the desktop layout is unchanged.
 
-      {/* Core fields grid */}
+        `flex-col-reverse` reverses the visual order of the two children below
+        without touching the DOM order; `md:flex-col` flips back at md and up.
+        Pure Tailwind, zero JS, SSR-safe.
+      */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 14,
-        }}
-        className="ff-core-fields"
+        className="flex flex-col-reverse md:flex-col"
+        style={{ gap: 22 }}
       >
+        {/* Photo + Today's Tip side-by-side (renders SECOND on mobile) */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.1fr 1fr",
+            gap: 12,
+          }}
+          className="ff-photo-tip-grid"
+        >
+          <PhotoUpload
+            photo={personal.photo}
+            showPhoto={personal.showPhoto}
+            photoShape={photoShape}
+            onPhotoChange={handlePhotoChange}
+            onToggleChange={handleToggleChange}
+            onShapeChange={setPhotoShape}
+            initials={initials}
+          />
+          <TodaysTipCard stepId="personal" />
+        </div>
+
+        {/* Core fields grid (renders FIRST on mobile) */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 14,
+          }}
+          className="ff-core-fields"
+        >
         <Field
           label="First name"
           required
@@ -311,6 +325,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           />
           <FieldError message={fieldErrors.email ?? null} />
         </Field>
+        </div>
       </div>
 
       {/* UAE Essentials block */}
