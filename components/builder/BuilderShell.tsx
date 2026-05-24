@@ -440,11 +440,11 @@ const DrawerPreviewBody = () => {
     return () => ro.disconnect();
   }, []);
 
-  // Crop a small strip off the top of the rendered CV so the template's own
-  // page padding (e.g. Classic's py-12) doesn't waste vertical space in the
-  // preview. The exported PDF still keeps the full margin — this is preview-
-  // only cosmetics.
-  const TOP_CROP = 28;
+  // The live preview must be faithful to what will be exported — so we render
+  // the CV in full, including each template's own page padding. (Earlier we
+  // tried clipping the top to save vertical space, but that broke full-bleed
+  // sidebar templates like Executive: the sidebar/headers ended up flush
+  // against the top edge with no margin and looked unfinished.)
 
   return (
     <div
@@ -460,7 +460,7 @@ const DrawerPreviewBody = () => {
       <div
         style={{
           width: "100%",
-          height: Math.max(0, contentHeight * scale - TOP_CROP),
+          height: contentHeight * scale,
           position: "relative",
         }}
       >
@@ -468,7 +468,7 @@ const DrawerPreviewBody = () => {
           ref={contentRef}
           style={{
             position: "absolute",
-            top: -TOP_CROP,
+            top: 0,
             left: 0,
             width: A4_W,
             transformOrigin: "top left",
