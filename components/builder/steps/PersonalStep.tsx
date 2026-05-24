@@ -155,47 +155,18 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       </div>
 
       {/*
-        Mobile reorder: below the desktop breakpoint (Tailwind `xl` = 1280 px,
-        same line at which the side-by-side preview turns on in BuilderShell),
-        the identity fields render ABOVE the photo + tip card so the primary
-        task (filling your name + contact) is what the user sees first. On
-        xl+ the original DOM order is restored — desktop layout is unchanged.
-
-        The breakpoint MUST stay synchronised with BuilderShell's "desktop
-        line" (xl = 1280 px) — the toggle, the mobile preview view, and this
-        form reorder all switch together at that boundary so there's no
-        viewport band where the chrome is in mixed-mode.
-
-        `flex-col-reverse` reverses the visual order of the two children
-        below without touching the DOM order; `xl:flex-col` flips back at
-        xl and up. Pure Tailwind, zero JS, SSR-safe.
+        Core contact fields render BEFORE the photo + tip card at every
+        viewport — the required action (name, headline, phone, email) is the
+        primary task; the optional photo and the rotating tip are supporting
+        material that follows. Previously this wrapper used
+        `flex-col-reverse xl:flex-col` to keep desktop in the old DOM order,
+        which left the bug: on desktop the photo + tip card sat above the
+        contact fields. Fix is the physically reorder the DOM children so
+        order is consistent at all widths; the responsive flex-reverse is
+        gone and no breakpoint needs to stay in sync.
       */}
-      <div
-        className="flex flex-col-reverse xl:flex-col"
-        style={{ gap: 22 }}
-      >
-        {/* Photo + Today's Tip side-by-side (renders SECOND on mobile) */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.1fr 1fr",
-            gap: 12,
-          }}
-          className="ff-photo-tip-grid"
-        >
-          <PhotoUpload
-            photo={personal.photo}
-            showPhoto={personal.showPhoto}
-            photoShape={photoShape}
-            onPhotoChange={handlePhotoChange}
-            onToggleChange={handleToggleChange}
-            onShapeChange={setPhotoShape}
-            initials={initials}
-          />
-          <TodaysTipCard stepId="personal" />
-        </div>
-
-        {/* Core fields grid (renders FIRST on mobile) */}
+      <div className="flex flex-col" style={{ gap: 22 }}>
+        {/* Core fields grid — primary, ALWAYS first */}
         <div
           style={{
             display: "grid",
@@ -320,6 +291,27 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           />
           <FieldError message={fieldErrors.email ?? null} />
         </Field>
+        </div>
+
+        {/* Photo + Today's Tip side-by-side — supporting material, ALWAYS after the core fields */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.1fr 1fr",
+            gap: 12,
+          }}
+          className="ff-photo-tip-grid"
+        >
+          <PhotoUpload
+            photo={personal.photo}
+            showPhoto={personal.showPhoto}
+            photoShape={photoShape}
+            onPhotoChange={handlePhotoChange}
+            onToggleChange={handleToggleChange}
+            onShapeChange={setPhotoShape}
+            initials={initials}
+          />
+          <TodaysTipCard stepId="personal" />
         </div>
       </div>
 
