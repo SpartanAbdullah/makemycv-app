@@ -16,17 +16,14 @@ import { pdfAdapter } from "../../lib/importers/pdfAdapter";
 import { docxAdapter } from "../../lib/importers/docxAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type { CvData } from "../../lib/types/cv";
-import { UpgradeModal } from "../modals/UpgradeModal";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
-import dynamic from "next/dynamic";
-
-const DevResetAI = dynamic(() => import("../DevResetAI"), { ssr: false });
-
+import { TipJarModal } from "../TipJarModal";
+import { SUPPORT_URL } from "../../lib/config/support";
 type ImportType = "pdf" | "docx";
 
 type ImportContextValue = {
@@ -668,18 +665,15 @@ export const BuilderShell = ({
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
-  const isPro = useCvStore((state) => state.isPro);
-  const hasUsedFreeDownload = useCvStore((state) => state.hasUsedFreeDownload);
-  const setHasUsedFreeDownload = useCvStore((state) => state.setHasUsedFreeDownload);
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
   const previewOpen = useUiStore((s) => s.previewDrawerOpen);
   const setPreviewOpen = useUiStore((s) => s.setPreviewDrawerOpen);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [tipJarOpen, setTipJarOpen] = useState(false);
 
   // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
   // which is also what the server renders — keeps SSR hydration safe.
@@ -759,19 +753,14 @@ export const BuilderShell = ({
 
   // ---- Download (TopBar + drawer) ----
   const handleDownload = async () => {
-    if (!isPro && hasUsedFreeDownload) {
-      setUpgradeOpen(true);
-      return;
-    }
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      await downloadCV(
-        data,
-        isPro ? "pro" : "free",
-        data.settings.templateId ?? "classic",
-      );
-      if (!isPro) setHasUsedFreeDownload(true);
+      await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      // Tip jar: surface 1500ms after the download fires so the success feels
+      // settled before we ask. TipJarModal owns its own 90-day suppression and
+      // once-per-session guard — safe to trigger on every success.
+      window.setTimeout(() => setTipJarOpen(true), 1500);
     } catch {
       setDownloadError("Couldn't generate PDF. Try again or export as DOCX.");
     } finally {
@@ -977,6 +966,35 @@ export const BuilderShell = ({
               >
                 {children}
               </div>
+
+              {/* Subtle support link — never a CTA, never a banner. Sits at the
+                  bottom of the scrollable column so it appears below content
+                  when the form is short and below the fold when it's long. */}
+              <div
+                style={{
+                  marginTop: "auto",
+                  padding: "16px 24px 20px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--ff-faint)",
+                  letterSpacing: "0.06em",
+                  textAlign: "center",
+                }}
+              >
+                MakeMyCV is free ·{" "}
+                <a
+                  href={SUPPORT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: "var(--ff-muted)",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  Support MakeMyCV
+                </a>
+              </div>
             </main>
           </div>
 
@@ -1010,9 +1028,6 @@ export const BuilderShell = ({
         {!stepIsReview && !stepIsScore && (
           <MobileViewToggle value={mobileView} onChange={setMobileView} />
         )}
-
-        {/* Dev AI reset (dev-only) */}
-        <DevResetAI />
 
         {/* Mobile preview overlay */}
         {previewOpen && <PreviewOverlay onClose={() => setPreviewOpen(false)} />}
@@ -1073,7 +1088,11 @@ export const BuilderShell = ({
           />
         )}
 
-        <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+        <TipJarModal
+          open={tipJarOpen}
+          context="post-download"
+          onClose={() => setTipJarOpen(false)}
+        />
 
         {/* Inline style block — keeps the responsive form-column rules close
             to the layout that uses them. */}

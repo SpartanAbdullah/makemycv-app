@@ -26,7 +26,7 @@ export default function FixInBuilderButton({ reportId }: { reportId: string }) {
         "Opening builder…"
       ) : (
         <>
-          Fix in Builder — $5
+          Fix in Builder
           <svg
             viewBox="0 0 24 24"
             fill="none"

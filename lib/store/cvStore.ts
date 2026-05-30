@@ -171,10 +171,17 @@ const PRO_STORAGE_KEY = "makemycv:isPro";
 const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
 const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 
+// TODO: Remove isPro flag entirely in next release — kept for backward compat
+// with localStorage from previous version. See DECISION_LOG.md 2026-05-31
+// (pricing model pivot: paid Pro → free + voluntary support).
+//
+// Until then: isPro is force-set to `true` so no UI condition can hide a
+// feature. The localStorage keys are still read so we don't trample old user
+// state, but their values no longer gate anything.
 const loadAccessState = (): AccessState => {
   if (typeof window === "undefined") {
     return {
-      isPro: false,
+      isPro: true,
       hasUsedFreeDownload: false,
       appliedCouponCode: "",
       proAccessSource: "free",
@@ -184,31 +191,23 @@ const loadAccessState = (): AccessState => {
   const storedCouponCode = getNormalizedCouponCode(
     window.localStorage.getItem(COUPON_STORAGE_KEY) ?? "",
   );
-  const hasCouponAccess =
+  const hasValidCouponInStorage =
     storedCouponCode.length > 0 && isValidProCoupon(storedCouponCode);
 
-  if (storedCouponCode && !hasCouponAccess) {
-    window.localStorage.removeItem(COUPON_STORAGE_KEY);
-  }
-
-  const hasManualPro = window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
   return {
-    isPro: hasManualPro || hasCouponAccess,
+    isPro: true,
     hasUsedFreeDownload:
       window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
-    appliedCouponCode: hasCouponAccess ? storedCouponCode : "",
-    proAccessSource: hasManualPro
-      ? "manual"
-      : hasCouponAccess
-        ? "coupon"
-        : "free",
+    appliedCouponCode: hasValidCouponInStorage ? storedCouponCode : "",
+    proAccessSource: "free",
   };
 };
 
 export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
-  isPro: false,
+  // TODO: Remove isPro flag in next release. See DECISION_LOG.md 2026-05-31.
+  isPro: true,
   hasUsedFreeDownload: false,
   appliedCouponCode: "",
   proAccessSource: "free",
@@ -217,98 +216,31 @@ export const useCvStore = create<CvStore>((set, get) => ({
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
     set((state) => ({ data: { ...state.data, [key]: value } })),
+  // TODO: Remove setIsPro in next release. Currently a no-op that always
+  // settles isPro=true; localStorage write preserved so old code paths that
+  // still call it don't crash. See DECISION_LOG.md 2026-05-31.
   setIsPro: (value) => {
     if (typeof window !== "undefined")
       window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
-    const couponIsActive =
-      get().appliedCouponCode.length > 0 &&
-      isValidProCoupon(get().appliedCouponCode);
-    set({
-      isPro: value || couponIsActive,
-      proAccessSource: value ? "manual" : couponIsActive ? "coupon" : "free",
-    });
+    set({ isPro: true, proAccessSource: "free" });
   },
   setHasUsedFreeDownload: (value) => {
     if (typeof window !== "undefined")
       window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
     set({ hasUsedFreeDownload: value });
   },
-  applyCoupon: async (value) => {
-    const normalized = getNormalizedCouponCode(value);
-
-    if (!normalized) {
-      return { ok: false, message: "Enter a promo code to unlock Pro." };
-    }
-
-    if (!isValidProCoupon(normalized)) {
-      return { ok: false, message: "That promo code is not valid." };
-    }
-
-    try {
-      const response = await fetch("/api/coupons/apply", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ code: normalized }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as {
-        code?: string;
-        message?: string;
-      } | null;
-
-      if (!response.ok) {
-        return {
-          ok: false,
-          message:
-            payload?.message ??
-            "We couldn't apply that promo right now. Please try again.",
-        };
-      }
-
-      const appliedCode = getNormalizedCouponCode(payload?.code ?? normalized);
-
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(COUPON_STORAGE_KEY, appliedCode);
-      }
-
-      const hasManualPro =
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
-
-      set({
-        isPro: true,
-        appliedCouponCode: appliedCode,
-        proAccessSource: hasManualPro ? "manual" : "coupon",
-      });
-
-      return {
-        ok: true,
-        message:
-          payload?.message ?? "Promo applied. Pro features are now unlocked.",
-      };
-    } catch {
-      return {
-        ok: false,
-        message: "We couldn't apply that promo right now. Please try again.",
-      };
-    }
-  },
+  // TODO: Remove applyCoupon/clearCoupon in next release. Coupon system is
+  // deferred to Phase 2 per DECISION_LOG.md 2026-05-31. Kept as no-ops so
+  // any stale call sites don't crash.
+  applyCoupon: async () => ({
+    ok: true,
+    message: "MakeMyCV is now free — no promo code needed.",
+  }),
   clearCoupon: () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(COUPON_STORAGE_KEY);
     }
-
-    const hasManualPro =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(PRO_STORAGE_KEY) === "true";
-
-    set({
-      isPro: hasManualPro,
-      appliedCouponCode: "",
-      proAccessSource: hasManualPro ? "manual" : "free",
-    });
+    set({ appliedCouponCode: "" });
   },
   reset: () => {
     clearCvStorage();

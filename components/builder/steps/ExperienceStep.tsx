@@ -10,7 +10,7 @@ import { NavigationButtons } from "../NavigationButtons";
 import { Icon } from "../Icon";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
-import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
+import { useAIImprove } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
   sanitizeJobTitleLive,
@@ -101,7 +101,7 @@ export const ExperienceStep = ({
       const trigger = sessionStorage.getItem("makemycv_ai_trigger");
       if (trigger === "bullets") {
         sessionStorage.removeItem("makemycv_ai_trigger");
-        if (!hasUsedFreeAI("bullets") && fields.length > 0) {
+        if (fields.length > 0) {
           handleGenerateBullets(0);
         }
       }
@@ -575,9 +575,7 @@ export const ExperienceStep = ({
                           padding: "8px 0",
                         }}
                       >
-                        {aiError === "FREE_LIMIT_REACHED"
-                          ? "You've used your free AI bullet generation. Upgrade to Pro to keep going."
-                          : aiError}
+                        {aiError.message}
                       </p>
                     )}
                   </div>

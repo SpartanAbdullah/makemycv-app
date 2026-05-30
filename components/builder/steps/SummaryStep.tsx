@@ -9,7 +9,7 @@ import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { FieldError } from "../../FieldError";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
-import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
+import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { Icon } from "../Icon";
 import { TodaysTipCard } from "../TodaysTipCard";
@@ -74,7 +74,7 @@ export const SummaryStep = ({
       const trigger = sessionStorage.getItem("makemycv_ai_trigger");
       if (trigger === "summary") {
         sessionStorage.removeItem("makemycv_ai_trigger");
-        if (!hasUsedFreeAI("summary")) fireAISummary();
+        fireAISummary();
       }
     } catch { /* SSR guard */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps

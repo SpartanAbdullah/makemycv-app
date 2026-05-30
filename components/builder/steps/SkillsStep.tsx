@@ -7,7 +7,7 @@ import { skillsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { createId } from "../../../lib/utils/id";
 import { NavigationButtons } from "../NavigationButtons";
-import { useAIImprove, hasUsedFreeAI } from "../../../hooks/useAIImprove";
+import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
 import { Icon } from "../Icon";
@@ -89,7 +89,7 @@ export const SkillsStep = ({
       const trigger = sessionStorage.getItem("makemycv_ai_trigger");
       if (trigger === "skills") {
         sessionStorage.removeItem("makemycv_ai_trigger");
-        if (!hasUsedFreeAI("skills")) fireAISuggest();
+        fireAISuggest();
       }
     } catch {
       /* SSR guard */

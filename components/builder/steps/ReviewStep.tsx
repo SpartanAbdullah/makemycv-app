@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
   type ReactNode,
 } from "react";
 import { builderSteps } from "../../../lib/utils/steps";
@@ -15,20 +14,14 @@ import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
 import { computeScore } from "../../../lib/scoreEngine";
-import { UpgradeModal } from "../../modals/UpgradeModal";
 import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
+import { TipJarModal } from "../../TipJarModal";
 
 const A4_W = 794;
 const A4_H = 1123;
-const LOCKED_TEMPLATES = new Set([
-  "executive",
-  "ats-clean",
-  "exec-split",
-  "corp-sidebar",
-]);
 
 /**
  * Template thumbnail — A4-aspect mini-render using scale(width / 794).
@@ -95,28 +88,12 @@ export const ReviewStep = ({
   const data = useCvStore((state) => state.data);
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
-  const isPro = useCvStore((state) => state.isPro);
-  const hasUsedFreeDownload = useCvStore((state) => state.hasUsedFreeDownload);
-  const setHasUsedFreeDownload = useCvStore(
-    (state) => state.setHasUsedFreeDownload,
-  );
-  const appliedCouponCode = useCvStore((state) => state.appliedCouponCode);
-  const proAccessSource = useCvStore((state) => state.proAccessSource);
-  const applyCoupon = useCvStore((state) => state.applyCoupon);
-  const clearCoupon = useCvStore((state) => state.clearCoupon);
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
-  const [couponCode, setCouponCode] = useState("");
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  const [couponFeedback, setCouponFeedback] = useState<{
-    type: "error" | "info";
-    text: string;
-  } | null>(null);
-  const [filter, setFilter] = useState<"all" | "free" | "pro">("all");
+  const [tipJarOpen, setTipJarOpen] = useState(false);
 
   const score = useMemo(
     () =>
@@ -135,19 +112,12 @@ export const ReviewStep = ({
 
   const handleExportDocx = () => exportToDocx(data);
   const handleDownloadPdf = async () => {
-    if (!isPro && hasUsedFreeDownload) {
-      setUpgradeOpen(true);
-      return;
-    }
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      await downloadCV(
-        data,
-        isPro ? "pro" : "free",
-        data.settings.templateId ?? "classic",
-      );
-      if (!isPro) setHasUsedFreeDownload(true);
+      await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      // Tip jar: see BuilderShell.handleDownload — same pattern.
+      window.setTimeout(() => setTipJarOpen(true), 1500);
     } catch {
       setDownloadError("pdf-failed");
     } finally {
@@ -167,33 +137,7 @@ export const ReviewStep = ({
   };
 
   const handleTemplateChange = (id: string) => {
-    if (!isPro && LOCKED_TEMPLATES.has(id)) {
-      setUpgradeOpen(true);
-      return;
-    }
     updateSection("settings", { ...data.settings, templateId: id });
-  };
-
-  const handleApplyCoupon = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsApplyingCoupon(true);
-    const result = await applyCoupon(couponCode);
-    setIsApplyingCoupon(false);
-    if (!result.ok) {
-      setCouponFeedback({ type: "error", text: result.message });
-      return;
-    }
-    setCouponCode("");
-    setCouponFeedback({ type: "info", text: result.message });
-    setUpgradeOpen(false);
-  };
-
-  const handleRemoveCoupon = () => {
-    clearCoupon();
-    setCouponFeedback({
-      type: "info",
-      text: "Promo removed from this browser.",
-    });
   };
 
   const incomplete = builderSteps.filter(
@@ -492,156 +436,6 @@ export const ReviewStep = ({
             </p>
           </div>
 
-          {/* Promo section */}
-          {(proAccessSource === "coupon" || !isPro) && (
-            <div
-              style={{
-                padding: 18,
-                background: "var(--ff-card)",
-                border: "1px solid var(--ff-line)",
-                borderRadius: 14,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      letterSpacing: "0.12em",
-                      color: "var(--ff-muted)",
-                      textTransform: "uppercase",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Apply promo
-                  </p>
-                  <p
-                    style={{
-                      fontSize: 12.5,
-                      color: "var(--ff-muted)",
-                    }}
-                  >
-                    Use an internal promo code to unlock Pro without payment.
-                  </p>
-                </div>
-                {proAccessSource === "coupon" && (
-                  <span
-                    style={{
-                      borderRadius: 999,
-                      background: "var(--ff-accent-soft)",
-                      border: "1px solid rgba(14,124,74,0.3)",
-                      color: "var(--ff-accent-dark)",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "5px 10px",
-                      whiteSpace: "nowrap",
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      fontFamily: "var(--font-mono)",
-                    }}
-                  >
-                    Pro unlocked
-                  </span>
-                )}
-              </div>
-              {proAccessSource === "coupon" ? (
-                <div
-                  style={{
-                    marginTop: 14,
-                    padding: "14px 16px",
-                    borderRadius: 10,
-                    background: "#F0FDF4",
-                    border: "1px solid #BBF7D0",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "var(--ff-accent-dark)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Promo{" "}
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                      }}
-                    >
-                      {appliedCouponCode}
-                    </span>{" "}
-                    is active on this browser.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleRemoveCoupon}
-                    className="cv-btn-secondary"
-                    style={{
-                      marginTop: 10,
-                      fontSize: 12,
-                      padding: "8px 14px",
-                    }}
-                  >
-                    Remove promo
-                  </button>
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleApplyCoupon}
-                  style={{ marginTop: 14, display: "flex", gap: 8 }}
-                >
-                  <input
-                    id="promo-code"
-                    type="text"
-                    value={couponCode}
-                    onChange={(event) => {
-                      setCouponCode(event.target.value);
-                      if (couponFeedback) setCouponFeedback(null);
-                    }}
-                    placeholder="Enter promo code"
-                    className="cv-input"
-                    style={{ flex: 1 }}
-                    autoComplete="off"
-                    disabled={isApplyingCoupon}
-                  />
-                  <button
-                    type="submit"
-                    className="cv-btn-secondary"
-                    style={{
-                      padding: "12px 18px",
-                      whiteSpace: "nowrap",
-                    }}
-                    disabled={isApplyingCoupon}
-                  >
-                    {isApplyingCoupon ? "Applying…" : "Apply"}
-                  </button>
-                </form>
-              )}
-              {couponFeedback && (
-                <p
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12.5,
-                    color:
-                      couponFeedback.type === "error"
-                        ? "var(--ff-red)"
-                        : "var(--ff-accent-dark)",
-                    fontWeight: 500,
-                  }}
-                >
-                  {couponFeedback.text}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* ── Middle: choose a template ─────────────────────── */}
@@ -649,106 +443,49 @@ export const ReviewStep = ({
           style={{ display: "flex", flexDirection: "column", gap: 14 }}
           className="ff-review-templates"
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 22,
-                  color: "var(--ff-ink)",
-                  fontWeight: 600,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Choose a template
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 12.5,
-                  color: "var(--ff-muted)",
-                  marginTop: 3,
-                }}
-              >
-                All six are ATS-tested and used by UAE recruiters.
-              </div>
+          <div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 22,
+                color: "var(--ff-ink)",
+                fontWeight: 600,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Choose a template
             </div>
             <div
               style={{
-                display: "flex",
-                gap: 4,
-                padding: 4,
-                background: "var(--ff-card)",
-                border: "1px solid var(--ff-line)",
-                borderRadius: 999,
+                fontFamily: "var(--font-body)",
+                fontSize: 12.5,
+                color: "var(--ff-muted)",
+                marginTop: 3,
               }}
             >
-              {(["all", "free", "pro"] as const).map((tab) => {
-                const active = filter === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setFilter(tab)}
-                    style={{
-                      fontFamily: "var(--font-body)",
-                      fontSize: 12,
-                      padding: "5px 14px",
-                      borderRadius: 999,
-                      background: active ? "var(--ff-ink)" : "transparent",
-                      color: active ? "white" : "var(--ff-muted)",
-                      border: "none",
-                      fontWeight: active ? 600 : 500,
-                      cursor: "pointer",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {tab}
-                  </button>
-                );
-              })}
+              All six are ATS-tested and used by UAE recruiters.
             </div>
           </div>
 
           <div className="ff-templates-grid">
-            {templates
-              .filter((t) => {
-                if (filter === "all") return true;
-                const isLocked = LOCKED_TEMPLATES.has(t.id);
-                if (filter === "free") return !isLocked;
-                return isLocked;
-              })
-              .map((tmpl) => {
-                const isLocked = !isPro && LOCKED_TEMPLATES.has(tmpl.id);
-                const isSelected = data.settings.templateId === tmpl.id;
-                return (
-                  <TemplateCard
-                    key={tmpl.id}
-                    name={tmpl.name}
-                    description={tmpl.description}
-                    badge={tmpl.badge}
-                    selected={isSelected}
-                    locked={isLocked}
-                    onClick={() => handleTemplateChange(tmpl.id)}
-                    onPreview={() => setPreviewTemplateId(tmpl.id)}
-                  >
-                    <TemplateThumb>
-                      <tmpl.Render
-                        data={data}
-                        plan={isPro ? "pro" : "free"}
-                      />
-                    </TemplateThumb>
-                  </TemplateCard>
-                );
-              })}
+            {templates.map((tmpl) => {
+              const isSelected = data.settings.templateId === tmpl.id;
+              return (
+                <TemplateCard
+                  key={tmpl.id}
+                  name={tmpl.name}
+                  description={tmpl.description}
+                  badge={tmpl.badge}
+                  selected={isSelected}
+                  onClick={() => handleTemplateChange(tmpl.id)}
+                  onPreview={() => setPreviewTemplateId(tmpl.id)}
+                >
+                  <TemplateThumb>
+                    <tmpl.Render data={data} plan="pro" />
+                  </TemplateThumb>
+                </TemplateCard>
+              );
+            })}
           </div>
         </div>
 
@@ -777,7 +514,11 @@ export const ReviewStep = ({
         </button>
       </div>
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <TipJarModal
+        open={tipJarOpen}
+        context="post-download"
+        onClose={() => setTipJarOpen(false)}
+      />
 
       <TemplatePreviewModal
         templateId={previewTemplateId}
@@ -929,7 +670,6 @@ const TemplateCard = ({
   description,
   badge,
   selected,
-  locked,
   onClick,
   onPreview,
   children,
@@ -938,7 +678,6 @@ const TemplateCard = ({
   description: string;
   badge?: string;
   selected: boolean;
-  locked: boolean;
   onClick: () => void;
   onPreview?: () => void;
   children: ReactNode;
@@ -1017,25 +756,6 @@ const TemplateCard = ({
         }}
       >
         {badge}
-      </span>
-    )}
-    {locked && (
-      <span
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          zIndex: 2,
-          width: 24,
-          height: 24,
-          borderRadius: "50%",
-          background: "var(--ff-ink)",
-          color: "white",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        <Icon name="lock" size={11} />
       </span>
     )}
     {children}

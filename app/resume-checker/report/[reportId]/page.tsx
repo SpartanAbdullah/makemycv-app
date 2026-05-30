@@ -5,7 +5,9 @@ import ScoreSidebar from "@/components/resume-checker/ScoreSidebar";
 import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
+import PostReportTipJar from "@/components/resume-checker/PostReportTipJar";
 import { Logo } from "@/components/Logo";
+import { SUPPORT_URL } from "@/lib/config/support";
 
 export const runtime = "nodejs";
 
@@ -121,10 +123,28 @@ export default async function ReportPage({
         </div>
       </section>
 
+      {/* Footer — subtle support link, NOT a CTA */}
+      <footer className="mx-auto max-w-6xl px-6 pt-10 pb-12 text-center text-xs text-slate-500">
+        MakeMyCV is free ·{" "}
+        <a
+          href={SUPPORT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-slate-700"
+        >
+          Support MakeMyCV
+        </a>
+      </footer>
+
       {/* Mobile sticky Fix CTA (hidden on lg+ where sidebar is visible) */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 p-3 backdrop-blur lg:hidden">
         <FixInBuilderButton reportId={reportId} />
       </div>
+
+      {/* Tip jar — fires 1500ms after the report mounts (the ATS check success
+          moment). Suppressed for 90 days after a tip or dismissal, and once
+          per session. NOT a blocker. */}
+      <PostReportTipJar />
     </main>
   );
 }

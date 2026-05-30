@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { kv } from "@vercel/kv";
 
 type AIType = "bullets" | "skills" | "summary";
 
@@ -12,6 +14,54 @@ type RequestBody = {
   existingSkills?: string[];
   existingSummary?: string;
 };
+
+const SUPPORT_URL = "https://www.makemycv.ae/support";
+
+// Per-IP rate limits backed by the same Upstash instance that powers @vercel/kv.
+// Two windows compose: daily (slow drip) + burst (anti-hammer).
+const dailyLimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(10, "24 h"),
+  analytics: true,
+  prefix: "mmcv_ai_daily",
+});
+
+const burstLimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(3, "60 s"),
+  analytics: true,
+  prefix: "mmcv_ai_burst",
+});
+
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  // Local dev / no proxy — fall back to a stable string so the window still works.
+  return "anon";
+}
+
+function rateLimitedResponse(retryAfterSeconds: number) {
+  const safeRetryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
+  return NextResponse.json(
+    {
+      error: "rate_limited",
+      message:
+        "You've used your AI improvements for now. They reset gradually. " +
+        "If you'd like to help cover AI costs, support is appreciated.",
+      supportUrl: SUPPORT_URL,
+      retryAfter: safeRetryAfter,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(safeRetryAfter) },
+    },
+  );
+}
 
 function buildPrompt(body: RequestBody): { system: string; user: string } {
   switch (body.type) {
@@ -108,6 +158,21 @@ export async function POST(request: Request) {
         { error: "API not configured" },
         { status: 500 },
       );
+    }
+
+    const ip = getClientIp(request);
+
+    // Burst window first — cheaper to reject, smaller window.
+    const burst = await burstLimit.limit(ip);
+    if (!burst.success) {
+      const retryAfter = Math.max(1, (burst.reset - Date.now()) / 1000);
+      return rateLimitedResponse(retryAfter);
+    }
+
+    const daily = await dailyLimit.limit(ip);
+    if (!daily.success) {
+      const retryAfter = Math.max(1, (daily.reset - Date.now()) / 1000);
+      return rateLimitedResponse(retryAfter);
     }
 
     const body = (await request.json()) as RequestBody;

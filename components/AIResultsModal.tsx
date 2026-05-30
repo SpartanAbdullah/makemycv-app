@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { AIImproveType } from "../hooks/useAIImprove";
+import type { AIError, AIImproveType } from "../hooks/useAIImprove";
 
 type Props = {
   isOpen: boolean;
@@ -9,7 +9,7 @@ type Props = {
   type: AIImproveType;
   results: string[];
   isLoading: boolean;
-  error: string | null;
+  error: AIError | null;
   onApply: (selected: string[]) => void;
   onRetry?: () => void;
 };
@@ -300,40 +300,40 @@ export function AIResultsModal({
           </div>
         )}
 
-        {/* Free limit reached */}
-        {error === "FREE_LIMIT_REACHED" && (
+        {/* Rate-limited (per-IP server limit on /api/ai-improve) */}
+        {error?.code === "RATE_LIMITED" && (
           <div className="flex flex-col items-center py-8 text-center">
-            <span className="mb-3 text-4xl">{"\u{1F512}"}</span>
+            <span className="mb-3 text-4xl">{"\u{1F4A1}"}</span>
             <h3 className="text-base font-bold text-gray-900">
-              You&apos;ve used your free AI improvement
+              Take a breather
             </h3>
             <p className="mt-2 max-w-sm text-sm text-gray-500">
-              Upgrade to Pro to unlock unlimited AI-powered CV improvements,
-              skill suggestions, and summary rewrites.
+              {error.message}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                window.open("https://makemycv.ae/#pricing", "_blank");
-              }}
-              className="mt-4 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
-            >
-              Upgrade to Pro {"\u2192"}
-            </button>
+            {error.supportUrl && (
+              <a
+                href={error.supportUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Support MakeMyCV
+              </a>
+            )}
             <button
               type="button"
               onClick={onClose}
               className="mt-2 block text-center text-sm text-gray-400 underline cursor-pointer hover:text-gray-600"
             >
-              or continue editing manually
+              Continue editing
             </button>
           </div>
         )}
 
-        {/* Error state */}
-        {error && error !== "FREE_LIMIT_REACHED" && (
+        {/* Generic error */}
+        {error && error.code !== "RATE_LIMITED" && (
           <div className="flex flex-col items-center py-8 text-center">
-            <p className="text-sm font-medium text-red-600">{error}</p>
+            <p className="text-sm font-medium text-red-600">{error.message}</p>
             {onRetry && (
               <button
                 type="button"
@@ -363,7 +363,7 @@ export function AIResultsModal({
 
         {/* Footer */}
         <p className="mt-4 text-center text-xs text-gray-400">
-          {"\u2728"} Powered by Claude AI {"\u00B7"} 1 free use per feature
+          {"\u2728"} Powered by Claude AI
         </p>
       </div>
     </div>
