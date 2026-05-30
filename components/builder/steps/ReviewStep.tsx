@@ -18,7 +18,7 @@ import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
-import { TipJarModal } from "../../TipJarModal";
+import { DownloadTipModal } from "../../DownloadTipModal";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -93,7 +93,7 @@ export const ReviewStep = ({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
-  const [tipJarOpen, setTipJarOpen] = useState(false);
+  const [downloadTipOpen, setDownloadTipOpen] = useState(false);
 
   const score = useMemo(
     () =>
@@ -111,15 +111,22 @@ export const ReviewStep = ({
     "friend";
 
   const handleExportDocx = () => exportToDocx(data);
-  const handleDownloadPdf = async () => {
+  // Click → open the pre-download tip modal. The modal calls
+  // `triggerDownload` to perform the actual PDF generation once the user
+  // has either tipped or explicitly chosen to skip after the reminder.
+  const handleDownloadPdf = () => {
+    setDownloadError(null);
+    setDownloadTipOpen(true);
+  };
+
+  const triggerDownload = async () => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
       await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-      // Tip jar: see BuilderShell.handleDownload — same pattern.
-      window.setTimeout(() => setTipJarOpen(true), 1500);
-    } catch {
+    } catch (err) {
       setDownloadError("pdf-failed");
+      throw err;
     } finally {
       setIsDownloading(false);
     }
@@ -514,10 +521,11 @@ export const ReviewStep = ({
         </button>
       </div>
 
-      <TipJarModal
-        open={tipJarOpen}
-        context="post-download"
-        onClose={() => setTipJarOpen(false)}
+      <DownloadTipModal
+        open={downloadTipOpen}
+        onClose={() => setDownloadTipOpen(false)}
+        triggerDownload={triggerDownload}
+        userName={data.personal.firstName?.trim() || undefined}
       />
 
       <TemplatePreviewModal

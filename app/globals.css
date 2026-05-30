@@ -902,6 +902,7 @@ body {
 
 @media print {
   [data-tipjar-modal],
+  [data-download-tip-modal],
   [data-context^="post-"] {
     display: none !important;
   }

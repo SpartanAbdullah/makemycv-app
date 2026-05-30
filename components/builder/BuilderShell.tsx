@@ -22,7 +22,7 @@ import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
-import { TipJarModal } from "../TipJarModal";
+import { DownloadTipModal } from "../DownloadTipModal";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportType = "pdf" | "docx";
 
@@ -394,44 +394,47 @@ const PreviewDrawer = ({
   );
 };
 
-/* Preview body — scales the 794-px-wide PreviewPanel to fit the drawer width
- * and uses two ResizeObservers so the outer scroll height matches the actual
- * CV content height after scaling (the CV grows past A4 height for long CVs).
+/* Preview body — scales the 794-px-wide PreviewPanel to fit the drawer
+ * BOTH horizontally and vertically, so the entire CV is always visible at
+ * once with no scrolling (the original "full page compacted into a small
+ * area" behaviour). scale = min(wrapW / A4_W, wrapH / contentH).
  *
- *   wrapRef:    drawer body — measures available width → derives scale
- *   contentRef: inner 794-wide CV → measures rendered scrollHeight to size
- *               the spacer so the scrollbar reflects scaled content height. */
+ * Two ResizeObservers feed the calculation: one on the wrap (the drawer
+ * body — its width/height changes with the layout), and one on the inner
+ * content (its unscaled height changes with the CV content). When either
+ * changes, recompute scale. */
 const A4_W = 794;
 const DrawerPreviewBody = () => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0.55);
-  const [contentHeight, setContentHeight] = useState(1123);
+  const [scale, setScale] = useState(0.45);
 
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const update = () => {
-      const w = el.clientWidth;
-      if (w > 0) setScale(w / A4_W);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    const wrap = wrapRef.current;
+    const content = contentRef.current;
+    if (!wrap || !content) return;
 
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
     const update = () => {
-      const h = el.scrollHeight;
-      if (h > 0) setContentHeight(h);
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      const ch = content.scrollHeight;
+      if (w <= 0 || h <= 0 || ch <= 0) return;
+      const scaleW = w / A4_W;
+      const scaleH = h / ch;
+      // Cap at 1 so single-page CVs in a generously-sized drawer don't
+      // up-scale and look pixelated.
+      setScale(Math.min(scaleW, scaleH, 1));
     };
+
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const wrapObs = new ResizeObserver(update);
+    const contentObs = new ResizeObserver(update);
+    wrapObs.observe(wrap);
+    contentObs.observe(content);
+    return () => {
+      wrapObs.disconnect();
+      contentObs.disconnect();
+    };
   }, []);
 
   // The live preview must be faithful to what will be exported — so we render
@@ -446,32 +449,24 @@ const DrawerPreviewBody = () => {
       style={{
         flex: 1,
         background: "white",
-        overflowY: "auto",
-        overflowX: "hidden",
+        // No scroll — the CV always fits because scale shrinks to match.
+        overflow: "hidden",
         position: "relative",
       }}
     >
       <div
+        ref={contentRef}
         style={{
-          width: "100%",
-          height: contentHeight * scale,
-          position: "relative",
+          position: "absolute",
+          top: 0,
+          left: "50%",
+          width: A4_W,
+          transformOrigin: "top center",
+          transform: `translateX(-50%) scale(${scale})`,
+          background: "white",
         }}
       >
-        <div
-          ref={contentRef}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: A4_W,
-            transformOrigin: "top left",
-            transform: `scale(${scale})`,
-            background: "white",
-          }}
-        >
-          <PreviewPanel sticky={false} />
-        </div>
+        <PreviewPanel sticky={false} />
       </div>
     </div>
   );
@@ -673,7 +668,7 @@ export const BuilderShell = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [tipJarOpen, setTipJarOpen] = useState(false);
+  const [downloadTipOpen, setDownloadTipOpen] = useState(false);
 
   // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
   // which is also what the server renders — keeps SSR hydration safe.
@@ -752,17 +747,23 @@ export const BuilderShell = ({
   };
 
   // ---- Download (TopBar + drawer) ----
-  const handleDownload = async () => {
+  // Click → open the pre-download tip modal. The modal calls
+  // `triggerDownload` to perform the actual download once the user has
+  // either tipped or explicitly chosen to skip after the reminder. The
+  // modal surfaces its own spinner / error / thanks states.
+  const handleDownload = () => {
+    setDownloadError(null);
+    setDownloadTipOpen(true);
+  };
+
+  const triggerDownload = async () => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
       await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-      // Tip jar: surface 1500ms after the download fires so the success feels
-      // settled before we ask. TipJarModal owns its own 90-day suppression and
-      // once-per-session guard — safe to trigger on every success.
-      window.setTimeout(() => setTipJarOpen(true), 1500);
-    } catch {
+    } catch (err) {
       setDownloadError("Couldn't generate PDF. Try again or export as DOCX.");
+      throw err;
     } finally {
       setIsDownloading(false);
     }
@@ -1088,10 +1089,11 @@ export const BuilderShell = ({
           />
         )}
 
-        <TipJarModal
-          open={tipJarOpen}
-          context="post-download"
-          onClose={() => setTipJarOpen(false)}
+        <DownloadTipModal
+          open={downloadTipOpen}
+          onClose={() => setDownloadTipOpen(false)}
+          triggerDownload={triggerDownload}
+          userName={data.personal.firstName?.trim() || undefined}
         />
 
         {/* Inline style block — keeps the responsive form-column rules close
