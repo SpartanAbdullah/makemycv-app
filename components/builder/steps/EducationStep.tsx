@@ -10,9 +10,13 @@ import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import {
   sanitizeCompanyName,
+  sanitizeCompanyNameLive,
   sanitizeJobTitle,
+  sanitizeJobTitleLive,
 } from "../../../lib/sanitize";
 import type { CvEducation } from "../../../lib/types/cv";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 
 const ATTESTING_BODIES = [
   "MOFA \u2013 UAE Ministry of Foreign Affairs",
@@ -97,17 +101,13 @@ export const EducationStep = ({
   };
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      <section className="cv-step-card">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="cv-step-heading">Education</h2>
-          <span className="cv-badge-required">Required</span>
-        </div>
-        <p className="cv-step-subtitle">
-          Add your most recent education first.
-        </p>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
 
-        <div className="mt-6">
+      <section className="cv-step-card">
+        <div>
           <Repeater
             title="Education entries"
             action={
@@ -161,8 +161,13 @@ export const EducationStep = ({
                             placeholder="e.g. Bachelor of Business Administration"
                             {...register(`education.${index}.degree`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeJobTitleLive(e.target.value);
+                              register(`education.${index}.degree`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
+                              register(`education.${index}.degree`).onBlur(e);
                             }}
                           />
                         </Field>
@@ -172,8 +177,13 @@ export const EducationStep = ({
                             placeholder="e.g. American University of Sharjah"
                             {...register(`education.${index}.school`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeCompanyNameLive(e.target.value);
+                              register(`education.${index}.school`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeCompanyName(e.target.value);
                               register(`education.${index}.school`).onChange(e);
+                              register(`education.${index}.school`).onBlur(e);
                             }}
                           />
                         </Field>
@@ -183,8 +193,13 @@ export const EducationStep = ({
                             placeholder="e.g. Finance"
                             {...register(`education.${index}.field`)}
                             onChange={(e) => {
+                              e.target.value = sanitizeJobTitleLive(e.target.value);
+                              register(`education.${index}.field`).onChange(e);
+                            }}
+                            onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.field`).onChange(e);
+                              register(`education.${index}.field`).onBlur(e);
                             }}
                           />
                         </Field>
@@ -292,11 +307,11 @@ export const EducationStep = ({
         )}
 
         <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Include graduation dates. If your degree was earned outside the UAE, note whether it has been attested by MOFA or the relevant emirate authority.
+          <Icon name="sparkle" size={11} style={{ verticalAlign: "-2px" }} /> Include graduation dates. If your degree was earned outside the UAE, note whether it has been attested by MOFA or the relevant emirate authority.
         </div>
       </section>
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} />
+      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} nextLabel="Continue to Skills" />
     </form>
   );
 };

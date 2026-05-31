@@ -21,8 +21,8 @@ export const NavigationButtons = ({
     style={{
       display: "flex",
       gap: 12,
-      marginTop: 32,
-      paddingTop: 24,
+      marginTop: 16,
+      paddingTop: 14,
       borderTop: "1px solid var(--border-soft)",
       alignItems: "center",
     }}

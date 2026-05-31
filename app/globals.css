@@ -1,105 +1,153 @@
+/* Focus Flow display & UI fonts — Bricolage Grotesque (display), Inter (UI),
+   Instrument Serif (editorial italic for Today's Tip), JetBrains Mono (badges
+   and counters). All Google Fonts. Local Sora/Fraunces from layout.tsx remain
+   exposed via --font-sora / --font-fraunces for any legacy callers. The
+   Google Fonts @import has to precede the Tailwind @import to satisfy the
+   CSS @import-ordering rule. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap');
 @import "tailwindcss";
 
-/* ─── MakeMyCV Design System v2 ─────────────────────────────
-   Color philosophy: Indigo-slate system. Calm, credible,
-   professional. UAE financial/corporate trust palette.
+/* ─── MakeMyCV Design System v3 — "Focus Flow" ───────────────
+   Calm, modern, UAE-rooted CV builder. Single emerald accent
+   replaces the prior indigo/violet gradient. Bricolage + Inter.
    ─────────────────────────────────────────────────────────── */
 :root {
-  /* Brand */
-  --brand-primary:     #4F46E5;
-  --brand-primary-h:   #4338CA;
-  --brand-primary-s:   #EEF2FF;
-  --brand-accent:      #6366F1;
-  --brand-accent-text: #4F46E5;
-
+  /* ── Focus Flow tokens (canonical) ── */
   /* Surfaces */
-  --surface-page:    #F4F5F7;
-  --surface-card:    #FFFFFF;
-  --surface-raised:  #FFFFFF;
-  --surface-sunken:  #F8F9FB;
-  --surface-overlay: rgba(15,23,42,0.45);
+  --ff-paper:        #FBFAF7;
+  --ff-card:         #FFFFFF;
+  --ff-sunken:       #F5F3EC;
+
+  /* Ink */
+  --ff-ink:          #0B0F0C;
+  --ff-ink-2:        #222A25;
+  --ff-muted:        #6B7368;
+  --ff-faint:        #A6ADA4;
+
+  /* Lines */
+  --ff-line:         #E6E4DD;
+  --ff-line-strong:  #D7D4CB;
+
+  /* UAE green accent */
+  --ff-accent:       #0E7C4A;
+  --ff-accent-dark:  #0A5C37;
+  --ff-accent-soft:  #E7F2EC;
+  --ff-accent-ring:  rgba(14, 124, 74, 0.20);
+
+  /* Status */
+  --ff-warn:         #A26500;
+  --ff-warn-soft:    #FFF5E0;
+  --ff-red:          #B43A2E;
+
+  /* ── Brand (mapped to Focus Flow) ─────────────────────────
+     Existing components reference --brand-primary; remap to the
+     UAE green so the whole builder shifts in one place. Legacy
+     "primary-s" stays as the soft accent. */
+  --brand-primary:     var(--ff-accent);
+  --brand-primary-h:   var(--ff-accent-dark);
+  --brand-primary-s:   var(--ff-accent-soft);
+  --brand-accent:      var(--ff-accent);
+  --brand-accent-text: var(--ff-accent-dark);
+
+  /* Surfaces — kept for backward compat, mapped to ff tones */
+  --surface-page:    var(--ff-paper);
+  --surface-card:    var(--ff-card);
+  --surface-raised:  var(--ff-card);
+  --surface-sunken:  var(--ff-sunken);
+  --surface-overlay: rgba(11, 15, 12, 0.45);
 
   /* Borders */
-  --border-soft:     #E8EBF0;
-  --border-medium:   #D1D5DB;
-  --border-focus:    #4F46E5;
+  --border-soft:     var(--ff-line);
+  --border-medium:   var(--ff-line-strong);
+  --border-focus:    var(--ff-accent);
 
-  /* Text */
-  --text-heading:    #0F172A;
-  --text-body:       #374151;
-  --text-muted:      #6B7280;
-  --text-faint:      #9CA3AF;
+  /* Text — mapped to ff ink scale */
+  --text-heading:    var(--ff-ink);
+  --text-body:       var(--ff-ink-2);
+  --text-muted:      var(--ff-muted);
+  --text-faint:      var(--ff-faint);
   --text-inverse:    #FFFFFF;
 
-  /* Sidebar */
-  --sidebar-bg:      #0F172A;
+  /* Sidebar (legacy — sidebar dropped, kept so old refs don't 404) */
+  --sidebar-bg:      var(--ff-ink);
   --sidebar-border:  #1E293B;
-  --sidebar-text:    #94A3B8;
+  --sidebar-text:    var(--ff-muted);
   --sidebar-active:  #FFFFFF;
   --sidebar-icon-bg: #1E293B;
 
   /* Status */
-  --status-success:  #10B981;
-  --status-warning:  #F59E0B;
-  --status-error:    #EF4444;
-  --status-info:     #3B82F6;
+  --status-success:  var(--ff-accent);
+  --status-warning:  var(--ff-warn);
+  --status-error:    var(--ff-red);
+  --status-info:     #2563EB;
 
-  /* Shadows */
-  --shadow-xs:  0 1px 2px rgba(15,23,42,0.04);
-  --shadow-sm:  0 1px 3px rgba(15,23,42,0.06),
-                0 1px 2px rgba(15,23,42,0.04);
-  --shadow-md:  0 4px 6px rgba(15,23,42,0.05),
-                0 2px 4px rgba(15,23,42,0.04);
-  --shadow-lg:  0 10px 15px rgba(15,23,42,0.06),
-                0 4px 6px rgba(15,23,42,0.04);
-  --shadow-xl:  0 20px 25px rgba(15,23,42,0.07),
-                0 8px 10px rgba(15,23,42,0.04);
+  /* Shadows — Focus Flow soft shadows */
+  --shadow-xs:  0 1px 2px rgba(11, 15, 12, 0.04);
+  --shadow-sm:  0 1px 0 rgba(11, 15, 12, 0.03);
+  --shadow-md:  0 4px 12px rgba(11, 15, 12, 0.06);
+  --shadow-lg:  0 14px 36px rgba(11, 15, 12, 0.10);
+  --shadow-xl:  0 30px 60px rgba(11, 15, 12, 0.12);
+  --shadow-drawer: 0 30px 60px rgba(11, 15, 12, 0.10);
 
   /* Radii */
   --radius-sm:  6px;
   --radius-md:  10px;
-  --radius-lg:  14px;
-  --radius-xl:  18px;
-  --radius-2xl: 24px;
+  --radius-lg:  12px;
+  --radius-xl:  14px;
+  --radius-2xl: 18px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
 
   /* Spacing scale */
   --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
   --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
   --space-8: 32px;  --space-10: 40px; --space-12: 48px;
 
-  /* Typography */
-  --font-display: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
+  /* Typography stacks */
+  --font-display: 'Bricolage Grotesque', var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body:    'Inter', var(--font-inter), system-ui, sans-serif;
+  --font-serif:   'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Brand wordmark — Poppins (loaded via next/font in app/layout.tsx). */
+  --font-brand:   var(--font-poppins), 'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
+
+  /* ─── Brand tokens (May 2026 handoff) ──────────────────────
+     Source of truth for marketing surfaces, social cards, and
+     anywhere the makemycv.ae mark appears in UI. */
+  --brand-navy:    #1B2A4A;
+  --brand-gold:    #C49A48;
+  --brand-gold-lt: #D4A95A;
+  --brand-cream:   #F4EEE0;
 
   /* Transitions */
   --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Sidebar width */
-  --sidebar-w: 220px;
+  /* Builder shell metrics */
+  --topbar-h:     64px;
+  --progressbar-h:58px;
+  --drawer-w:     clamp(460px, 48vw, 820px);
+  --drawer-gap:   24px;
+  --form-max:     clamp(540px, 44vw, 780px);
+  /* Legacy alias — old sidebar width; left for backward-compat. */
+  --sidebar-w:    220px;
 
-  /* Legacy aliases (backward compat) */
-  --background: var(--surface-page);
-  --foreground: var(--text-heading);
-  --surface: var(--surface-card);
-  --muted: var(--text-muted);
-  --accent: var(--brand-primary);
-  --accent-2: #d66a3a;
-  --ring: rgba(79, 70, 229, 0.2);
+  /* Legacy aliases (backward compat with older callers) */
+  --background: var(--ff-paper);
+  --foreground: var(--ff-ink);
+  --surface:    var(--ff-card);
+  --muted:      var(--ff-muted);
+  --accent:     var(--ff-accent);
+  --accent-2:   #d66a3a;
+  --ring:       var(--ff-accent-ring);
 
-  /* ─── Checker / marketing polish tokens (v3) ───────────────
-     Used on /resume-checker and report pages. Unifies with
-     makemycv-site marketing brief. Do NOT refactor unrelated
-     components to these — migrate inline only when touched. */
-
-  /* Brand */
-  --brand-blue: #2563EB;
+  /* ─── Checker / marketing tokens (kept) ─────────────────── */
+  --brand-blue:      #2563EB;
   --brand-blue-dark: #1D4ED8;
-  --brand-ink: #0A0F1E;
-  --brand-deep: #111827;
+  --brand-ink:       #0A0F1E;
+  --brand-deep:      #111827;
 
-  /* Severity */
   --severity-error: #DC2626;
   --severity-error-bg: #FEF2F2;
   --severity-error-border: #FECACA;
@@ -110,35 +158,53 @@
   --severity-good-bg: #ECFDF5;
   --severity-good-border: #A7F3D0;
 
-  /* Surfaces */
   --paper: #FFFFFF;
   --paper-2: #F8FAFC;
-  --line: #E2E8F0;
-  --line-strong: #CBD5E1;
+  --line: var(--ff-line);
+  --line-strong: var(--ff-line-strong);
 
-  /* Shadows (soft / CTA) */
   --shadow-sm-soft: 0 2px 6px rgba(15, 23, 42, 0.06);
   --shadow-md-soft: 0 8px 24px rgba(15, 23, 42, 0.06);
   --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
-  --shadow-cta: 0 6px 20px rgba(37, 99, 235, 0.35);
-  --shadow-cta-hover: 0 10px 28px rgba(37, 99, 235, 0.45);
-
-  /* Radii */
-  --radius-card: 16px;
-  --radius-pill: 999px;
+  --shadow-cta: 0 6px 20px rgba(14, 124, 74, 0.30);
+  --shadow-cta-hover: 0 10px 28px rgba(14, 124, 74, 0.40);
 }
 
 @theme inline {
-  --color-background: var(--surface-page);
-  --color-foreground: var(--text-heading);
-  --font-sans: var(--font-body);
+  --color-background: var(--ff-paper);
+  --color-foreground: var(--ff-ink);
+  --font-sans:    var(--font-body);
   --font-display: var(--font-display);
+  --font-serif:   var(--font-serif);
+  --font-mono:    var(--font-mono);
 
-  /* Checker polish tokens exposed as Tailwind utilities */
+  /* Focus Flow palette exposed as Tailwind utilities (bg-ff-accent, etc.) */
+  --color-ff-paper:       var(--ff-paper);
+  --color-ff-card:        var(--ff-card);
+  --color-ff-sunken:      var(--ff-sunken);
+  --color-ff-ink:         var(--ff-ink);
+  --color-ff-ink-2:       var(--ff-ink-2);
+  --color-ff-muted:       var(--ff-muted);
+  --color-ff-faint:       var(--ff-faint);
+  --color-ff-line:        var(--ff-line);
+  --color-ff-line-strong: var(--ff-line-strong);
+  --color-ff-accent:      var(--ff-accent);
+  --color-ff-accent-dark: var(--ff-accent-dark);
+  --color-ff-accent-soft: var(--ff-accent-soft);
+
+  /* Checker polish tokens */
   --color-brand-blue: var(--brand-blue);
   --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-ink: var(--brand-ink);
   --color-brand-deep: var(--brand-deep);
+
+  /* makemycv.ae brand tokens (May 2026 handoff) — Tailwind utilities
+     bg-brand-navy / text-brand-gold etc. */
+  --color-brand-navy:    var(--brand-navy);
+  --color-brand-gold:    var(--brand-gold);
+  --color-brand-gold-lt: var(--brand-gold-lt);
+  --color-brand-cream:   var(--brand-cream);
+  --font-brand:          var(--font-brand);
 
   --color-severity-error: var(--severity-error);
   --color-severity-error-bg: var(--severity-error-bg);
@@ -163,58 +229,61 @@
 }
 
 body {
-  background: var(--surface-page);
-  color: var(--text-body);
+  background: var(--ff-paper);
+  color: var(--ff-ink-2);
   font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.font-display {
-  font-family: var(--font-display);
-}
+.font-display { font-family: var(--font-display); }
+.font-serif   { font-family: var(--font-serif); }
+.font-mono    { font-family: var(--font-mono); }
 
-/* ─── Builder v2 Utility Classes ────────────────────────────── */
+/* ─── Builder v3 utility classes ───────────────────────────── */
 
-/* Input — unified style used across all steps */
+/* Input — unified style used across all builder steps */
 .cv-input {
   width: 100%;
-  background: var(--surface-sunken);
-  border: 1.5px solid var(--border-medium);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--text-body);
+  background: var(--ff-card);
+  border: 1px solid var(--ff-line);
+  border-radius: var(--radius-lg);
+  padding: 13px 16px;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--ff-ink);
   transition: border-color var(--transition-fast),
-              box-shadow var(--transition-fast);
+              box-shadow var(--transition-fast),
+              background var(--transition-fast);
   outline: none;
   font-family: var(--font-body);
 }
-.cv-input::placeholder { color: var(--text-faint); }
+.cv-input::placeholder { color: var(--ff-faint); }
+.cv-input:hover:not(:focus) { border-color: var(--ff-line-strong); }
 .cv-input:focus {
-  border-color: var(--border-focus);
-  background: var(--surface-card);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.10);
-}
-.cv-input:hover:not(:focus) {
-  border-color: #B0B8C6;
+  border-color: var(--ff-accent);
+  box-shadow: 0 0 0 3px var(--ff-accent-ring);
+  background: var(--ff-card);
 }
 
 /* Textarea variant */
 .cv-textarea {
   resize: vertical;
   min-height: 120px;
-  line-height: 1.6;
+  line-height: 1.55;
+  padding: 12px 14px;
 }
 
-/* Label — step field labels */
+/* Label — Focus Flow uses sentence case + smaller weight, not all-caps */
 .cv-label {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ff-ink-2);
+  margin-bottom: 8px;
   font-family: var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 /* Field group */
@@ -222,38 +291,38 @@ body {
 
 /* Step card — the white form container */
 .cv-step-card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-xl);
+  background: var(--ff-card);
+  border: 1px solid var(--ff-line);
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
-  padding: 32px;
+  padding: 22px;
 }
 
 /* Entry card — accordion item */
 .cv-entry-card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  background: var(--ff-card);
+  border: 1px solid var(--ff-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-base),
               border-color var(--transition-base);
 }
 .cv-entry-card:hover {
   box-shadow: var(--shadow-md);
-  border-color: #C7CDD8;
+  border-color: var(--ff-line-strong);
 }
 
-/* Primary button */
+/* Primary button (accent fill) */
 .cv-btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--brand-primary);
-  color: var(--text-inverse);
+  background: var(--ff-accent);
+  color: #FFFFFF;
   font-weight: 600;
   font-size: 14px;
-  padding: 11px 22px;
+  padding: 12px 22px;
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
@@ -261,76 +330,68 @@ body {
               transform var(--transition-fast),
               box-shadow var(--transition-fast);
   font-family: var(--font-body);
-  box-shadow: 0 1px 3px rgba(79,70,229,0.25),
-              0 0 0 0px rgba(79,70,229,0);
+  box-shadow: 0 1px 0 rgba(11,15,12,0.04);
 }
 .cv-btn-primary:hover {
-  background: var(--brand-primary-h);
-  box-shadow: 0 4px 12px rgba(79,70,229,0.30);
+  background: var(--ff-accent-dark);
+  box-shadow: 0 6px 14px rgba(14,124,74,0.22);
   transform: translateY(-1px);
 }
-.cv-btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(79,70,229,0.25);
-}
+.cv-btn-primary:active { transform: translateY(0); }
 .cv-btn-primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
-/* Secondary button */
+/* Secondary button (light card + line border) */
 .cv-btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--surface-card);
-  color: var(--text-body);
+  background: var(--ff-card);
+  color: var(--ff-ink);
   font-weight: 500;
   font-size: 14px;
-  padding: 10px 18px;
+  padding: 11px 18px;
   border-radius: var(--radius-md);
-  border: 1.5px solid var(--border-medium);
+  border: 1px solid var(--ff-line);
   cursor: pointer;
   transition: all var(--transition-fast);
   font-family: var(--font-body);
 }
 .cv-btn-secondary:hover {
-  background: var(--surface-sunken);
-  border-color: #9AA3B0;
-  color: var(--text-heading);
+  background: var(--ff-sunken);
+  border-color: var(--ff-line-strong);
 }
 
-/* Ghost / add button */
+/* Ghost dashed button — used for "Add another" rows */
 .cv-btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   background: transparent;
-  color: var(--brand-accent-text);
-  font-weight: 600;
+  color: var(--ff-muted);
+  font-weight: 500;
   font-size: 13px;
-  padding: 9px 16px;
+  padding: 11px 16px;
   border-radius: var(--radius-md);
-  border: 1.5px dashed #C4B5FD;
+  border: 1px dashed var(--ff-line-strong);
   cursor: pointer;
   transition: all var(--transition-fast);
   font-family: var(--font-body);
   width: 100%;
 }
 .cv-btn-ghost:hover {
-  background: var(--brand-primary-s);
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
+  background: var(--ff-card);
+  border-color: var(--ff-accent);
+  color: var(--ff-accent-dark);
 }
-.cv-btn-ghost:hover svg {
-  transform: rotate(90deg);
-}
-.cv-btn-ghost svg {
-  transition: transform var(--transition-base);
-}
+.cv-btn-ghost svg { transition: transform var(--transition-base); }
+.cv-btn-ghost:hover svg { transform: rotate(90deg); }
 
 /* Danger / remove button */
 .cv-btn-danger {
@@ -338,10 +399,10 @@ body {
   align-items: center;
   gap: 5px;
   background: transparent;
-  color: #9CA3AF;
+  color: var(--ff-muted);
   font-weight: 500;
   font-size: 12px;
-  padding: 5px 10px;
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
@@ -349,54 +410,118 @@ body {
   font-family: var(--font-body);
 }
 .cv-btn-danger:hover {
-  background: #FEF2F2;
-  color: #DC2626;
+  background: #FBEFED;
+  color: var(--ff-red);
 }
 
-/* ATS / tip box */
+/* Accent-outlined button — used by "Generate more with AI" */
+.cv-btn-accent-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--ff-card);
+  color: var(--ff-accent-dark);
+  border: 1px solid rgba(14,124,74,0.45);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
+}
+.cv-btn-accent-outline:hover {
+  background: var(--ff-accent-soft);
+  border-color: var(--ff-accent);
+}
+
+/* Tip box — used for inline "ATS tip" footers in some steps */
 .cv-tip-box {
-  background: #FAFBFF;
-  border: 1px dashed #C7D2FE;
+  background: var(--ff-sunken);
+  border: 1px solid var(--ff-line);
   border-radius: var(--radius-md);
   padding: 12px 16px;
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: var(--ff-muted);
   line-height: 1.6;
 }
-.cv-tip-box strong { color: var(--brand-accent-text); }
+.cv-tip-box strong { color: var(--ff-accent-dark); }
+
+/* Today's Tip card */
+.tip-card {
+  padding: 20px;
+  background: linear-gradient(135deg, #F0F7F2 0%, var(--ff-paper) 70%);
+  border: 1px solid rgba(14,124,74,0.33);
+  border-radius: var(--radius-card);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+.tip-card .tip-quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ff-ink);
+}
+.tip-card .tip-citation {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  color: var(--ff-muted);
+  line-height: 1.45;
+}
 
 /* Optional badge */
 .cv-badge-optional {
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #92400E;
-  background: #FFFBEB;
-  border: 1px solid #FDE68A;
-  padding: 2px 7px;
-  border-radius: 20px;
+  color: var(--ff-warn);
+  background: var(--ff-warn-soft);
+  border: 1px solid #F7E2A3;
+  padding: 3px 8px;
+  border-radius: 999px;
   margin-left: 7px;
   vertical-align: middle;
+  font-family: var(--font-mono);
 }
 
 /* Required badge */
 .cv-badge-required {
   display: inline-flex;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #065F46;
-  background: #ECFDF5;
-  border: 1px solid #A7F3D0;
-  padding: 2px 7px;
-  border-radius: 20px;
+  color: var(--ff-accent-dark);
+  background: var(--ff-accent-soft);
+  border: 1px solid rgba(14,124,74,0.3);
+  padding: 3px 8px;
+  border-radius: 999px;
   margin-left: 7px;
   vertical-align: middle;
+  font-family: var(--font-mono);
+}
+
+/* Step badge — small monospace eyebrow above the page heading */
+.cv-step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ff-accent);
+  text-transform: uppercase;
 }
 
 /* Skill chip */
@@ -404,18 +529,18 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #EEF2FF;
-  color: #3730A3;
-  border: 1px solid #C7D2FE;
-  border-radius: 20px;
+  background: var(--ff-accent-soft);
+  color: var(--ff-accent-dark);
+  border: 1px solid rgba(14,124,74,0.18);
+  border-radius: 999px;
   padding: 5px 12px;
   font-size: 13px;
   font-weight: 500;
   transition: all var(--transition-fast);
 }
 .cv-skill-chip:hover {
-  background: #E0E7FF;
-  border-color: #A5B4FC;
+  background: #D7EBDD;
+  border-color: rgba(14,124,74,0.30);
 }
 .cv-skill-chip-remove {
   display: flex;
@@ -424,8 +549,8 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #C7D2FE;
-  color: #3730A3;
+  background: rgba(14,124,74,0.18);
+  color: var(--ff-accent-dark);
   cursor: pointer;
   transition: all var(--transition-fast);
   flex-shrink: 0;
@@ -433,57 +558,118 @@ body {
   padding: 0;
 }
 .cv-skill-chip-remove:hover {
-  background: #818CF8;
+  background: var(--ff-accent);
   color: white;
 }
 
-/* Step heading in form area */
+/* Step heading — large Bricolage display */
 .cv-step-heading {
   font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text-heading);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ff-ink);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0;
 }
-.cv-step-heading .accent {
-  color: var(--brand-primary);
-}
+.cv-step-heading .accent { color: var(--ff-accent); }
 .cv-step-subtitle {
-  font-size: 14px;
-  color: var(--text-muted);
-  margin-top: 6px;
+  font-size: 15px;
+  color: var(--ff-muted);
+  margin-top: 10px;
   line-height: 1.5;
+  max-width: 560px;
 }
 
-/* Select dropdown — consistent with cv-input */
+/* Select dropdown — matches cv-input */
 .cv-select {
   width: 100%;
-  background: var(--surface-sunken);
-  border: 1.5px solid var(--border-medium);
-  border-radius: var(--radius-md);
-  padding: 10px 36px 10px 14px;
-  font-size: 14px;
-  color: var(--text-body);
+  background: var(--ff-card);
+  border: 1px solid var(--ff-line);
+  border-radius: var(--radius-lg);
+  padding: 13px 38px 13px 16px;
+  font-size: 14.5px;
+  color: var(--ff-ink);
   transition: border-color var(--transition-fast),
               box-shadow var(--transition-fast);
   outline: none;
   font-family: var(--font-body);
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B7368' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 14px center;
   cursor: pointer;
 }
 .cv-select:focus {
-  border-color: var(--border-focus);
-  background-color: var(--surface-card);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.10);
+  border-color: var(--ff-accent);
+  box-shadow: 0 0 0 3px var(--ff-accent-ring);
 }
 
-/* ─── Score Widget AI Border Animation ────────────────────── */
+/* ─── Step beads (top progress strip) ────────────────────── */
+.cv-bead {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background var(--transition-base), color var(--transition-base), border-color var(--transition-base);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  cursor: default;
+}
+.cv-bead-active {
+  background: var(--ff-ink);
+  color: white;
+  padding: 6px 14px;
+  font-weight: 600;
+  border-color: var(--ff-ink);
+}
+.cv-bead-done {
+  background: var(--ff-accent-soft);
+  color: var(--ff-accent-dark);
+  padding: 6px 12px;
+  border-color: rgba(14,124,74,0.26);
+  cursor: pointer;
+}
+.cv-bead-done:hover { background: #D7EBDD; }
+.cv-bead-future {
+  background: transparent;
+  color: var(--ff-muted);
+  padding: 6px 12px;
+  border-color: var(--ff-line);
+}
+.cv-bead-locked {
+  background: transparent;
+  color: var(--ff-faint);
+  padding: 6px 12px;
+  border-color: var(--ff-line);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.cv-bead-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.cv-bead-dot-active   { background: var(--ff-accent); }
+.cv-bead-dot-done     { background: var(--ff-accent); }
+.cv-bead-dot-future   { background: transparent; border: 1.5px solid var(--ff-line-strong); color: var(--ff-faint); }
 
+/* Mobile: hide the step beads scroller's separator, keep beads compact */
+@media (max-width: 1023px) {
+  .cv-bead { font-size: 11.5px; padding-top: 5px; padding-bottom: 5px; }
+}
+
+/* ─── Score Widget AI Border Animation (legacy) ──────────── */
 @property --angle {
   syntax: '<angle>';
   initial-value: 0deg;
@@ -505,20 +691,18 @@ body {
   padding: 2px;
   background: conic-gradient(
     from var(--angle, 0deg),
-    #6366f1,
-    #8b5cf6,
-    #ec4899,
-    #f59e0b,
-    #10b981,
-    #3b82f6,
-    #6366f1
+    var(--ff-accent),
+    #34A36A,
+    var(--ff-accent-dark),
+    #34A36A,
+    var(--ff-accent)
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: ai-spin 3s linear infinite;
+  animation: ai-spin 3.5s linear infinite;
 }
 
 .ai-glow-border::after {
@@ -528,37 +712,48 @@ body {
   border-radius: 9999px;
   background: conic-gradient(
     from var(--angle, 0deg),
-    #6366f140,
-    #8b5cf640,
-    #ec489940,
-    #f59e0b40,
-    #10b98140,
-    #3b82f640,
-    #6366f140
+    rgba(14,124,74,0.30),
+    rgba(14,124,74,0.45),
+    rgba(14,124,74,0.30)
   );
   filter: blur(8px);
-  animation: ai-spin 3s linear infinite;
+  animation: ai-spin 3.5s linear infinite;
   z-index: -1;
 }
 
 @keyframes ai-spin {
-  to {
-    --angle: 360deg;
-  }
+  to { --angle: 360deg; }
 }
 
-/* Pause animation when score is 100 (perfect) */
 .ai-glow-border.score-perfect::before,
 .ai-glow-border.score-perfect::after {
   animation: none;
-  background: conic-gradient(
-    from 0deg,
-    #22c55e,
-    #16a34a,
-    #22c55e
-  );
+  background: conic-gradient(from 0deg, #22c55e, #16a34a, #22c55e);
 }
 
+/* ─── Loading spinner ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Photo placeholder stripe (used in handoff preview) ─── */
+.photo-stripe {
+  background-image: repeating-linear-gradient(135deg,
+    var(--ff-sunken),
+    var(--ff-sunken) 6px,
+    transparent 6px,
+    transparent 12px);
+  background-color: rgba(245, 243, 236, 0.6);
+}
+
+/* ─── Tip card entry animation ─── */
+@keyframes tip-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tip-card-animate { animation: tip-enter 250ms ease both; }
+
+/* ─── Print rules — unchanged from v2 ────────────────────── */
 @media print {
   @page {
     size: A4;
@@ -665,5 +860,50 @@ body {
   .avoid-orphan {
     break-after: avoid;
     page-break-after: avoid;
+  }
+}
+
+/* ─── TipJar component utilities ─────────────────────────────
+   Ported from the marketing site so the TipJar JSX can stay
+   byte-identical to its original. Four small classes, scoped
+   tight; do not generalise without crediting the brand pack.
+   Print: tip jar must never render on paper — hide it. */
+.btn-primary {
+  background-image: linear-gradient(135deg, #2563eb 0%, #4338ca 100%);
+  color: #ffffff;
+  transition: filter 150ms ease, transform 150ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.shadow-card-blue {
+  box-shadow:
+    0 10px 30px -10px rgba(37, 99, 235, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.card-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 18px 42px -12px rgba(37, 99, 235, 0.24),
+    0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.text-brand-muted {
+  color: #64748b;
+}
+
+@media print {
+  [data-tipjar-modal],
+  [data-download-tip-modal],
+  [data-context^="post-"] {
+    display: none !important;
   }
 }

@@ -26,6 +26,10 @@ export type CvPersonal = {
   country?: string;
   dateOfBirth?: string;
   drivingLicense?: string;
+  // UAE-essentials block on the Contact step. Both are optional strings so
+  // imported CVs (PDF/DOCX/LinkedIn) that don't carry these still validate.
+  visaStatus?: string;
+  availability?: string;
 };
 
 export type CvExperience = {
@@ -77,12 +81,15 @@ export type CvProject = {
   bullets: string[];
 };
 
-export type PhotoShape = "round" | "square";
+export type PhotoShape = "round" | "square" | "hidden";
+
+export type CvFontFamily = "sans" | "display" | "serif";
 
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
   fontScale?: number;
+  fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
 };

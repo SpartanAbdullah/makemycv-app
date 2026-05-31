@@ -5,37 +5,41 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
-import { NavigationButtons } from "../NavigationButtons";
 import { PhotoUpload } from "../PhotoUpload";
+import { TodaysTipCard } from "../TodaysTipCard";
+import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
+import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import {
   sanitizeName,
+  sanitizeNameLive,
   sanitizeEmail,
   sanitizePhone,
+  sanitizePhoneLive,
   sanitizeJobTitle,
+  sanitizeJobTitleLive,
   sanitizeLocation,
-  sanitizeURL,
+  sanitizeLocationLive,
   validateEmail,
-  validateLinkedIn,
-  validateURL,
 } from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
-export const PersonalStep = ({
-  onNext,
-}: {
-  onNext: () => void;
-}) => {
+const ICON_INPUT_PAD = 40;
+
+export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const personal = useCvStore((state) => state.data.personal);
-  const photoShape = useCvStore((state) => state.data.settings.photoShape ?? "round");
+  const photoShape = useCvStore(
+    (state) => state.data.settings.photoShape ?? "round",
+  );
   const updateSection = useCvStore((state) => state.updateSection);
   const settings = useCvStore((state) => state.data.settings);
   const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showMore, setShowMore] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string | null>
+  >({});
 
   const setFieldError = (field: string, error: string | null) =>
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
@@ -59,7 +63,6 @@ export const PersonalStep = ({
     handleSubmit,
     watch,
     reset,
-    setValue,
     formState: { errors, isDirty },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
@@ -78,7 +81,6 @@ export const PersonalStep = ({
     const subscription = watch((value) => {
       const nextSerialized = JSON.stringify(value);
       if (nextSerialized === lastSerializedRef.current) return;
-
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (nextSerialized !== lastSerializedRef.current) {
@@ -93,165 +95,184 @@ export const PersonalStep = ({
     };
   }, [watch, updateSection]);
 
+  const initials = `${personal.firstName?.charAt(0) ?? ""}${
+    personal.lastName?.charAt(0) ?? ""
+  }`;
+
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
-      {/* Heading */}
-      <div>
-        <h1 className="cv-step-heading">
-          Please enter your{" "}
-          <span className="accent">contact</span> info
-        </h1>
-        <p className="cv-step-subtitle">
-          Add your phone number and email so recruiters can reach you.
-        </p>
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
+
+      {/* Import row — PDF/DOCX is the only working source, so it takes the
+          full-width primary slot. LinkedIn paste-import was a dead placeholder
+          (see git history for removal). */}
+      <ImportButton
+        icon="upload"
+        label="Import existing CV (PDF / DOCX)"
+        onClick={() => handleImport("pdf")}
+      />
+
+      {/* OR divider */}
+      <div
+        style={{
+          position: "relative",
+          textAlign: "center",
+          margin: "8px 0 4px",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: 0,
+            right: 0,
+            height: 1,
+            background: "var(--ff-line)",
+          }}
+        />
+        <span
+          style={{
+            position: "relative",
+            background: "var(--ff-paper)",
+            padding: "0 14px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--ff-faint)",
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+          }}
+        >
+          Or fill by hand
+        </span>
       </div>
 
-      {/* Photo upload + Import CV side by side */}
-      <div className="pb-6 border-b border-[var(--border-soft)] mb-2">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Left: Photo upload */}
-          <div>
-            <PhotoUpload
-              photo={personal.photo}
-              showPhoto={personal.showPhoto}
-              photoShape={photoShape}
-              onPhotoChange={handlePhotoChange}
-              onToggleChange={handleToggleChange}
-            />
-          </div>
-
-          {/* Right: Import CV */}
-          <div
-            className="flex flex-col items-center justify-center h-full min-h-[120px] border-2 border-dashed border-gray-200 rounded-2xl p-4 hover:border-indigo-300 hover:bg-indigo-50 transition cursor-pointer"
-            onClick={() => handleImport("pdf")}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleImport("pdf");
-              }
-            }}
-          >
-            <span className="text-3xl">📄</span>
-            <span className="text-sm font-semibold text-gray-700 mt-2">Import Existing CV</span>
-            <span className="text-xs text-gray-400 mt-1 text-center">Upload a PDF or DOCX to auto-fill</span>
-          </div>
-        </div>
-
-        {/* Photo shape toggle */}
-        {personal.photo && personal.showPhoto && (
-          <div className="mt-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Photo Shape</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPhotoShape("round")}
-                className={`px-4 py-1.5 rounded-lg text-sm transition ${
-                  photoShape === "round"
-                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
-                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
-                }`}
-              >
-                ⬤ Round
-              </button>
-              <button
-                type="button"
-                onClick={() => setPhotoShape("square")}
-                className={`px-4 py-1.5 rounded-lg text-sm transition ${
-                  photoShape === "square"
-                    ? "border-2 border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold"
-                    : "border border-gray-200 text-gray-500 hover:border-indigo-300"
-                }`}
-              >
-                ■ Square
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Core fields */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="cv-label">FIRST NAME (MANDATORY)</label>
+      {/*
+        Core contact fields render BEFORE the photo + tip card at every
+        viewport — the required action (name, headline, phone, email) is the
+        primary task; the optional photo and the rotating tip are supporting
+        material that follows. Previously this wrapper used
+        `flex-col-reverse xl:flex-col` to keep desktop in the old DOM order,
+        which left the bug: on desktop the photo + tip card sat above the
+        contact fields. Fix is the physically reorder the DOM children so
+        order is consistent at all widths; the responsive flex-reverse is
+        gone and no breakpoint needs to stay in sync.
+      */}
+      <div className="flex flex-col" style={{ gap: 22 }}>
+        {/* Core fields grid — primary, ALWAYS first */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 14,
+          }}
+          className="ff-core-fields"
+        >
+        <Field
+          label="First name"
+          required
+          error={errors.firstName?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Muhammad"
             {...register("firstName")}
             onChange={(e) => {
-              e.target.value = sanitizeName(e.target.value);
+              e.target.value = sanitizeNameLive(e.target.value);
               register("firstName").onChange(e);
             }}
+            onBlur={(e) => {
+              e.target.value = sanitizeName(e.target.value);
+              register("firstName").onChange(e);
+              register("firstName").onBlur(e);
+            }}
           />
-          {errors.firstName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">LAST NAME (MANDATORY)</label>
+        </Field>
+        <Field
+          label="Last name"
+          required
+          error={errors.lastName?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Al-Rashidi"
             {...register("lastName")}
             onChange={(e) => {
-              e.target.value = sanitizeName(e.target.value);
+              e.target.value = sanitizeNameLive(e.target.value);
               register("lastName").onChange(e);
             }}
-          />
-          {errors.lastName?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">CITY</label>
-          <input
-            className="cv-input"
-            placeholder="e.g. Dubai, UAE"
-            {...register("location")}
-            onChange={(e) => {
-              e.target.value = sanitizeLocation(e.target.value);
-              register("location").onChange(e);
+            onBlur={(e) => {
+              e.target.value = sanitizeName(e.target.value);
+              register("lastName").onChange(e);
+              register("lastName").onBlur(e);
             }}
           />
-        </div>
-
-        <div>
-          <label className="cv-label">HEADLINE / JOB TITLE</label>
+        </Field>
+        <Field
+          label="Headline"
+          hint="Mirrors the role you want, not the one you held."
+          error={errors.headline?.message}
+        >
           <input
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
             {...register("headline")}
             onChange={(e) => {
-              e.target.value = sanitizeJobTitle(e.target.value);
+              e.target.value = sanitizeJobTitleLive(e.target.value);
               register("headline").onChange(e);
             }}
+            onBlur={(e) => {
+              e.target.value = sanitizeJobTitle(e.target.value);
+              register("headline").onChange(e);
+              register("headline").onBlur(e);
+            }}
           />
-          {errors.headline?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.headline.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="cv-label">PHONE (MANDATORY)</label>
+        </Field>
+        <Field label="City" leftIcon="pin">
+          <input
+            className="cv-input"
+            placeholder="e.g. Dubai, UAE"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
+            {...register("location")}
+            onChange={(e) => {
+              e.target.value = sanitizeLocationLive(e.target.value);
+              register("location").onChange(e);
+            }}
+            onBlur={(e) => {
+              e.target.value = sanitizeLocation(e.target.value);
+              register("location").onChange(e);
+              register("location").onBlur(e);
+            }}
+          />
+        </Field>
+        <Field label="Phone" leftIcon="phone" required>
           <input
             className="cv-input"
             placeholder="+971 50 123 4567"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("phone")}
             onChange={(e) => {
-              e.target.value = sanitizePhone(e.target.value);
+              e.target.value = sanitizePhoneLive(e.target.value);
               register("phone").onChange(e);
             }}
+            onBlur={(e) => {
+              e.target.value = sanitizePhone(e.target.value);
+              register("phone").onChange(e);
+              register("phone").onBlur(e);
+            }}
           />
-        </div>
-
-        <div>
-          <label className="cv-label">EMAIL (MANDATORY)</label>
+        </Field>
+        <Field
+          label="Email"
+          leftIcon="mail"
+          required
+          error={errors.email?.message}
+        >
           <input
             className="cv-input"
             placeholder="yourname@email.com"
+            style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("email")}
             onChange={(e) => {
               e.target.value = sanitizeEmail(e.target.value);
@@ -262,129 +283,105 @@ export const PersonalStep = ({
               setFieldError("email", validateEmail(e.target.value));
             }}
           />
-          {errors.email?.message && (
-            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
-          )}
           <FieldError message={fieldErrors.email ?? null} />
+        </Field>
+        </div>
+
+        {/* Photo + Today's Tip side-by-side — supporting material, ALWAYS after the core fields */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.1fr 1fr",
+            gap: 12,
+          }}
+          className="ff-photo-tip-grid"
+        >
+          <PhotoUpload
+            photo={personal.photo}
+            showPhoto={personal.showPhoto}
+            photoShape={photoShape}
+            onPhotoChange={handlePhotoChange}
+            onToggleChange={handleToggleChange}
+            onShapeChange={setPhotoShape}
+            initials={initials}
+          />
+          <TodaysTipCard stepId="personal" />
         </div>
       </div>
 
-      {/* Add more details */}
-      <div>
+      {/* UAE essentials + extras live on their own step now — see
+          UAEEssentialsStep. Continue → routes there next. */}
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 4,
+        }}
+      >
         <button
-          type="button"
-          onClick={() => setShowMore((v) => !v)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--brand-primary)",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-            transition: "color var(--transition-fast)",
-          }}
+          type="submit"
+          className="cv-btn-primary"
+          style={{ padding: "12px 26px" }}
         >
-          <span
-            style={{
-              display: "inline-block",
-              transition: "transform var(--transition-fast)",
-              transform: showMore ? "rotate(45deg)" : "none",
-            }}
-          >
-            +
-          </span>
-          {showMore ? "Hide extra details" : "Add more details"}
+          Continue
+          <Icon name="chevron-right" size={14} strokeWidth={2.5} />
         </button>
-
-        {showMore && (
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <label className="cv-label">LINKEDIN</label>
-              <input
-                className="cv-input"
-                placeholder="linkedin.com/in/yourname"
-                {...register("linkedin")}
-                onBlur={(e) => {
-                  register("linkedin").onBlur(e);
-                  const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value) setValue("linkedin", url, { shouldDirty: true });
-                  setFieldError("linkedin", validateLinkedIn(url));
-                }}
-              />
-              <FieldError message={fieldErrors.linkedin ?? null} type="warning" />
-            </div>
-            <div>
-              <label className="cv-label">WEBSITE</label>
-              <input
-                className="cv-input"
-                placeholder="www.yourportfolio.com"
-                {...register("website")}
-                onBlur={(e) => {
-                  register("website").onBlur(e);
-                  const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value) setValue("website", url, { shouldDirty: true });
-                  setFieldError("website", validateURL(url));
-                }}
-              />
-              <FieldError message={fieldErrors.website ?? null} type="warning" />
-            </div>
-            <div>
-              <label className="cv-label">NATIONALITY</label>
-              <input
-                className="cv-input"
-                placeholder="e.g. Emirati, Pakistani, Indian"
-                {...register("nationality")}
-                onChange={(e) => {
-                  e.target.value = sanitizeName(e.target.value);
-                  register("nationality").onChange(e);
-                }}
-              />
-            </div>
-            <div>
-              <label className="cv-label">COUNTRY</label>
-              <input
-                className="cv-input"
-                placeholder="e.g. United Arab Emirates"
-                {...register("country")}
-                onChange={(e) => {
-                  e.target.value = sanitizeLocation(e.target.value);
-                  register("country").onChange(e);
-                }}
-              />
-            </div>
-            <div>
-              <label className="cv-label">DATE OF BIRTH</label>
-              <input
-                className="cv-input"
-                placeholder="e.g. 15/03/1990"
-                {...register("dateOfBirth")}
-              />
-            </div>
-            <div>
-              <label className="cv-label">DRIVING LICENSE</label>
-              <input
-                className="cv-input"
-                placeholder="e.g. UAE Light Vehicle License"
-                {...register("drivingLicense")}
-              />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ATS tip */}
-      <div className="cv-tip-box">
-        ATS tip: Match the contact details you use on job applications.
-      </div>
-
-      {/* Navigation */}
-      <NavigationButtons
-        onNext={handleSubmit(onNext)}
-      />
+      <style>{`
+        @media (max-width: 900px) {
+          .ff-photo-tip-grid { grid-template-columns: 1fr !important; }
+          .ff-core-fields { grid-template-columns: 1fr !important; }
+          .ff-uae-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </form>
   );
 };
+
+/* ─── Helpers ─── */
+const ImportButton = ({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: "upload" | "linkedin";
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      width: "100%",
+      fontFamily: "var(--font-body)",
+      fontSize: 13,
+      color: "var(--ff-ink)",
+      background: "var(--ff-card)",
+      border: "1px dashed var(--ff-line-strong)",
+      padding: "13px 16px",
+      borderRadius: 12,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      cursor: "pointer",
+      fontWeight: 500,
+      transition: "border-color 120ms, background 120ms, color 120ms",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.borderColor = "var(--ff-accent)";
+      e.currentTarget.style.color = "var(--ff-accent-dark)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = "var(--ff-line-strong)";
+      e.currentTarget.style.color = "var(--ff-ink)";
+    }}
+  >
+    <Icon name={icon} size={14} />
+    {label}
+  </button>
+);

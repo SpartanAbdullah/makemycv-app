@@ -15,40 +15,19 @@ export type AIImprovePayload = {
   existingSummary?: string;
 };
 
-const STORAGE_KEYS: Record<AIImproveType, string> = {
-  bullets: "makemycv_ai_bullets_used",
-  skills: "makemycv_ai_skills_used",
-  summary: "makemycv_ai_summary_used",
+export type AIError = {
+  code: "RATE_LIMITED" | "OTHER";
+  message: string;
+  supportUrl?: string;
+  retryAfter?: number;
 };
-
-export function hasUsedFreeAI(type: AIImproveType): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(STORAGE_KEYS[type]) === "1";
-  } catch {
-    return false;
-  }
-}
 
 export function useAIImprove() {
   const [results, setResults] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AIError | null>(null);
 
   const improve = useCallback(async (payload: AIImprovePayload) => {
-    const key = STORAGE_KEYS[payload.type];
-
-    try {
-      if (localStorage.getItem(key) === "1") {
-        setError("FREE_LIMIT_REACHED");
-        setResults([]);
-        setIsLoading(false);
-        return;
-      }
-    } catch {
-      /* SSR guard */
-    }
-
     setIsLoading(true);
     setError(null);
     setResults([]);
@@ -60,36 +39,48 @@ export function useAIImprove() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = (await res.json().catch(() => null)) as
+        | {
+            results?: string[];
+            error?: string;
+            message?: string;
+            supportUrl?: string;
+            retryAfter?: number;
+          }
+        | null;
 
-      if (!res.ok) {
-        setError(data.error || "Something went wrong");
-        setIsLoading(false);
+      if (res.status === 429) {
+        setError({
+          code: "RATE_LIMITED",
+          message:
+            data?.message ??
+            "You've used your AI improvements for now. They reset gradually.",
+          supportUrl: data?.supportUrl,
+          retryAfter: data?.retryAfter,
+        });
         return;
       }
 
-      setResults(data.results);
-      try {
-        localStorage.setItem(key, "1");
-      } catch {
-        /* storage full */
+      if (!res.ok) {
+        setError({
+          code: "OTHER",
+          message: data?.error ?? "Something went wrong",
+        });
+        return;
       }
+
+      setResults(data?.results ?? []);
     } catch {
-      setError("Something went wrong");
+      setError({ code: "OTHER", message: "Something went wrong" });
     } finally {
       setIsLoading(false);
     }
   }, []);
-
-  const hasUsedFree = useCallback(
-    (type: AIImproveType) => hasUsedFreeAI(type),
-    [],
-  );
 
   const clearResults = useCallback(() => {
     setResults([]);
     setError(null);
   }, []);
 
-  return { improve, results, isLoading, error, hasUsedFree, clearResults };
+  return { improve, results, isLoading, error, clearResults };
 }

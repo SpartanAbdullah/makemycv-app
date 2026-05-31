@@ -1,6 +1,8 @@
 // Static mockup that previews the upcoming ATS report on the upload page.
 // Pure JSX, no interactivity, no real data. "Aisha K." is a placeholder.
 
+import { Logo } from "../Logo";
+
 const EXAMPLE_SCORE = 82;
 const RADIUS = 40;
 const STROKE = 8;
@@ -26,12 +28,8 @@ export default function ExampleReportPreview() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-line bg-paper-2 px-5 py-3">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-brand-blue/10 flex items-center justify-center text-brand-blue" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.6 4.6a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <span className="text-xs font-semibold text-slate-900">MakeMyCV · ATS Checker</span>
+          <Logo variant="mark" height={22} href={null} />
+          <span className="text-xs font-semibold text-slate-900">makemycv.ae · ATS Checker</span>
         </div>
         <div className="rounded-md border border-line bg-paper px-2 py-1 text-[10px] font-medium text-slate-500">
           Share

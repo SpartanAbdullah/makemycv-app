@@ -3,7 +3,6 @@
 import { useMemo, useState, useRef, useCallback } from "react";
 import { useCvStore } from "../lib/store/cvStore";
 import { computeScore } from "../lib/scoreEngine";
-import { hasUsedFreeAI } from "../hooks/useAIImprove";
 import type {
   ScoreCategory,
   ScoreCategoryId,
@@ -252,21 +251,16 @@ function CategoryCard({
           {(() => {
             const aiCta = AI_CTA_BY_CATEGORY[category.id];
             if (aiCta) {
-              const used = hasUsedFreeAI(aiCta.type);
               return (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (used) {
-                      onSectionClick?.(category.id);
-                    } else {
-                      triggerAIAndNavigate(aiCta.type, category.id, onSectionClick);
-                    }
+                    triggerAIAndNavigate(aiCta.type, category.id, onSectionClick);
                   }}
                   className="mt-1 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
                 >
-                  {used ? `${aiCta.label} \u{1F512}` : aiCta.label}
+                  {aiCta.label}
                 </button>
               );
             }
@@ -293,21 +287,16 @@ function CategoryCard({
           {(() => {
             const aiCta = AI_CTA_BY_CATEGORY[category.id];
             if (aiCta) {
-              const used = hasUsedFreeAI(aiCta.type);
               return (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (used) {
-                      onSectionClick?.(category.id);
-                    } else {
-                      triggerAIAndNavigate(aiCta.type, category.id, onSectionClick);
-                    }
+                    triggerAIAndNavigate(aiCta.type, category.id, onSectionClick);
                   }}
                   className="mt-1 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
                 >
-                  {used ? `${aiCta.label} \u{1F512}` : aiCta.label}
+                  {aiCta.label}
                 </button>
               );
             }

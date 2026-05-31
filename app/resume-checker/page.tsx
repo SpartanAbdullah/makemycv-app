@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import UploadDropzone from "@/components/resume-checker/UploadDropzone";
 import ExampleReportPreview from "@/components/resume-checker/ExampleReportPreview";
+import { Logo } from "@/components/Logo";
 
 export const metadata: Metadata = {
   title: "Free ATS Resume Checker for UAE Jobs | MakeMyCV",
@@ -77,7 +78,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Is it really free?",
-    a: "Yes. The full report — scores, issues, recommended fixes, all of it — is free. If you later want to fix everything inside our builder and export a polished PDF, that's a one-time $5 charge. No subscriptions.",
+    a: "Yes — the report and the builder are both free, no sign-up, no payment. If MakeMyCV saves you time and you want to help cover hosting and AI costs, there's a tip jar — but it's entirely optional.",
   },
   {
     q: "How accurate is the parser?",
@@ -105,6 +106,9 @@ export default function ResumeCheckerPage() {
           }}
         />
         <div className="relative mx-auto max-w-5xl px-6 text-center">
+          <div className="mb-8 flex justify-center">
+            <Logo variant="white" height={32} href="/" />
+          </div>
           <div className="mb-4 inline-flex rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/80">
             Free · No sign-up · UAE-focused
           </div>

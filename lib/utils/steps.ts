@@ -1,6 +1,7 @@
 export type BuilderStep = {
   id:
     | "personal"
+    | "uaeEssentials"
     | "summary"
     | "experience"
     | "education"
@@ -20,6 +21,12 @@ export const builderSteps: BuilderStep[] = [
     title: "Personal Info",
     required: true,
     atsTip: "Match the name and email you use on applications.",
+  },
+  {
+    id: "uaeEssentials",
+    title: "UAE Essentials",
+    atsTip:
+      "Visa status and notice period let UAE recruiters pre-screen in seconds.",
   },
   {
     id: "summary",

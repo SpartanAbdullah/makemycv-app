@@ -16,6 +16,8 @@ export const personalSchema = z.object({
   country: z.string().optional(),
   dateOfBirth: z.string().optional(),
   drivingLicense: z.string().optional(),
+  visaStatus: z.string().optional(),
+  availability: z.string().optional(),
 });
 
 export const summarySchema = z.object({

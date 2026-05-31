@@ -1,6 +1,8 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatRange, getFullName } from "./utils";
+import { getEssentialChips } from "../utils/essentials";
+import { resolveTheme } from "./theme";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,7 @@ export const ATSCleanTemplate = ({
 }) => {
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
+  const theme = resolveTheme(data.settings, "#111827");
 
   // Contact line — plain text only, no emoji, separated by middle dot
   const contactParts: string[] = [
@@ -74,14 +77,12 @@ export const ATSCleanTemplate = ({
     data.personal.website?.trim()
       ? shortenDisplayUrl(data.personal.website)
       : "",
-    data.personal.nationality?.trim() || "",
-    data.personal.drivingLicense?.trim()
-      ? `DL: ${data.personal.drivingLicense.trim()}`
-      : "",
     data.personal.dateOfBirth?.trim()
       ? `DOB: ${data.personal.dateOfBirth.trim()}`
       : "",
   ].filter(Boolean);
+
+  const essentialChips = getEssentialChips(data.personal);
 
   const hasSummary = Boolean(data.personal.summary?.trim());
   const hasExperience = data.experience.length > 0;
@@ -90,7 +91,9 @@ export const ATSCleanTemplate = ({
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
-  const showPhoto = Boolean(data.personal.photo && data.personal.showPhoto);
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
 
   // Determine which section is rendered first (for marginTop: 0)
   const firstSection = hasSummary
@@ -116,7 +119,7 @@ export const ATSCleanTemplate = ({
         minHeight: "1123px",
         backgroundColor: "#ffffff",
         padding: "48px 52px",
-        fontFamily: "inherit",
+        fontFamily: theme.fontFamily,
         fontSize: "11.5px",
         color: "#1a1a1a",
         lineHeight: 1.55,
@@ -171,6 +174,20 @@ export const ATSCleanTemplate = ({
                 {contactParts.join(" · ")}
               </div>
             )}
+            {essentialChips.length > 0 && (
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "#374151",
+                  lineHeight: 1.55,
+                  marginTop: "2px",
+                }}
+              >
+                {essentialChips
+                  .map((c) => `${c.label}: ${c.value}`)
+                  .join(" · ")}
+              </div>
+            )}
           </div>
 
           {showPhoto && data.personal.photo && (
@@ -202,7 +219,7 @@ export const ATSCleanTemplate = ({
 
         <div
           style={{
-            borderBottom: "2px solid #111827",
+            borderBottom: `2px solid ${theme.accent}`,
             marginTop: "8px",
             marginBottom: "16px",
           }}

@@ -5,6 +5,9 @@ import ScoreSidebar from "@/components/resume-checker/ScoreSidebar";
 import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
+import PostReportTipJar from "@/components/resume-checker/PostReportTipJar";
+import { Logo } from "@/components/Logo";
+import { SUPPORT_URL } from "@/lib/config/support";
 
 export const runtime = "nodejs";
 
@@ -81,17 +84,10 @@ export default async function ReportPage({
       {/* Sticky top bar */}
       <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6">
-          <Link
-            href="/resume-checker"
-            className="flex items-center gap-2 font-display text-sm font-semibold text-slate-900"
-          >
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-blue/10 text-brand-blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.6 4.6a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </span>
-            MakeMyCV · ATS Checker
-          </Link>
+          <div className="flex items-center gap-3">
+            <Logo variant="horizontal" height={28} href="/resume-checker" />
+            <span className="hidden text-xs text-slate-500 sm:inline">· ATS Checker</span>
+          </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-slate-500 sm:inline">
               Report <span className="font-mono text-slate-700">{shortReportId(reportId)}</span> · available 24h
@@ -127,10 +123,27 @@ export default async function ReportPage({
         </div>
       </section>
 
+      {/* Footer — subtle support link, NOT a CTA */}
+      <footer className="mx-auto max-w-6xl px-6 pt-10 pb-12 text-center text-xs text-slate-500">
+        <a
+          href={SUPPORT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-slate-700"
+        >
+          Built by Abdullah
+        </a>
+      </footer>
+
       {/* Mobile sticky Fix CTA (hidden on lg+ where sidebar is visible) */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 p-3 backdrop-blur lg:hidden">
         <FixInBuilderButton reportId={reportId} />
       </div>
+
+      {/* Tip jar — fires 1500ms after the report mounts (the ATS check success
+          moment). Suppressed for 90 days after a tip or dismissal, and once
+          per session. NOT a blocker. */}
+      <PostReportTipJar />
     </main>
   );
 }

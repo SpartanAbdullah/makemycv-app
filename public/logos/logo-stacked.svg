@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="190" viewBox="0 0 240 190" role="img">
+  <title>makemycv.ae stacked logo</title>
+  <desc>The ascending two-peak icon above the wordmark makemycv dot ae.</desc>
+  <g transform="translate(74,18) scale(1.4375)">
+    <rect x="1" y="1" width="62" height="62" rx="15" fill="#1B2A4A"></rect>
+    <path d="M10 48 L21 33 L30 48 Z" fill="#F4EEE0"></path>
+    <path d="M28 48 L42 15 L54 48 Z" fill="#C49A48"></path>
+  </g>
+  <text x="120" y="150" text-anchor="middle" font-family="Poppins, Montserrat, &#39;Segoe UI&#39;, Arial, sans-serif" font-size="32" font-weight="600" letter-spacing="-0.8" fill="#1B2A4A">makemycv<tspan fill="#C49A48">.ae</tspan></text>
+</svg>

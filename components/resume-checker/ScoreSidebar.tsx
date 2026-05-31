@@ -56,14 +56,11 @@ export default function ScoreSidebar({
           </div>
         </div>
 
-        {/* Premium CTA */}
+        {/* Fix-in-Builder CTA */}
         <div className="mt-6 border-t border-line pt-5">
           <FixInBuilderButton reportId={reportId} />
           <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-500">
-            All report insights are free. Builder unlocks cost $5.
-          </p>
-          <p className="mt-1 text-center text-[11px] leading-relaxed text-slate-500">
-            No subscription. No trial.
+            Report and builder are both free. No sign-up.
           </p>
         </div>
       </div>

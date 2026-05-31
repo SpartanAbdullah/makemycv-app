@@ -8,10 +8,87 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
-import { sanitizeLanguageName } from "../../../lib/sanitize";
+import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
+import { UAEDot } from "../UAEDot";
+import { Icon } from "../Icon";
 import type { CvLanguage, LanguageLevel } from "../../../lib/types/cv";
 
 type LanguagesForm = { languages: CvLanguage[] };
+
+/* ── Suggested-language chips (UAE-relevant) ───────────────────────────── */
+
+const COMMON_LANGUAGES = [
+  "English",
+  "Arabic",
+  "Urdu",
+  "Hindi",
+  "Tagalog",
+  "Malayalam",
+  "Tamil",
+  "French",
+  "Russian",
+];
+
+const SuggestionChips = ({
+  current,
+  onAdd,
+}: {
+  current: string[];
+  onAdd: (name: string) => void;
+}) => {
+  const taken = new Set(current.map((n) => n.trim().toLowerCase()));
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "var(--ff-muted)",
+          textTransform: "uppercase",
+          marginBottom: 8,
+        }}
+      >
+        Quick add
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {COMMON_LANGUAGES.map((lang) => {
+          const isAdded = taken.has(lang.toLowerCase());
+          return (
+            <button
+              key={lang}
+              type="button"
+              onClick={() => {
+                if (!isAdded) onAdd(lang);
+              }}
+              disabled={isAdded}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 12,
+                padding: "5px 12px",
+                borderRadius: 999,
+                border: isAdded
+                  ? "1px solid var(--ff-accent-soft)"
+                  : "1px solid var(--ff-line)",
+                background: isAdded ? "var(--ff-accent-soft)" : "white",
+                color: isAdded ? "var(--ff-accent-dark)" : "var(--ff-ink)",
+                cursor: isAdded ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                transition: "border-color 120ms, background 120ms",
+                opacity: isAdded ? 0.75 : 1,
+              }}
+            >
+              {isAdded ? "✓ " : "+ "}
+              {lang}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 /* ── Custom proficiency dropdown ── */
 
@@ -180,25 +257,36 @@ export const LanguagesStep = ({
   }, [watch, updateSection]);
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit(onNext)}
+      style={{ display: "flex", flexDirection: "column", gap: 22 }}
+    >
       <section className="cv-step-card">
-        <div className="flex items-center justify-between">
-          <h2 className="cv-step-heading">Languages</h2>
-          <span className="cv-badge-optional">Optional</span>
-        </div>
-        <p className="cv-step-subtitle">
-          Add languages and proficiency levels.
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Suggested languages — common in the UAE labour market */}
+          <SuggestionChips
+            current={fields.map((f) => f.name)}
+            onAdd={(name) =>
+              append({
+                id: crypto.randomUUID(),
+                name,
+                level: "conversational",
+              })
+            }
+          />
 
-        <div className="mt-6 space-y-4">
           <button
             type="button"
             onClick={() =>
-              append({ id: crypto.randomUUID(), name: "", level: "conversational" })
+              append({
+                id: crypto.randomUUID(),
+                name: "",
+                level: "conversational",
+              })
             }
             className="cv-btn-ghost"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            <Icon name="plus" size={14} />
             Add language
           </button>
 
@@ -210,8 +298,13 @@ export const LanguagesStep = ({
                   placeholder="e.g. Arabic"
                   {...register(`languages.${index}.name`)}
                   onChange={(e) => {
+                    e.target.value = sanitizeLanguageNameLive(e.target.value);
+                    register(`languages.${index}.name`).onChange(e);
+                  }}
+                  onBlur={(e) => {
                     e.target.value = sanitizeLanguageName(e.target.value);
                     register(`languages.${index}.name`).onChange(e);
+                    register(`languages.${index}.name`).onBlur(e);
                   }}
                 />
               </Field>
@@ -226,18 +319,14 @@ export const LanguagesStep = ({
               <button
                 type="button"
                 onClick={() => remove(index)}
-                className="cv-btn-danger self-end"
-                style={{ marginTop: 8 }}
+                className="cv-btn-danger"
+                style={{ alignSelf: "center", marginTop: 26 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                <Icon name="trash" size={12} />
                 Remove
               </button>
             </div>
           ))}
-        </div>
-
-        <div className="cv-tip-box" style={{ marginTop: 16 }}>
-          ATS tip: Use standard proficiency labels. Arabic and English are highly valued in the UAE — list both if applicable.
         </div>
       </section>
 

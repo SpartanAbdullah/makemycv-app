@@ -29,9 +29,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // MakeMyCV is now fully free — see DECISION_LOG.md 2026-05-31. This
+    // endpoint stays mounted for back-compat with any stale clients but
+    // returns honest copy: the code "applies" without unlocking anything
+    // (because everything is already unlocked for everyone).
     return NextResponse.json({
       code: coupon.code,
-      message: "Promo applied. Pro features are now unlocked.",
+      message: "MakeMyCV is now free for everyone — no promo code needed.",
     });
   } catch {
     return NextResponse.json(

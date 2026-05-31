@@ -1,0 +1,234 @@
+"use client";
+
+import { useCvStore } from "../../lib/store/cvStore";
+import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
+
+const ACCENT_SWATCHES: { label: string; hex: string }[] = [
+  { label: "Emerald", hex: "#0E7C4A" },
+  { label: "Navy", hex: "#1E2A4A" },
+  { label: "Teal", hex: "#1e5b54" },
+  { label: "Burgundy", hex: "#7A1F2B" },
+  { label: "Slate", hex: "#1F2937" },
+  { label: "Royal", hex: "#1E3A8A" },
+  { label: "Forest", hex: "#14532D" },
+  { label: "Bronze", hex: "#92400E" },
+];
+
+const FONT_SCALES: { label: string; value: number }[] = [
+  { label: "Compact", value: 0.92 },
+  { label: "Normal", value: 1 },
+  { label: "Spacious", value: 1.08 },
+];
+
+const FONT_FAMILIES: { label: string; value: CvFontFamily; sample: string }[] = [
+  { label: "Sans", value: "sans", sample: "Inter" },
+  { label: "Display", value: "display", sample: "Bricolage" },
+  { label: "Serif", value: "serif", sample: "Instrument" },
+];
+
+const PHOTO_SHAPES: { label: string; value: PhotoShape }[] = [
+  { label: "Round", value: "round" },
+  { label: "Square", value: "square" },
+  { label: "Hidden", value: "hidden" },
+];
+
+const Group = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div>
+    <div
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.12em",
+        color: "var(--ff-muted)",
+        textTransform: "uppercase",
+        marginBottom: 8,
+      }}
+    >
+      {label}
+    </div>
+    {children}
+  </div>
+);
+
+const Segmented = <T extends string | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { label: string; value: T; sample?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) => (
+  <div
+    style={{
+      display: "inline-flex",
+      background: "var(--ff-paper)",
+      border: "1px solid var(--ff-line)",
+      borderRadius: 10,
+      padding: 3,
+      gap: 2,
+    }}
+  >
+    {options.map((opt) => {
+      const active = opt.value === value;
+      return (
+        <button
+          key={String(opt.value)}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 12,
+            fontWeight: active ? 600 : 500,
+            padding: "5px 12px",
+            borderRadius: 7,
+            border: "none",
+            background: active ? "var(--ff-ink)" : "transparent",
+            color: active ? "white" : "var(--ff-ink-2)",
+            cursor: "pointer",
+            transition: "background 120ms",
+          }}
+        >
+          {opt.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+export const CustomizePanel = () => {
+  const data = useCvStore((s) => s.data);
+  const updateSection = useCvStore((s) => s.updateSection);
+  const settings = data.settings;
+
+  const setSetting = <K extends keyof typeof settings>(
+    key: K,
+    value: (typeof settings)[K],
+  ) => {
+    updateSection("settings", { ...settings, [key]: value });
+  };
+
+  const accentColor = settings.accentColor ?? "#1e5b54";
+
+  return (
+    <div
+      style={{
+        background: "var(--ff-card)",
+        border: "1px solid var(--ff-line)",
+        borderRadius: 14,
+        padding: 18,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 16,
+            fontWeight: 600,
+            color: "var(--ff-ink)",
+            marginBottom: 2,
+          }}
+        >
+          Customize
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--ff-muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          Apply across all templates. Live preview updates as you tweak.
+        </div>
+      </div>
+
+      <Group label="Accent colour">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {ACCENT_SWATCHES.map((sw) => {
+            const active = accentColor.toLowerCase() === sw.hex.toLowerCase();
+            return (
+              <button
+                key={sw.hex}
+                type="button"
+                title={sw.label}
+                aria-label={sw.label}
+                onClick={() => setSetting("accentColor", sw.hex)}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: sw.hex,
+                  border: active
+                    ? "2px solid var(--ff-ink)"
+                    : "1.5px solid var(--ff-line)",
+                  outline: active ? "2px solid white" : "none",
+                  outlineOffset: -4,
+                  cursor: "pointer",
+                  padding: 0,
+                  flexShrink: 0,
+                }}
+              />
+            );
+          })}
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginLeft: 4,
+            }}
+          >
+            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>Hex</span>
+            <input
+              type="color"
+              value={accentColor}
+              onChange={(e) => setSetting("accentColor", e.target.value)}
+              style={{
+                width: 28,
+                height: 24,
+                border: "1px solid var(--ff-line)",
+                borderRadius: 6,
+                background: "transparent",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            />
+          </label>
+        </div>
+      </Group>
+
+      <Group label="Font scale">
+        <Segmented
+          options={FONT_SCALES}
+          value={settings.fontScale ?? 1}
+          onChange={(v) => setSetting("fontScale", v)}
+        />
+      </Group>
+
+      <Group label="Font family">
+        <Segmented
+          options={FONT_FAMILIES}
+          value={settings.fontFamily ?? "sans"}
+          onChange={(v) => setSetting("fontFamily", v)}
+        />
+      </Group>
+
+      <Group label="Photo">
+        <Segmented
+          options={PHOTO_SHAPES}
+          value={settings.photoShape ?? "round"}
+          onChange={(v) => setSetting("photoShape", v)}
+        />
+      </Group>
+    </div>
+  );
+};

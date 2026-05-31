@@ -2,10 +2,14 @@ import type { CvData, CvSkill, PlanTier } from "../types/cv";
 import { formatDateRange } from "../utils/format";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
+import { getEssentialChips } from "../utils/essentials";
+import { resolveTheme } from "./theme";
 
 export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: PlanTier }) => {
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline || "Your Headline";
+  const theme = resolveTheme(data.settings, "#1e5b54");
+  const photoVisible = theme.photoVisible;
   const hasSummary = Boolean(data.personal.summary);
   const hasExperience = data.experience.length > 0;
   const hasEducation = data.education.length > 0;
@@ -84,16 +88,12 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           wrapAnywhere: true,
         }
       : null,
-    data.personal.nationality?.trim()
-      ? { icon: "🌍", text: data.personal.nationality.trim(), wrapAnywhere: false }
-      : null,
-    data.personal.drivingLicense?.trim()
-      ? { icon: "🚗", text: data.personal.drivingLicense.trim(), wrapAnywhere: false }
-      : null,
     data.personal.dateOfBirth?.trim()
       ? { icon: "🎂", text: `DOB: ${data.personal.dateOfBirth.trim()}`, wrapAnywhere: false }
       : null,
   ].filter(Boolean) as Array<{ icon: string; text: string; href?: string; wrapAnywhere: boolean }>;
+
+  const essentialChips = getEssentialChips(data.personal);
 
   const toTitleCase = (value: string) =>
     value
@@ -108,7 +108,10 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const formatSkill = (skill: CvSkill) => toTitleCase(skill.name);
 
   return (
-    <div className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[11.5px] leading-[1.45] text-slate-700">
+    <div
+      className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[11.5px] leading-[1.45] text-slate-700"
+      style={{ fontFamily: theme.fontFamily }}
+    >
       {plan === "free" && (
         <div
           aria-hidden="true"
@@ -165,10 +168,23 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                   ))}
                 </div>
               )}
+              {essentialChips.length > 0 && (
+                <div className="mt-1.5 text-[10px] leading-snug text-slate-600">
+                  {essentialChips.map((chip, idx) => (
+                    <span key={chip.label}>
+                      <span className="font-semibold text-slate-800">{chip.label}:</span>{" "}
+                      <span>{chip.value}</span>
+                      {idx < essentialChips.length - 1 ? (
+                        <span className="text-slate-300 mx-1.5">·</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Photo: absolute top-right */}
-            {data.personal.photo && data.personal.showPhoto && (
+            {data.personal.photo && data.personal.showPhoto && photoVisible && (
               <div
                 style={{
                   position: "absolute",
