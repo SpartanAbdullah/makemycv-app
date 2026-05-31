@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SUPPORT_URL } from "../lib/config/support";
+import { KofiIcon } from "./KofiIcon";
 
 /**
  * DownloadTipModal — post-download tip jar surface.
@@ -13,33 +14,32 @@ import { SUPPORT_URL } from "../lib/config/support";
  * download.
  *
  * Phase set:
- *   picking ── tip presets + custom amount + emoji escalation.
- *              Primary CTA "Tip $X via PayPal" opens PayPal in a new
- *              tab, writes mmcv_tipped_at, advances to thanks. NO
- *              download is triggered — the download already happened.
+ *   picking ── Ko-fi primary CTA + PayPal secondary link + "Maybe
+ *              later" dismiss. No amount picker (Ko-fi handles amount
+ *              on its own page). On either tip click: open the external
+ *              tab, write `mmcv_tipped_at`, advance to `thanks`.
  *   thanks  ── 🎉 + personalised thank-you, spread-the-word with copy
  *              link, feedback link.
  *
  * Suppression (two layers, both checked by `shouldShowDownloadTip()`):
  *   1. `localStorage.mmcv_tipped_at` — 90-day window after a successful
- *      tip. Written by this modal on tip click, also by TipJar/
- *      TipJarModal in the ATS flow. Persists across refreshes.
+ *      tip click. Written here, also by TipJar in the ATS flow.
+ *      Persists across refreshes.
  *   2. Module-level `dismissedThisSession` — set on any close (X, Esc,
- *      backdrop). Survives client navigation between Builder and Review
- *      because module state is per-JS-execution-context; resets on a
- *      true page reload. Mirrors the TipJarModal pattern.
+ *      backdrop, "Maybe later", post-tip Close). Survives client
+ *      navigation between Builder and Review (same JS execution
+ *      context), resets on a true page reload. Mirrors TipJarModal.
  *
- * On a tip, suppression layer 1 kicks in (mmcv_tipped_at set). On a
- * plain dismiss without tipping, layer 2 kicks in (module flag) — user
- * gets prompted again after a page refresh, never within the session.
- *
- * This is a deliberate revert of the pre-download tip-gate that shipped
- * in 116c4aa. See DECISION_LOG.md 2026-05-31 (second entry) for the why.
+ * See DECISION_LOG.md 2026-05-31 for the full path that landed us here.
  */
 
+const KOFI_USERNAME =
+  process.env.NEXT_PUBLIC_KOFI_USERNAME || "makemycv_ae";
 const PAYPAL_HANDLE =
   process.env.NEXT_PUBLIC_PAYPAL_ME_HANDLE || "Abdullah2431";
-const PRESETS = [3, 5, 10, 25];
+
+const KOFI_URL = `https://ko-fi.com/${KOFI_USERNAME}`;
+const PAYPAL_URL = `https://paypal.me/${PAYPAL_HANDLE}`;
 const SHARE_URL = "https://makemycv.ae";
 const STORAGE_KEY = "mmcv_tipped_at";
 const SUPPRESS_DAYS = 90;
@@ -64,9 +64,8 @@ function isWithinSuppressionWindow(): boolean {
 
 /**
  * Combined suppression check for callers. Returns false if the user has
- * tipped in the last 90 days OR has dismissed the modal at any point
- * this session. Parents should call this before scheduling the modal to
- * open.
+ * tipped in the last 90 days OR dismissed the modal at any point this
+ * session. Parents should call this before scheduling the modal open.
  */
 export function shouldShowDownloadTip(): boolean {
   return !dismissedThisSession && !isWithinSuppressionWindow();
@@ -81,46 +80,15 @@ type Props = {
   userName?: string;
 };
 
-function emojiFor(amount: number): { emoji: string; message: string } {
-  if (amount < 1) {
-    return { emoji: "\u{1F914}", message: "Pick an amount to keep us going." };
-  }
-  if (amount <= 2) {
-    return { emoji: "\u{1F642}", message: "Thanks — every bit helps." };
-  }
-  if (amount <= 6) {
-    return { emoji: "\u{1F60A}", message: "Really appreciate this." };
-  }
-  if (amount <= 14) {
-    return { emoji: "\u{1F929}", message: "Wow — thank you!" };
-  }
-  if (amount <= 49) {
-    return { emoji: "\u{1F979}", message: "You're incredibly kind." };
-  }
-  return { emoji: "\u{1F680}", message: "You're a legend. Genuinely." };
-}
-
 export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
   const [phase, setPhase] = useState<Phase>("picking");
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(5);
-  const [customAmount, setCustomAmount] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
-  const [tippedAmount, setTippedAmount] = useState(0);
-
-  const amount =
-    selectedPreset ??
-    (customAmount ? Math.max(0, Math.floor(Number(customAmount))) : 0);
-  const { emoji, message } = emojiFor(amount);
-  const canTip = amount >= 1;
 
   // Reset to picking each time the modal opens
   useEffect(() => {
     if (!open) return;
     setPhase("picking");
-    setSelectedPreset(5);
-    setCustomAmount("");
     setShareCopied(false);
-    setTippedAmount(0);
   }, [open]);
 
   // Escape closes — inline the dismiss logic so the effect closure
@@ -151,8 +119,7 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
 
   if (!open) return null;
   // Defense-in-depth: parents already filter via shouldShowDownloadTip(),
-  // but a stale open=true from a 90-day-old localStorage stamp would
-  // otherwise leak through. Render nothing if suppressed.
+  // but a stale open=true should never leak through over a recent tip.
   if (isWithinSuppressionWindow()) return null;
 
   const handleClose = () => {
@@ -160,18 +127,18 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
     onClose();
   };
 
-  const handleTip = () => {
-    if (!canTip) return;
-    const url = `https://paypal.me/${PAYPAL_HANDLE}/${amount}USD`;
+  const markTippedAndAdvance = (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
     try {
       localStorage.setItem(STORAGE_KEY, new Date().toISOString());
     } catch {
       /* localStorage unavailable — silent fail */
     }
-    setTippedAmount(amount);
     setPhase("thanks");
   };
+
+  const handleKofi = () => markTippedAndAdvance(KOFI_URL);
+  const handlePaypal = () => markTippedAndAdvance(PAYPAL_URL);
 
   const handleCopyShare = async () => {
     try {
@@ -234,8 +201,8 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
           }}
         />
 
-        {/* Close button — always available; the modal is a non-blocking
-            tip jar, never a gate. */}
+        {/* Close button — always available; this is a non-blocking tip
+            jar, never a gate. */}
         <button
           type="button"
           onClick={handleClose}
@@ -274,27 +241,14 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
         <div style={{ padding: "32px 28px 28px" }}>
           {phase === "picking" && (
             <PickingView
-              amount={amount}
-              canTip={canTip}
-              emoji={emoji}
-              message={message}
-              selectedPreset={selectedPreset}
-              customAmount={customAmount}
-              onSelectPreset={(p) => {
-                setSelectedPreset(p);
-                setCustomAmount("");
-              }}
-              onCustomChange={(v) => {
-                setCustomAmount(v);
-                setSelectedPreset(null);
-              }}
-              onTip={handleTip}
+              onKofi={handleKofi}
+              onPaypal={handlePaypal}
+              onMaybeLater={handleClose}
             />
           )}
 
           {phase === "thanks" && (
             <ThanksView
-              amount={tippedAmount}
               displayName={displayName}
               shareCopied={shareCopied}
               onCopyShare={handleCopyShare}
@@ -317,220 +271,80 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
 /* ─── Picking ──────────────────────────────────────────────── */
 
 function PickingView({
-  amount,
-  canTip,
-  emoji,
-  message,
-  selectedPreset,
-  customAmount,
-  onSelectPreset,
-  onCustomChange,
-  onTip,
+  onKofi,
+  onPaypal,
+  onMaybeLater,
 }: {
-  amount: number;
-  canTip: boolean;
-  emoji: string;
-  message: string;
-  selectedPreset: number | null;
-  customAmount: string;
-  onSelectPreset: (p: number) => void;
-  onCustomChange: (v: string) => void;
-  onTip: () => void;
+  onKofi: () => void;
+  onPaypal: () => void;
+  onMaybeLater: () => void;
 }) {
   return (
     <>
-      <h2
-        className="font-display"
-        style={{
-          fontSize: 22,
-          fontWeight: 700,
-          color: "#0f172a",
-          margin: 0,
-          marginTop: 4,
-        }}
-      >
-        Did this help?
-      </h2>
-      <p
-        style={{
-          fontSize: 13.5,
-          color: "#64748b",
-          marginTop: 6,
-          marginBottom: 0,
-          lineHeight: 1.55,
-        }}
-      >
-        MakeMyCV is free because of people like you. A tip covers hosting
-        and the AI behind the bullets — completely optional.
-      </p>
-
-      {/* Presets */}
-      <div
-        style={{
-          marginTop: 22,
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 8,
-        }}
-      >
-        {PRESETS.map((p) => {
-          const active = selectedPreset === p;
-          return (
-            <button
-              key={p}
-              type="button"
-              onClick={() => onSelectPreset(p)}
-              aria-pressed={active}
-              className={
-                active
-                  ? "btn-primary"
-                  : "transition-colors hover:border-blue-300 hover:text-[#2563eb]"
-              }
-              style={{
-                padding: "10px 0",
-                borderRadius: 10,
-                border: active ? "none" : "1px solid #e2e8f0",
-                background: active ? undefined : "white",
-                color: active ? "white" : "#334155",
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              ${p}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Custom amount */}
-      <div style={{ marginTop: 12 }}>
-        <label
-          htmlFor="dtm-custom-amount"
+      <div style={{ textAlign: "center", marginTop: 4 }}>
+        <div style={{ fontSize: 44, lineHeight: 1 }}>{"\u{1F64F}"}</div>
+        <h2
+          className="font-display"
           style={{
-            display: "block",
-            fontSize: 11,
-            color: "#64748b",
-            fontWeight: 500,
-            marginBottom: 6,
+            fontSize: 22,
+            fontWeight: 700,
+            color: "#0f172a",
+            margin: "14px 0 0",
           }}
         >
-          Or enter your own amount
-        </label>
-        <div style={{ position: "relative" }}>
-          <span
-            style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#64748b",
-              pointerEvents: "none",
-            }}
-          >
-            $
-          </span>
-          <input
-            id="dtm-custom-amount"
-            type="number"
-            min={1}
-            step={1}
-            inputMode="numeric"
-            value={customAmount}
-            onChange={(e) => onCustomChange(e.target.value)}
-            placeholder="0"
-            style={{
-              width: "100%",
-              padding: "10px 12px 10px 26px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              fontSize: 14,
-              color: "#0f172a",
-              outline: "none",
-              background: "white",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Emoji + message */}
-      <div style={{ marginTop: 18, textAlign: "center" }}>
-        <div style={{ fontSize: 44, lineHeight: 1 }}>{emoji}</div>
+          Did MakeMyCV help you?
+        </h2>
         <p
           style={{
             marginTop: 8,
-            fontSize: 13,
-            fontWeight: 500,
-            color: "#334155",
+            fontSize: 14,
+            color: "#475569",
+            lineHeight: 1.55,
           }}
         >
-          {message}
+          A small tip keeps it free for the next person.
         </p>
       </div>
 
-      {/* Primary CTA — decoupled from download (the download already
-          ran in the parent). */}
+      {/* Primary CTA — Ko-fi */}
       <button
         type="button"
-        onClick={onTip}
-        disabled={!canTip}
-        className={canTip ? "btn-primary" : undefined}
-        style={{
-          marginTop: 18,
-          width: "100%",
-          padding: "14px",
-          borderRadius: 12,
-          border: "none",
-          fontSize: 15,
-          fontWeight: 700,
-          color: "white",
-          background: canTip ? undefined : "#cbd5e1",
-          cursor: canTip ? "pointer" : "not-allowed",
-        }}
+        onClick={onKofi}
+        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
       >
-        {canTip
-          ? `Tip $${amount} via PayPal`
-          : "Pick an amount to continue"}
+        <KofiIcon size={22} />
+        <span>Tip via Ko-fi</span>
       </button>
 
-      {/* Reassurance — the Abdullah2431 trust bridge. Tells the user
-          exactly who/what they'll see on the PayPal page so the handle
-          doesn't read as a phishing link. */}
-      <p
-        style={{
-          marginTop: 12,
-          fontSize: 11.5,
-          color: "#64748b",
-          textAlign: "center",
-          lineHeight: 1.55,
-        }}
-      >
-        You&apos;ll be sent to PayPal. The handle is{" "}
-        <code
-          style={{
-            fontFamily: "var(--font-mono, ui-monospace, monospace)",
-            background: "#f1f5f9",
-            padding: "1px 5px",
-            borderRadius: 4,
-            fontSize: 11,
-            color: "#334155",
-          }}
+      {/* Secondary — PayPal */}
+      <div className="mt-3 text-center">
+        <button
+          type="button"
+          onClick={onPaypal}
+          className="inline-flex items-center gap-1 text-sm text-slate-600 transition-colors hover:text-slate-900 hover:underline"
         >
-          Abdullah2431
-        </code>{" "}
-        — that&apos;s me, the developer behind MakeMyCV. The page will show
-        &ldquo;Abdullah &mdash; MakeMyCV&rdquo; to confirm.
+          Or tip via PayPal <span aria-hidden="true">{"→"}</span>
+        </button>
+      </div>
+
+      {/* Reassurance microcopy — identical to TipJar */}
+      <p className="mt-5 text-sm leading-relaxed text-slate-500">
+        Built by Abdullah, a solo developer in Dubai. Ko-fi accepts cards
+        without a PayPal account; tips go directly to him.
       </p>
-      <p
-        style={{
-          marginTop: 6,
-          fontSize: 11,
-          color: "#94a3b8",
-          textAlign: "center",
-        }}
-      >
-        No PayPal account needed &mdash; credit card works too.
-      </p>
+
+      {/* Dismiss — small, low-contrast, does NOT write the 90-day flag.
+          The module-level session flag still gets set (in handleClose)
+          so the user isn't re-prompted within the same session. */}
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={onMaybeLater}
+          className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
+        >
+          Maybe later
+        </button>
+      </div>
     </>
   );
 }
@@ -538,13 +352,11 @@ function PickingView({
 /* ─── Thanks (post-tip) ────────────────────────────────────── */
 
 function ThanksView({
-  amount,
   displayName,
   shareCopied,
   onCopyShare,
   onClose,
 }: {
-  amount: number;
   displayName: string;
   shareCopied: boolean;
   onCopyShare: () => void;
@@ -573,8 +385,8 @@ function ThanksView({
             lineHeight: 1.55,
           }}
         >
-          Your ${amount} tip helps keep MakeMyCV free for everyone in the UAE
-          looking for work.
+          Your tip helps keep MakeMyCV free for everyone in the UAE looking for
+          work.
         </p>
       </div>
 

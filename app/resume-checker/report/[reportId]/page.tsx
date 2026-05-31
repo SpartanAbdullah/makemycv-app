@@ -125,14 +125,13 @@ export default async function ReportPage({
 
       {/* Footer — subtle support link, NOT a CTA */}
       <footer className="mx-auto max-w-6xl px-6 pt-10 pb-12 text-center text-xs text-slate-500">
-        MakeMyCV is free ·{" "}
         <a
           href={SUPPORT_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="underline underline-offset-2 hover:text-slate-700"
         >
-          Support MakeMyCV
+          Built by Abdullah
         </a>
       </footer>
 

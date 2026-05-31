@@ -95,3 +95,45 @@ The DownloadTipModal shipped in commit 116c4aa as a pre-download gate that block
 Post-implementation review flagged the brand-promise inconsistency and confirmshaming pattern before the change merged to `main`. Reverted while still on `stagingmmc`.
 
 ---
+
+## 2026-05-31 — Final Tip Surface: Ko-fi Primary + PayPal Secondary
+
+### Outcome
+Tip rail consolidated to Ko-fi as primary (`ko-fi.com/makemycv_ae`), PayPal as secondary (`paypal.me/Abdullah2431`).
+
+### Path taken to get here
+1. Initial plan: PayPal-only via `paypal.me/Abdullah2431/[amount]USD` deep links with custom amount tiles + emoji feedback.
+2. Incognito test revealed `paypal.me` does not offer guest card checkout — users without PayPal accounts are blocked.
+3. Pivoted to Buy Me a Coffee (BMC). Onboarded via BMC's Stripe Connect Express path. Reached final KYC step where Stripe required a UAE trade licence / freelancer permit (Path B). Cancelled the BMC submission without uploading anything.
+4. Pivoted to Ko-fi with PayPal as the payout method. Bypasses Stripe entirely. Onboarding completed cleanly. End-to-end test transaction $3 → $2.58 landed in PayPal Business balance (~14% combined PayPal processing + FX fee).
+
+### Why Ko-fi-with-PayPal-payout works where BMC-with-Stripe didn't
+Ko-fi offers PayPal as a payout method alternative. The supporter pays via Ko-fi's commercial PayPal checkout (which DOES offer guest card, unlike paypal.me's P2P rail). The PayPal Business account (already set up) acts as the merchant relationship. Stripe's UAE-individual trade-licence requirement is never hit because Stripe is not in the loop.
+
+### Trade-offs accepted
+- ~14% combined fee (PayPal processing + USD→AED FX conversion) vs Stripe's ~3-5% if Stripe were available
+- Ko-fi's brand recognition is lower than BMC's — mitigated by the trust-anchor microcopy ("Built by Abdullah") and the in-app Ko-fi cup icon for instant recognition
+- Amount picker is delegated to Ko-fi's page (we don't deep-link amounts) — simpler UI, slightly less conversion control
+
+### What changed in code (this commit)
+- All tip surfaces (TipJar, TipJarModal, DownloadTipModal, PostReportTipJar) now use Ko-fi as primary, PayPal as secondary
+- Amount tiles + custom amount input + amount-based emoji feedback REMOVED (Ko-fi handles amount on their page)
+- Added `KofiIcon` component using the brand asset in `public/`
+- Added env var `NEXT_PUBLIC_KOFI_USERNAME=makemycv_ae`
+- Kept env var `NEXT_PUBLIC_PAYPAL_ME_HANDLE=Abdullah2431`
+- Microcopy rewritten to reference Ko-fi primary + PayPal alternative + Abdullah personally
+
+### What stays from earlier iterations
+- Post-download (not pre-download) surfacing pattern for DownloadTipModal (Prompt 3 refactor stands)
+- 90-day `mmcv_tipped_at` suppression in localStorage
+- Module-level session suppression (cross-component)
+- All print-hide CSS rules for tip surfaces
+- `isPro` flag in Zustand store (deprecated, forced true, NOT deleted for back-compat)
+
+### Path B triggers (revisit if any hit)
+- Sustained traffic >1,000 MAU for 3 consecutive months
+- Sustained monthly tips >AED 1,500 for 3 consecutive months
+- Concrete B2B opportunity
+- → When triggered: obtain UAE freelance permit, reinstate Pro tier, integrate Stripe direct
+
+---

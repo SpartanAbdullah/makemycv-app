@@ -52,7 +52,7 @@ function rateLimitedResponse(retryAfterSeconds: number) {
       error: "rate_limited",
       message:
         "You've used your AI improvements for now. They reset gradually. " +
-        "If you'd like to help cover AI costs, support is appreciated.",
+        "If you'd like to help cover AI costs, tips via Ko-fi are appreciated.",
       supportUrl: SUPPORT_URL,
       retryAfter: safeRetryAfter,
     },

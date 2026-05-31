@@ -980,7 +980,6 @@ export const BuilderShell = ({
                   textAlign: "center",
                 }}
               >
-                MakeMyCV is free ·{" "}
                 <a
                   href={SUPPORT_URL}
                   target="_blank"
@@ -991,7 +990,7 @@ export const BuilderShell = ({
                     textUnderlineOffset: 3,
                   }}
                 >
-                  Support MakeMyCV
+                  Built by Abdullah
                 </a>
               </div>
             </main>
