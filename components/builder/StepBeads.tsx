@@ -13,6 +13,7 @@ type Props = {
 
 const STEP_LABELS: Record<string, string> = {
   personal: "Contact",
+  uaeEssentials: "UAE Essentials",
   summary: "Summary",
   experience: "Experience",
   education: "Education",

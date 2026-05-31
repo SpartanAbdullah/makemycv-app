@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BuilderShell } from "../../components/builder/BuilderShell";
 import ImportFromReportBanner from "../../components/builder/ImportFromReportBanner";
 import { PersonalStep } from "../../components/builder/steps/PersonalStep";
+import { UAEEssentialsStep } from "../../components/builder/steps/UAEEssentialsStep";
 import { SummaryStep } from "../../components/builder/steps/SummaryStep";
 import { ExperienceStep } from "../../components/builder/steps/ExperienceStep";
 import { EducationStep } from "../../components/builder/steps/EducationStep";
@@ -57,12 +58,19 @@ export const BuilderClient = () => {
       <ImportFromReportBanner />
       <BuilderShell stepId={stepId} onStepChange={goToStep}>
       {stepId === "personal" && (
-        <PersonalStep onNext={() => goToStep(nextStep || "summary")} />
+        <PersonalStep onNext={() => goToStep(nextStep || "uaeEssentials")} />
+      )}
+      {stepId === "uaeEssentials" && (
+        <UAEEssentialsStep
+          onNext={() => goToStep(nextStep || "summary")}
+          onBack={() => goToStep(prevStep || "personal")}
+          onSkip={() => goToStep(nextStep || "summary")}
+        />
       )}
       {stepId === "summary" && (
         <SummaryStep
           onNext={() => goToStep(nextStep || "experience")}
-          onBack={() => goToStep(prevStep || "personal")}
+          onBack={() => goToStep(prevStep || "uaeEssentials")}
           onSkip={() => goToStep(nextStep || "experience")}
         />
       )}

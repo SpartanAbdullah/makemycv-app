@@ -7,7 +7,6 @@ import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { PhotoUpload } from "../PhotoUpload";
 import { TodaysTipCard } from "../TodaysTipCard";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
 import { Field } from "../../forms/Field";
@@ -22,10 +21,7 @@ import {
   sanitizeJobTitleLive,
   sanitizeLocation,
   sanitizeLocationLive,
-  sanitizeURL,
   validateEmail,
-  validateLinkedIn,
-  validateURL,
 } from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
@@ -41,7 +37,6 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showMore, setShowMore] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string | null>
   >({});
@@ -68,7 +63,6 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
     handleSubmit,
     watch,
     reset,
-    setValue,
     formState: { errors, isDirty },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
@@ -315,222 +309,8 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
         </div>
       </div>
 
-      {/* UAE Essentials block */}
-      <section
-        style={{
-          padding: 18,
-          background: "var(--ff-accent-soft)",
-          border: "1px solid rgba(14,124,74,0.30)",
-          borderRadius: 14,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <UAEDot size={13} />
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 15,
-              fontWeight: 600,
-              color: "var(--ff-accent-dark)",
-            }}
-          >
-            UAE essentials
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--ff-accent)",
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              marginLeft: "auto",
-            }}
-          >
-            +8 pts
-          </span>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 12,
-          }}
-          className="ff-uae-grid"
-        >
-          <Field label="Visa status">
-            <select className="cv-select" {...register("visaStatus")}>
-              <option value="">Select status…</option>
-              <option value="UAE National">UAE National</option>
-              <option value="GCC National">GCC National</option>
-              <option value="Family sponsorship">Family sponsorship</option>
-              <option value="Employment visa">Employment visa</option>
-              <option value="Golden Visa">Golden Visa</option>
-              <option value="Green Visa">Green Visa</option>
-              <option value="Freelance permit">Freelance permit</option>
-              <option value="Investor visa">Investor visa</option>
-              <option value="Visit visa">Visit visa</option>
-              <option value="Cancelled / transferable">
-                Cancelled / transferable
-              </option>
-            </select>
-          </Field>
-          <Field label="Availability">
-            <select className="cv-select" {...register("availability")}>
-              <option value="">Select availability…</option>
-              <option value="Immediate">Immediate</option>
-              <option value="2 weeks notice">2 weeks notice</option>
-              <option value="30 days notice">30 days notice</option>
-              <option value="60 days notice">60 days notice</option>
-              <option value="90 days notice">90 days notice</option>
-            </select>
-          </Field>
-          <Field label="UAE driving licence">
-            <select className="cv-select" {...register("drivingLicense")}>
-              <option value="">Select…</option>
-              <option value="Light Vehicle">Light Vehicle</option>
-              <option value="Heavy Vehicle">Heavy Vehicle</option>
-              <option value="Motorcycle">Motorcycle</option>
-              <option value="International licence">
-                International licence
-              </option>
-              <option value="None">None</option>
-            </select>
-          </Field>
-        </div>
-      </section>
-
-      {/* More details expander */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowMore((v) => !v)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--ff-accent-dark)",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-            transition: "color var(--transition-fast)",
-          }}
-        >
-          <span
-            style={{
-              display: "inline-block",
-              transition: "transform var(--transition-fast)",
-              transform: showMore ? "rotate(45deg)" : "none",
-            }}
-          >
-            <Icon name="plus" size={13} />
-          </span>
-          {showMore ? "Hide extra details" : "Add more details"}
-        </button>
-
-        {showMore && (
-          <div
-            style={{
-              marginTop: 16,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-            }}
-            className="ff-core-fields"
-          >
-            <Field
-              label="LinkedIn"
-              optional
-              leftIcon="linkedin"
-            >
-              <input
-                className="cv-input"
-                placeholder="linkedin.com/in/yourname"
-                style={{ paddingLeft: ICON_INPUT_PAD }}
-                {...register("linkedin")}
-                onBlur={(e) => {
-                  register("linkedin").onBlur(e);
-                  const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value)
-                    setValue("linkedin", url, { shouldDirty: true });
-                  setFieldError("linkedin", validateLinkedIn(url));
-                }}
-              />
-              <FieldError
-                message={fieldErrors.linkedin ?? null}
-                type="warning"
-              />
-            </Field>
-            <Field label="Website" optional leftIcon="globe">
-              <input
-                className="cv-input"
-                placeholder="www.yourportfolio.com"
-                style={{ paddingLeft: ICON_INPUT_PAD }}
-                {...register("website")}
-                onBlur={(e) => {
-                  register("website").onBlur(e);
-                  const url = sanitizeURL(e.target.value);
-                  if (url !== e.target.value)
-                    setValue("website", url, { shouldDirty: true });
-                  setFieldError("website", validateURL(url));
-                }}
-              />
-              <FieldError
-                message={fieldErrors.website ?? null}
-                type="warning"
-              />
-            </Field>
-            <Field label="Nationality" optional>
-              <input
-                className="cv-input"
-                placeholder="e.g. Emirati, Pakistani, Indian"
-                {...register("nationality")}
-                onChange={(e) => {
-                  e.target.value = sanitizeNameLive(e.target.value);
-                  register("nationality").onChange(e);
-                }}
-                onBlur={(e) => {
-                  e.target.value = sanitizeName(e.target.value);
-                  register("nationality").onChange(e);
-                  register("nationality").onBlur(e);
-                }}
-              />
-            </Field>
-            <Field label="Country" optional>
-              <input
-                className="cv-input"
-                placeholder="e.g. United Arab Emirates"
-                {...register("country")}
-                onChange={(e) => {
-                  e.target.value = sanitizeLocationLive(e.target.value);
-                  register("country").onChange(e);
-                }}
-                onBlur={(e) => {
-                  e.target.value = sanitizeLocation(e.target.value);
-                  register("country").onChange(e);
-                  register("country").onBlur(e);
-                }}
-              />
-            </Field>
-            <Field label="Date of birth" optional>
-              <input
-                className="cv-input"
-                placeholder="e.g. 15/03/1990"
-                {...register("dateOfBirth")}
-              />
-            </Field>
-          </div>
-        )}
-      </div>
+      {/* UAE essentials + extras live on their own step now — see
+          UAEEssentialsStep. Continue → routes there next. */}
 
       {/* Footer */}
       <div

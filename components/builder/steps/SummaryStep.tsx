@@ -128,12 +128,17 @@ export const SummaryStep = ({
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
 
+      {/* Full-width textarea on top, tip card stacked below. The previous
+          side-by-side layout squeezed the textarea into ~58% of the form
+          column at >=900px which felt cramped \u2014 the summary needs room to
+          breathe (30-120 words). */}
       <div className="ff-summary-grid">
         <section className="cv-step-card">
           <Field label="Professional summary" error={errors.summary?.message}>
             <textarea
-              rows={6}
+              rows={10}
               className="cv-input cv-textarea"
+              style={{ minHeight: 260, lineHeight: 1.6, fontSize: 14.5 }}
               placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
               {...register("summary")}
               onBlur={(e) => {
@@ -158,13 +163,13 @@ export const SummaryStep = ({
                     ? "text-amber-500"
                     : "text-green-600";
             return (
-              <p className={`mt-1 text-xs ${countColor}`}>
+              <p className={`mt-2 text-xs ${countColor}`}>
                 {wordCount} words {"\u00B7"} Recommended: 30{"\u2013"}120
               </p>
             );
           })()}
           <FieldError message={summaryWarning} type="warning" />
-          <div className="mt-3 flex justify-end">
+          <div className="mt-4 flex justify-end">
             <button
               type="button"
               onClick={fireAISummary}
@@ -187,13 +192,13 @@ export const SummaryStep = ({
       />
 
       <style>{`
+        /* Stacked at every viewport — textarea up top with full column
+           width, tip card below. (Was a 1.4fr | 1fr side-by-side at
+           >=900px which squeezed the textarea.) */
         .ff-summary-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 14px;
-        }
-        @media (min-width: 900px) {
-          .ff-summary-grid { grid-template-columns: 1.4fr 1fr; align-items: start; }
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
         }
       `}</style>
 
