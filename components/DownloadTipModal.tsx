@@ -38,7 +38,7 @@ import { SUPPORT_URL } from "../lib/config/support";
  */
 
 const PAYPAL_HANDLE =
-  process.env.NEXT_PUBLIC_PAYPAL_ME_HANDLE || "makemycv";
+  process.env.NEXT_PUBLIC_PAYPAL_ME_HANDLE || "Abdullah2431";
 const PRESETS = [3, 5, 10, 25];
 const SHARE_URL = "https://makemycv.ae";
 const STORAGE_KEY = "mmcv_tipped_at";
