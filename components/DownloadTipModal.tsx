@@ -4,49 +4,79 @@ import { useEffect, useState } from "react";
 import { SUPPORT_URL } from "../lib/config/support";
 
 /**
- * DownloadTipModal — pre-download tip gate.
+ * DownloadTipModal — post-download tip jar surface.
  *
- * Replaces the previous "post-download, dismissible" tip-jar pattern in
- * the Builder flow. Every Download click now opens this modal:
+ * The Builder Download flow runs PDF generation immediately; on success,
+ * the parent schedules this modal to open ~1500ms later — but ONLY if
+ * `shouldShowDownloadTip()` returns true (no recent tip + not dismissed
+ * this session). This is a tip jar, not a paywall: nothing gates the
+ * download.
  *
- *   picking     ── user picks a tip amount (or zero)
- *     ├─ "Tip $X & Download" → opens PayPal in a new tab, kicks off the
- *     │   actual PDF download, advances to "thanks" on success.
- *     └─ "Download without supporting 😔" → routes to "reminder".
- *   reminder    ── one more chance to reconsider; honest reminder about
- *                  hosting + AI costs. Two buttons:
- *     ├─ "Take me back" → returns to picking.
- *     └─ "Continue anyway 😢" → runs the download, closes the modal.
- *   downloading ── spinner while triggerDownload() is in flight.
- *   thanks      ── thank-you + spread-the-word + feedback links. Tippers
- *                  only. Closes via X.
- *   error       ── triggerDownload() threw. Retry returns to whichever
- *                  CTA the user came from.
+ * Phase set:
+ *   picking ── tip presets + custom amount + emoji escalation.
+ *              Primary CTA "Tip $X via PayPal" opens PayPal in a new
+ *              tab, writes mmcv_tipped_at, advances to thanks. NO
+ *              download is triggered — the download already happened.
+ *   thanks  ── 🎉 + personalised thank-you, spread-the-word with copy
+ *              link, feedback link.
  *
- * The modal does NOT consult mmcv_tipped_at — every download fires the
- * gate. This is a deliberate change from the original spec; see
- * DECISION_LOG.md (the post-2026-05-31 follow-up that flipped the tip
- * jar from "post-success, suppressible" to "pre-download, every time").
+ * Suppression (two layers, both checked by `shouldShowDownloadTip()`):
+ *   1. `localStorage.mmcv_tipped_at` — 90-day window after a successful
+ *      tip. Written by this modal on tip click, also by TipJar/
+ *      TipJarModal in the ATS flow. Persists across refreshes.
+ *   2. Module-level `dismissedThisSession` — set on any close (X, Esc,
+ *      backdrop). Survives client navigation between Builder and Review
+ *      because module state is per-JS-execution-context; resets on a
+ *      true page reload. Mirrors the TipJarModal pattern.
+ *
+ * On a tip, suppression layer 1 kicks in (mmcv_tipped_at set). On a
+ * plain dismiss without tipping, layer 2 kicks in (module flag) — user
+ * gets prompted again after a page refresh, never within the session.
+ *
+ * This is a deliberate revert of the pre-download tip-gate that shipped
+ * in 116c4aa. See DECISION_LOG.md 2026-05-31 (second entry) for the why.
  */
 
 const PAYPAL_HANDLE =
   process.env.NEXT_PUBLIC_PAYPAL_ME_HANDLE || "makemycv";
 const PRESETS = [3, 5, 10, 25];
 const SHARE_URL = "https://makemycv.ae";
+const STORAGE_KEY = "mmcv_tipped_at";
+const SUPPRESS_DAYS = 90;
 
-type Phase =
-  | "picking"
-  | "reminder"
-  | "downloading"
-  | "thanks"
-  | "error";
+// Module-scoped session flag. Survives client navigation (Builder ↔
+// Review), resets only on a true page reload. Mirrors TipJarModal.
+let dismissedThisSession = false;
 
-type ErrorOrigin = "tip" | "skip";
+function isWithinSuppressionWindow(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return false;
+    const stamped = Date.parse(stored);
+    if (Number.isNaN(stamped)) return false;
+    const ageMs = Date.now() - stamped;
+    return ageMs < SUPPRESS_DAYS * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Combined suppression check for callers. Returns false if the user has
+ * tipped in the last 90 days OR has dismissed the modal at any point
+ * this session. Parents should call this before scheduling the modal to
+ * open.
+ */
+export function shouldShowDownloadTip(): boolean {
+  return !dismissedThisSession && !isWithinSuppressionWindow();
+}
+
+type Phase = "picking" | "thanks";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  triggerDownload: () => Promise<void>;
   /** First name for personalised thanks copy. Optional. */
   userName?: string;
 };
@@ -70,18 +100,12 @@ function emojiFor(amount: number): { emoji: string; message: string } {
   return { emoji: "\u{1F680}", message: "You're a legend. Genuinely." };
 }
 
-export const DownloadTipModal = ({
-  open,
-  onClose,
-  triggerDownload,
-  userName,
-}: Props) => {
+export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
   const [phase, setPhase] = useState<Phase>("picking");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(5);
   const [customAmount, setCustomAmount] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
   const [tippedAmount, setTippedAmount] = useState(0);
-  const [errorOrigin, setErrorOrigin] = useState<ErrorOrigin>("tip");
 
   const amount =
     selectedPreset ??
@@ -99,20 +123,25 @@ export const DownloadTipModal = ({
     setTippedAmount(0);
   }, [open]);
 
-  // Escape closes (but not during downloading, to avoid leaving an
-  // in-flight PDF generator without surfacing its result)
+  // Escape closes — inline the dismiss logic so the effect closure
+  // doesn't have to capture a handleClose ref.
   useEffect(() => {
     if (!open) return;
+    if (isWithinSuppressionWindow()) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && phase !== "downloading") onClose();
+      if (e.key === "Escape") {
+        dismissedThisSession = true;
+        onClose();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose, phase]);
+  }, [open, onClose]);
 
-  // Lock body scroll while open
+  // Lock body scroll while visible
   useEffect(() => {
     if (!open) return;
+    if (isWithinSuppressionWindow()) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -121,52 +150,27 @@ export const DownloadTipModal = ({
   }, [open]);
 
   if (!open) return null;
+  // Defense-in-depth: parents already filter via shouldShowDownloadTip(),
+  // but a stale open=true from a 90-day-old localStorage stamp would
+  // otherwise leak through. Render nothing if suppressed.
+  if (isWithinSuppressionWindow()) return null;
 
-  const runDownload = async (origin: ErrorOrigin) => {
-    setErrorOrigin(origin);
-    setPhase("downloading");
-    try {
-      await triggerDownload();
-      return true;
-    } catch {
-      setPhase("error");
-      return false;
-    }
+  const handleClose = () => {
+    dismissedThisSession = true;
+    onClose();
   };
 
-  const handleTipAndDownload = async () => {
+  const handleTip = () => {
     if (!canTip) return;
     const url = `https://paypal.me/${PAYPAL_HANDLE}/${amount}USD`;
     window.open(url, "_blank", "noopener,noreferrer");
     try {
-      localStorage.setItem("mmcv_tipped_at", new Date().toISOString());
+      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
     } catch {
       /* localStorage unavailable — silent fail */
     }
     setTippedAmount(amount);
-    const ok = await runDownload("tip");
-    if (ok) setPhase("thanks");
-  };
-
-  const handleSkipTip = () => setPhase("reminder");
-
-  const handleReconsider = () => setPhase("picking");
-
-  const handleContinueAnyway = async () => {
-    const ok = await runDownload("skip");
-    if (ok) onClose();
-  };
-
-  const handleRetry = () => {
-    if (errorOrigin === "tip") {
-      void runDownload("tip").then((ok) => {
-        if (ok) setPhase("thanks");
-      });
-    } else {
-      void runDownload("skip").then((ok) => {
-        if (ok) onClose();
-      });
-    }
+    setPhase("thanks");
   };
 
   const handleCopyShare = async () => {
@@ -180,19 +184,17 @@ export const DownloadTipModal = ({
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget) return;
-    if (phase === "downloading") return;
-    onClose();
+    if (e.target === e.currentTarget) handleClose();
   };
 
-  const displayName = userName?.trim() || "friend";
+  const displayName = userName?.trim() || "";
 
   return (
     <div
       data-download-tip-modal
       role="dialog"
       aria-modal="true"
-      aria-label="Support MakeMyCV before downloading"
+      aria-label="Support MakeMyCV"
       onClick={handleBackdropClick}
       style={{
         position: "fixed",
@@ -232,43 +234,42 @@ export const DownloadTipModal = ({
           }}
         />
 
-        {/* Close button — hidden during downloading */}
-        {phase !== "downloading" && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              zIndex: 2,
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: "transparent",
-              border: "none",
-              color: "#64748b",
-              cursor: "pointer",
-              display: "grid",
-              placeItems: "center",
-            }}
+        {/* Close button — always available; the modal is a non-blocking
+            tip jar, never a gate. */}
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 2,
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: "transparent",
+            border: "none",
+            color: "#64748b",
+            cursor: "pointer",
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        )}
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
 
         <div style={{ padding: "32px 28px 28px" }}>
           {phase === "picking" && (
@@ -287,19 +288,9 @@ export const DownloadTipModal = ({
                 setCustomAmount(v);
                 setSelectedPreset(null);
               }}
-              onTipAndDownload={handleTipAndDownload}
-              onSkipTip={handleSkipTip}
+              onTip={handleTip}
             />
           )}
-
-          {phase === "reminder" && (
-            <ReminderView
-              onReconsider={handleReconsider}
-              onContinueAnyway={handleContinueAnyway}
-            />
-          )}
-
-          {phase === "downloading" && <DownloadingView />}
 
           {phase === "thanks" && (
             <ThanksView
@@ -307,15 +298,7 @@ export const DownloadTipModal = ({
               displayName={displayName}
               shareCopied={shareCopied}
               onCopyShare={handleCopyShare}
-              onClose={onClose}
-            />
-          )}
-
-          {phase === "error" && (
-            <ErrorView
-              origin={errorOrigin}
-              onRetry={handleRetry}
-              onClose={onClose}
+              onClose={handleClose}
             />
           )}
         </div>
@@ -325,9 +308,6 @@ export const DownloadTipModal = ({
         @keyframes dtm-fade-in {
           from { opacity: 0; transform: scale(0.98); }
           to   { opacity: 1; transform: scale(1); }
-        }
-        @keyframes dtm-spin {
-          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
@@ -345,8 +325,7 @@ function PickingView({
   customAmount,
   onSelectPreset,
   onCustomChange,
-  onTipAndDownload,
-  onSkipTip,
+  onTip,
 }: {
   amount: number;
   canTip: boolean;
@@ -356,8 +335,7 @@ function PickingView({
   customAmount: string;
   onSelectPreset: (p: number) => void;
   onCustomChange: (v: string) => void;
-  onTipAndDownload: () => void;
-  onSkipTip: () => void;
+  onTip: () => void;
 }) {
   return (
     <>
@@ -371,7 +349,7 @@ function PickingView({
           marginTop: 4,
         }}
       >
-        Before you download…
+        Did this help?
       </h2>
       <p
         style={{
@@ -382,8 +360,8 @@ function PickingView({
           lineHeight: 1.55,
         }}
       >
-        MakeMyCV is free because of people like you. A small tip covers
-        hosting and the AI behind the bullets.
+        MakeMyCV is free because of people like you. A tip covers hosting
+        and the AI behind the bullets — completely optional.
       </p>
 
       {/* Presets */}
@@ -490,10 +468,11 @@ function PickingView({
         </p>
       </div>
 
-      {/* Primary CTA */}
+      {/* Primary CTA — decoupled from download (the download already
+          ran in the parent). */}
       <button
         type="button"
-        onClick={onTipAndDownload}
+        onClick={onTip}
         disabled={!canTip}
         className={canTip ? "btn-primary" : undefined}
         style={{
@@ -510,174 +489,49 @@ function PickingView({
         }}
       >
         {canTip
-          ? `Tip $${amount} · Download CV`
+          ? `Tip $${amount} via PayPal`
           : "Pick an amount to continue"}
       </button>
 
+      {/* Reassurance — the Abdullah2431 trust bridge. Tells the user
+          exactly who/what they'll see on the PayPal page so the handle
+          doesn't read as a phishing link. */}
       <p
         style={{
-          marginTop: 8,
+          marginTop: 12,
+          fontSize: 11.5,
+          color: "#64748b",
+          textAlign: "center",
+          lineHeight: 1.55,
+        }}
+      >
+        You&apos;ll be sent to PayPal. The handle is{" "}
+        <code
+          style={{
+            fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            background: "#f1f5f9",
+            padding: "1px 5px",
+            borderRadius: 4,
+            fontSize: 11,
+            color: "#334155",
+          }}
+        >
+          Abdullah2431
+        </code>{" "}
+        — that&apos;s me, the developer behind MakeMyCV. The page will show
+        &ldquo;Abdullah &mdash; MakeMyCV&rdquo; to confirm.
+      </p>
+      <p
+        style={{
+          marginTop: 6,
           fontSize: 11,
           color: "#94a3b8",
           textAlign: "center",
         }}
       >
-        Secure via PayPal. No PayPal account needed — credit card works too.
+        No PayPal account needed &mdash; credit card works too.
       </p>
-
-      {/* Secondary CTA — guilt-trip styling on purpose */}
-      <button
-        type="button"
-        onClick={onSkipTip}
-        style={{
-          marginTop: 16,
-          width: "100%",
-          padding: "10px",
-          borderRadius: 10,
-          border: "none",
-          background: "transparent",
-          fontSize: 12.5,
-          color: "#94a3b8",
-          cursor: "pointer",
-          textDecoration: "underline",
-          textUnderlineOffset: 3,
-        }}
-      >
-        Download without supporting {"\u{1F614}"}
-      </button>
     </>
-  );
-}
-
-/* ─── Reminder (after user picks "skip") ───────────────────── */
-
-function ReminderView({
-  onReconsider,
-  onContinueAnyway,
-}: {
-  onReconsider: () => void;
-  onContinueAnyway: () => void;
-}) {
-  return (
-    <>
-      <div style={{ textAlign: "center", marginTop: 8 }}>
-        <div style={{ fontSize: 48, lineHeight: 1 }}>{"\u{1F494}"}</div>
-        <h2
-          className="font-display"
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            color: "#0f172a",
-            margin: "12px 0 0",
-          }}
-        >
-          Wait — are you sure?
-        </h2>
-      </div>
-
-      <div
-        style={{
-          marginTop: 18,
-          padding: 16,
-          borderRadius: 12,
-          background: "#FEF3F2",
-          border: "1px solid #FECDCA",
-        }}
-      >
-        <p
-          style={{
-            fontSize: 13.5,
-            color: "#7A271A",
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
-          MakeMyCV is built and run by one person. Every download we generate
-          costs real money in hosting and AI tokens. Even $1 — the price of a
-          cup of karak — keeps this tool free for the next person who needs it.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onReconsider}
-        className="btn-primary"
-        style={{
-          marginTop: 18,
-          width: "100%",
-          padding: "14px",
-          borderRadius: 12,
-          border: "none",
-          fontSize: 15,
-          fontWeight: 700,
-          color: "white",
-          cursor: "pointer",
-        }}
-      >
-        Take me back — I&apos;ll help
-      </button>
-
-      <button
-        type="button"
-        onClick={onContinueAnyway}
-        style={{
-          marginTop: 10,
-          width: "100%",
-          padding: "10px",
-          borderRadius: 10,
-          border: "none",
-          background: "transparent",
-          fontSize: 12.5,
-          color: "#94a3b8",
-          cursor: "pointer",
-          textDecoration: "underline",
-          textUnderlineOffset: 3,
-        }}
-      >
-        I really can&apos;t right now {"\u{1F622}"}
-      </button>
-    </>
-  );
-}
-
-/* ─── Downloading ──────────────────────────────────────────── */
-
-function DownloadingView() {
-  return (
-    <div style={{ padding: "32px 0 16px", textAlign: "center" }}>
-      <div
-        aria-hidden="true"
-        style={{
-          width: 44,
-          height: 44,
-          margin: "0 auto",
-          borderRadius: "50%",
-          border: "4px solid #e2e8f0",
-          borderTopColor: "#2563eb",
-          animation: "dtm-spin 0.9s linear infinite",
-        }}
-      />
-      <p
-        className="font-display"
-        style={{
-          marginTop: 18,
-          fontSize: 16,
-          fontWeight: 600,
-          color: "#0f172a",
-        }}
-      >
-        Preparing your PDF…
-      </p>
-      <p
-        style={{
-          marginTop: 6,
-          fontSize: 12.5,
-          color: "#64748b",
-        }}
-      >
-        Hang tight — this usually takes a couple of seconds.
-      </p>
-    </div>
   );
 }
 
@@ -709,7 +563,7 @@ function ThanksView({
             margin: "14px 0 0",
           }}
         >
-          Thank you, {displayName}!
+          {displayName ? `Thank you, ${displayName}!` : "Thank you!"}
         </h2>
         <p
           style={{
@@ -720,7 +574,7 @@ function ThanksView({
           }}
         >
           Your ${amount} tip helps keep MakeMyCV free for everyone in the UAE
-          looking for work. Your PDF is on its way to your downloads folder.
+          looking for work.
         </p>
       </div>
 
@@ -819,83 +673,6 @@ function ThanksView({
         Close
       </button>
     </>
-  );
-}
-
-/* ─── Error ────────────────────────────────────────────────── */
-
-function ErrorView({
-  origin,
-  onRetry,
-  onClose,
-}: {
-  origin: ErrorOrigin;
-  onRetry: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div style={{ textAlign: "center", padding: "8px 0" }}>
-      <div style={{ fontSize: 44, lineHeight: 1 }}>{"⚠️"}</div>
-      <h2
-        className="font-display"
-        style={{
-          fontSize: 20,
-          fontWeight: 700,
-          color: "#0f172a",
-          margin: "12px 0 0",
-        }}
-      >
-        Something went wrong
-      </h2>
-      <p
-        style={{
-          marginTop: 8,
-          fontSize: 13.5,
-          color: "#64748b",
-          lineHeight: 1.55,
-        }}
-      >
-        We couldn&apos;t generate your PDF.{" "}
-        {origin === "tip"
-          ? "Your tip went through — but please try the download again."
-          : "Please try again."}
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="btn-primary"
-        style={{
-          marginTop: 18,
-          width: "100%",
-          padding: "12px",
-          borderRadius: 10,
-          border: "none",
-          fontSize: 14,
-          fontWeight: 700,
-          color: "white",
-          cursor: "pointer",
-        }}
-      >
-        Try again
-      </button>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          marginTop: 10,
-          width: "100%",
-          padding: "10px",
-          borderRadius: 10,
-          border: "none",
-          background: "transparent",
-          fontSize: 12.5,
-          color: "#94a3b8",
-          cursor: "pointer",
-        }}
-      >
-        Close
-      </button>
-    </div>
   );
 }
 

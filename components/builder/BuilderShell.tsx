@@ -22,7 +22,7 @@ import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
-import { DownloadTipModal } from "../DownloadTipModal";
+import { DownloadTipModal, shouldShowDownloadTip } from "../DownloadTipModal";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportType = "pdf" | "docx";
 
@@ -747,23 +747,21 @@ export const BuilderShell = ({
   };
 
   // ---- Download (TopBar + drawer) ----
-  // Click → open the pre-download tip modal. The modal calls
-  // `triggerDownload` to perform the actual download once the user has
-  // either tipped or explicitly chosen to skip after the reminder. The
-  // modal surfaces its own spinner / error / thanks states.
-  const handleDownload = () => {
-    setDownloadError(null);
-    setDownloadTipOpen(true);
-  };
-
-  const triggerDownload = async () => {
+  // The download runs IMMEDIATELY on click — no modal in the way. On
+  // success, the post-download tip jar is scheduled to appear ~1500ms
+  // later, but only if the user is eligible (no recent tip + not
+  // dismissed this session). Errors do NOT open the modal; the existing
+  // downloadError bar handles them.
+  const handleDownload = async () => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
       await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-    } catch (err) {
+      if (shouldShowDownloadTip()) {
+        window.setTimeout(() => setDownloadTipOpen(true), 1500);
+      }
+    } catch {
       setDownloadError("Couldn't generate PDF. Try again or export as DOCX.");
-      throw err;
     } finally {
       setIsDownloading(false);
     }
@@ -1092,7 +1090,6 @@ export const BuilderShell = ({
         <DownloadTipModal
           open={downloadTipOpen}
           onClose={() => setDownloadTipOpen(false)}
-          triggerDownload={triggerDownload}
           userName={data.personal.firstName?.trim() || undefined}
         />
 

@@ -64,3 +64,34 @@ When triggered: obtain UAE freelance permit → reinstate Pro tier → integrate
 - Roadmap: `ROADMAP.md` (Pro tier moved to "Phase 2 — Post-Licence")
 
 ---
+
+## 2026-05-31 — DownloadTipModal: Pre-Download Gate → Post-Download Surface
+
+### What changed
+The DownloadTipModal shipped in commit 116c4aa as a pre-download gate that blocked the download behind a tip choice with a `reminder` (guilt-trip) fallback phase. This was rolled back to a post-download non-blocking surface.
+
+### Why
+1. **Brand consistency.** The marketing site's `/support` page states: "This is a tip jar, not a paywall. Every feature is free for everyone, tip or no tip." The pre-download gate, however soft, was structurally a paywall surface — the user had to acknowledge a tip ask before reaching the deliverable. Cross-property dissonance erodes trust.
+2. **Confirmshaming pattern.** The `reminder` phase ("heart-break emoji," "I really can't right now 😢" skip button) is a recognized dark pattern. Short-term conversion lift, long-term brand damage.
+3. **Wrong emotional moment.** UAE job seekers downloading a CV are typically anxious and time-pressed. Tip conversion is healthier at the gratitude peak (after success) than at the urgency peak (before success).
+4. **Compliance posture.** A passive post-success tip prompt is unambiguously a tip jar. A pre-download tip-or-skip gate is ambiguously transactional, which carries higher risk for an unlicensed operating identity.
+
+### What stayed (engineering preserved)
+- Modal infrastructure
+- Picking phase: presets, custom amount, emoji escalation
+- Thanks phase: name personalization, spread-the-word with Copy share link, feedback link
+- Print-hide CSS rule
+- Suppression via `localStorage.mmcv_tipped_at` (90 days)
+
+### What was removed
+- `reminder` phase entirely (heart-break copy, sad-emoji skip button)
+- `downloading` phase (download now runs in parent, modal appears after)
+- `error` phase (parent handles download errors)
+- `triggerDownload` prop on modal
+- "Download without supporting 😔" secondary button
+- Coupled "Tip $X · Download CV" primary CTA → decoupled to "Tip $X via PayPal"
+
+### Trigger that prompted this revert
+Post-implementation review flagged the brand-promise inconsistency and confirmshaming pattern before the change merged to `main`. Reverted while still on `stagingmmc`.
+
+---

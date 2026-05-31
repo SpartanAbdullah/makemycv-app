@@ -18,7 +18,7 @@ import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
-import { DownloadTipModal } from "../../DownloadTipModal";
+import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -111,22 +111,20 @@ export const ReviewStep = ({
     "friend";
 
   const handleExportDocx = () => exportToDocx(data);
-  // Click → open the pre-download tip modal. The modal calls
-  // `triggerDownload` to perform the actual PDF generation once the user
-  // has either tipped or explicitly chosen to skip after the reminder.
-  const handleDownloadPdf = () => {
-    setDownloadError(null);
-    setDownloadTipOpen(true);
-  };
-
-  const triggerDownload = async () => {
+  // The PDF download runs immediately. On success, the post-download
+  // tip jar is scheduled ~1500ms later (suppressed if recently tipped
+  // or dismissed this session). Errors stay in the existing inline
+  // error UI — they don't open the modal.
+  const handleDownloadPdf = async () => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
       await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-    } catch (err) {
+      if (shouldShowDownloadTip()) {
+        window.setTimeout(() => setDownloadTipOpen(true), 1500);
+      }
+    } catch {
       setDownloadError("pdf-failed");
-      throw err;
     } finally {
       setIsDownloading(false);
     }
@@ -524,7 +522,6 @@ export const ReviewStep = ({
       <DownloadTipModal
         open={downloadTipOpen}
         onClose={() => setDownloadTipOpen(false)}
-        triggerDownload={triggerDownload}
         userName={data.personal.firstName?.trim() || undefined}
       />
 
