@@ -2,6 +2,8 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Inter, Plus_Jakarta_Sans, Poppins } from "next/font/google";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { organizationSchema } from "@/lib/seo/schema";
 
 const sora = localFont({
   src: [
@@ -141,40 +143,10 @@ export default function RootLayout({
       <body
         className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} ${poppins.variable} antialiased`}
       >
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              name: "MakeMyCV",
-              applicationCategory: "BusinessApplication",
-              operatingSystem: "Web",
-              description:
-                "Free online CV builder designed for UAE job seekers. " +
-                "ATS-optimized templates with instant PDF export.",
-              url: "https://app.makemycv.ae",
-              offers: {
-                "@type": "Offer",
-                price: "0",
-                priceCurrency: "AED",
-              },
-              featureList: [
-                "ATS-friendly CV templates",
-                "Instant PDF export",
-                "UAE job market focused",
-                "No sign-up required",
-                "Live CV preview",
-              ],
-              inLanguage: "en-AE",
-              publisher: {
-                "@type": "Organization",
-                name: "MakeMyCV",
-                url: "https://makemycv.ae",
-              },
-            }),
-          }}
-        />
+        {/* Site-wide Organization identity. Pages that need surface-specific
+            schema (WebApplication, FAQPage, BreadcrumbList) emit it locally
+            and link back to this @id via the publisher field. */}
+        <JsonLd data={organizationSchema()} />
         {children}
       </body>
     </html>
