@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import UploadDropzone from "@/components/resume-checker/UploadDropzone";
 import ExampleReportPreview from "@/components/resume-checker/ExampleReportPreview";
 import { Logo } from "@/components/Logo";
+import { JsonLd } from "@/components/seo/JsonLd";
+import {
+  appWebSiteSchema,
+  breadcrumbListSchema,
+  faqPageSchema,
+  webApplicationSchema,
+} from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Free ATS Resume Checker for UAE Jobs | MakeMyCV",
@@ -89,6 +96,22 @@ const FAQS: Array<{ q: string; a: string }> = [
 export default function ResumeCheckerPage() {
   return (
     <main className="min-h-screen bg-paper-2">
+      {/* JSON-LD — emitted server-side so crawlers and AI fetchers see schema
+          in the initial HTML. WebApplication describes the tool itself;
+          FAQPage mirrors the visible <details> Q/As below; BreadcrumbList
+          gives the page its position in the site graph. */}
+      <JsonLd data={appWebSiteSchema()} />
+      <JsonLd data={webApplicationSchema()} />
+      <JsonLd
+        data={faqPageSchema(FAQS.map((f) => ({ q: f.q, a: f.a })))}
+      />
+      <JsonLd
+        data={breadcrumbListSchema([
+          { name: "Home", item: "https://app.makemycv.ae/" },
+          { name: "ATS Resume Checker" },
+        ])}
+      />
+
       {/* HERO */}
       <section
         className="relative overflow-hidden pb-32 pt-20 md:pb-40 md:pt-24"
@@ -118,6 +141,18 @@ export default function ResumeCheckerPage() {
           <p className="mx-auto mt-5 max-w-2xl text-base text-white/70 sm:text-lg">
             Tested against the same ATS parsers used by DIFC firms, UAE banks,
             and government entities. No email required.
+          </p>
+          {/* Answer-first definition paragraph — sits directly under the hero
+              so an AI engine can extract a self-contained "what is this?" /
+              "what does it do?" answer from the first ~80 words. No fabricated
+              stats; describes the mechanism, not a number. */}
+          <p className="mx-auto mt-6 max-w-2xl text-sm leading-relaxed text-white/65 sm:text-base">
+            An ATS (Applicant Tracking System) is the software UAE employers
+            use to filter CVs before a recruiter sees them. If the parser
+            can&apos;t read your file cleanly, the application stops there.
+            This free checker scans your CV against the same parsers used at
+            DIFC firms, UAE banks, and government entities, and flags exactly
+            what breaks it &mdash; in about 30 seconds, no sign-up.
           </p>
           <p className="mx-auto mt-3 max-w-xl text-xs text-white/50">
             Your CV is processed securely and deleted after 24 hours.
