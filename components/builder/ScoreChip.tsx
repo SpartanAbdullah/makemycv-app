@@ -87,7 +87,7 @@ export const ScoreChip = ({
           display: "inline-flex",
           alignItems: "center",
           gap: 8,
-          padding: "5px 5px 5px 12px",
+          padding: "9px 9px 9px 12px",
           background: style.bg,
           border: `1px solid ${style.border}`,
           borderRadius: 999,

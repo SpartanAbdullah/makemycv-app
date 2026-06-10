@@ -162,7 +162,7 @@ export const SummaryStep = ({
               type="button"
               onClick={fireAISummary}
               className="cv-btn-secondary"
-              style={{ fontSize: 12, padding: "5px 12px" }}
+              style={{ fontSize: 12, padding: "11px 16px" }}
             >
               <Icon name="sparkle" size={13} />
               Write my summary with AI

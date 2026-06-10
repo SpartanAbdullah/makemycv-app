@@ -87,7 +87,7 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
             background: "rgba(255,255,255,0.10)",
             border: "1px solid rgba(255,255,255,0.18)",
             borderRadius: 999,
-            padding: "6px 14px",
+            padding: "12px 18px",
             color: "white",
             fontSize: 13,
             fontWeight: 500,
@@ -186,7 +186,7 @@ const TopBar = ({
             color: "var(--ff-ink)",
             background: "transparent",
             border: "1px solid var(--ff-line)",
-            padding: "7px 14px",
+            padding: "11px 14px",
             borderRadius: 999,
             cursor: "pointer",
             alignItems: "center",
@@ -205,7 +205,7 @@ const TopBar = ({
             color: "white",
             background: "var(--ff-accent)",
             border: "none",
-            padding: "7px 16px",
+            padding: "11px 16px",
             borderRadius: 999,
             display: "inline-flex",
             alignItems: "center",
@@ -604,7 +604,9 @@ const MobileViewToggle = ({
             fontFamily: "var(--font-body)",
             fontSize: 13,
             fontWeight: 600,
-            padding: "8px 18px",
+            // 12px vertical padding keeps each segment >=44px tall — this is
+            // THE primary mobile control (audit UI-5 touch-target floor).
+            padding: "12px 18px",
             borderRadius: 999,
             border: "none",
             background: active ? "white" : "transparent",
@@ -893,7 +895,10 @@ export const BuilderShell = ({
                 fontSize: 12,
                 cursor: "pointer",
                 textDecoration: "underline",
-                marginLeft: 16,
+                marginLeft: 4,
+                // Padded hit area — the bare text link was ~15px tall
+                // (audit UI-5 touch-target floor).
+                padding: "14px 12px",
               }}
             >
               Dismiss

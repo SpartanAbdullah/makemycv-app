@@ -163,8 +163,8 @@ export const CustomizePanel = () => {
                 aria-label={sw.label}
                 onClick={() => setSetting("accentColor", sw.hex)}
                 style={{
-                  width: 24,
-                  height: 24,
+                  width: 32,
+                  height: 32,
                   borderRadius: "50%",
                   background: sw.hex,
                   border: active
@@ -193,8 +193,8 @@ export const CustomizePanel = () => {
               value={accentColor}
               onChange={(e) => setSetting("accentColor", e.target.value)}
               style={{
-                width: 28,
-                height: 24,
+                width: 36,
+                height: 32,
                 border: "1px solid var(--ff-line)",
                 borderRadius: 6,
                 background: "transparent",
