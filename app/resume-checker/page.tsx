@@ -81,7 +81,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "What happens to my CV?",
-    a: "We parse it to generate the report, then store the parsed report for 24 hours so you can revisit the URL. After that it's automatically deleted. No accounts, no email list, no tracking pixels.",
+    a: "Your PDF never uploads — your browser extracts the text and sends only that. We use an AI service (Anthropic) to parse it into a report, store the report for 24 hours so you can revisit the URL, then it auto-deletes. No accounts, no email list, no tracking pixels.",
   },
   {
     q: "Is it really free?",

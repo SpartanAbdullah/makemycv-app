@@ -105,8 +105,9 @@ export default async function ReportPage({
             {firstName === "your" ? "your" : `${firstName}'s`} CV.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Save this URL if you want to return. Reports are anonymous and
-            auto-delete in 24 hours.
+            Save this URL if you want to return. Not linked to any account —
+            anyone with this link can view it until it auto-deletes in 24
+            hours.
           </p>
         </div>
       </section>

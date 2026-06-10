@@ -105,14 +105,29 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
 
-      {/* Import row — PDF/DOCX is the only working source, so it takes the
-          full-width primary slot. LinkedIn paste-import was a dead placeholder
-          (see git history for removal). */}
-      <ImportButton
-        icon="upload"
-        label="Import existing CV (PDF / DOCX)"
-        onClick={() => handleImport("pdf")}
-      />
+      {/* Import row — PDF is the only working source today (the DOCX adapter
+          exists but is unwired; see audit UX-4), so the label must not
+          promise it. LinkedIn paste-import was a dead placeholder (see git
+          history for removal). */}
+      <div>
+        <ImportButton
+          icon="upload"
+          label="Import existing CV (PDF)"
+          onClick={() => handleImport("pdf")}
+        />
+        <p
+          style={{
+            marginTop: 6,
+            fontSize: 11.5,
+            color: "var(--ff-faint)",
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          Your file is read in this browser — it is never uploaded. Have a
+          Word CV? Save it as PDF first; DOCX import is coming soon.
+        </p>
+      </div>
 
       {/* OR divider */}
       <div

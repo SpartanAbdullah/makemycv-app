@@ -11,6 +11,7 @@ import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
 import { Icon } from "../Icon";
+import { AiDisclosure } from "../AiDisclosure";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
 type SkillsForm = { skills: CvSkill[] };
@@ -239,11 +240,14 @@ export const SkillsStep = ({
           type="button"
           onClick={fireAISuggest}
           className="cv-btn-accent-outline"
-          style={{ width: "100%", padding: "11px", marginTop: 12, marginBottom: 14 }}
+          style={{ width: "100%", padding: "11px", marginTop: 12 }}
         >
           <Icon name="sparkle" size={13} />
           Suggest skills for my profile
         </button>
+        <div style={{ marginBottom: 14 }}>
+          <AiDisclosure align="left" />
+        </div>
 
         {/* Skills pills — draggable */}
         {fields.length === 0 ? (

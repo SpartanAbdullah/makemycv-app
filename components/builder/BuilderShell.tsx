@@ -129,15 +129,6 @@ const TopBar = ({
   onDownload: () => void;
   isDownloading: boolean;
 }) => {
-  // Time since last save — local to the component since it ticks every 15s.
-  const [savedAgo, setSavedAgo] = useState("just now");
-  useEffect(() => {
-    const t = setInterval(() => {
-      setSavedAgo("just now");
-    }, 30000);
-    return () => clearInterval(t);
-  }, []);
-
   return (
     <div
       style={{
@@ -178,7 +169,7 @@ const TopBar = ({
             textOverflow: "ellipsis",
           }}
         >
-          {cvName} · auto-saved {savedAgo}
+          {cvName} · saved on this device
         </span>
       </div>
 
@@ -980,6 +971,11 @@ export const BuilderShell = ({
                   textAlign: "center",
                 }}
               >
+                <p style={{ marginBottom: 6, letterSpacing: "0.02em" }}>
+                  Your CV lives in this browser only — we never see it. AI
+                  suggestions are the one exception (sent securely, never
+                  stored).
+                </p>
                 <a
                   href={SUPPORT_URL}
                   target="_blank"

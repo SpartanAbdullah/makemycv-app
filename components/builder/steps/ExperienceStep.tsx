@@ -8,6 +8,7 @@ import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { Icon } from "../Icon";
+import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { useAIImprove } from "../../../hooks/useAIImprove";
@@ -210,7 +211,9 @@ export const ExperienceStep = ({
     setOpenIndex(fields.length);
   };
 
-  const improveAllWithAI = () => {
+  // Generates suggestions for the FIRST role only — the label must say so.
+  // Looping every role would burn the user's whole daily AI quota (10/24h).
+  const suggestBulletsWithAI = () => {
     if (fields.length === 0) return;
     handleGenerateBullets(0);
   };
@@ -220,11 +223,11 @@ export const ExperienceStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Improve all button */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      {/* AI bullet suggestions — first (most recent) role */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <button
           type="button"
-          onClick={improveAllWithAI}
+          onClick={suggestBulletsWithAI}
           disabled={aiLoading || fields.length === 0}
           style={{
             fontFamily: "var(--font-body)",
@@ -243,8 +246,9 @@ export const ExperienceStep = ({
           }}
         >
           <Icon name="sparkle" size={13} />
-          {aiLoading ? "Generating…" : "Improve all with AI"}
+          {aiLoading ? "Generating…" : "Suggest bullets with AI"}
         </button>
+        <AiDisclosure />
       </div>
 
       {/* Roles list */}

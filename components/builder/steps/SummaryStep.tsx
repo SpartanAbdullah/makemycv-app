@@ -13,6 +13,7 @@ import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { Icon } from "../Icon";
 import { TodaysTipCard } from "../TodaysTipCard";
+import { AiDisclosure } from "../AiDisclosure";
 
 type SummaryForm = { summary: string };
 
@@ -154,7 +155,7 @@ export const SummaryStep = ({
             );
           })()}
           <FieldError message={summaryWarning} type="warning" />
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex flex-col items-end">
             <button
               type="button"
               onClick={fireAISummary}
@@ -164,6 +165,7 @@ export const SummaryStep = ({
               <Icon name="sparkle" size={13} />
               Write my summary with AI
             </button>
+            <AiDisclosure />
           </div>
         </section>
         <TodaysTipCard stepId="summary" />
