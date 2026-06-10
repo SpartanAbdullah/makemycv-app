@@ -13,7 +13,11 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
-import { computeScore } from "../../../lib/scoreEngine";
+import {
+  computeScore,
+  computeDerivedStats,
+  GRADE_LABELS,
+} from "../../../lib/scoreEngine";
 import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
@@ -166,32 +170,12 @@ export const ReviewStep = ({
     (step) => step.id !== "review" && !getStepCompletion(step, data),
   );
 
-  /* ── Stats line items for the score card ── */
-  const totalBullets = data.experience.reduce(
-    (sum, e) => sum + (e.bullets ?? []).filter(Boolean).length,
-    0,
-  );
-  const measurableBullets = data.experience.reduce(
-    (sum, e) =>
-      sum + (e.bullets ?? []).filter((b) => /\d/.test(b ?? "")).length,
-    0,
-  );
-  const uaeFilled = [
-    data.personal.visaStatus,
-    data.personal.availability,
-    data.personal.drivingLicense,
-  ].filter((v) => v && v.trim()).length;
-  const expectedPages =
-    data.experience.length <= 2 && totalBullets <= 8 ? 1 : 2;
-
-  const scoreCategoryLabel =
-    score.total >= 85
-      ? "Outstanding CV"
-      : score.total >= 65
-        ? "Strong CV"
-        : score.total >= 40
-          ? "Almost there"
-          : "Getting started";
+  /* ── Stats + label come from the engine — never recomputed locally.
+        The old local copies used different rules (untrimmed bullets, a
+        second threshold table), which is how "0 of 9 measurable bullets"
+        could sit beside "Strong CV" (audit §4 symptom b). ── */
+  const stats = useMemo(() => computeDerivedStats(data), [data]);
+  const scoreCategoryLabel = GRADE_LABELS[score.grade];
 
   return (
     <div
@@ -343,26 +327,26 @@ export const ReviewStep = ({
               <StatRow
                 label="Measurable bullets"
                 value={
-                  totalBullets > 0
-                    ? `${measurableBullets} of ${totalBullets}`
+                  stats.totalBullets > 0
+                    ? `${stats.measurableBullets} of ${stats.totalBullets}`
                     : "—"
                 }
               />
               <StatRow
                 label="UAE essentials filled"
                 value={
-                  uaeFilled === 3
+                  stats.uaeFilledCount === 3
                     ? "All ✓"
-                    : `${uaeFilled} of 3`
+                    : `${stats.uaeFilledCount} of 3`
                 }
               />
               <StatRow
                 label="Sections complete"
-                value={`${builderSteps.filter((s) => getStepCompletion(s, data)).length - (getStepCompletion(builderSteps[builderSteps.length - 1], data) ? 1 : 0)} of ${builderSteps.length - 1}`}
+                value={`${builderSteps.filter((s) => s.id !== "review" && getStepCompletion(s, data)).length} of ${builderSteps.length - 1}`}
               />
               <StatRow
                 label="Expected length"
-                value={`${expectedPages} page${expectedPages > 1 ? "s" : ""}`}
+                value={`${stats.expectedPages} page${stats.expectedPages > 1 ? "s" : ""}`}
               />
             </div>
           </div>

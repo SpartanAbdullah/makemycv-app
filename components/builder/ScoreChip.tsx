@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ScoreReport } from "../../lib/resumeChecker/types";
+import type { ScoreGrade, ScoreReport } from "../../lib/resumeChecker/types";
+import { GRADE_CHIP_LABELS } from "../../lib/scoreEngine";
 import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 
 type Tier = "danger" | "warn" | "ok" | "great";
 
-function tierFor(score: number): Tier {
-  if (score < 50) return "danger";
-  if (score < 70) return "warn";
-  if (score < 85) return "ok";
-  return "great";
-}
+// Tier (color treatment) derives from the engine grade — the chip used to
+// hardcode its own 50/70/85 thresholds, so a 65–69 CV showed "Strong CV"
+// on the Review step and amber "Fair" here simultaneously (audit §4).
+const TIER_BY_GRADE: Record<ScoreGrade, Tier> = {
+  poor: "danger",
+  "needs-work": "warn",
+  good: "ok",
+  excellent: "great",
+};
 
 const TIER_STYLE: Record<
   Tier,
@@ -51,7 +55,7 @@ export const ScoreChip = ({
   delta?: number;
 }) => {
   const animated = useAnimatedNumber(report.total);
-  const tier = tierFor(report.total);
+  const tier = TIER_BY_GRADE[report.grade];
   const style = TIER_STYLE[tier];
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -178,10 +182,7 @@ export const ScoreChip = ({
                 fontWeight: 600,
               }}
             >
-              {tier === "danger" && "Needs work"}
-              {tier === "warn" && "Fair"}
-              {tier === "ok" && "Strong"}
-              {tier === "great" && "Excellent"}
+              {GRADE_CHIP_LABELS[report.grade]}
             </span>
           </div>
 

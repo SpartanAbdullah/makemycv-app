@@ -997,7 +997,7 @@ const SuggestionBullet = ({
           textTransform: "uppercase",
         }}
       >
-        AI suggestion · +4 pts
+        AI suggestion
       </div>
       <div
         style={{

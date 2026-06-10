@@ -32,28 +32,65 @@ export type ScoreOptions = {
   parseSignals?: ParseSignals;
 };
 
-// --- Legacy types (kept so the calculateScore shim keeps compiling) ---
+// --- The ONE label table (audit §4, symptom b) ---
+//
+// Every consumer (Review hero, TopBar chip, any future surface) derives its
+// label from `report.grade`, which is derived from `report.total` by
+// gradeFromTotal below. Hardcoding thresholds anywhere else is how the
+// 65–69 band ended up "Strong CV" on Review and amber "Fair" in the TopBar
+// at the same time. Don't reintroduce a second table.
 
-/** @deprecated use ScoreCategory from lib/resumeChecker/types */
-export type LegacyScoreCategory = {
-  name: string;
-  score: number;
-  maxScore: number;
-  suggestions: string[];
+/** Long-form labels for hero/summary surfaces. */
+export const GRADE_LABELS: Record<ScoreGrade, string> = {
+  excellent: "Outstanding CV",
+  good: "Strong CV",
+  "needs-work": "Almost there",
+  poor: "Getting started",
 };
 
-/** @deprecated use ScoreReport from lib/resumeChecker/types */
-export type ScoreResult = {
-  total: number;
-  grade: "Excellent" | "Good" | "Fair" | "Needs Work";
-  categories: LegacyScoreCategory[];
+/** Short labels for compact surfaces (TopBar chip). Same grade, same
+ *  thresholds — only the wording is shorter. */
+export const GRADE_CHIP_LABELS: Record<ScoreGrade, string> = {
+  excellent: "Excellent",
+  good: "Strong",
+  "needs-work": "Almost there",
+  poor: "Needs work",
 };
 
-// Re-export legacy alias so older imports (`import type { ScoreCategory }`) keep
-// resolving to the OLD shape during migration. Checker UI should import
-// ScoreCategory from lib/resumeChecker/types instead.
-/** @deprecated use ScoreCategory from lib/resumeChecker/types */
-export type { LegacyScoreCategory as ScoreCategoryDeprecated };
+// --- Derived stats (audit §4) ---
+//
+// The Review step used to re-implement these with subtly different rules
+// (untrimmed bullets, its own /\d/ test), so "X of Y measurable bullets"
+// could disagree with what the engine actually scored. One implementation,
+// engine-consistent trimming.
+
+export type ScoreDerivedStats = {
+  totalBullets: number;
+  measurableBullets: number;
+  /** visaStatus / availability / drivingLicense filled, 0–3. */
+  uaeFilledCount: number;
+  expectedPages: 1 | 2;
+};
+
+export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
+  const bullets = cv.experience.flatMap((e) =>
+    e.bullets.map((b) => b.trim()).filter(Boolean),
+  );
+  const measurableBullets = bullets.filter((b) => /\d/.test(b)).length;
+  const uaeFilledCount = [
+    cv.personal.visaStatus,
+    cv.personal.availability,
+    cv.personal.drivingLicense,
+  ].filter((v) => v && v.trim()).length;
+  const expectedPages: 1 | 2 =
+    cv.experience.length <= 2 && bullets.length <= 8 ? 1 : 2;
+  return {
+    totalBullets: bullets.length,
+    measurableBullets,
+    uaeFilledCount,
+    expectedPages,
+  };
+}
 
 // --- Word / text helpers ---
 
@@ -96,6 +133,11 @@ type SubSignal = {
   /** True if this sub-signal depends on parseSignals. Excluded from both
    *  numerator and denominator when parseSignals is not supplied. */
   conditional: boolean;
+  /** False when there is no input to judge (e.g. "summary ≤ 200 words"
+   *  with no summary). Not-applicable signals are excluded from numerator
+   *  AND denominator and emit no issue — a blank CV must not collect
+   *  vacuous passes and green "what's working" rows (audit §4 symptom c). */
+  applicable: boolean;
   /** Issue to attach to the output. When pass=true, severity='good'. */
   issue: ScoreIssue;
 };
@@ -183,6 +225,7 @@ function sig(
   severity: ScoreSeverity,
   issue: Omit<ScoreIssue, "id" | "severity" | "signal">,
   conditional = false,
+  applicable = true,
 ): SubSignal {
   return {
     id,
@@ -190,6 +233,7 @@ function sig(
     points,
     pass,
     conditional,
+    applicable,
     issue: {
       id,
       severity,
@@ -278,17 +322,27 @@ function evaluateContent(
     );
   }
 
-  // C4 Summary ≤ 200 words (1)
+  // C4 Summary ≤ 200 words (1) — N/A with no summary (an empty summary must
+  // not earn a vacuous "concise" pass).
   {
     const pass = summaryWords <= 200;
     out.push(
-      sig("C4", "content", 1, pass, pass ? "good" : "review", {
-        title: pass ? "Summary is concise" : "Summary is too long",
-        description: pass
-          ? "Under 200 words keeps the summary scannable."
-          : `${summaryWords} words. Recruiters skim the first 10 seconds — long summaries get skipped.`,
-        actionable: pass ? "" : "Trim to 2–4 sentences. Keep the metric, drop the adjectives.",
-      }),
+      sig(
+        "C4",
+        "content",
+        1,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass ? "Summary is concise" : "Summary is too long",
+          description: pass
+            ? "Under 200 words keeps the summary scannable."
+            : `${summaryWords} words. Recruiters skim the first 10 seconds — long summaries get skipped.`,
+          actionable: pass ? "" : "Trim to 2–4 sentences. Keep the metric, drop the adjectives.",
+        },
+        false,
+        summary.length > 0,
+      ),
     );
   }
 
@@ -387,20 +441,29 @@ function evaluateContent(
     );
   }
 
-  // C10 No bullet > 60 words (2)
+  // C10 No bullet > 60 words (2) — N/A with zero bullets.
   {
     const hugeBullets = allBullets.filter((b) => wordCount(b) > 60).length;
     const pass = hugeBullets === 0;
     out.push(
-      sig("C10", "content", 2, pass, pass ? "good" : "error", {
-        title: pass
-          ? "No paragraph-length bullets"
-          : `${hugeBullets} bullet${hugeBullets === 1 ? " runs" : "s run"} past 60 words`,
-        description: pass
-          ? "Good — no bullets have drifted into paragraph territory."
-          : "60+ words defeats the purpose of using bullets. Recruiters won't read them.",
-        actionable: pass ? "" : "Rewrite each as a single crisp sentence. Two ideas = two bullets.",
-      }),
+      sig(
+        "C10",
+        "content",
+        2,
+        pass,
+        pass ? "good" : "error",
+        {
+          title: pass
+            ? "No paragraph-length bullets"
+            : `${hugeBullets} bullet${hugeBullets === 1 ? " runs" : "s run"} past 60 words`,
+          description: pass
+            ? "Good — no bullets have drifted into paragraph territory."
+            : "60+ words defeats the purpose of using bullets. Recruiters won't read them.",
+          actionable: pass ? "" : "Rewrite each as a single crisp sentence. Two ideas = two bullets.",
+        },
+        false,
+        allBullets.length > 0,
+      ),
     );
   }
 
@@ -761,18 +824,27 @@ function evaluateAts(
     );
   }
 
-  // A6 No emojis (1)
+  // A6 No emojis (1) — N/A when there is no user text to scan.
   {
     const allUserText = [p.summary, ...cv.experience.flatMap((e) => e.bullets)].join(" ");
     const pass = !EMOJI_REGEX.test(allUserText);
     out.push(
-      sig("A6", "atsEssentials", 1, pass, pass ? "good" : "error", {
-        title: pass ? "No emojis in CV content" : "Emojis detected in CV content",
-        description: pass
-          ? ""
-          : "ATS parsers treat emojis as junk characters — the surrounding text may get dropped.",
-        actionable: pass ? "" : "Remove all emoji characters from bullets and summary.",
-      }),
+      sig(
+        "A6",
+        "atsEssentials",
+        1,
+        pass,
+        pass ? "good" : "error",
+        {
+          title: pass ? "No emojis in CV content" : "Emojis detected in CV content",
+          description: pass
+            ? ""
+            : "ATS parsers treat emojis as junk characters — the surrounding text may get dropped.",
+          actionable: pass ? "" : "Remove all emoji characters from bullets and summary.",
+        },
+        false,
+        allUserText.trim().length > 0,
+      ),
     );
   }
 
@@ -872,7 +944,9 @@ function evaluateAts(
     }
   }
 
-  // A11 Current role populated (2) — flagged the real-world failure mode
+  // A11 Current role populated (2) — flagged the real-world failure mode.
+  // N/A on a CV with no experience content at all: a fully blank CV must
+  // not earn a green "No current role marked — OK if you're between jobs".
   {
     const currentRoles = cv.experience.filter(
       (e) => e.isCurrent && (e.role.trim() || e.company.trim()),
@@ -881,21 +955,32 @@ function evaluateAts(
       (e) => e.role.trim() && e.company.trim(),
     );
     const hasAny = cv.experience.some((e) => e.isCurrent);
-    // Neutral case: no experience entries exist at all → issue reviewed at A7/S7 level.
+    const hasExperienceContent = cv.experience.some(
+      (e) => e.role.trim() || e.company.trim() || e.isCurrent,
+    );
     // If any entry is marked current, it must have both role and company.
     const pass = hasAny ? hasComplete : currentRoles.length === 0;
     out.push(
-      sig("A11", "atsEssentials", 2, pass, pass ? "good" : "error", {
-        title: pass
-          ? hasAny
-            ? "Current role is complete"
-            : "No current role marked — OK if you're between jobs"
-          : "Current role is missing title or company",
-        description: pass
-          ? ""
-          : "An ATS treats the current role as the signal of what you do today. Half-filled = ambiguous.",
-        actionable: pass ? "" : "Fill in both role and company for the role marked 'Present'.",
-      }),
+      sig(
+        "A11",
+        "atsEssentials",
+        2,
+        pass,
+        pass ? "good" : "error",
+        {
+          title: pass
+            ? hasAny
+              ? "Current role is complete"
+              : "No current role marked — OK if you're between jobs"
+            : "Current role is missing title or company",
+          description: pass
+            ? ""
+            : "An ATS treats the current role as the signal of what you do today. Half-filled = ambiguous.",
+          actionable: pass ? "" : "Fill in both role and company for the role marked 'Present'.",
+        },
+        false,
+        hasExperienceContent,
+      ),
     );
   }
 
@@ -941,15 +1026,25 @@ function evaluateDesign(cv: CvData): SubSignal[] {
     );
   }
 
-  // D3 ≤ 1200 words (2)
+  // D3 ≤ 1200 words (2) — N/A with no content (a blank CV is not "not
+  // overstuffed", it's empty).
   {
     const pass = approxTotal <= 1200;
     out.push(
-      sig("D3", "design", 2, pass, pass ? "good" : "review", {
-        title: pass ? "CV isn't overstuffed" : "CV may spill to a 3rd page",
-        description: pass ? "" : `~${approxTotal} words — risks bleeding onto a third page.`,
-        actionable: pass ? "" : "Trim older roles to 2–3 bullets each. Keep the latest 2 roles detailed.",
-      }),
+      sig(
+        "D3",
+        "design",
+        2,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass ? "CV isn't overstuffed" : "CV may spill to a 3rd page",
+          description: pass ? "" : `~${approxTotal} words — risks bleeding onto a third page.`,
+          actionable: pass ? "" : "Trim older roles to 2–3 bullets each. Keep the latest 2 roles detailed.",
+        },
+        false,
+        approxTotal > 0,
+      ),
     );
   }
 
@@ -977,32 +1072,50 @@ function evaluateDesign(cv: CvData): SubSignal[] {
     );
   }
 
-  // D6 Skills < 30 (2)
+  // D6 Skills < 30 (2) — N/A with zero skills.
   {
     const pass = skillsCount < 30;
     out.push(
-      sig("D6", "design", 2, pass, pass ? "good" : "review", {
-        title: pass ? "Skills aren't keyword-stuffed" : `${skillsCount} skills listed — likely too many`,
-        description: pass
-          ? ""
-          : "30+ skills signals keyword stuffing. Recruiters (and ATS scoring models) penalise it.",
-        actionable: pass ? "" : "Keep 10–20 highly relevant skills. Drop generic ones like 'Microsoft Office'.",
-      }),
+      sig(
+        "D6",
+        "design",
+        2,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass ? "Skills aren't keyword-stuffed" : `${skillsCount} skills listed — likely too many`,
+          description: pass
+            ? ""
+            : "30+ skills signals keyword stuffing. Recruiters (and ATS scoring models) penalise it.",
+          actionable: pass ? "" : "Keep 10–20 highly relevant skills. Drop generic ones like 'Microsoft Office'.",
+        },
+        false,
+        skillsCount > 0,
+      ),
     );
   }
 
-  // D7 Each skill ≤ 40 chars (2)
+  // D7 Each skill ≤ 40 chars (2) — N/A with zero skills.
   {
     const longSkills = cv.skills.filter((s) => s.name.length > 40).length;
     const pass = longSkills === 0;
     out.push(
-      sig("D7", "design", 2, pass, pass ? "good" : "review", {
-        title: pass ? "Skills are short phrases" : `${longSkills} skill${longSkills === 1 ? " item looks" : " items look"} like sentences`,
-        description: pass
-          ? ""
-          : "When skills are written as sentences instead of keywords, ATS keyword matching gets noisy.",
-        actionable: pass ? "" : "Each skill should be a single term or short phrase (2–4 words), not a sentence.",
-      }),
+      sig(
+        "D7",
+        "design",
+        2,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass ? "Skills are short phrases" : `${longSkills} skill${longSkills === 1 ? " item looks" : " items look"} like sentences`,
+          description: pass
+            ? ""
+            : "When skills are written as sentences instead of keywords, ATS keyword matching gets noisy.",
+          actionable: pass ? "" : "Each skill should be a single term or short phrase (2–4 words), not a sentence.",
+        },
+        false,
+        skillsCount > 0,
+      ),
     );
   }
 
@@ -1110,7 +1223,9 @@ export function computeScore(
     ...evaluateDesign(cv),
   ];
 
-  const applicable = allSignals.filter((s) => !s.conditional || signals);
+  const applicable = allSignals.filter(
+    (s) => (!s.conditional || signals) && s.applicable,
+  );
 
   const totalEarned = applicable.reduce(
     (sum, s) => sum + (s.pass ? s.points : 0),
@@ -1179,52 +1294,9 @@ export function computeScore(
   };
 }
 
-// --- Deprecated shims ---
-
-const LEGACY_GRADE_MAP: Record<ScoreGrade, ScoreResult["grade"]> = {
-  excellent: "Excellent",
-  good: "Good",
-  "needs-work": "Fair",
-  poor: "Needs Work",
-};
-
-/**
- * @deprecated Use `computeScore(cv, { mode: 'builder' })` and the unified
- * ScoreReport shape. This shim is preserved so any lagging consumer keeps
- * compiling; remove in v1.1 after verifying no production import remains.
- */
-export function calculateScore(data: CvData): ScoreResult {
-  const report = computeScore(data, { mode: "builder" });
-  const categories: LegacyScoreCategory[] = report.categories.map((c) => {
-    const issues = c.issues.filter((i) => i.severity !== "good");
-    const maxPointsForCategory = Math.round(c.weight * 100);
-    return {
-      name: c.name,
-      score: Math.round((c.score / 100) * maxPointsForCategory),
-      maxScore: maxPointsForCategory,
-      suggestions: issues.map((i) =>
-        i.actionable ? `${i.title} — ${i.actionable}` : i.title,
-      ),
-    };
-  });
-
-  return {
-    total: report.total,
-    grade: LEGACY_GRADE_MAP[report.grade],
-    categories,
-  };
-}
-
-/**
- * @deprecated Use `computeScore(cv, { mode: 'checker', parseSignals })`. Kept
- * so the checker route and any lagging UI keep compiling during migration.
- */
-export function computeCheckerScore(
-  cv: CvData,
-  signals: ParseSignals,
-): ScoreReport {
-  return computeScore(cv, { mode: "checker", parseSignals: signals });
-}
+// Deprecated shims (calculateScore, computeCheckerScore) and their legacy
+// types were deleted in the 2026-06 scoring consolidation — repo-wide grep
+// confirmed zero production imports.
 
 export type {
   ScoreCategory,
