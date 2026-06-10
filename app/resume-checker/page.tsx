@@ -11,17 +11,40 @@ import {
 } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
-  title: "Free ATS Resume Checker for UAE Jobs | MakeMyCV",
+  // No "| MakeMyCV" here — the layout's title template appends it, and
+  // including it twice produced "… | MakeMyCV | MakeMyCV" (audit ENG-19).
+  title: "Free ATS Resume Checker for UAE Jobs",
   description:
     "ATS-check your CV in about 30 seconds. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
   robots: { index: true, follow: true },
+  // Page-level openGraph/twitter REPLACE the layout's objects wholesale, so
+  // images/siteName/locale must be restated or WhatsApp/LinkedIn previews
+  // lose their image on the one page built to be shared (audit ENG-19).
   openGraph: {
     title: "Free ATS Resume Checker for UAE Jobs",
     description:
       "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
     url: "https://app.makemycv.ae/resume-checker",
     type: "website",
+    siteName: "MakeMyCV",
+    locale: "en_AE",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "MakeMyCV - Free ATS Resume Checker for UAE Jobs",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Free ATS Resume Checker for UAE Jobs",
+    description:
+      "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
+    images: ["/og-image.png"],
+    creator: "@makemycv",
   },
 };
 
