@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import type { StepStatus } from "./Stepper";
 import { StepBeads } from "./StepBeads";
@@ -10,11 +18,17 @@ import { builderSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
+import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
-import { MappingReview } from "../import/MappingReview";
-import { pdfAdapter } from "../../lib/importers/pdfAdapter";
-import { docxAdapter } from "../../lib/importers/docxAdapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
+
+// Code-split the rare paths out of /builder's first paint (audit PERF-6):
+// MappingReview (743 lines) renders only mid-import, and the adapters pull
+// the 816-line heuristic textParser eagerly when imported statically.
+const MappingReview = dynamic(
+  () => import("../import/MappingReview").then((m) => m.MappingReview),
+  { ssr: false },
+);
 import type { CvData } from "../../lib/types/cv";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
@@ -37,6 +51,14 @@ export const useImport = () => {
   if (!ctx) throw new Error("useImport must be used inside BuilderShell");
   return ctx;
 };
+
+// Shared score report (audit PERF-3): BuilderShell computes the engine
+// report once per (deferred) data commit for the TopBar chip; ReviewStep
+// consumes the same report instead of running the 1,200-line engine a
+// second time per commit.
+const ScoreReportContext = createContext<ScoreReport | null>(null);
+
+export const useSharedScoreReport = () => useContext(ScoreReportContext);
 
 type ImportState =
   | { phase: "idle" }
@@ -671,6 +693,13 @@ export const BuilderShell = ({
   // the desktop UI even if the value is "preview".
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
 
+  // Desktop detection (audit PERF-1): the xl-only preview drawer used to be
+  // CSS-hidden but ALWAYS MOUNTED, so every phone paid a full A4 template
+  // reconciliation per keystroke commit for a drawer it could never see.
+  // Server/mobile first paint renders no drawer (matching what CSS showed);
+  // the drawer mounts only once the viewport is confirmed xl+.
+  const [isDesktop, setIsDesktop] = useState(false);
+
   // If the viewport grows to xl+ (e.g. user rotates a tablet), reset to
   // "edit" so the mobile-only preview view is not left dangling in memory.
   // Client-only via useEffect — no window access at render time.
@@ -678,6 +707,7 @@ export const BuilderShell = ({
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(min-width: 1280px)");
     const onChange = () => {
+      setIsDesktop(mq.matches);
       if (mq.matches) setMobileView("edit");
     };
     onChange();
@@ -710,14 +740,18 @@ export const BuilderShell = ({
     return result;
   }, [data, stepId]);
 
-  // Score report — computed live, shown in the TopBar (number + popover).
+  // Score report — shown in the TopBar (number + popover) and shared with
+  // ReviewStep via ScoreReportContext. Computed on DEFERRED data (audit
+  // PERF-3) so the regex-heavy engine runs after urgent typing renders,
+  // off the keystroke path on low-end devices.
+  const deferredData = useDeferredValue(data);
   const scoreReport: ScoreReport = useMemo(
     () =>
-      computeScore(data, {
+      computeScore(deferredData, {
         mode: "builder",
         parseSignals: parseSignals ?? undefined,
       }),
-    [data, parseSignals],
+    [deferredData, parseSignals],
   );
 
   const cvName =
@@ -798,11 +832,16 @@ export const BuilderShell = ({
         ? ".pdf,application/pdf"
         : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const source = type === "pdf" ? "PDF" : "DOCX";
-    const adapter = type === "pdf" ? pdfAdapter : docxAdapter;
 
     triggerFileInput(accept, async (file) => {
       setImportState({ phase: "parsing", source });
       try {
+        // Adapters (and the textParser they pull in) load on first import,
+        // not at builder first paint (audit PERF-6).
+        const adapter =
+          type === "pdf"
+            ? (await import("../../lib/importers/pdfAdapter")).pdfAdapter
+            : (await import("../../lib/importers/docxAdapter")).docxAdapter;
         const parsed = await adapter.parse(file);
         setImportState({ phase: "review", source, parsed });
       } catch {
@@ -823,10 +862,10 @@ export const BuilderShell = ({
   };
 
   const stepIsReview = stepId === "review";
-  const stepIsScore = stepId === "score";
 
   return (
     <ImportContext.Provider value={{ handleImport }}>
+      <ScoreReportContext.Provider value={scoreReport}>
       <div
         style={{
           display: "flex",
@@ -943,7 +982,7 @@ export const BuilderShell = ({
           */}
           <div
             className={
-              mobileView === "preview" && !stepIsReview && !stepIsScore
+              mobileView === "preview" && !stepIsReview
                 ? "hidden xl:contents"
                 : "contents"
             }
@@ -973,7 +1012,7 @@ export const BuilderShell = ({
               {/* Form column — anchored left on xl+, full-width on smaller */}
               <div
                 className={
-                  stepIsReview || stepIsScore
+                  stepIsReview
                     ? "ff-form-column ff-form-column-review"
                     : "ff-form-column"
                 }
@@ -1018,16 +1057,18 @@ export const BuilderShell = ({
 
           {/* Mobile preview view (xl-) — scaled A4 CV that matches the export.
               Only mounted when toggled on, AND only on steps that have a
-              preview at all (not review/score, which have their own layouts).
+              preview at all (not review, which has its own layout).
               `xl:hidden` ensures desktop never shows it. */}
-          {mobileView === "preview" && !stepIsReview && !stepIsScore && (
+          {mobileView === "preview" && !stepIsReview && (
             <div className="contents xl:hidden">
               <MobilePreviewView />
             </div>
           )}
 
-          {/* Preview drawer — xl+ only, hidden on review/score steps */}
-          {!stepIsReview && !stepIsScore && (
+          {/* Preview drawer — mounted ONLY on confirmed xl+ viewports
+              (audit PERF-1); the hidden/xl:block class stays as a CSS
+              belt-and-braces. Hidden on the review step. */}
+          {!stepIsReview && isDesktop && (
             <div className="hidden xl:block" style={{ pointerEvents: "auto" }}>
               <PreviewDrawer
                 templateId={data.settings.templateId}
@@ -1043,7 +1084,7 @@ export const BuilderShell = ({
 
         {/* Mobile Edit | Preview toggle — replaces the old floating pill.
             Hidden on xl+ via Tailwind (side-by-side handles desktop). */}
-        {!stepIsReview && !stepIsScore && (
+        {!stepIsReview && (
           <MobileViewToggle value={mobileView} onChange={setMobileView} />
         )}
 
@@ -1233,6 +1274,7 @@ export const BuilderShell = ({
           .cv-bead-strip::-webkit-scrollbar { display: none; }
         `}</style>
       </div>
+      </ScoreReportContext.Provider>
     </ImportContext.Provider>
   );
 };

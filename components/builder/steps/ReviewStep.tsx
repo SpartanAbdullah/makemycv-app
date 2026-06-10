@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -24,6 +25,8 @@ import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
 import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
 import { ShareScoreCard } from "../../ShareScoreCard";
+import { useSharedScoreReport } from "../BuilderShell";
+import type { CvData } from "../../../lib/types/cv";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -100,14 +103,21 @@ export const ReviewStep = ({
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [downloadTipOpen, setDownloadTipOpen] = useState(false);
 
-  const score = useMemo(
+  // Reuse BuilderShell's report instead of running the engine a second
+  // time per commit (audit PERF-3). The local fallback only exists for
+  // any future mount outside the shell.
+  const sharedReport = useSharedScoreReport();
+  const fallbackReport = useMemo(
     () =>
-      computeScore(data, {
-        mode: "builder",
-        parseSignals: parseSignals ?? undefined,
-      }),
-    [data, parseSignals],
+      sharedReport
+        ? null
+        : computeScore(data, {
+            mode: "builder",
+            parseSignals: parseSignals ?? undefined,
+          }),
+    [sharedReport, data, parseSignals],
   );
+  const score = sharedReport ?? fallbackReport!;
 
   const animatedScore = useAnimatedNumber(score.total);
   const firstName =
@@ -482,9 +492,7 @@ export const ReviewStep = ({
                   onClick={() => handleTemplateChange(tmpl.id)}
                   onPreview={() => setPreviewTemplateId(tmpl.id)}
                 >
-                  <TemplateThumb>
-                    <tmpl.Render data={data} plan="pro" />
-                  </TemplateThumb>
+                  <TemplateGalleryPreview Render={tmpl.Render} data={data} />
                 </TemplateCard>
               );
             })}
@@ -586,6 +594,29 @@ export const ReviewStep = ({
     </div>
   );
 };
+
+/* ─── Memoized gallery thumbnail (audit PERF-4) ──────────────
+   Six full A4 template trees are mounted at once in the gallery; without
+   memo, every unrelated ReviewStep state change (share feedback, modal
+   opens) re-rendered all six. memo skips them unless the CV data or the
+   template itself changes. content-visibility lets the browser skip
+   painting thumbnails that are scrolled off-screen (mobile stacks them
+   in one column). */
+const TemplateGalleryPreview = memo(function TemplateGalleryPreview({
+  Render,
+  data,
+}: {
+  Render: (props: { data: CvData; plan?: "free" | "pro" }) => React.ReactElement;
+  data: CvData;
+}) {
+  return (
+    <div style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
+      <TemplateThumb>
+        <Render data={data} plan="pro" />
+      </TemplateThumb>
+    </div>
+  );
+});
 
 /* ─── Score donut ───────────────────────────────────────── */
 const ScoreDonut = ({ total }: { total: number }) => {
