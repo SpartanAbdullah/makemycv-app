@@ -198,14 +198,13 @@ export const ReviewStep = ({
                 letterSpacing: "-0.03em",
               }}
             >
-              Looking good,
+              {score.total >= 40 ? "Looking good," : "Let's build this out,"}
               <br />
               <span className="accent">{firstName}.</span>
             </h1>
             <p className="cv-step-subtitle" style={{ maxWidth: 380 }}>
-              You&apos;re scoring above {Math.min(Math.round(score.total * 0.95), 97)}%
-              of CVs in the UAE market. Take a final look, pick a template, and
-              download.
+              Your CV scores {score.total}/100 on our UAE hiring rubric. Take a
+              final look, pick a template, and download.
             </p>
           </div>
 
@@ -292,8 +291,8 @@ export const ReviewStep = ({
                     marginTop: 4,
                   }}
                 >
-                  Top {Math.max(5, 100 - Math.round(score.total * 0.95))}% in
-                  UAE · {data.personal.headline?.trim() || "your field"}
+                  {data.personal.headline?.trim() || "Your CV"} · UAE hiring
+                  rubric
                 </div>
                 <div
                   style={{
@@ -468,7 +467,8 @@ export const ReviewStep = ({
                 marginTop: 3,
               }}
             >
-              All six are ATS-tested and used by UAE recruiters.
+              All six export as real text, not images. Classic and ATS Clean
+              are the safest picks for online applications.
             </div>
           </div>
 

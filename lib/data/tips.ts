@@ -30,7 +30,7 @@ export const tips: UaeTip[] = [
     id: "visa-status-first",
     quote:
       "UAE recruiters scan visa status in the first three seconds. Put yours up top, not buried at the bottom.",
-    citation: "Based on 1,200+ Bayt & LinkedIn UAE listings, 2024.",
+    citation: "From our review of UAE job listings on Bayt and LinkedIn, 2024.",
     stepId: "personal",
   },
   {
@@ -43,8 +43,8 @@ export const tips: UaeTip[] = [
   {
     id: "english-arabic-bilingual",
     quote:
-      "Bilingual Arabic-English candidates receive 38% more interview callbacks for UAE government and semi-government roles.",
-    citation: "Interior360 internal hiring review, Q1 2025.",
+      "Bilingual Arabic-English candidates get noticeably more interview callbacks for UAE government and semi-government roles.",
+    citation: "Pattern from hands-on hiring reviews at Interior360, 2025.",
     stepId: "languages",
   },
   {
@@ -58,7 +58,7 @@ export const tips: UaeTip[] = [
     id: "experience-quantify",
     quote:
       "‘Led a team’ tells nothing. ‘Led 14 people across 3 sites to AED 42M revenue’ tells a story.",
-    citation: "Internal review of 850 UAE operations CVs, 2024.",
+    citation: "From hands-on reviews of UAE operations CVs, 2024.",
     stepId: "experience",
   },
   {
@@ -86,7 +86,7 @@ export const tips: UaeTip[] = [
     id: "skills-mirror-jd",
     quote:
       "Mirror the exact wording of the job description. ‘Stakeholder management’ and ‘client liaison’ are not the same string to an ATS.",
-    citation: "Internal Interior360 ATS audit, 2024.",
+    citation: "From hands-on ATS testing at Interior360, 2024.",
     stepId: "skills",
   },
   {
@@ -99,8 +99,8 @@ export const tips: UaeTip[] = [
   {
     id: "projects-tools",
     quote:
-      "On project bullets, name the tools. ‘Built a dashboard in Power BI’ outperforms ‘Built a dashboard’ by 22% on first-pass ATS matches.",
-    citation: "Internal Interior360 ATS audit, 2024.",
+      "On project bullets, name the tools. ‘Built a dashboard in Power BI’ beats ‘Built a dashboard’ in ATS keyword matching.",
+    citation: "From hands-on ATS testing at Interior360, 2024.",
     stepId: "projects",
   },
   {
@@ -134,7 +134,7 @@ export const tips: UaeTip[] = [
     id: "summary-length",
     quote:
       "Aim for 40 to 80 words in the summary. Anything shorter reads like a placeholder; anything longer gets skipped.",
-    citation: "Internal Interior360 writing review, Q4 2024.",
+    citation: "From hands-on CV writing reviews at Interior360, 2024.",
     stepId: "summary",
   },
   {
@@ -155,7 +155,7 @@ export const tips: UaeTip[] = [
     id: "languages-cefr",
     quote:
       "Use ‘Native’, ‘Fluent’, ‘Professional’ or ‘Conversational’ — not numeric scales. UAE recruiters scan by label, not band.",
-    citation: "Internal Interior360 writing review, 2024.",
+    citation: "From hands-on CV writing reviews at Interior360, 2024.",
     stepId: "languages",
   },
   {

@@ -13,13 +13,13 @@ import {
 export const metadata: Metadata = {
   title: "Free ATS Resume Checker for UAE Jobs | MakeMyCV",
   description:
-    "ATS-check your CV in 30 seconds. Free. No sign-up. Tested against the same parsers used by DIFC firms, UAE banks, and government entities.",
+    "ATS-check your CV in about 30 seconds. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Free ATS Resume Checker for UAE Jobs",
     description:
-      "Upload your CV, get a free ATS report in 30 seconds. No sign-up. Built for the UAE job market.",
+      "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
     url: "https://app.makemycv.ae/resume-checker",
     type: "website",
   },
@@ -89,7 +89,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "How accurate is the parser?",
-    a: "We test against the same extraction path used by ATS systems common in DIFC firms, UAE banks, and government entities. If our parser can't read a section cleanly, theirs probably can't either — which is the signal you actually want.",
+    a: "Our checker runs the same steps an ATS runs: extract the raw text, detect the sections, and flag formatting that blocks parsing. If our extraction path can't read a section cleanly, an ATS likely can't either — which is the signal you actually want.",
   },
 ];
 
@@ -136,11 +136,12 @@ export default function ResumeCheckerPage() {
             Free · No sign-up · UAE-focused
           </div>
           <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-            ATS-check your CV in 30 seconds.
+            ATS-check your CV in about 30 seconds.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-white/70 sm:text-lg">
-            Tested against the same ATS parsers used by DIFC firms, UAE banks,
-            and government entities. No email required.
+            We read your CV the way ATS software does &mdash; raw text
+            extraction and section detection &mdash; and flag exactly what
+            breaks. No email required.
           </p>
           {/* Answer-first definition paragraph — sits directly under the hero
               so an AI engine can extract a self-contained "what is this?" /
@@ -150,9 +151,9 @@ export default function ResumeCheckerPage() {
             An ATS (Applicant Tracking System) is the software UAE employers
             use to filter CVs before a recruiter sees them. If the parser
             can&apos;t read your file cleanly, the application stops there.
-            This free checker scans your CV against the same parsers used at
-            DIFC firms, UAE banks, and government entities, and flags exactly
-            what breaks it &mdash; in about 30 seconds, no sign-up.
+            This free checker reads your CV the same way an ATS does &mdash;
+            raw text extraction and section detection &mdash; and flags
+            exactly what breaks it, in about 30 seconds, no sign-up.
           </p>
           <p className="mx-auto mt-3 max-w-xl text-xs text-white/50">
             Your CV is processed securely and deleted after 24 hours.
@@ -170,7 +171,7 @@ export default function ResumeCheckerPage() {
             <div>
               <ExampleReportPreview />
               <p className="mt-3 text-center text-xs text-slate-500">
-                Here&apos;s what you&apos;ll see in 30 seconds.
+                Here&apos;s what you&apos;ll see in about 30 seconds.
               </p>
             </div>
           </div>
@@ -287,7 +288,7 @@ export default function ResumeCheckerPage() {
             </svg>
           </a>
           <p className="mt-4 text-xs text-white/60">
-            Free. No account. Takes 30 seconds.
+            Free. No account. Takes about 30 seconds.
           </p>
         </div>
       </section>
