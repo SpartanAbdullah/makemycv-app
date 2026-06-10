@@ -1,47 +1,46 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
-import { Inter, Plus_Jakarta_Sans, Poppins } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  Instrument_Serif,
+  Inter,
+  JetBrains_Mono,
+} from "next/font/google";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { organizationSchema } from "@/lib/seo/schema";
 
-const sora = localFont({
-  src: [
-    { path: "../public/fonts/Sora-400.woff2", weight: "400", style: "normal" },
-    { path: "../public/fonts/Sora-600.woff2", weight: "600", style: "normal" },
-  ],
-  variable: "--font-sora",
-  display: "swap",
-});
-
-const fraunces = localFont({
-  src: [
-    { path: "../public/fonts/Fraunces-600.woff2", weight: "600", style: "normal" },
-    { path: "../public/fonts/Fraunces-700.woff2", weight: "700", style: "normal" },
-  ],
-  variable: "--font-fraunces",
-  display: "swap",
-});
-
+/* Focus Flow font pipeline (audit PERF-2). Exactly the four families the
+   UI renders, all self-hosted through next/font (no render-blocking
+   Google @import chain). The previous setup loaded EIGHT families —
+   Sora/Fraunces/Poppins/Plus Jakarta were preloaded but never painted,
+   and Inter was loaded twice. The Logo renders SVG files, so no
+   wordmark font is needed. */
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
 });
 
-const plusJakarta = Plus_Jakarta_Sans({
+const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
-  variable: "--font-jakarta",
+  variable: "--font-bricolage",
   display: "swap",
-  weight: ["500", "600", "700", "800"],
+  weight: ["500", "600", "700"],
 });
 
-// Brand wordmark font — Poppins, per the May 2026 brand handoff.
-const poppins = Poppins({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-poppins",
+  variable: "--font-instrument",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: "400",
+  style: ["normal", "italic"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
+  weight: ["500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -138,11 +137,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} ${poppins.variable}`}
+      className={`${inter.variable} ${bricolage.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
-      <body
-        className={`${sora.variable} ${fraunces.variable} ${inter.variable} ${plusJakarta.variable} ${poppins.variable} antialiased`}
-      >
+      <body className="antialiased">
         {/* Site-wide Organization identity. Pages that need surface-specific
             schema (WebApplication, FAQPage, BreadcrumbList) emit it locally
             and link back to this @id via the publisher field. */}

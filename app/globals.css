@@ -1,10 +1,8 @@
 /* Focus Flow display & UI fonts — Bricolage Grotesque (display), Inter (UI),
    Instrument Serif (editorial italic for Today's Tip), JetBrains Mono (badges
-   and counters). All Google Fonts. Local Sora/Fraunces from layout.tsx remain
-   exposed via --font-sora / --font-fraunces for any legacy callers. The
-   Google Fonts @import has to precede the Tailwind @import to satisfy the
-   CSS @import-ordering rule. */
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap');
+   and counters). All four are self-hosted via next/font in app/layout.tsx —
+   the render-blocking Google @import chain was removed in the 2026-06 audit
+   (PERF-2), along with the dead Sora/Fraunces/Poppins/Plus Jakarta loaders. */
 @import "tailwindcss";
 
 /* ─── MakeMyCV Design System v3 — "Focus Flow" ───────────────
@@ -103,13 +101,15 @@
   --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
   --space-8: 32px;  --space-10: 40px; --space-12: 48px;
 
-  /* Typography stacks */
-  --font-display: 'Bricolage Grotesque', var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body:    'Inter', var(--font-inter), system-ui, sans-serif;
-  --font-serif:   'Instrument Serif', Georgia, 'Times New Roman', serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* Brand wordmark — Poppins (loaded via next/font in app/layout.tsx). */
-  --font-brand:   var(--font-poppins), 'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
+  /* Typography stacks — next/font variables first (self-hosted), then the
+     plain family name for any environment without the loader. */
+  --font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono:    var(--font-jetbrains), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Brand wordmark token kept for back-compat; the Poppins loader was dead
+     weight (the Logo renders SVG files) and was removed in the 2026-06 audit. */
+  --font-brand:   'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
 
   /* ─── Brand tokens (May 2026 handoff) ──────────────────────
      Source of truth for marketing surfaces, social cards, and
