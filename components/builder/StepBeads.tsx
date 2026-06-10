@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { BuilderStep } from "../../lib/utils/steps";
 import type { StepStatus } from "./Stepper";
 import { Icon } from "./Icon";
@@ -31,8 +32,22 @@ const STEP_LABELS: Record<string, string> = {
  *
  * Clicking a done step navigates back to it. Future steps are non-interactive
  * (matches the existing locked / incomplete behaviour from getStepCompletion).
+ *
+ * The strip hides its scrollbar, so on narrow viewports the active bead can
+ * sit off-screen with nothing signalling more content — we scroll it into
+ * view whenever the step changes (audit PERF-7).
  */
 export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) => {
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [currentId]);
+
   return (
     <div
       className="cv-bead-strip"
@@ -73,6 +88,7 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) =>
           >
             <button
               type="button"
+              ref={isActive ? activeRef : undefined}
               className={beadClass}
               onClick={() => {
                 if (isDone || isActive) onStepClick(step.id);

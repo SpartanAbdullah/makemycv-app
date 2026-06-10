@@ -1099,13 +1099,19 @@ export const BuilderShell = ({
           .ff-form-column {
             width: 100%;
             max-width: 100%;
-            padding: 32px 24px 32px;
+            /* 110px bottom padding clears the fixed Edit|Preview pill
+               (bottom:20 + ~50px tall) so it can't sit on top of the
+               Continue button or footer link at full scroll (audit
+               PERF-7/UX). Preview mode reserves its own 96px. */
+            padding: 32px 24px 110px;
           }
           @media (min-width: 768px) {
-            .ff-form-column { padding: 32px 36px 32px; }
+            .ff-form-column { padding: 32px 36px 110px; }
           }
           @media (min-width: 1024px) {
-            .ff-form-column { padding: 36px 40px 36px; max-width: 860px; }
+            /* Toggle is still visible until xl (1280px) — keep the bottom
+               clearance until the drawer layout takes over. */
+            .ff-form-column { padding: 36px 40px 110px; max-width: 860px; }
           }
           @media (min-width: 1280px) {
             .ff-form-column {
