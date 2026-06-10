@@ -127,12 +127,26 @@ export async function extractPdfTextInBrowser(input: File): Promise<string> {
 
   const pdfjsLib = await import("pdfjs-dist");
 
-  // Point worker to CDN — avoids shipping the large worker bundle.
-  // unspecified: replace with a local /public path if CDN is unavailable.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-
   const arrayBuffer = await input.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  // Worker is self-hosted (audit PERF-8): the old cdnjs URL failed at the
+  // exact moment a user uploads on corporate networks and under ad/privacy
+  // blockers — common for job seekers uploading from office machines. The
+  // vendored copy in /public is version-locked to the installed pdfjs-dist;
+  // after upgrading the package, re-run:
+  //   Copy-Item node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/
+  // The CDN stays as a catch-retry fallback. Each attempt gets its own
+  // buffer copy because pdfjs transfers (detaches) the ArrayBuffer it
+  // receives.
+  let pdf;
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+  } catch (err) {
+    console.warn("[pdfAdapter] local worker failed, retrying via CDN:", err);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+  }
 
   const pageTexts: string[] = [];
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
