@@ -20,6 +20,7 @@ import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
+import { ImportParseError } from "../../lib/importers/adapter";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 
 // Code-split the rare paths out of /builder's first paint (audit PERF-6):
@@ -38,10 +39,9 @@ import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadTipModal, shouldShowDownloadTip } from "../DownloadTipModal";
 import { SUPPORT_URL } from "../../lib/config/support";
-type ImportType = "pdf" | "docx";
-
 type ImportContextValue = {
-  handleImport: (type: ImportType) => void;
+  /** Opens a PDF/DOCX picker; format is routed by file extension. */
+  handleImport: () => void;
 };
 
 const ImportContext = createContext<ImportContextValue | null>(null);
@@ -826,29 +826,44 @@ export const BuilderShell = ({
     input.click();
   };
 
-  const handleImport = async (type: ImportType) => {
+  // One picker for both formats, routed by extension — the DOCX adapter was
+  // fully implemented but unreachable because the only caller hardcoded
+  // "pdf" (audit UX-4). Word CVs are the most common format among UAE job
+  // seekers.
+  const handleImport = async () => {
     const accept =
-      type === "pdf"
-        ? ".pdf,application/pdf"
-        : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    const source = type === "pdf" ? "PDF" : "DOCX";
+      ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     triggerFileInput(accept, async (file) => {
+      const isDocx =
+        /\.docx$/i.test(file.name) ||
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const source = isDocx ? "DOCX" : "PDF";
       setImportState({ phase: "parsing", source });
       try {
         // Adapters (and the textParser they pull in) load on first import,
         // not at builder first paint (audit PERF-6).
-        const adapter =
-          type === "pdf"
-            ? (await import("../../lib/importers/pdfAdapter")).pdfAdapter
-            : (await import("../../lib/importers/docxAdapter")).docxAdapter;
+        const adapter = isDocx
+          ? (await import("../../lib/importers/docxAdapter")).docxAdapter
+          : (await import("../../lib/importers/pdfAdapter")).pdfAdapter;
         const parsed = await adapter.parse(file);
         setImportState({ phase: "review", source, parsed });
-      } catch {
+      } catch (err) {
+        // Typed failures route to specific guidance (audit UX-18); the file
+        // is untouched and the user stays in the builder — never a dead end.
         setImportState({ phase: "idle" });
-        setErrorMsg(
-          `Could not parse ${source}. Please check the file and try again.`,
-        );
+        if (err instanceof ImportParseError) {
+          setErrorMsg(
+            err.kind === "empty-text"
+              ? `${err.message} You can also try the free AI Resume Checker, which handles more layouts.`
+              : err.message,
+          );
+        } else {
+          setErrorMsg(
+            `Could not read your ${source} file. Check the file and try again — or fill in your details below.`,
+          );
+        }
       }
     });
   };

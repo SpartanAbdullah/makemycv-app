@@ -218,6 +218,10 @@ export default function UploadDropzone() {
               <div className="text-sm text-slate-500">
                 PDF only · max 5MB · no sign-up
               </div>
+              <div className="mt-1 text-xs text-slate-400">
+                Your file is read in this browser — only the extracted text
+                is sent to build your report.
+              </div>
             </div>
           )}
 

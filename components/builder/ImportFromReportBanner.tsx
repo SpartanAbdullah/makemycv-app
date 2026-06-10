@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useCvStore } from "@/lib/store/cvStore";
+import { mapCvToParsed } from "@/lib/importers/fieldMapper";
 import type { CvData } from "@/lib/types/cv";
 import type { ParseSignals } from "@/lib/resumeChecker/types";
+
+// Same dynamic split as BuilderShell — the review screen loads only when an
+// import is actually in flight.
+const MappingReview = dynamic(
+  () => import("../import/MappingReview").then((m) => m.MappingReview),
+  { ssr: false },
+);
 
 type Phase =
   | { kind: "idle" }
@@ -17,32 +26,22 @@ type Phase =
   | { kind: "imported"; replaced: boolean }
   | { kind: "error"; message: string };
 
-function hasUserContent(data: CvData): boolean {
-  const p = data.personal;
-  if (p.firstName.trim() || p.lastName.trim() || p.email.trim() || p.phone.trim() || p.summary.trim()) {
-    return true;
-  }
-  if (data.experience.some((e) => e.company.trim() || e.role.trim() || e.bullets.some((b) => b.trim()))) {
-    return true;
-  }
-  if (data.education.some((e) => e.school.trim() || e.degree.trim())) {
-    return true;
-  }
-  if (data.skills.length > 0 || data.languages.length > 0) return true;
-  return false;
-}
-
 export default function ImportFromReportBanner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reportId = searchParams.get("importedFrom");
   const hydrated = useCvStore((s) => s.hydrated);
-  const currentData = useCvStore((s) => s.data);
   const importCvVersion = useCvStore((s) => s.importCvVersion);
   const setParseSignals = useCvStore((s) => s.setParseSignals);
 
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const hasRunRef = useRef(false);
+
+  // ParsedDocument view of the imported CV for MappingReview (audit UX-8).
+  const parsedForReview = useMemo(
+    () => (phase.kind === "confirm" ? mapCvToParsed(phase.imported) : null),
+    [phase],
+  );
 
   // Strip the query param once we've taken action.
   const stripParam = () => {
@@ -89,19 +88,15 @@ export default function ImportFromReportBanner() {
 
         const importedSignals: ParseSignals | null =
           payload.parseSignals ?? null;
-        const hadContent = hasUserContent(currentData);
-        if (hadContent) {
-          setPhase({
-            kind: "confirm",
-            imported: payload.cv,
-            importedSignals,
-          });
-        } else {
-          importCvVersion(payload.cv, "replace");
-          setParseSignals(importedSignals);
-          setPhase({ kind: "imported", replaced: true });
-          stripParam();
-        }
+        // ALWAYS review (audit UX-8): the AI parser misassigns fields just
+        // like the heuristic one (it falls back to the same textParser), so
+        // its output goes through the same MappingReview screen instead of
+        // landing in the store unreviewed.
+        setPhase({
+          kind: "confirm",
+          imported: payload.cv,
+          importedSignals,
+        });
       } catch {
         if (cancelled) return;
         setPhase({
@@ -133,51 +128,46 @@ export default function ImportFromReportBanner() {
     );
   }
 
-  if (phase.kind === "confirm") {
+  if (phase.kind === "confirm" && parsedForReview) {
+    // The AI-parsed CV flows through the SAME field-review screen as the
+    // heuristic import — per-field edit, role↔company swaps, Replace/Merge
+    // choice — instead of the old blind Replace/Keep modal (audit UX-8).
     return (
-      <Modal>
-        <h2 className="font-display text-lg font-semibold text-slate-900">
-          Replace your existing CV?
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          You already have a CV in the builder. The imported CV from your ATS
-          report has different content.
-        </p>
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              setPhase({ kind: "imported", replaced: false });
-              stripParam();
-              router.refresh();
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Keep my existing CV
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              importCvVersion(phase.imported, "replace");
-              setParseSignals(phase.importedSignals);
-              setPhase({ kind: "imported", replaced: true });
-              stripParam();
-            }}
-            className="rounded-lg bg-[var(--ff-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ff-accent-dark)]"
-          >
-            Replace with imported CV
-          </button>
-        </div>
-      </Modal>
+      <MappingReview
+        source="ATS report"
+        parsed={parsedForReview}
+        onConfirm={(partial, mode) => {
+          importCvVersion(partial, mode);
+          setParseSignals(phase.importedSignals);
+          setPhase({ kind: "imported", replaced: mode === "replace" });
+          stripParam();
+        }}
+        onCancel={() => {
+          setPhase({ kind: "imported", replaced: false });
+          stripParam();
+        }}
+      />
     );
   }
 
   if (phase.kind === "imported") {
     return (
       <Banner tone="success" dismissible onDismiss={() => setPhase({ kind: "idle" })}>
-        {phase.replaced
-          ? "Imported from your ATS report. Review and edit any section."
-          : "Kept your existing CV. Nothing imported."}
+        {phase.replaced ? (
+          <span>
+            Imported from your ATS report. Reports can&apos;t carry visa
+            status, notice period or nationality —{" "}
+            <button
+              type="button"
+              onClick={() => router.push("/builder?step=uaeEssentials")}
+              className="font-semibold underline underline-offset-2"
+            >
+              add them now →
+            </button>
+          </span>
+        ) : (
+          "Kept your existing CV. Nothing imported."
+        )}
       </Banner>
     );
   }
@@ -231,16 +221,5 @@ function Banner({
   );
 }
 
-function Modal({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        {children}
-      </div>
-    </div>
-  );
-}
+// (The old blind Replace/Keep Modal was removed in the 2026-06 wave-3 work —
+// the confirm phase now renders MappingReview instead.)

@@ -4,6 +4,9 @@
 
 export type ParsedContact = {
   name?: string;
+  /** Set when the source already carries a headline (e.g. the report→builder
+   *  path round-trips a full CvData); the text parser never extracts one. */
+  headline?: string;
   email?: string;
   phone?: string;
   location?: string;

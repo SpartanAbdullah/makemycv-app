@@ -175,6 +175,26 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
     }));
   };
 
+  // ── Projects updaters ───────────────────────────────────────────────────
+  const updateProject = (
+    idx: number,
+    patch: Partial<NonNullable<EditableCv["projects"]>[number]>,
+  ) => {
+    setEdited((prev) => {
+      const list = [...(prev.projects ?? [])];
+      if (!list[idx]) return prev;
+      list[idx] = { ...list[idx], ...patch };
+      return { ...prev, projects: list };
+    });
+  };
+
+  const removeProject = (idx: number) => {
+    setEdited((prev) => ({
+      ...prev,
+      projects: (prev.projects ?? []).filter((_, i) => i !== idx),
+    }));
+  };
+
   // ── Counts (footer button label + "no data" message) ───────────────────
   const sectionCount = [
     edited.personal?.firstName || edited.personal?.email ? 1 : 0,
@@ -183,6 +203,7 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
     edited.skills?.length ? 1 : 0,
     edited.languages?.length ? 1 : 0,
     edited.certifications?.length ? 1 : 0,
+    edited.projects?.length ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
   const hasPersonal = Boolean(
@@ -383,6 +404,64 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
               </div>
             </Section>
           ) : null}
+
+          {/* Projects — kept by the wave-3 parser instead of discarded */}
+          {edited.projects?.length ? (
+            <Section title={`Projects (${edited.projects.length})`}>
+              <div className="space-y-3">
+                {edited.projects.map((p, i) => (
+                  <EntryShell key={p.id} index={i} onRemove={() => removeProject(i)}>
+                    <Grid>
+                      <TextField
+                        label="Project name"
+                        value={p.name}
+                        onChange={(v) => updateProject(i, { name: v })}
+                      />
+                      <TextField
+                        label="Link"
+                        value={p.link ?? ""}
+                        onChange={(v) => updateProject(i, { link: v })}
+                      />
+                    </Grid>
+                    {p.bullets.filter(Boolean).length > 0 && (
+                      <div className="mt-3 space-y-1.5">
+                        {p.bullets.map((b, bi) => (
+                          <input
+                            key={bi}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-slate-400 focus:outline-none"
+                            value={b}
+                            dir={getDir(b)}
+                            onChange={(e) => {
+                              const bullets = [...p.bullets];
+                              bullets[bi] = e.target.value;
+                              updateProject(i, { bullets });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </EntryShell>
+                ))}
+              </div>
+            </Section>
+          ) : null}
+
+          {/* Unplaced content — never silently dropped (audit Wave 3) */}
+          {(parsed.unplaced?.length ?? 0) > 0 && (
+            <Section title="We couldn't place this">
+              <p className="mb-2 text-xs text-slate-500">
+                Lines we found in the file but couldn&apos;t map to a field.
+                Nothing here will be imported — copy anything you need into
+                the builder after confirming.
+              </p>
+              <textarea
+                readOnly
+                rows={Math.min(6, (parsed.unplaced?.length ?? 0) + 1)}
+                className="w-full rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 focus:outline-none"
+                value={(parsed.unplaced ?? []).join("\n")}
+              />
+            </Section>
+          )}
         </div>
 
         {/* Footer */}
