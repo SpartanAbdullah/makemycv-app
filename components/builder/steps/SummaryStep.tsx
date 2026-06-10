@@ -49,8 +49,6 @@ export const SummaryStep = ({
   /* AI summary writer */
   const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const aiTriggerChecked = useRef(false);
-
   const fireAISummary = () => {
     const store = useCvStore.getState().data;
     setAiModalOpen(true);
@@ -66,19 +64,6 @@ export const SummaryStep = ({
       existingSummary: store.personal.summary,
     });
   };
-
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "summary") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        fireAISummary();
-      }
-    } catch { /* SSR guard */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleApplySummary = (selected: string[]) => {
     if (selected[0]) {

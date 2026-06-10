@@ -91,26 +91,6 @@ export const ExperienceStep = ({
   // Suggestions queue per role. Accepting merges into bullets[]; rejecting
   // drops the suggestion from the queue.
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
-  const aiTriggerChecked = useRef(false);
-
-  // Auto-trigger if the user came in from the score panel.
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "bullets") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        if (fields.length > 0) {
-          handleGenerateBullets(0);
-        }
-      }
-    } catch {
-      /* SSR guard */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // When the hook returns results, route them into the active role's queue.
   useEffect(() => {
     if (aiActiveIndex === null) return;

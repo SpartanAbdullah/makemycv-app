@@ -64,7 +64,6 @@ export const SkillsStep = ({
     clearResults: aiClear,
   } = useAIImprove();
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const aiTriggerChecked = useRef(false);
 
   const fireAISuggest = () => {
     const store = useCvStore.getState().data;
@@ -81,21 +80,6 @@ export const SkillsStep = ({
       existingSkills: fields.map((f) => f.name),
     });
   };
-
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "skills") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        fireAISuggest();
-      }
-    } catch {
-      /* SSR guard */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleApplySkills = (selected: string[]) => {
     const existingNames = new Set(fields.map((f) => f.name.toLowerCase()));
