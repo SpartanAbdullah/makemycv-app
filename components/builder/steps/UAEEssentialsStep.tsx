@@ -164,7 +164,7 @@ export const UAEEssentialsStep = ({
               </option>
             </select>
           </Field>
-          <Field label="Availability">
+          <Field label="Availability / notice period">
             <select className="cv-select" {...register("availability")}>
               <option value="">Select availability…</option>
               <option value="Immediate">Immediate</option>

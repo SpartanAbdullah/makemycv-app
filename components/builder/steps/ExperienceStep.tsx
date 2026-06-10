@@ -335,14 +335,14 @@ export const ExperienceStep = ({
                         disabled={!canMoveUp}
                         label="Move up"
                       >
-                        <Icon name="chevron-left" size={12} />
+                        <Icon name="chevron-up" size={12} />
                       </CardIconBtn>
                       <CardIconBtn
                         onClick={() => reorder(index, index + 1)}
                         disabled={!canMoveDown}
                         label="Move down"
                       >
-                        <Icon name="chevron-right" size={12} />
+                        <Icon name="chevron-down" size={12} />
                       </CardIconBtn>
                     </div>
                     {fields.length > 1 && (
@@ -505,7 +505,7 @@ export const ExperienceStep = ({
                       >
                         <textarea
                           rows={2}
-                          placeholder="Describe an achievement, not a duty."
+                          placeholder="What did you achieve? Start with a verb, add a number."
                           className="cv-input cv-textarea"
                           style={{ minHeight: 56 }}
                           {...register(
@@ -553,16 +553,74 @@ export const ExperienceStep = ({
                       <SuggestionLoading />
                     )}
 
+                    {/* Inline AI error — same affordances as the modal flow
+                        (audit UX-15): rate-limited shows the support link,
+                        other errors get a retry. */}
                     {aiError && aiActiveIndex === index && (
-                      <p
+                      <div
                         style={{
-                          fontSize: 12,
-                          color: "var(--ff-red)",
-                          padding: "8px 0",
+                          marginTop: 6,
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          background: "#FBEFED",
+                          border: "1px solid #F2D2CE",
                         }}
                       >
-                        {aiError.message}
-                      </p>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "var(--ff-red)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {aiError.message}
+                        </p>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: "flex",
+                            gap: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {aiError.code === "RATE_LIMITED" ? (
+                            aiError.supportUrl && (
+                              <a
+                                href={aiError.supportUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: "var(--ff-accent-dark)",
+                                  textDecoration: "underline",
+                                  textUnderlineOffset: 2,
+                                }}
+                              >
+                                Support MakeMyCV
+                              </a>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateBullets(index)}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "var(--ff-ink)",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                textUnderlineOffset: 2,
+                              }}
+                            >
+                              Try again
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
 

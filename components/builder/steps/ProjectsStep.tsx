@@ -123,6 +123,21 @@ export const ProjectsStep = ({
       <StepHeader stepId="projects" />
       <section className="cv-step-card">
         <div>
+          {/* Empty-state value framing (audit UX-20). */}
+          {fields.length === 0 && (
+            <p
+              style={{
+                marginBottom: 12,
+                fontSize: 13,
+                lineHeight: 1.55,
+                color: "var(--ff-muted)",
+              }}
+            >
+              A project is any work you can point to: a fit-out you managed, a
+              dashboard you built, an event you ran. One strong project with
+              tools and results beats an empty section — or skip this step.
+            </p>
+          )}
           <Repeater
             title="Projects"
             action={

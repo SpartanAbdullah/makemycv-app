@@ -219,6 +219,12 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 ? "No fields could be extracted. Try a different file."
                 : "Fix anything that looks wrong, then confirm to import. Common mis-mappings: role ↔ company, school ↔ degree."}
             </p>
+            {sectionCount > 0 && (
+              <p className="mt-2 text-xs text-slate-400">
+                We can&apos;t read visa status, notice period, nationality or
+                projects from files — you&apos;ll add those in the next steps.
+              </p>
+            )}
           </div>
           <button
             type="button"

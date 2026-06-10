@@ -228,7 +228,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
         </Field>
         <Field
           label="Headline"
-          hint="Mirrors the role you want, not the one you held."
+          hint="Write the job title you want next."
           error={errors.headline?.message}
         >
           <input
@@ -263,7 +263,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             }}
           />
         </Field>
-        <Field label="Phone" leftIcon="phone" required>
+        {/* Not marked required: the schema allows an empty phone, and the
+            label must not overstate (audit UX-19). The +971 tip still nudges
+            users to add one. */}
+        <Field label="Phone" leftIcon="phone">
           <input
             className="cv-input"
             placeholder="+971 50 123 4567"

@@ -84,6 +84,22 @@ export const CertificationsStep = ({
       <StepHeader stepId="certifications" />
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Empty-state value framing (audit UX-20) — helps users decide
+              whether this optional step is worth their time. */}
+          {fields.length === 0 && (
+            <p
+              style={{
+                padding: "8px 0",
+                fontSize: 13,
+                lineHeight: 1.55,
+                color: "var(--ff-muted)",
+              }}
+            >
+              In the UAE, certifications like PMP, NEBOSH, CFA, CIPD and
+              DHA/DOH carry real weight with recruiters. Add yours — or skip
+              this step if you have none.
+            </p>
+          )}
           <button
             type="button"
             onClick={() =>

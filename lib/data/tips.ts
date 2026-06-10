@@ -57,7 +57,7 @@ export const tips: UaeTip[] = [
   {
     id: "experience-quantify",
     quote:
-      "‘Led a team’ tells nothing. ‘Led 14 people across 3 sites to AED 42M revenue’ tells a story.",
+      "‘Led a team’ says nothing. ‘Led 14 people across 3 sites to AED 42M revenue’ shows what you did.",
     citation: "From hands-on reviews of UAE operations CVs, 2024.",
     stepId: "experience",
   },
@@ -85,7 +85,7 @@ export const tips: UaeTip[] = [
   {
     id: "skills-mirror-jd",
     quote:
-      "Mirror the exact wording of the job description. ‘Stakeholder management’ and ‘client liaison’ are not the same string to an ATS.",
+      "Copy the exact wording of the job description. To an ATS, ‘stakeholder management’ and ‘client liaison’ are different skills.",
     citation: "From hands-on ATS testing at Interior360, 2024.",
     stepId: "skills",
   },
@@ -106,7 +106,7 @@ export const tips: UaeTip[] = [
   {
     id: "review-length",
     quote:
-      "One page for under five years, two for five plus. Three is for academics and C-suite, not the rest of us.",
+      "One page if you have under five years of experience, two pages for more. Three pages is only for academics and executives.",
     citation: "Bayt UAE recruiter panel, 2024.",
     stepId: "review",
   },
@@ -122,6 +122,10 @@ export const tips: UaeTip[] = [
     quote:
       "Photos are accepted by most UAE employers but toggle them off when applying to blind-hiring international companies.",
     citation: "ILO global hiring practices brief, 2023.",
+    // Scoped to the step that owns the photo control — as a universal tip it
+    // was mathematically unreachable (personal has scoped tips that always
+    // win the rotation; audit UX-10).
+    stepId: "personal",
   },
   {
     id: "headline-mirror-role",
@@ -161,7 +165,7 @@ export const tips: UaeTip[] = [
   {
     id: "availability-immediate",
     quote:
-      "If you can start within 30 days, write ‘Immediate’ or ‘30 days notice’. Vague ‘negotiable’ entries drop down the pile.",
+      "If you can start within 30 days, write ‘Immediate’ or ‘30 days notice’. A vague ‘negotiable’ gets your CV skipped.",
     citation: "Bayt UAE recruiter survey, 2024.",
     stepId: "personal",
   },

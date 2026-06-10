@@ -147,7 +147,8 @@ export const CustomizePanel = () => {
             lineHeight: 1.5,
           }}
         >
-          Apply across all templates. Live preview updates as you tweak.
+          Live preview updates as you tweak. Some options apply only to
+          certain templates.
         </div>
       </div>
 

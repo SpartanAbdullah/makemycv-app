@@ -171,6 +171,21 @@ export const SkillsStep = ({
     replace(updated);
   };
 
+  // Touch/keyboard-friendly reorder — HTML5 drag never fires on mobile
+  // touch (audit UX-13), so each chip also gets explicit move buttons.
+  const moveSkill = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= fields.length) return;
+    const items = fields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      level: toSkillLevel(f.level ?? "intermediate"),
+    }));
+    const [moved] = items.splice(index, 1);
+    items.splice(target, 0, moved);
+    replace(items);
+  };
+
   const handleDrop = (dropIndex: number) => {
     if (draggedIndex === null || draggedIndex === dropIndex) return;
     const items = fields.map((f) => ({
@@ -285,6 +300,26 @@ export const SkillsStep = ({
                   {"\u283F"}
                 </span>
                 {field.name}
+                <button
+                  type="button"
+                  onClick={() => moveSkill(i, -1)}
+                  disabled={i === 0}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${field.name} earlier`}
+                  style={{ opacity: i === 0 ? 0.35 : 1 }}
+                >
+                  {"\u2039"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSkill(i, 1)}
+                  disabled={i === fields.length - 1}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${field.name} later`}
+                  style={{ opacity: i === fields.length - 1 ? 0.35 : 1 }}
+                >
+                  {"\u203A"}
+                </button>
                 <button
                   type="button"
                   onClick={() => removeSkill(i)}

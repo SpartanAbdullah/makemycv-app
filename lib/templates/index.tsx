@@ -152,24 +152,34 @@ const CorpSidebarThumb = () => (
 );
 
 export const templates: TemplateDefinition[] = [
+  /* Badges are an honest ATS-safety signal (audit UI-10): single-column
+     text-first layouts get "ATS-safe"; sidebar/two-column structures get
+     "Design-led" because older ATS parsers can interleave their columns —
+     fine for direct email, riskier for online application portals. */
   {
     id: "classic",
     name: "Classic",
     description: "Clean single-column layout for traditional roles.",
+    badge: "ATS-safe",
     Thumbnail: ClassicThumb,
     Render: ClassicTemplate,
   },
   {
     id: "modern",
     name: "Modern",
+    // Has a 2fr/1fr two-column body (modern.tsx:154) — NOT ATS-safe-badged,
+    // whatever earlier notes claimed. Verified against the template source.
     description: "Two-column layout with a refined accent section.",
+    badge: "Design-led",
     Thumbnail: ModernThumb,
     Render: ModernTemplate,
   },
   {
     id: "executive",
     name: "Executive",
-    description: "Navy sidebar with two-column layout for senior roles.",
+    description:
+      "Navy sidebar, two-column. Best for direct email to a recruiter.",
+    badge: "Design-led",
     Thumbnail: ExecutiveThumb,
     Render: ExecutiveTemplate,
   },
@@ -177,7 +187,7 @@ export const templates: TemplateDefinition[] = [
     id: "ats-clean",
     name: "ATS Clean",
     description: "Single-column layout engineered for maximum ATS pass rate.",
-    badge: "ATS Optimised",
+    badge: "ATS-safe",
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
   },
@@ -185,13 +195,16 @@ export const templates: TemplateDefinition[] = [
     id: "exec-split",
     name: "Executive Split",
     description: "Dark header with two-column body for senior professionals.",
+    badge: "Design-led",
     Thumbnail: ExecSplitThumb,
     Render: ExecSplitTemplate,
   },
   {
     id: "corp-sidebar",
     name: "Corporate",
-    description: "Right dark sidebar with structured left content area.",
+    description:
+      "Right dark sidebar. Best for direct email to a recruiter.",
+    badge: "Design-led",
     Thumbnail: CorpSidebarThumb,
     Render: CorpSidebarTemplate,
   },

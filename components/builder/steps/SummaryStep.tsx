@@ -127,7 +127,7 @@ export const SummaryStep = ({
               rows={10}
               className="cv-input cv-textarea"
               style={{ minHeight: 260, lineHeight: 1.6, fontSize: 14.5 }}
-              placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
+              placeholder={"e.g. Operations Manager with 8 years of experience in logistics and procurement in the UAE. I lead teams of 10+, manage vendors, and cut costs. Looking for a senior role in Dubai."}
               {...register("summary")}
               onBlur={(e) => {
                 register("summary").onBlur(e);

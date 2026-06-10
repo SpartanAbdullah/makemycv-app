@@ -236,6 +236,9 @@ export function PhotoUpload({
             JPG, PNG or WebP · max 5MB
             <br />
             Auto-cropped to square.
+            <br />
+            Photos are common on UAE CVs. Switch off for international or
+            blind-hiring employers.
           </div>
         </div>
       </div>

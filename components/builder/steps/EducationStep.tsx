@@ -44,7 +44,10 @@ export const EducationStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(education));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // First card opens by default — matching ExperienceStep — so a first-time
+  // user lands on a typeable form, not a collapsed "Education 1" mystery
+  // card (audit UX-12). This is a REQUIRED step.
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const {
     register,
@@ -59,7 +62,7 @@ export const EducationStep = ({
     defaultValues: { education },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: "education",
   });
@@ -148,7 +151,42 @@ export const EducationStep = ({
 
                   {isOpen && (
                     <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end" style={{ gap: 6 }}>
+                        {/* Reorder — education order (most-recent-first) is one
+                            of the app's own ATS tips, but had no affordance
+                            here (audit UX-13). */}
+                        {fields.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                move(index, index - 1);
+                                setOpenIndex(index - 1);
+                              }}
+                              disabled={index === 0}
+                              className="cv-btn-ghost"
+                              aria-label="Move entry up"
+                              title="Move up"
+                              style={{ padding: "8px 10px", opacity: index === 0 ? 0.4 : 1 }}
+                            >
+                              <Icon name="chevron-up" size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                move(index, index + 1);
+                                setOpenIndex(index + 1);
+                              }}
+                              disabled={index === fields.length - 1}
+                              className="cv-btn-ghost"
+                              aria-label="Move entry down"
+                              title="Move down"
+                              style={{ padding: "8px 10px", opacity: index === fields.length - 1 ? 0.4 : 1 }}
+                            >
+                              <Icon name="chevron-down" size={12} />
+                            </button>
+                          </>
+                        )}
                         {fields.length > 1 && (
                           <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -212,7 +250,7 @@ export const EducationStep = ({
                           <input className="cv-input" placeholder="e.g. 2022" {...register(`education.${index}.endDate`)} />
                         </Field>
                         <Field label="Notes">
-                          <input className="cv-input" placeholder="e.g. Sharjah" {...register(`education.${index}.notes`)} />
+                          <input className="cv-input" placeholder="e.g. Graduated with distinction / GPA 3.8" {...register(`education.${index}.notes`)} />
                         </Field>
                       </div>
 

@@ -16,6 +16,7 @@ type IconProps = {
 
 export type IconName =
   | "check"
+  | "chevron-up"
   | "chevron-down"
   | "chevron-right"
   | "chevron-left"
@@ -66,6 +67,12 @@ export const Icon = ({
       return (
         <svg {...common}>
           <polyline points="20 6 9 17 4 12" />
+        </svg>
+      );
+    case "chevron-up":
+      return (
+        <svg {...common}>
+          <polyline points="6 15 12 9 18 15" />
         </svg>
       );
     case "chevron-down":
