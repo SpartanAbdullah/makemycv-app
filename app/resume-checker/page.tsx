@@ -74,7 +74,10 @@ const STEPS: Array<{ n: string; title: string; description: string }> = [
   { n: "3", title: "Review", description: "Read every issue and fix with guidance." },
 ];
 
-const FAQS: Array<{ q: string; a: string }> = [
+// `a` is the plain-text answer (also mirrored into the FAQPage JSON-LD);
+// `aJsx` optionally overrides the on-page rendering so answers can carry
+// links without putting markup into the structured data.
+const FAQS: Array<{ q: string; a: string; aJsx?: React.ReactNode }> = [
   {
     q: "What formats do you support?",
     a: "Text-based PDF today — the format you get when you export from Word, Google Docs, or most builders. DOCX is on the v2 roadmap. Scanned image PDFs (from phone photos) aren't supported yet because there's no readable text to score.",
@@ -86,6 +89,17 @@ const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "Is it really free?",
     a: "Yes — the report and the builder are both free, no sign-up, no payment. If MakeMyCV saves you time and you want to help cover hosting and AI costs, there's a tip jar — but it's entirely optional.",
+    aJsx: (
+      <>
+        Yes &mdash; the report and{" "}
+        <a href="/builder" className="underline underline-offset-2 text-brand-blue hover:text-brand-blue-dark">
+          the builder
+        </a>{" "}
+        are both free, no sign-up, no payment. If MakeMyCV saves you time and
+        you want to help cover hosting and AI costs, there&apos;s a tip jar
+        &mdash; but it&apos;s entirely optional.
+      </>
+    ),
   },
   {
     q: "How accurate is the parser?",
@@ -250,7 +264,7 @@ export default function ResumeCheckerPage() {
                     </svg>
                   </span>
                 </summary>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">{f.a}</p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{f.aJsx ?? f.a}</p>
               </details>
             ))}
           </div>
@@ -289,6 +303,15 @@ export default function ResumeCheckerPage() {
           </a>
           <p className="mt-4 text-xs text-white/60">
             Free. No account. Takes about 30 seconds.
+          </p>
+          <p className="mt-3 text-sm text-white/70">
+            No CV yet?{" "}
+            <a
+              href="/builder"
+              className="font-semibold text-white underline underline-offset-2 hover:text-white/90"
+            >
+              Build one free &rarr;
+            </a>
           </p>
         </div>
       </section>

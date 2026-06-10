@@ -140,7 +140,20 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
   const handleKofi = () => markTippedAndAdvance(KOFI_URL);
   const handlePaypal = () => markTippedAndAdvance(PAYPAL_URL);
 
+  // Native share sheet first (WhatsApp is the default share channel for the
+  // UAE audience — audit ENG-18), clipboard as the desktop fallback.
   const handleCopyShare = async () => {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "MakeMyCV — free UAE CV builder",
+          url: SHARE_URL,
+        });
+      } catch {
+        /* share sheet dismissed */
+      }
+      return;
+    }
     try {
       await navigator.clipboard.writeText(SHARE_URL);
       setShareCopied(true);
@@ -437,7 +450,7 @@ function ThanksView({
             cursor: "pointer",
           }}
         >
-          {shareCopied ? "Link copied ✓" : "Copy share link"}
+          {shareCopied ? "Link copied ✓" : "Share with a friend"}
         </button>
       </div>
 

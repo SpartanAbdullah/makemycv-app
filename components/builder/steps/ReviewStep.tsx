@@ -19,6 +19,7 @@ import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
 import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
+import { ShareScoreCard } from "../../ShareScoreCard";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -130,10 +131,26 @@ export const ReviewStep = ({
     }
   };
 
+  // The CV lives only in this browser's localStorage — sharing the builder
+  // URL would hand the recipient an EMPTY builder (audit UX-5). We share
+  // the product link instead, native share sheet first (WhatsApp-first UAE
+  // audience), clipboard as fallback.
   const handleShareLink = async () => {
     if (typeof navigator === "undefined") return;
+    const shareUrl = "https://makemycv.ae";
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "MakeMyCV — free UAE CV builder",
+          url: shareUrl,
+        });
+      } catch {
+        /* share sheet dismissed */
+      }
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     } catch {
@@ -425,7 +442,7 @@ export const ReviewStep = ({
                 className="cv-btn-secondary"
                 style={{ flex: 1, padding: "12px" }}
               >
-                {shareCopied ? "Link copied ✓" : "Copy share link"}
+                {shareCopied ? "Link copied ✓" : "Share MakeMyCV"}
               </button>
             </div>
             <p
@@ -438,6 +455,9 @@ export const ReviewStep = ({
             >
               PDF is best for applications. DOCX is editable.
             </p>
+            <div style={{ textAlign: "center" }}>
+              <ShareScoreCard total={score.total} />
+            </div>
           </div>
 
         </div>

@@ -95,7 +95,8 @@ export const TipJar = ({
       </div>
 
       <p className="mt-2 text-sm text-brand-muted">
-        MakeMyCV is free for everyone. Tips help cover hosting and AI costs.
+        MakeMyCV is free for everyone — including people who can&apos;t pay
+        right now. A small tip keeps it that way.
       </p>
 
       {/* Primary CTA — Ko-fi. Big, full-width, indigo. The icon + label

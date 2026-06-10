@@ -320,6 +320,33 @@ export function AIResultsModal({
                 Support MakeMyCV
               </a>
             )}
+            {/* Free third exit — peak appreciation, possibly zero budget
+                (audit ENG-18). Native share sheet first, clipboard fallback. */}
+            <button
+              type="button"
+              onClick={async () => {
+                const url = "https://makemycv.ae";
+                if (typeof navigator.share === "function") {
+                  try {
+                    await navigator.share({
+                      title: "MakeMyCV — free UAE CV builder",
+                      url,
+                    });
+                  } catch {
+                    /* share sheet dismissed */
+                  }
+                  return;
+                }
+                try {
+                  await navigator.clipboard.writeText(url);
+                } catch {
+                  /* clipboard blocked */
+                }
+              }}
+              className="mt-3 text-sm text-gray-500 underline cursor-pointer hover:text-gray-700"
+            >
+              Can&apos;t tip? Sharing helps too &rarr;
+            </button>
             <button
               type="button"
               onClick={onClose}

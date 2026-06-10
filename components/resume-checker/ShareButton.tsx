@@ -2,13 +2,31 @@
 
 import { useState } from "react";
 
+/**
+ * Shares the report URL. Two honesty/UX upgrades from the 2026-06 audit:
+ * ENG-17 — the user is told the link exposes their report (which contains
+ * their parsed CV) to anyone holding it; ENG-18 — native share sheet first
+ * (WhatsApp-first UAE audience), clipboard fallback.
+ */
 export default function ShareButton() {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const HINT =
+    "Anyone with this link can view your report until it expires (24h).";
+
+  const handleShare = async () => {
     if (typeof window === "undefined") return;
+    const url = window.location.href;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "My ATS report — MakeMyCV", url });
+      } catch {
+        // Share sheet dismissed — nothing to do.
+      }
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -19,8 +37,10 @@ export default function ShareButton() {
   return (
     <button
       type="button"
-      onClick={handleCopy}
+      onClick={handleShare}
       aria-live="polite"
+      title={HINT}
+      aria-label={`Share report. ${HINT}`}
       className="inline-flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
     >
       {copied ? (
