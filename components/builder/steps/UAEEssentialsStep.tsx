@@ -125,6 +125,8 @@ export const UAEEssentialsStep = ({
           >
             UAE essentials
           </span>
+          {/* No invented point values here — the engine doesn't score these
+              fields directly (same class of claim as the removed "+4 pts"). */}
           <span
             style={{
               fontFamily: "var(--font-mono)",
@@ -133,15 +135,16 @@ export const UAEEssentialsStep = ({
               fontWeight: 600,
               letterSpacing: "0.04em",
               marginLeft: "auto",
+              textTransform: "uppercase",
             }}
           >
-            +8 pts
+            Recruiter signal
           </span>
         </div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1fr",
             gap: 12,
           }}
           className="ff-uae-grid"
@@ -184,6 +187,25 @@ export const UAEEssentialsStep = ({
               </option>
               <option value="None">None</option>
             </select>
+          </Field>
+          {/* Promoted from "Extras" (audit UX-9): nationality is a hard
+              pre-screen field in most UAE postings — it belongs with the
+              recruiter signals and counts toward step completion. */}
+          <Field label="Nationality">
+            <input
+              className="cv-input"
+              placeholder="e.g. Emirati, Pakistani, Indian"
+              {...register("nationality")}
+              onChange={(e) => {
+                e.target.value = sanitizeNameLive(e.target.value);
+                register("nationality").onChange(e);
+              }}
+              onBlur={(e) => {
+                e.target.value = sanitizeName(e.target.value);
+                register("nationality").onChange(e);
+                register("nationality").onBlur(e);
+              }}
+            />
           </Field>
         </div>
       </section>
@@ -285,22 +307,6 @@ export const UAEEssentialsStep = ({
             <FieldError
               message={fieldErrors.website ?? null}
               type="warning"
-            />
-          </Field>
-          <Field label="Nationality" optional>
-            <input
-              className="cv-input"
-              placeholder="e.g. Emirati, Pakistani, Indian"
-              {...register("nationality")}
-              onChange={(e) => {
-                e.target.value = sanitizeNameLive(e.target.value);
-                register("nationality").onChange(e);
-              }}
-              onBlur={(e) => {
-                e.target.value = sanitizeName(e.target.value);
-                register("nationality").onChange(e);
-                register("nationality").onBlur(e);
-              }}
             />
           </Field>
           <Field label="Country" optional>

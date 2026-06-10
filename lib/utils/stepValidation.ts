@@ -59,14 +59,15 @@ export const getStepCompletion = (step: BuilderStep, data: CvData): boolean => {
       return personalSchema.safeParse(data.personal).success;
     case "uaeEssentials": {
       // Optional step. Counts as "done" if the user has filled at least one
-      // UAE essential (visa / availability / driving licence). Extras (DOB,
-      // nationality, etc.) live on the same step but don't count toward
-      // completion — they're nice-to-haves, not the UAE-recruiter signal.
+      // UAE essential — visa, availability, driving licence, or nationality
+      // (promoted into the essentials card in the 2026-06 audit, UX-9:
+      // nationality is a hard pre-screen field in most UAE postings).
       const p = data.personal;
       return Boolean(
         (p.visaStatus && p.visaStatus.trim()) ||
           (p.availability && p.availability.trim()) ||
-          (p.drivingLicense && p.drivingLicense.trim()),
+          (p.drivingLicense && p.drivingLicense.trim()) ||
+          (p.nationality && p.nationality.trim()),
       );
     }
     case "summary":

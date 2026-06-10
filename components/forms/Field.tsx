@@ -1,4 +1,11 @@
-import { ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useId,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Icon, type IconName } from "../builder/Icon";
 
 type Props = {
@@ -26,6 +33,12 @@ type Props = {
  *
  * The component supports the legacy two-prop signature (label + children) used
  * across older steps; new props are all optional and additive.
+ *
+ * The label is programmatically associated with the input (audit UI-6):
+ * when children is a single element without its own id, we assign a
+ * useId()-generated id and point the label's htmlFor at it — tapping the
+ * label focuses the input, and screen readers stop announcing every field
+ * as unlabeled.
  */
 export const Field = ({
   label,
@@ -36,7 +49,18 @@ export const Field = ({
   optional,
   leftIcon,
   children,
-}: Props) => (
+}: Props) => {
+  const fieldId = useId();
+  const childArray = Children.toArray(children);
+  const single =
+    childArray.length === 1 && isValidElement(childArray[0])
+      ? (childArray[0] as ReactElement<{ id?: string }>)
+      : null;
+  const assignedId = single && !single.props.id ? fieldId : single?.props.id;
+  const content =
+    single && !single.props.id ? cloneElement(single, { id: fieldId }) : children;
+
+  return (
   <div className="cv-field" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
     <div
       style={{
@@ -48,6 +72,7 @@ export const Field = ({
       }}
     >
       <label
+        htmlFor={assignedId}
         style={{
           fontFamily: "var(--font-body)",
           fontSize: 13,
@@ -110,10 +135,10 @@ export const Field = ({
         >
           <Icon name={leftIcon} size={15} />
         </span>
-        {children}
+        {content}
       </div>
     ) : (
-      children
+      content
     )}
     {hint && !error && (
       <span
@@ -138,4 +163,5 @@ export const Field = ({
       </span>
     )}
   </div>
-);
+  );
+};

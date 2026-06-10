@@ -78,8 +78,13 @@ export const EducationStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.education) {
+        // id-only filter, matching every other step. The old
+        // `e.school && e.degree` condition silently DROPPED half-entered
+        // entries from the store — type a university name, tap Back, and
+        // it was gone (audit UX-6). Completion is gated separately by
+        // educationSchema in lib/utils/stepValidation.ts.
         const next = (value.education ?? []).filter(
-          (e): e is CvEducation => Boolean(e && e.id && e.school && e.degree),
+          (e): e is CvEducation => Boolean(e && e.id),
         );
         const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;

@@ -28,6 +28,21 @@ import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
 const ICON_INPUT_PAD = 40;
 
+// Emirate options for the location select (audit UX-9). Values are the
+// exact strings written into personal.location — emirate is a primary
+// recruiter filter on Bayt/NaukriGulf, so a structured choice beats free
+// text for the common case. "Other city…" reveals a free-text input.
+const EMIRATE_OPTIONS = [
+  "Dubai, UAE",
+  "Abu Dhabi, UAE",
+  "Sharjah, UAE",
+  "Ajman, UAE",
+  "Ras Al Khaimah, UAE",
+  "Fujairah, UAE",
+  "Umm Al Quwain, UAE",
+  "Al Ain, UAE",
+];
+
 export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const personal = useCvStore((state) => state.data.personal);
   const photoShape = useCvStore(
@@ -41,6 +56,8 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string | null>
   >({});
+  // True once the user explicitly picks "Other city…" in the emirate select.
+  const [customLocation, setCustomLocation] = useState(false);
 
   const setFieldError = (field: string, error: string | null) =>
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
@@ -64,6 +81,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
@@ -246,22 +264,58 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             }}
           />
         </Field>
-        <Field label="City" leftIcon="pin">
-          <input
-            className="cv-input"
-            placeholder="e.g. Dubai, UAE"
-            style={{ paddingLeft: ICON_INPUT_PAD }}
-            {...register("location")}
-            onChange={(e) => {
-              e.target.value = sanitizeLocationLive(e.target.value);
-              register("location").onChange(e);
-            }}
-            onBlur={(e) => {
-              e.target.value = sanitizeLocation(e.target.value);
-              register("location").onChange(e);
-              register("location").onBlur(e);
-            }}
-          />
+        {/* Emirate select (audit UX-9): emirate is a primary recruiter
+            filter on Bayt/NaukriGulf, but location was a bare free-text
+            input. The select writes into the SAME personal.location string —
+            no store-shape change — with an "Other" escape to free text. */}
+        <Field label="City / Emirate" leftIcon="pin">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <select
+              className="cv-select"
+              style={{ paddingLeft: ICON_INPUT_PAD }}
+              value={
+                EMIRATE_OPTIONS.includes(watch("location") ?? "")
+                  ? (watch("location") as string)
+                  : customLocation || (watch("location") ?? "").trim() !== ""
+                    ? "__other__"
+                    : ""
+              }
+              onChange={(e) => {
+                if (e.target.value === "__other__") {
+                  setCustomLocation(true);
+                } else {
+                  setCustomLocation(false);
+                  setValue("location", e.target.value, { shouldDirty: true });
+                }
+              }}
+            >
+              <option value="">Select your emirate…</option>
+              {EMIRATE_OPTIONS.map((em) => (
+                <option key={em} value={em}>
+                  {em}
+                </option>
+              ))}
+              <option value="__other__">Other city…</option>
+            </select>
+            {(customLocation ||
+              ((watch("location") ?? "").trim() !== "" &&
+                !EMIRATE_OPTIONS.includes(watch("location") ?? ""))) && (
+              <input
+                className="cv-input"
+                placeholder="e.g. Muscat, Oman"
+                {...register("location")}
+                onChange={(e) => {
+                  e.target.value = sanitizeLocationLive(e.target.value);
+                  register("location").onChange(e);
+                }}
+                onBlur={(e) => {
+                  e.target.value = sanitizeLocation(e.target.value);
+                  register("location").onChange(e);
+                  register("location").onBlur(e);
+                }}
+              />
+            )}
+          </div>
         </Field>
         {/* Not marked required: the schema allows an empty phone, and the
             label must not overstate (audit UX-19). The +971 tip still nudges
