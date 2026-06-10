@@ -63,6 +63,10 @@ export type ParsedDocument = {
    *  wave-3 parser work. */
   projects?: ParsedProject[];
   uae?: ParsedUaeFields;
+  /** Header-block lines the parser detected but could not map to any field
+   *  (taglines, headlines, decorative text). Surfaced in MappingReview as a
+   *  copyable "we couldn't place this" bucket — never silently dropped. */
+  unplaced?: string[];
 };
 
 /** Why a parse failed — lets the UI route each failure mode differently

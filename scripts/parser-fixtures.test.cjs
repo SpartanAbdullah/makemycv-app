@@ -74,6 +74,7 @@ const run = (name) => {
   check(f, "5 skills", d.skills.length === 5, d.skills);
   check(f, "3 languages, levels stripped", d.languages.length === 3 && d.languages.includes("English") && d.languages.includes("Arabic"), d.languages);
   check(f, "certification PMP/PMI/2023", d.certifications[0]?.name === "PMP" && d.certifications[0]?.issuer === "PMI" && (d.certifications[0]?.date ?? "").includes("2023"), d.certifications[0]);
+  check(f, "headline lands in the unplaced bucket, not dropped", (d.unplaced ?? []).includes("Senior Operations Manager"), d.unplaced);
 }
 
 /* ── (b) two-column, pdf.js-linearized ──────────────────────────────────── */
@@ -124,6 +125,7 @@ const run = (name) => {
   // Projects section is no longer silently discarded (new in wave 3)
   check(f, "2 projects kept", (d.projects ?? []).length === 2, d.projects);
   check(f, "project 1 name + detail-as-bullet", (d.projects?.[0]?.name ?? "") === "Dubai Hills Mall fit-out" && (d.projects?.[0]?.bullets ?? []).length === 1, d.projects?.[0]);
+  check(f, "headline in unplaced bucket", (d.unplaced ?? []).includes("Procurement Specialist"), d.unplaced);
 }
 
 /* ── (d) scanned / near-empty text layer ────────────────────────────────── */
@@ -135,6 +137,7 @@ const run = (name) => {
   check(f, "no skills", d.skills.length === 0, d.skills);
   check(f, "no summary", (d.summary ?? "") === "", d.summary);
   check(f, "no email/phone", !d.contact.email && !d.contact.phone, d.contact);
+  check(f, "garbage lines preserved in unplaced (not invented as fields)", (d.unplaced ?? []).length === 2, d.unplaced);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

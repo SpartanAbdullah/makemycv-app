@@ -896,7 +896,7 @@ export function parseTextToDocument(text: string): ParsedDocument {
   };
 
   // Find the first section header — everything before it is the contact /
-  // headline block. We've already harvested it; ignore the rest.
+  // headline block.
   let firstSectionIdx = lines.length;
   for (let i = 0; i < lines.length; i++) {
     if (detectSection(lines[i])) {
@@ -904,6 +904,18 @@ export function parseTextToDocument(text: string): ParsedDocument {
       break;
     }
   }
+
+  // Header-block lines we couldn't harvest (headlines, taglines, column
+  // labels) used to be silently dropped. Collect them so the review screen
+  // can show a copyable "we couldn't place this" bucket (audit Wave 3).
+  const unplaced: string[] = [];
+  for (let i = 0; i < firstSectionIdx; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (consumedLines.has(i)) continue;
+    unplaced.push(line);
+  }
+  result.unplaced = unplaced;
 
   for (let i = firstSectionIdx; i < lines.length; i++) {
     const line = lines[i];
