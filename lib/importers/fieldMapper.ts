@@ -44,7 +44,11 @@ function seedHeadline(experience: ParsedExperience[] | undefined): string {
 export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
   const result: Partial<CvData> = {};
 
-  if (parsed.contact || parsed.summary) {
+  const hasUae =
+    parsed.uae &&
+    Object.values(parsed.uae).some((v) => (v ?? "").trim().length > 0);
+
+  if (parsed.contact || parsed.summary || hasUae) {
     const nameParts = (parsed.contact?.name ?? "").trim().split(/\s+/);
     result.personal = {
       ...defaultCvData.personal,
@@ -57,6 +61,12 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       website: parsed.contact?.website ?? "",
       summary: parsed.summary ?? "",
       headline: seedHeadline(parsed.experience),
+      // UAE recruiter signals from labeled lines (wave-3 parser work) —
+      // these land directly in the UAE Essentials fields.
+      nationality: parsed.uae?.nationality ?? "",
+      visaStatus: parsed.uae?.visaStatus ?? "",
+      availability: parsed.uae?.availability ?? "",
+      drivingLicense: parsed.uae?.drivingLicense ?? "",
     };
   }
 
@@ -109,6 +119,21 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
         name: c.name ?? "",
         issuer: c.issuer ?? "",
         date: c.date ?? "",
+      }));
+  }
+
+  // Projects were detected by the parser but silently discarded before the
+  // 2026-06 wave-3 work — now they round-trip into the builder.
+  if (parsed.projects?.length) {
+    result.projects = parsed.projects
+      .filter((p) => (p.name ?? "").trim() || p.bullets?.length)
+      .map((p) => ({
+        id: createId(),
+        name: p.name ?? "",
+        link: p.link ?? "",
+        bullets: p.bullets?.filter(Boolean).length
+          ? p.bullets.filter(Boolean)
+          : [""],
       }));
   }
 

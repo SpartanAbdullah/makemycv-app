@@ -4,7 +4,13 @@
 // unspecified: worker CDN URL must be reachable; swap for local path in offline envs.
 
 import type { ImportAdapter, ParsedDocument } from "./adapter";
+import { ImportParseError } from "./adapter";
 import { parseTextToDocument } from "./textParser";
+
+// Below this many characters of extracted text, the PDF is almost
+// certainly a scanned image with no usable text layer (mirrors the
+// /resume-checker dropzone's guard).
+const MIN_TEXT_LENGTH = 200;
 
 type PdfTextItemLike = {
   str: string;
@@ -146,12 +152,27 @@ export const pdfAdapter: ImportAdapter = {
   async parse(input: File): Promise<ParsedDocument> {
     if (typeof window === "undefined") return {};
 
+    // Failures THROW typed errors instead of resolving `{}` (audit UX-18) —
+    // the old swallow-to-empty behavior made every failure mode (corrupt
+    // file, scanned image, odd layout) land on the same dead-end "No fields
+    // could be extracted" review screen, and BuilderShell's error UI was
+    // unreachable.
+    let fullText: string;
     try {
-      const fullText = await extractPdfTextInBrowser(input);
-      return parseTextToDocument(fullText);
+      fullText = await extractPdfTextInBrowser(input);
     } catch (err) {
-      console.warn("[pdfAdapter] Parse failed:", err);
-      return {};
+      console.warn("[pdfAdapter] Extraction failed:", err);
+      throw new ImportParseError(
+        "corrupt-file",
+        "This PDF could not be opened. It may be corrupted or password-protected.",
+      );
     }
+    if (fullText.trim().length < MIN_TEXT_LENGTH) {
+      throw new ImportParseError(
+        "empty-text",
+        "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again.",
+      );
+    }
+    return parseTextToDocument(fullText);
   },
 };

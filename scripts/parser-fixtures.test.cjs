@@ -85,16 +85,17 @@ const run = (name) => {
   check(f, "phone", (d.contact.phone ?? "").includes("971 55 987 6543"), d.contact.phone);
   check(f, "3 skills from sidebar", d.skills.length === 3, d.skills);
   check(f, "2 experience entries", d.experience.length === 2, d.experience.length);
-  // BASELINE BUGS (recorded 2026-06, to be fixed in the wave-3 parser
-  // commit): DATE_TOKEN_RE matches bare month names WITHOUT word
-  // boundaries, so "Marketing" loses its "Mar" ("keting Director") and the
-  // phantom "Mar" date-token occupies startDate, which prevents the real
-  // "Jan 2019 - Present" date line from attaching (isCurrent stays false).
-  check(f, "exp1 role (BASELINE BUG: month-name eats 'Mar')", d.experience[0]?.role === "keting Director", d.experience[0]?.role);
+  // The three BASELINE BUGS recorded in the fixtures commit are fixed:
+  // DATE_TOKEN_RE month names now require word boundaries, so "Marketing"
+  // keeps its "Mar", and the real "Jan 2019 - Present" date line attaches
+  // to the entry instead of a phantom "Mar" token.
+  check(f, "exp1 role (month-boundary fix)", d.experience[0]?.role === "Marketing Director", d.experience[0]?.role);
   check(f, "exp1 company", d.experience[0]?.company === "Star Media Group", d.experience[0]?.company);
-  check(f, "exp1 current (BASELINE BUG: phantom Mar date blocks the date line)", d.experience[0]?.isCurrent === false, d.experience[0]?.isCurrent);
+  check(f, "exp1 current via date line (fix)", d.experience[0]?.isCurrent === true, d.experience[0]?.isCurrent);
+  check(f, "exp1 startDate Jan 2019 (fix)", (d.experience[0]?.startDate ?? "").includes("2019"), d.experience[0]?.startDate);
   check(f, "exp1 unmarked bullets captured", (d.experience[0]?.bullets ?? []).length === 2, d.experience[0]?.bullets);
-  check(f, "exp2 role (BASELINE BUG: month-name eats 'Mar')", d.experience[1]?.role === "keting Manager", d.experience[1]?.role);
+  check(f, "exp2 role (month-boundary fix)", d.experience[1]?.role === "Marketing Manager", d.experience[1]?.role);
+  check(f, "exp2 dates 2014-2018", (d.experience[1]?.startDate ?? "").includes("2014") && (d.experience[1]?.endDate ?? "").includes("2018"), [d.experience[1]?.startDate, d.experience[1]?.endDate]);
   check(f, "education entry exists (degree carries MA)", (d.education[0]?.degree ?? "").includes("MA"), d.education[0]);
   check(f, "2 languages", d.languages.length === 2, d.languages);
 }
@@ -105,8 +106,13 @@ const run = (name) => {
   const d = run(f);
   check(f, "name", d.contact.name === "Imran Patel", d.contact.name);
   check(f, "email from labeled line", d.contact.email === "imran.patel@example.com", d.contact.email);
-  check(f, "00971 phone", (d.contact.phone ?? "").replace(/\D/g, "").includes("971524448899"), d.contact.phone);
-  check(f, "location detected", (d.contact.location ?? "").includes("Sharjah"), d.contact.location);
+  check(f, "00971 phone normalized to +971 form", d.contact.phone === "+971 52 444 8899", d.contact.phone);
+  check(f, "location without the 'Location:' label", d.contact.location === "Sharjah, UAE", d.contact.location);
+  // UAE labeled fields (new in the wave-3 parser work)
+  check(f, "uae nationality", d.uae?.nationality === "Indian", d.uae);
+  check(f, "uae visa status", d.uae?.visaStatus === "Employment visa (transferable)", d.uae?.visaStatus);
+  check(f, "uae notice period", d.uae?.availability === "30 days", d.uae?.availability);
+  check(f, "uae driving licence", d.uae?.drivingLicense === "UAE Light Vehicle", d.uae?.drivingLicense);
   check(f, "summary", (d.summary ?? "").includes("6 years"), d.summary);
   check(f, "2 experience entries", d.experience.length === 2, d.experience.length);
   check(f, "exp1 role/company split on double-space", d.experience[0]?.role === "Procurement Specialist" && d.experience[0]?.company === "BuildCo Contracting LLC", [d.experience[0]?.role, d.experience[0]?.company]);
@@ -115,6 +121,9 @@ const run = (name) => {
   check(f, "education degree + school", (d.education[0]?.degree ?? "").includes("B.Sc") && (d.education[0]?.school ?? "").includes("Mumbai"), d.education[0]);
   check(f, "4 skills via semicolons", d.skills.length === 4, d.skills);
   check(f, "2 languages, levels stripped", d.languages.length === 2 && d.languages.includes("English") && d.languages.includes("Hindi"), d.languages);
+  // Projects section is no longer silently discarded (new in wave 3)
+  check(f, "2 projects kept", (d.projects ?? []).length === 2, d.projects);
+  check(f, "project 1 name + detail-as-bullet", (d.projects?.[0]?.name ?? "") === "Dubai Hills Mall fit-out" && (d.projects?.[0]?.bullets ?? []).length === 1, d.projects?.[0]);
 }
 
 /* ── (d) scanned / near-empty text layer ────────────────────────────────── */

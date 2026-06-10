@@ -25,6 +25,8 @@ import type {
   ParsedExperience,
   ParsedEducation,
   ParsedCertification,
+  ParsedProject,
+  ParsedUaeFields,
 } from "./adapter";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
@@ -42,8 +44,12 @@ const BARE_DOMAIN_RE =
 
 const MONTH_NAMES =
   "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+// Word boundaries around month names are load-bearing: without them "Mar"
+// matched inside "Marketing", so "Marketing Director" parsed as "keting
+// Director" and the phantom date stole the entry's startDate slot
+// (baseline bug exposed by __fixtures__/two-column-interleaved.txt).
 const DATE_TOKEN_RE = new RegExp(
-  `(?:${MONTH_NAMES})[\\s.,]*\\d{4}|(?:${MONTH_NAMES})|\\b(?:19|20)\\d{2}\\b`,
+  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}|\\b(?:${MONTH_NAMES})\\b|\\b(?:19|20)\\d{2}\\b`,
   "gi",
 );
 const PRESENT_RE = /\b(?:present|current|now|ongoing|till\s+date|todate)\b/i;
@@ -630,6 +636,106 @@ function stripLanguageLevel(name: string): string {
     .trim();
 }
 
+// ── UAE labeled-field harvesting ─────────────────────────────────────────────
+//
+// GCC CVs routinely carry labeled personal-detail lines ("Visa Status:
+// Employment visa", "Nationality: Indian", "Notice Period: 30 days").
+// These were ignored before the 2026-06 wave-3 work; now they map straight
+// into the builder's UAE Essentials fields.
+
+const UAE_LABEL_PATTERNS: Array<{
+  key: keyof ParsedUaeFields;
+  re: RegExp;
+}> = [
+  { key: "nationality", re: /^nationality\s*[:\-–]\s*(.+)$/i },
+  { key: "visaStatus", re: /^(?:visa\s*status|visa|residency\s*status)\s*[:\-–]\s*(.+)$/i },
+  {
+    key: "availability",
+    re: /^(?:notice\s*period|availability|available\s*(?:from|to\s*join)?)\s*[:\-–]\s*(.+)$/i,
+  },
+  { key: "drivingLicense", re: /^driving\s*licen[sc]e\s*[:\-–]\s*(.+)$/i },
+];
+
+function harvestUaeFields(lines: string[]): {
+  uae: ParsedUaeFields;
+  consumedLines: Set<number>;
+} {
+  const uae: ParsedUaeFields = {};
+  const consumed = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    for (const { key, re } of UAE_LABEL_PATTERNS) {
+      const m = line.match(re);
+      if (m && !uae[key]) {
+        uae[key] = m[1].trim();
+        consumed.add(i);
+        break;
+      }
+    }
+  }
+  return { uae, consumedLines: consumed };
+}
+
+// ── Phone normalization ──────────────────────────────────────────────────────
+
+/**
+ * Normalize UAE phone formats toward "+971 5X XXX XXXX". "00971…" and bare
+ * "971…"/"05X…" forms are common in Word CVs; ATS systems and recruiters
+ * expect the +971 form. Non-UAE numbers pass through untouched.
+ */
+function normalizePhone(raw: string): string {
+  const original = raw.trim();
+  const digits = original.replace(/\D/g, "");
+  let local: string | null = null;
+  if (digits.startsWith("00971")) local = digits.slice(5);
+  else if (digits.startsWith("971") && digits.length >= 11 && digits.length <= 12)
+    local = digits.slice(3);
+  else if (digits.startsWith("05") && digits.length === 10) local = digits.slice(1);
+  else if (original.startsWith("+971")) local = digits.slice(3);
+  if (local === null) return original;
+  const grouped =
+    local.length === 9
+      ? `${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`
+      : local;
+  return `+971 ${grouped}`.trim();
+}
+
+// ── Projects block parser ────────────────────────────────────────────────────
+
+function parseProjectsBlock(lines: string[]): ParsedProject[] {
+  const out: ParsedProject[] = [];
+  let current: ParsedProject | null = null;
+  const push = () => {
+    if (current && ((current.name ?? "").trim() || current.bullets?.length)) {
+      out.push(current);
+    }
+    current = null;
+  };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (isBulletLine(line)) {
+      if (!current) current = { bullets: [] };
+      current.bullets = current.bullets ?? [];
+      current.bullets.push(stripBulletPrefix(line));
+      continue;
+    }
+    // New project header. "Name — detail" puts the detail into the first
+    // bullet so nothing the user wrote is dropped.
+    push();
+    const parts = line.split(/\s+(?:—|–|\|)\s+/).map((p) => p.trim());
+    current = {
+      name: parts[0],
+      bullets: parts.slice(1).filter(Boolean),
+    };
+    const url = line.match(GENERIC_URL_RE);
+    if (url) current.link = url[0];
+  }
+  push();
+  return out;
+}
+
 // ── Contact harvesting ───────────────────────────────────────────────────────
 
 const CONTACT_SCAN_DEPTH = 30;
@@ -684,7 +790,7 @@ function harvestContact(lines: string[]): {
       // 8 ≤ digit-count ≤ 15.
       const digits = phoneMatch[0].replace(/\D/g, "");
       if (digits.length >= 8 && digits.length <= 15) {
-        contact.phone = phoneMatch[0].trim();
+        contact.phone = normalizePhone(phoneMatch[0]);
         matchedSomething = true;
       }
     }
@@ -695,8 +801,13 @@ function harvestContact(lines: string[]): {
       const segments = line.split(/\s+\|\s+|\s+·\s+|\s+•\s+/);
       for (const seg of segments) {
         // Strip any leading emoji/icon prefix used in our PDF templates
-        // (📍, ✉️, 📞, etc.) so the saved value is plain text.
-        const s = seg.replace(/^[^A-Za-zÀ-ɏ0-9]+/, "").trim();
+        // (📍, ✉️, 📞, etc.) so the saved value is plain text, and drop a
+        // leading "Location:" / "Address:" / "City:" label — Word CVs label
+        // their contact lines, and the label used to leak into the value.
+        const s = seg
+          .replace(/^[^A-Za-zÀ-ɏ0-9]+/, "")
+          .replace(/^(?:location|address|city)\s*[:\-–]\s*/i, "")
+          .trim();
         if (!s) continue;
         if (s.match(EMAIL_RE)) continue;
         if (s.match(BARE_DOMAIN_RE)) continue;
@@ -757,10 +868,19 @@ export function parseTextToDocument(text: string): ParsedDocument {
     skills: [],
     languages: [],
     certifications: [],
+    projects: [],
+    uae: {},
   };
 
   const { contact, consumedLines } = harvestContact(lines);
   result.contact = contact;
+
+  // UAE labeled fields can appear anywhere (header block or a "Personal
+  // Details" section) — sweep the whole document and consume the lines so
+  // they don't pollute the section buffers.
+  const { uae, consumedLines: uaeConsumed } = harvestUaeFields(lines);
+  result.uae = uae;
+  for (const i of uaeConsumed) consumedLines.add(i);
 
   // Section routing — start AFTER the first section header (so headline /
   // tagline lines in the header block don't accidentally land in "summary").
@@ -803,6 +923,9 @@ export function parseTextToDocument(text: string): ParsedDocument {
   result.experience = parseExperienceBlock(buffers.experience);
   result.education = parseEducationBlock(buffers.education);
   result.certifications = parseCertificationsBlock(buffers.certifications);
+  // A detected Projects section used to be buffered and then silently
+  // dropped — nothing the parser detects gets discarded any more.
+  result.projects = parseProjectsBlock(buffers.projects);
 
   result.skills = flattenList(buffers.skills);
 
