@@ -126,7 +126,7 @@ export default function ImportFromReportBanner() {
     return (
       <Banner tone="info">
         <span className="inline-flex items-center gap-2">
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--ff-accent-ring)] border-t-[var(--ff-accent)]" />
           Importing your CV from the ATS report…
         </span>
       </Banner>
@@ -163,7 +163,7 @@ export default function ImportFromReportBanner() {
               setPhase({ kind: "imported", replaced: true });
               stripParam();
             }}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="rounded-lg bg-[var(--ff-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ff-accent-dark)]"
           >
             Replace with imported CV
           </button>
@@ -209,7 +209,7 @@ function Banner({
       ? "border-emerald-200 bg-emerald-50 text-emerald-900"
       : tone === "error"
         ? "border-red-200 bg-red-50 text-red-900"
-        : "border-indigo-200 bg-indigo-50 text-indigo-900";
+        : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)]";
 
   return (
     <div

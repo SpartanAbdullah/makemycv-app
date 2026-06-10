@@ -203,7 +203,7 @@ const TopBar = ({
             fontFamily: "var(--font-body)",
             fontSize: 13,
             color: "white",
-            background: "var(--ff-ink)",
+            background: "var(--ff-accent)",
             border: "none",
             padding: "7px 16px",
             borderRadius: 999,

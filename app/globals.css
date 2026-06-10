@@ -865,21 +865,11 @@ body {
 
 /* ─── TipJar component utilities ─────────────────────────────
    Ported from the marketing site so the TipJar JSX can stay
-   byte-identical to its original. Four small classes, scoped
-   tight; do not generalise without crediting the brand pack.
+   byte-identical to its original. Scoped tight; do not
+   generalise without crediting the brand pack. (.btn-primary
+   was deleted 2026-06 — zero consumers, and its blue/indigo
+   gradient clashed with the near-namesake green .cv-btn-primary.)
    Print: tip jar must never render on paper — hide it. */
-.btn-primary {
-  background-image: linear-gradient(135deg, #2563eb 0%, #4338ca 100%);
-  color: #ffffff;
-  transition: filter 150ms ease, transform 150ms ease;
-}
-.btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-.btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
 .shadow-card-blue {
   box-shadow:
     0 10px 30px -10px rgba(37, 99, 235, 0.18),

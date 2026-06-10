@@ -132,7 +132,7 @@ const LevelDropdown = ({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-left flex justify-between items-center hover:border-indigo-300 focus:ring-2 focus:ring-indigo-300 focus:outline-none bg-white transition"
+        className="w-full px-4 py-2.5 border border-[var(--ff-line)] rounded-xl text-sm text-left flex justify-between items-center hover:border-[var(--ff-accent)] focus:ring-2 focus:ring-[var(--ff-accent-ring)] focus:outline-none bg-white transition"
       >
         <span className={displayLabel ? "text-gray-800" : "text-gray-400"}>
           {displayLabel || "Select proficiency level"}
@@ -149,7 +149,7 @@ const LevelDropdown = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden">
+        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-[var(--ff-line)] bg-white shadow-lg overflow-hidden">
           {LANGUAGE_LEVELS.map((level) => {
             const isSelected = level.value === value;
             return (
@@ -162,14 +162,14 @@ const LevelDropdown = ({
                 }}
                 className={`w-full px-4 py-3 text-left cursor-pointer transition flex items-center justify-between ${
                   isSelected
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "hover:bg-indigo-50"
+                    ? "bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)]"
+                    : "hover:bg-[var(--ff-accent-soft)]"
                 }`}
               >
                 <div>
                   <p
                     className={`text-sm ${
-                      isSelected ? "font-semibold text-indigo-700" : "font-medium text-gray-800"
+                      isSelected ? "font-semibold text-[var(--ff-accent-dark)]" : "font-medium text-gray-800"
                     }`}
                   >
                     {level.label}
@@ -177,7 +177,7 @@ const LevelDropdown = ({
                   <p className="text-xs text-gray-400">{level.description}</p>
                 </div>
                 {isSelected && (
-                  <span className="text-indigo-600 text-sm font-bold ml-2 shrink-0">
+                  <span className="text-[var(--ff-accent)] text-sm font-bold ml-2 shrink-0">
                     {"\u2713"}
                   </span>
                 )}
