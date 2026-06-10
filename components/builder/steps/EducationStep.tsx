@@ -8,6 +8,7 @@ import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import {
   sanitizeCompanyName,
   sanitizeCompanyNameLive,
@@ -105,6 +106,7 @@ export const EducationStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="education" />
 
       <section className="cv-step-card">
         <div>

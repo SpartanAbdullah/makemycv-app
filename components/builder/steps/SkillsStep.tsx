@@ -7,6 +7,7 @@ import { skillsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { createId } from "../../../lib/utils/id";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
@@ -195,6 +196,7 @@ export const SkillsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="skills" />
       <section className="cv-step-card">
         {/* Input row */}
         <div style={{ display: "flex", gap: 8 }}>

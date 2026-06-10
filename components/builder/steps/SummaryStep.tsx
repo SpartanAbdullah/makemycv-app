@@ -7,6 +7,7 @@ import { summarySchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { FieldError } from "../../FieldError";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove } from "../../../hooks/useAIImprove";
@@ -113,6 +114,7 @@ export const SummaryStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="summary" />
 
       {/* Full-width textarea on top, tip card stacked below. The previous
           side-by-side layout squeezed the textarea into ~58% of the form

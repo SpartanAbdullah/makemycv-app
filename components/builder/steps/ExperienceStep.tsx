@@ -7,6 +7,7 @@ import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
 import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
@@ -223,6 +224,7 @@ export const ExperienceStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="experience" />
       {/* AI bullet suggestions — first (most recent) role */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <button

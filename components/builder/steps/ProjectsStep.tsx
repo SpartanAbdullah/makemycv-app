@@ -8,6 +8,7 @@ import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { Icon } from "../Icon";
 import type { CvProject } from "../../../lib/types/cv";
@@ -119,6 +120,7 @@ export const ProjectsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="projects" />
       <section className="cv-step-card">
         <div>
           <Repeater

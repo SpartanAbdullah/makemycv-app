@@ -573,6 +573,13 @@ body {
   margin: 0;
 }
 .cv-step-heading .accent { color: var(--ff-accent); }
+/* Two-size heading scale: 32px default, 42px hero (Review step only).
+   Inline fontSize overrides on cv-step-heading are not allowed — add a
+   size class here instead (audit UI-3). */
+.cv-step-heading-hero {
+  font-size: 42px;
+  letter-spacing: -0.03em;
+}
 .cv-step-subtitle {
   font-size: 15px;
   color: var(--ff-muted);

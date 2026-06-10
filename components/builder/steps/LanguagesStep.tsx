@@ -7,6 +7,7 @@ import { languagesSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
 import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
 import { UAEDot } from "../UAEDot";
@@ -261,6 +262,7 @@ export const LanguagesStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="languages" />
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Suggested languages — common in the UAE labour market */}

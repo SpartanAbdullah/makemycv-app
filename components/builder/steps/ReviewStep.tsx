@@ -207,14 +207,7 @@ export const ReviewStep = ({
           style={{ display: "flex", flexDirection: "column", gap: 22 }}
         >
           <div>
-            <h1
-              className="cv-step-heading"
-              style={{
-                fontSize: 42,
-                fontWeight: 600,
-                letterSpacing: "-0.03em",
-              }}
-            >
+            <h1 className="cv-step-heading cv-step-heading-hero">
               {score.total >= 40 ? "Looking good," : "Let's build this out,"}
               <br />
               <span className="accent">{firstName}.</span>

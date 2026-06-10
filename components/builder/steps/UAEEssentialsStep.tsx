@@ -8,6 +8,7 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import {
@@ -95,19 +96,7 @@ export const UAEEssentialsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Intro */}
-      <div>
-        <h1
-          className="cv-step-heading"
-          style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em" }}
-        >
-          UAE essentials
-        </h1>
-        <p className="cv-step-subtitle" style={{ marginTop: 6 }}>
-          Visa status, notice period, and driving licence let UAE recruiters
-          pre-screen in seconds. All optional, all valuable.
-        </p>
-      </div>
+      <StepHeader stepId="uaeEssentials" />
 
       {/* UAE Essentials block */}
       <section

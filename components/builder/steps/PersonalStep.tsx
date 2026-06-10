@@ -9,6 +9,7 @@ import { PhotoUpload } from "../PhotoUpload";
 import { TodaysTipCard } from "../TodaysTipCard";
 import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
+import { StepHeader } from "../StepHeader";
 import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import {
@@ -104,6 +105,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="personal" />
 
       {/* Import row — PDF is the only working source today (the DOCX adapter
           exists but is unwired; see audit UX-4), so the label must not

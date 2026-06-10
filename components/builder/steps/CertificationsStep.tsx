@@ -7,6 +7,7 @@ import { certificationsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import type { CvCertification } from "../../../lib/types/cv";
@@ -80,6 +81,7 @@ export const CertificationsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="certifications" />
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <button
