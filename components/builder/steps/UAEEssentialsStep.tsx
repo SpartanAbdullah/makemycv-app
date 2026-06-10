@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
@@ -29,9 +27,11 @@ const ICON_INPUT_PAD = 40;
  * licence) plus optional extras (LinkedIn, Website, Nationality, Country,
  * Date of birth). Sits between Contact and Summary in the builder flow.
  *
- * Shares the `personal` store slice with PersonalStep — both bind to
- * `personalSchema` with `defaultValues: personal`. Only one step is
- * mounted at a time so there's no write race.
+ * Shares the `personal` store slice with PersonalStep (only one step is
+ * mounted at a time so there's no write race). Deliberately has NO zod
+ * resolver: every field on this screen is optional, and binding the full
+ * personalSchema meant an invalid firstName/email — fields that are not
+ * even on this screen — silently killed the Continue button (audit UX-3).
  */
 export const UAEEssentialsStep = ({
   onNext,
@@ -61,7 +61,6 @@ export const UAEEssentialsStep = ({
     setValue,
     formState: { isDirty },
   } = useForm<CvPersonal>({
-    resolver: zodResolver(personalSchema),
     defaultValues: personal,
   });
 

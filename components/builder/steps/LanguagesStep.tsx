@@ -214,7 +214,7 @@ export const LanguagesStep = ({
     watch,
     reset,
     setValue,
-    formState: { isDirty },
+    formState: { isDirty, errors },
   } = useForm<LanguagesForm>({
     resolver: zodResolver(languagesSchema),
     defaultValues: { languages },
@@ -294,7 +294,10 @@ export const LanguagesStep = ({
 
           {fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
-              <Field label="Language">
+              <Field
+                label="Language"
+                error={errors.languages?.[index]?.name?.message}
+              >
                 <input
                   className="cv-input"
                   placeholder="e.g. Arabic"
@@ -332,6 +335,14 @@ export const LanguagesStep = ({
         </div>
       </section>
 
+      {/* Form-level fallback (audit UX-3): Continue used to fail with no
+          message at all when a row was invalid. */}
+      {errors.languages && (
+        <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500 }}>
+          Fix the highlighted language entries above, or remove the empty row,
+          to continue.
+        </p>
+      )}
       <NavigationButtons
         onBack={onBack}
         onNext={handleSubmit(onNext)}

@@ -36,7 +36,7 @@ export const ProjectsStep = ({
     watch,
     getValues,
     reset,
-    formState: { isDirty },
+    formState: { isDirty, errors },
   } = useForm<ProjectsForm>({
     resolver: zodResolver(projectsSchema),
     defaultValues: { projects },
@@ -167,7 +167,10 @@ export const ProjectsStep = ({
                 </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <Field label="Project name">
+                  <Field
+                    label="Project name"
+                    error={errors.projects?.[index]?.name?.message}
+                  >
                     <input className="cv-input" placeholder="e.g. Dubai Mall Fit-Out Project" {...register(`projects.${index}.name`)} />
                   </Field>
                   <Field label="Link">
@@ -196,6 +199,11 @@ export const ProjectsStep = ({
                           Remove
                         </button>
                       </div>
+                      {errors.projects?.[index]?.bullets?.[bulletIndex]?.message && (
+                        <p style={{ fontSize: 12, color: "var(--ff-red)" }}>
+                          {errors.projects?.[index]?.bullets?.[bulletIndex]?.message}
+                        </p>
+                      )}
                       {(watch(`projects.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
                         <p style={{ fontSize: 12, color: "var(--status-warning)" }}>
                           Consider splitting into 2 bullets for readability.
@@ -225,6 +233,14 @@ export const ProjectsStep = ({
 
       </section>
 
+      {/* Form-level fallback (audit UX-3): Continue used to fail with no
+          message at all — e.g. a project without a bullet. */}
+      {errors.projects && (
+        <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500 }}>
+          Fix the highlighted project fields above, or remove the empty entry,
+          to continue.
+        </p>
+      )}
       <NavigationButtons
         onBack={onBack}
         onNext={handleSubmit(onNext)}

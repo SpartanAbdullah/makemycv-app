@@ -35,7 +35,7 @@ export const CertificationsStep = ({
     control,
     watch,
     reset,
-    formState: { isDirty },
+    formState: { isDirty, errors },
   } = useForm<CertificationsForm>({
     resolver: zodResolver(certificationsSchema),
     defaultValues: { certifications: safeCertifications },
@@ -132,10 +132,16 @@ export const CertificationsStep = ({
                 </button>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Name">
+                <Field
+                  label="Name"
+                  error={errors.certifications?.[index]?.name?.message}
+                >
                   <input className="cv-input" placeholder="e.g. PMP - Project Management Professional" {...register(`certifications.${index}.name`)} />
                 </Field>
-                <Field label="Issuer">
+                <Field
+                  label="Issuer"
+                  error={errors.certifications?.[index]?.issuer?.message}
+                >
                   <input className="cv-input" placeholder="e.g. PMI" {...register(`certifications.${index}.issuer`)} />
                 </Field>
                 <Field label="Date">
@@ -147,6 +153,14 @@ export const CertificationsStep = ({
         </div>
       </section>
 
+      {/* Form-level fallback (audit UX-3): Continue used to fail with no
+          message at all — e.g. a certification with a name but no issuer. */}
+      {errors.certifications && (
+        <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500 }}>
+          Fix the highlighted certification fields above, or remove the empty
+          entry, to continue.
+        </p>
+      )}
       <NavigationButtons
         onBack={onBack}
         onNext={handleSubmit(onNext)}
