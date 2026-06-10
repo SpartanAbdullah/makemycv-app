@@ -668,7 +668,9 @@ body {
   color: var(--ff-muted);
   padding: 10px 12px;
   border-color: var(--ff-line);
+  cursor: pointer;
 }
+.cv-bead-future:hover { border-color: var(--ff-line-strong); }
 .cv-bead-locked {
   background: transparent;
   color: var(--ff-faint);

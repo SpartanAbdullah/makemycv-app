@@ -61,6 +61,7 @@ export const BuilderClient = () => {
         <ExperienceStep
           onNext={() => goToStep(nextStep || "education")}
           onBack={() => goToStep(prevStep || "summary")}
+          onSkip={() => goToStep(nextStep || "education")}
         />
       )}
       {stepId === "education" && (

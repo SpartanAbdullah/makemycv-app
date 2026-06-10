@@ -29,9 +29,11 @@ type ExperienceForm = { experience: CvExperience[] };
 export const ExperienceStep = ({
   onNext,
   onBack,
+  onSkip,
 }: {
   onNext: () => void;
   onBack: () => void;
+  onSkip?: () => void;
 }) => {
   const experience = useCvStore((state) => state.data.experience);
   const updateSection = useCvStore((state) => state.updateSection);
@@ -697,10 +699,26 @@ export const ExperienceStep = ({
         </p>
       )}
 
+      {/* Fresh-grad escape (audit UX-2): this used to be the only content
+          step with no skip — a graduate with no formal experience hit a
+          hard validation wall with zero guidance. */}
+      <p
+        style={{
+          fontSize: 12.5,
+          lineHeight: 1.55,
+          color: "var(--ff-muted)",
+        }}
+      >
+        No formal work experience yet? Internships, volunteer work, and
+        university projects all count — add them as roles. Or skip for now
+        and come back later.
+      </p>
       <NavigationButtons
         onBack={onBack}
         onNext={handleSubmit(onNext)}
         nextLabel="Continue to Education"
+        showSkip={Boolean(onSkip)}
+        onSkip={onSkip}
       />
 
       <style>{`

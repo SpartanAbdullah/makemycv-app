@@ -688,21 +688,20 @@ export const BuilderShell = ({
     bindCvStorage();
   }, []);
 
+  // No step is ever "locked" any more (audit UX-1/UX-2): the old gating made
+  // skipped steps unreachable except by walking Back N times, and a fresh
+  // graduate who couldn't satisfy the Experience schema had every later bead
+  // disabled. Beads now show honest done/incomplete state and navigate
+  // freely; the Review "Missing sections" chips and the download guard carry
+  // the consequences instead of a hard wall.
   const statuses = useMemo(() => {
     const result: Record<string, StepStatus> = {};
-    builderSteps.forEach((step, index) => {
+    builderSteps.forEach((step) => {
       const completion = getStepCompletion(step, data);
-      const previousRequiredValid = builderSteps
-        .slice(0, index)
-        .filter((prev) => prev.required)
-        .every((prev) => getStepCompletion(prev, data));
-
       if (step.id === stepId) {
         result[step.id] = "active";
       } else if (completion) {
         result[step.id] = "done";
-      } else if (step.required) {
-        result[step.id] = previousRequiredValid ? "incomplete" : "locked";
       } else {
         result[step.id] = "incomplete";
       }

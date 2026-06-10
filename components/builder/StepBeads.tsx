@@ -30,8 +30,10 @@ const STEP_LABELS: Record<string, string> = {
  * are pill-shaped: future steps render outlined and muted, done steps render
  * filled-soft with an accent check, the active step renders solid black.
  *
- * Clicking a done step navigates back to it. Future steps are non-interactive
- * (matches the existing locked / incomplete behaviour from getStepCompletion).
+ * Every bead navigates (audit UX-1) — done, incomplete, and future steps
+ * alike. The bead styling stays honest about completion state; navigation
+ * freedom is the point (skipped steps used to be unreachable except by
+ * walking Back one step at a time).
  *
  * The strip hides its scrollbar, so on narrow viewports the active bead can
  * sit off-screen with nothing signalling more content — we scroll it into
@@ -90,10 +92,7 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) =>
               type="button"
               ref={isActive ? activeRef : undefined}
               className={beadClass}
-              onClick={() => {
-                if (isDone || isActive) onStepClick(step.id);
-              }}
-              disabled={isLocked || (!isDone && !isActive)}
+              onClick={() => onStepClick(step.id)}
               aria-current={isActive ? "step" : undefined}
               title={label}
             >
