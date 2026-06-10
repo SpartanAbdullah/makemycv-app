@@ -86,6 +86,9 @@ export const languagesSchema = z.object({
           "beginner",
           "intermediate",
           "advanced",
+          // v1→v2 migration output (see lib/types/cv.ts LanguageLevel) —
+          // without it, migrated users failed languages validation.
+          "fluent",
         ])
         .optional(),
     })

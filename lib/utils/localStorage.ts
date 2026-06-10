@@ -1,5 +1,5 @@
 import type { CvData } from "../types/cv";
-import { migrate } from "../store/migrate";
+import { CURRENT_VERSION, migrate } from "../store/migrate";
 
 const STORAGE_KEY = "makemycv:data";
 
@@ -42,7 +42,14 @@ export const loadCvFromStorage = (): CvData | null => {
 
 export const saveCvToStorage = (data: CvData) => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  // Stamp the schema version on EVERY save (audit W2-D). The in-memory
+  // CvData has no version field, so reset/importCvVersion used to persist
+  // unversioned payloads that re-ran the v1→v2 migration on next load —
+  // benign but wasteful, and it defeated migrate()'s "skipped" fast path.
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ ...data, version: CURRENT_VERSION }),
+  );
 };
 
 export const clearCvStorage = () => {
