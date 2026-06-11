@@ -5,6 +5,7 @@ import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { certificationsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
@@ -26,6 +27,7 @@ export const CertificationsStep = ({
   const certifications = useCvStore((state) => state.data.certifications);
   const safeCertifications = certifications ?? [];
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(safeCertifications));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -34,6 +36,7 @@ export const CertificationsStep = ({
     handleSubmit,
     control,
     watch,
+    getValues,
     reset,
     formState: { isDirty, errors },
   } = useForm<CertificationsForm>({
@@ -41,7 +44,7 @@ export const CertificationsStep = ({
     defaultValues: { certifications: safeCertifications },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, insert } = useFieldArray({
     control,
     name: "certifications",
   });
@@ -87,6 +90,22 @@ export const CertificationsStep = ({
       date: "",
     });
     setOpenIndex(fields.length);
+  };
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveEntry = (index: number) => {
+    const removed = getValues(`certifications.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Certification removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
   };
 
   // On failed submit, open the first card that has a validation error so the
@@ -167,7 +186,7 @@ export const CertificationsStep = ({
                           is optional, so removing the last entry is legitimate. */}
                       <button
                         type="button"
-                        onClick={() => remove(index)}
+                        onClick={() => handleRemoveEntry(index)}
                         className="cv-btn-danger"
                       >
                         <Icon name="trash" size={12} />

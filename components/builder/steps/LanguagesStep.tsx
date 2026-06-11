@@ -5,6 +5,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { languagesSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
@@ -204,6 +205,7 @@ export const LanguagesStep = ({
 }) => {
   const languages = useCvStore((state) => state.data.languages);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(languages));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -212,6 +214,7 @@ export const LanguagesStep = ({
     handleSubmit,
     control,
     watch,
+    getValues,
     reset,
     setValue,
     formState: { isDirty, errors },
@@ -220,10 +223,23 @@ export const LanguagesStep = ({
     defaultValues: { languages },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, insert } = useFieldArray({
     control,
     name: "languages",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the row BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveLanguage = (index: number) => {
+    const removed = getValues(`languages.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Language removed", {
+      actionLabel: "Undo",
+      onAction: () => insert(index, removed),
+    });
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ languages });
@@ -323,7 +339,7 @@ export const LanguagesStep = ({
               </Field>
               <button
                 type="button"
-                onClick={() => remove(index)}
+                onClick={() => handleRemoveLanguage(index)}
                 className="cv-btn-danger"
                 style={{ alignSelf: "center", marginTop: 26 }}
               >

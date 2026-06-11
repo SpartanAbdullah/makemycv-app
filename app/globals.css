@@ -277,6 +277,17 @@ body {
   background: var(--ff-card);
 }
 
+/* ─── "Has content" tint (founder request B7, 2026-06) ─────────
+   Decorative tier applied by Field after blur when a field simply
+   has text in it. Border-only BY DESIGN — no badge: the check-glyph
+   rule applies to validity claims only, and this tier makes none.
+   Must sit BEFORE the .cv-input-valid / .cv-input-error rules so
+   equal-specificity explicit feedback wins the cascade. */
+.cv-input.cv-input-filled:not(:focus),
+.cv-select.cv-input-filled:not(:focus) {
+  border-color: color-mix(in srgb, var(--ff-accent) 38%, var(--ff-line));
+}
+
 /* ─── Blur-feedback states (guided feedback, 2026-06) ──────────
    Applied by the Field wrapper AFTER blur, never per keystroke.
    :not(:focus) keeps the focus ring's appearance authoritative

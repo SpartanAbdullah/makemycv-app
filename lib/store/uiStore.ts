@@ -25,6 +25,9 @@ export type Toast = {
   tone: ToastTone;
   /** Auto-dismiss delay in ms. */
   duration: number;
+  /** Optional action button (e.g. "Undo") rendered next to the text. */
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 let toastSeq = 0;
@@ -36,7 +39,15 @@ type UiState = {
   setCurrentTipIndex: (n: number) => void;
 
   toasts: Toast[];
-  pushToast: (text: string, opts?: { tone?: ToastTone; duration?: number }) => void;
+  pushToast: (
+    text: string,
+    opts?: {
+      tone?: ToastTone;
+      duration?: number;
+      actionLabel?: string;
+      onAction?: () => void;
+    },
+  ) => void;
   dismissToast: (id: number) => void;
 
   visitedSections: Record<string, true>;
@@ -58,7 +69,13 @@ export const useUiStore = create<UiState>((set) => ({
           id: ++toastSeq,
           text,
           tone: opts?.tone ?? "notice",
-          duration: opts?.duration ?? 6000,
+          // Action toasts (e.g. Undo) must stay reachable — never shorter
+          // than the 6s default, even if a caller passes a short duration.
+          duration: opts?.onAction
+            ? Math.max(opts?.duration ?? 6000, 6000)
+            : (opts?.duration ?? 6000),
+          actionLabel: opts?.actionLabel,
+          onAction: opts?.onAction,
         },
       ],
     })),

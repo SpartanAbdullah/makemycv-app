@@ -15,11 +15,11 @@ const ACCENT_SWATCHES: { label: string; hex: string }[] = [
   { label: "Bronze", hex: "#92400E" },
 ];
 
-const FONT_SCALES: { label: string; value: number }[] = [
-  { label: "Compact", value: 0.92 },
-  { label: "Normal", value: 1 },
-  { label: "Spacious", value: 1.08 },
-];
+// "Font scale" control removed 2026-06: no render path (live template or
+// PDF layout) ever read theme.fontScale, so the control silently did
+// nothing — worse than not having it. settings.fontScale stays in the
+// schema for saved-data compat; re-add the control only once both render
+// paths actually consume it.
 
 const FONT_FAMILIES: { label: string; value: CvFontFamily; sample: string }[] = [
   { label: "Sans", value: "sans", sample: "Inter" },
@@ -249,14 +249,6 @@ export const CustomizePanel = () => {
             />
           </label>
         </div>
-      </Group>
-
-      <Group label="Font scale">
-        <Segmented
-          options={FONT_SCALES}
-          value={settings.fontScale ?? 1}
-          onChange={(v) => setSetting("fontScale", v)}
-        />
       </Group>
 
       <Group label="Font family">

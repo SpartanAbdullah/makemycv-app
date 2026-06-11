@@ -53,6 +53,16 @@ export const UAEEssentialsStep = ({
   const setFieldError = (field: string, error: string | null) =>
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
 
+  // Local "has content" tint (B7) for the two fields whose <Field> wraps
+  // TWO children (input + FieldError) — the Field-level default tint only
+  // reaches single-child fields. Same contract: seed from the stored
+  // value, update on blur, border-only via .cv-input-filled. A URL
+  // warning suppresses the tint (explicit feedback always wins).
+  const [extrasFilled, setExtrasFilled] = useState(() => ({
+    linkedin: (personal.linkedin ?? "").trim() !== "",
+    website: (personal.website ?? "").trim() !== "",
+  }));
+
   const {
     register,
     handleSubmit,
@@ -273,7 +283,9 @@ export const UAEEssentialsStep = ({
         >
           <Field label="LinkedIn" optional leftIcon="linkedin">
             <input
-              className="cv-input"
+              className={
+                extrasFilled.linkedin ? "cv-input cv-input-filled" : "cv-input"
+              }
               placeholder="linkedin.com/in/yourname"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("linkedin")}
@@ -282,7 +294,12 @@ export const UAEEssentialsStep = ({
                 const url = sanitizeURL(e.target.value);
                 if (url !== e.target.value)
                   setValue("linkedin", url, { shouldDirty: true });
-                setFieldError("linkedin", validateLinkedIn(url));
+                const warning = validateLinkedIn(url);
+                setFieldError("linkedin", warning);
+                setExtrasFilled((prev) => ({
+                  ...prev,
+                  linkedin: !warning && url.trim() !== "",
+                }));
               }}
             />
             <FieldError
@@ -292,7 +309,9 @@ export const UAEEssentialsStep = ({
           </Field>
           <Field label="Website" optional leftIcon="globe">
             <input
-              className="cv-input"
+              className={
+                extrasFilled.website ? "cv-input cv-input-filled" : "cv-input"
+              }
               placeholder="www.yourportfolio.com"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("website")}
@@ -301,7 +320,12 @@ export const UAEEssentialsStep = ({
                 const url = sanitizeURL(e.target.value);
                 if (url !== e.target.value)
                   setValue("website", url, { shouldDirty: true });
-                setFieldError("website", validateURL(url));
+                const warning = validateURL(url);
+                setFieldError("website", warning);
+                setExtrasFilled((prev) => ({
+                  ...prev,
+                  website: !warning && url.trim() !== "",
+                }));
               }}
             />
             <FieldError

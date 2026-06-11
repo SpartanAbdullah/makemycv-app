@@ -5,6 +5,7 @@ import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectsSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { AutoGrowTextarea } from "../../forms/AutoGrowTextarea";
 import { Repeater } from "../../forms/Repeater";
@@ -27,6 +28,7 @@ export const ProjectsStep = ({
 }) => {
   const projects = useCvStore((state) => state.data.projects);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(projects));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -43,7 +45,7 @@ export const ProjectsStep = ({
     defaultValues: { projects },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove, update, insert } = useFieldArray({
     control,
     name: "projects",
   });
@@ -122,6 +124,22 @@ export const ProjectsStep = ({
   const handleAddEntry = () => {
     append(createEmptyItems.project());
     setOpenIndex(fields.length);
+  };
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveEntry = (index: number) => {
+    const removed = getValues(`projects.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Project removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
   };
 
   // On failed submit, open the first card that has a validation error so the
@@ -207,7 +225,7 @@ export const ProjectsStep = ({
                     <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
                       <div className="flex items-center justify-end" style={{ gap: 6 }}>
                         {fields.length > 1 && (
-                          <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
+                          <button type="button" onClick={() => handleRemoveEntry(index)} className="cv-btn-danger">
                             <Icon name="trash" size={12} />
                             Remove
                           </button>

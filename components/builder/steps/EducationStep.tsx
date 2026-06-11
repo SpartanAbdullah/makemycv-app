@@ -5,6 +5,7 @@ import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { educationSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { useBlurFeedback } from "../../forms/useBlurFeedback";
 import { fieldValidators } from "../../../lib/validation/cvRequirements";
@@ -44,6 +45,7 @@ export const EducationStep = ({
 }) => {
   const education = useCvStore((state) => state.data.education);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(education));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // First card opens by default — matching ExperienceStep — so a first-time
@@ -58,6 +60,7 @@ export const EducationStep = ({
     handleSubmit,
     control,
     watch,
+    getValues,
     reset,
     setValue,
     formState: { errors, isDirty },
@@ -66,10 +69,26 @@ export const EducationStep = ({
     defaultValues: { education },
   });
 
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove, move, insert } = useFieldArray({
     control,
     name: "education",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveEntry = (index: number) => {
+    const removed = getValues(`education.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Education entry removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ education });
@@ -209,7 +228,7 @@ export const EducationStep = ({
                           </>
                         )}
                         {fields.length > 1 && (
-                          <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
+                          <button type="button" onClick={() => handleRemoveEntry(index)} className="cv-btn-danger">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                             Remove
                           </button>

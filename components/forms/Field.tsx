@@ -2,11 +2,27 @@ import {
   Children,
   cloneElement,
   isValidElement,
+  useEffect,
   useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ChangeEventHandler,
+  type FocusEvent,
+  type FocusEventHandler,
   type ReactElement,
   type ReactNode,
+  type Ref,
 } from "react";
 import { Icon, type IconName } from "../builder/Icon";
+
+/** Read .value defensively — only real form controls have one. */
+const readControlValue = (el: unknown): string =>
+  el instanceof HTMLInputElement ||
+  el instanceof HTMLTextAreaElement ||
+  el instanceof HTMLSelectElement
+    ? el.value
+    : "";
 
 export type FieldFeedback = {
   state: "valid" | "invalid" | "neutral";
@@ -36,6 +52,15 @@ type Props = {
    * Drive it with useBlurFeedback — never per keystroke.
    */
   feedback?: FieldFeedback;
+  /**
+   * Decorative "has content" tint (founder request B7, 2026-06): once the
+   * field blurs with text in it, the border takes a light green tint.
+   * Border-only ON PURPOSE — no check badge: the check glyph is reserved
+   * for validity claims (see `feedback`), and this tier makes none.
+   * Defaults on for single input/select/textarea children; explicit
+   * feedback (valid/invalid) always wins. Pass false to opt out.
+   */
+  filledTint?: boolean;
   children: ReactNode;
 };
 
@@ -63,6 +88,7 @@ export const Field = ({
   optional,
   leftIcon,
   feedback,
+  filledTint = true,
   children,
 }: Props) => {
   const fieldId = useId();
@@ -73,25 +99,83 @@ export const Field = ({
           id?: string;
           className?: string;
           "aria-invalid"?: boolean;
+          ref?: Ref<HTMLElement>;
+          onBlur?: FocusEventHandler<HTMLElement>;
+          onChange?: ChangeEventHandler<HTMLElement>;
         }>)
       : null;
   const assignedId = single && !single.props.id ? fieldId : single?.props.id;
 
+  // ── Decorative "filled" tier (B7) ──
+  // Only host form controls participate; composite children (e.g. the
+  // City/Emirate div in PersonalStep) keep their behavior untouched.
+  const tintEnabled =
+    filledTint &&
+    single !== null &&
+    (single.type === "input" ||
+      single.type === "select" ||
+      single.type === "textarea");
+  const [filled, setFilled] = useState(false);
+  const controlRef = useRef<HTMLElement | null>(null);
+
+  // Seed from the DOM whenever the field is NOT focused (runs every render
+  // on purpose): localStorage hydration and imports repopulate the form
+  // AFTER mount, so a mount-only check missed restored values. The focus
+  // guard preserves the blur contract — a field never gains the tint
+  // mid-typing; the blur/change wrappers own it while focused.
+  useEffect(() => {
+    const el = controlRef.current;
+    if (!el || document.activeElement === el) return;
+    const hasContent = readControlValue(el).trim() !== "";
+    if (hasContent !== filled) setFilled(hasContent);
+  });
+
   const showInvalid = Boolean(error) || feedback?.state === "invalid";
   const showValid = !showInvalid && feedback?.state === "valid";
-  const feedbackClass = showValid
+  // Filled is the lowest tier: any explicit validity claim suppresses it.
+  const showFilled = tintEnabled && filled && !showInvalid && !showValid;
+  const stateClass = showValid
     ? "cv-input-valid"
     : showInvalid && feedback
       ? "cv-input-error"
-      : "";
+      : showFilled
+        ? "cv-input-filled"
+        : "";
+
+  // cloneElement REPLACES the child's ref/handlers, so each wrapper calls
+  // the original first (sanitize-on-blur mutates e.target.value before we
+  // read it — order matters). React 19: the child's ref lives in props.
+  const childRef = single?.props.ref;
+  const childOnBlur = single?.props.onBlur;
+  const childOnChange = single?.props.onChange;
+  const tintProps = tintEnabled
+    ? {
+        ref: (node: HTMLElement | null) => {
+          controlRef.current = node;
+          if (typeof childRef === "function") childRef(node);
+          else if (childRef) childRef.current = node;
+        },
+        onBlur: (e: FocusEvent<HTMLElement>) => {
+          childOnBlur?.(e);
+          setFilled(readControlValue(e.target).trim() !== "");
+        },
+        onChange: (e: ChangeEvent<HTMLElement>) => {
+          childOnChange?.(e);
+          // Clear-only: emptying the field drops the tint right away, but
+          // typing never GAINS it mid-edit — the blur contract holds.
+          if (readControlValue(e.target).trim() === "") setFilled(false);
+        },
+      }
+    : undefined;
 
   const content = single
     ? cloneElement(single, {
         id: single.props.id ?? fieldId,
-        className: feedbackClass
-          ? `${single.props.className ?? ""} ${feedbackClass}`.trim()
+        className: stateClass
+          ? `${single.props.className ?? ""} ${stateClass}`.trim()
           : single.props.className,
         "aria-invalid": showInvalid || undefined,
+        ...tintProps,
       })
     : children;
 

@@ -90,6 +90,33 @@ const ToastCard = ({ toast }: { toast: Toast }) => {
       >
         {toast.text}
       </p>
+      {toast.actionLabel && toast.onAction && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.onAction?.();
+            dismissToast(toast.id);
+          }}
+          style={{
+            flexShrink: 0,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: isSuccess ? "var(--ff-accent-dark)" : "var(--ff-warn)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            fontWeight: 700,
+            lineHeight: 1,
+            textDecoration: "underline",
+            textUnderlineOffset: 2,
+            // Generous hit area per the 44px touch-target rule.
+            padding: "10px 8px",
+            margin: "-8px 0",
+          }}
+        >
+          {toast.actionLabel}
+        </button>
+      )}
       <button
         type="button"
         onClick={() => dismissToast(toast.id)}

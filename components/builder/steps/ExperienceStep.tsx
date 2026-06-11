@@ -5,6 +5,7 @@ import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { AutoGrowTextarea } from "../../forms/AutoGrowTextarea";
 import { useBlurFeedback } from "../../forms/useBlurFeedback";
@@ -40,6 +41,7 @@ export const ExperienceStep = ({
 }) => {
   const experience = useCvStore((state) => state.data.experience);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -59,10 +61,26 @@ export const ExperienceStep = ({
     defaultValues: { experience },
   });
 
-  const { fields, append, remove, update, move } = useFieldArray({
+  const { fields, append, remove, update, move, insert } = useFieldArray({
     control,
     name: "experience",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveRole = (index: number) => {
+    const removed = getValues(`experience.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Role removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
+  };
 
   const adjustOpenIndexForMove = (from: number, to: number) => {
     setOpenIndex((prev) => {
@@ -365,7 +383,7 @@ export const ExperienceStep = ({
                     {fields.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => remove(index)}
+                        onClick={() => handleRemoveRole(index)}
                         className="cv-btn-danger"
                       >
                         <Icon name="trash" size={12} />

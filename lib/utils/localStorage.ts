@@ -40,16 +40,28 @@ export const loadCvFromStorage = (): CvData | null => {
   return data;
 };
 
-export const saveCvToStorage = (data: CvData) => {
-  if (typeof window === "undefined") return;
+/**
+ * Returns false when the write fails (QuotaExceededError with a large
+ * base64 photo, private-mode restrictions). Callers surface the failure —
+ * the TopBar previously claimed "saved on this device" unconditionally
+ * while every subsequent keystroke was silently lost.
+ */
+export const saveCvToStorage = (data: CvData): boolean => {
+  if (typeof window === "undefined") return false;
   // Stamp the schema version on EVERY save (audit W2-D). The in-memory
   // CvData has no version field, so reset/importCvVersion used to persist
   // unversioned payloads that re-ran the v1→v2 migration on next load —
   // benign but wasteful, and it defeated migrate()'s "skipped" fast path.
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ ...data, version: CURRENT_VERSION }),
-  );
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...data, version: CURRENT_VERSION }),
+    );
+    return true;
+  } catch {
+    console.warn("[makemycv] storage: save failed (quota or privacy mode)");
+    return false;
+  }
 };
 
 export const clearCvStorage = () => {

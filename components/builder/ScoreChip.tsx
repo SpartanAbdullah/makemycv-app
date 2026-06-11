@@ -59,6 +59,21 @@ export const ScoreChip = ({
   const style = TIER_STYLE[tier];
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // How far (px) the popover shifts right of its default right:0 anchor so it
+  // stays on-screen on narrow phones — anchored to the chip's right edge, a
+  // 320px panel can spill past the LEFT viewport edge on ~360px screens.
+  const [shiftRight, setShiftRight] = useState(0);
+
+  const openPopover = () => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (rect) {
+      const width = Math.min(320, window.innerWidth - 32);
+      const left = rect.right - width;
+      setShiftRight(left < 16 ? 16 - left : 0);
+    }
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +84,18 @@ export const ScoreChip = ({
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   // Pull the top open issues (errors first, then reviews), capped at 3.
@@ -84,9 +111,12 @@ export const ScoreChip = ({
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openPopover())}
         aria-label={`CV Score: ${report.total} out of 100. Click for details.`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -146,8 +176,8 @@ export const ScoreChip = ({
           style={{
             position: "absolute",
             top: "calc(100% + 8px)",
-            right: 0,
-            width: 320,
+            right: -shiftRight,
+            width: "min(320px, calc(100vw - 32px))",
             background: "var(--ff-card)",
             border: "1px solid var(--ff-line)",
             borderRadius: 14,

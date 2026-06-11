@@ -187,12 +187,14 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
 /* ─── TopBar — 64px, logo + autosave + score chip + actions ── */
 const TopBar = ({
   cvName,
+  saveError,
   scoreReport,
   onTemplates,
   onDownload,
   isDownloading,
 }: {
   cvName: string;
+  saveError: boolean;
   scoreReport: ScoreReport;
   onTemplates: () => void;
   onDownload: () => void;
@@ -226,20 +228,42 @@ const TopBar = ({
             flexShrink: 0,
           }}
         />
-        <span
-          className="hidden md:inline"
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--ff-muted)",
-            letterSpacing: "0.06em",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {cvName} · saved on this device
-        </span>
+        {saveError ? (
+          // Save failures must be loud on EVERY viewport — the happy-path
+          // label is cosmetic, this one is data loss in progress.
+          <span
+            role="status"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--ff-red, #B3261E)",
+              background: "#FBEFED",
+              border: "1px solid #F2D2CE",
+              borderRadius: 999,
+              padding: "4px 10px",
+              letterSpacing: "0.04em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Not saved — storage full
+          </span>
+        ) : (
+          <span
+            className="hidden md:inline"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.06em",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {cvName} · saved on this device
+          </span>
+        )}
       </div>
 
       {/* Right — score chip + templates + download */}
@@ -589,7 +613,20 @@ const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
  * Sizing is measured client-side in useEffect (ResizeObserver), with a
  * safe SSR default of scale=0.45 so the first paint never mismatches the
  * server-rendered HTML. */
-const MobilePreviewView = () => {
+const MobilePreviewView = ({
+  templateId,
+  onPrevTemplate,
+  onNextTemplate,
+  onDownload,
+  isDownloading,
+}: {
+  templateId: string;
+  onPrevTemplate: () => void;
+  onNextTemplate: () => void;
+  onDownload: () => void;
+  isDownloading: boolean;
+}) => {
+  const template = getTemplateById(templateId);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.45);
@@ -635,6 +672,87 @@ const MobilePreviewView = () => {
         padding: "16px 16px 96px",
       }}
     >
+      {/* Mobile preview chrome — the preview was a dead end on phones: no
+          template switching, no download (the drawer's controls are xl+
+          only and the TopBar "All templates" button is hidden below sm). */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "3px 4px 3px 10px",
+            background: "var(--ff-card)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 999,
+            flexShrink: 0,
+            minWidth: 0,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--ff-muted)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginRight: 4,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {template.name}
+          </span>
+          <button
+            type="button"
+            onClick={onPrevTemplate}
+            aria-label="Previous template"
+            className="ff-hit-target"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
+          </button>
+          <button
+            type="button"
+            onClick={onNextTemplate}
+            aria-label="Next template"
+            className="ff-hit-target"
+            style={drawerChevronBtn}
+          >
+            <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={isDownloading}
+          style={{
+            flex: 1,
+            fontFamily: "var(--font-body)",
+            fontSize: 12.5,
+            color: "white",
+            background: "var(--ff-accent)",
+            border: "none",
+            padding: "10px",
+            borderRadius: 999,
+            fontWeight: 600,
+            cursor: isDownloading ? "wait" : "pointer",
+            opacity: isDownloading ? 0.7 : 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {isDownloading ? "Preparing…" : "Download PDF"}
+        </button>
+      </div>
       <div
         ref={wrapRef}
         style={{
@@ -768,6 +886,7 @@ export const BuilderShell = ({
   const router = useRouter();
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
+  const saveError = useCvStore((state) => state.saveError);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
@@ -1081,6 +1200,7 @@ export const BuilderShell = ({
       >
         <TopBar
           cvName={cvName}
+          saveError={saveError}
           scoreReport={scoreReport}
           onTemplates={() => onStepChange("review")}
           onDownload={() => handleDownload("pdf")}
@@ -1264,7 +1384,13 @@ export const BuilderShell = ({
               `xl:hidden` ensures desktop never shows it. */}
           {mobileView === "preview" && !stepIsReview && (
             <div className="contents xl:hidden">
-              <MobilePreviewView />
+              <MobilePreviewView
+                templateId={data.settings.templateId}
+                onPrevTemplate={() => handleCycleTemplate(-1)}
+                onNextTemplate={() => handleCycleTemplate(1)}
+                onDownload={() => handleDownload("pdf")}
+                isDownloading={isDownloading}
+              />
             </div>
           )}
 

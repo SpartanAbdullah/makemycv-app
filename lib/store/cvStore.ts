@@ -134,6 +134,9 @@ type ApplyCouponResult = { ok: boolean; message: string };
 type CvStore = {
   data: CvData;
   hydrated: boolean;
+  /** True when the last localStorage write failed — the autosave chip
+   *  must stop claiming "saved on this device". */
+  saveError: boolean;
   isPro: boolean;
   hasUsedFreeDownload: boolean;
   appliedCouponCode: string;
@@ -206,6 +209,7 @@ const loadAccessState = (): AccessState => {
 export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
+  saveError: false,
   // TODO: Remove isPro flag in next release. See DECISION_LOG.md 2026-05-31.
   isPro: true,
   hasUsedFreeDownload: false,
@@ -330,8 +334,17 @@ export const bindCvStorage = () => {
   }
 
   useCvStore.getState().setHydrated(true);
-  const saveDebounced = debounce((data: CvData) => saveCvToStorage(data), 500);
-  useCvStore.subscribe((state) => saveDebounced(state.data));
+  const saveDebounced = debounce((data: CvData) => {
+    const ok = saveCvToStorage(data);
+    // Only write on transitions — and guard the subscription on data
+    // identity below, so flipping saveError can never re-trigger a save.
+    if (useCvStore.getState().saveError === ok) {
+      useCvStore.setState({ saveError: !ok });
+    }
+  }, 500);
+  useCvStore.subscribe((state, prev) => {
+    if (state.data !== prev.data) saveDebounced(state.data);
+  });
 };
 
 export const createEmptyItems = {
