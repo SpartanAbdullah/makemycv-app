@@ -26,6 +26,11 @@ import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
 import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
 import { ShareScoreCard } from "../../ShareScoreCard";
 import { useSharedScoreReport } from "../BuilderShell";
+import { ExportGateDialog } from "../ExportGateDialog";
+import {
+  getFirstIncompleteSection,
+  getMissingItems,
+} from "../../../lib/validation/cvRequirements";
 import type { CvData } from "../../../lib/types/cv";
 
 const A4_W = 794;
@@ -125,12 +130,16 @@ export const ReviewStep = ({
     data.personal.lastName?.trim() ||
     "friend";
 
-  const handleExportDocx = () => exportToDocx(data);
+  // Export gate (guided feedback, 2026-06): both export formats check the
+  // shared cvRequirements module first. Missing required content opens the
+  // ONE blocking dialog in the system — "Go back and fix" / "Export anyway".
+  const [exportGate, setExportGate] = useState<null | "pdf" | "docx">(null);
+
   // The PDF download runs immediately. On success, the post-download
   // tip jar is scheduled ~1500ms later (suppressed if recently tipped
   // or dismissed this session). Errors stay in the existing inline
   // error UI — they don't open the modal.
-  const handleDownloadPdf = async () => {
+  const runDownloadPdf = async () => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
@@ -144,6 +153,25 @@ export const ReviewStep = ({
       setIsDownloading(false);
     }
   };
+
+  const runExport = async (kind: "pdf" | "docx") => {
+    if (kind === "docx") {
+      exportToDocx(data);
+      return;
+    }
+    await runDownloadPdf();
+  };
+
+  const requestExport = (kind: "pdf" | "docx") => {
+    if (getMissingItems(data).length > 0) {
+      setExportGate(kind);
+      return;
+    }
+    void runExport(kind);
+  };
+
+  const handleExportDocx = () => requestExport("docx");
+  const handleDownloadPdf = () => requestExport("pdf");
 
   // The CV lives only in this browser's localStorage — sharing the builder
   // URL would hand the recipient an EMPTY builder (audit UX-5). We share
@@ -528,6 +556,23 @@ export const ReviewStep = ({
         open={downloadTipOpen}
         onClose={() => setDownloadTipOpen(false)}
         userName={data.personal.firstName?.trim() || undefined}
+      />
+
+      {/* Export gate — the only blocking dialog in the system. */}
+      <ExportGateDialog
+        open={exportGate !== null}
+        missing={exportGate ? getMissingItems(data) : []}
+        onClose={() => setExportGate(null)}
+        onGoFix={() => {
+          const target = getFirstIncompleteSection(data);
+          setExportGate(null);
+          if (target) onJump(target);
+        }}
+        onExportAnyway={() => {
+          const kind = exportGate;
+          setExportGate(null);
+          if (kind) void runExport(kind);
+        }}
       />
 
       <TemplatePreviewModal

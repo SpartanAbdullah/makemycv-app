@@ -16,8 +16,13 @@ import { UAEDot } from "./UAEDot";
 import { Icon } from "./Icon";
 import { builderSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
-import { getSectionMissing } from "../../lib/validation/cvRequirements";
+import {
+  getFirstIncompleteSection,
+  getMissingItems,
+  getSectionMissing,
+} from "../../lib/validation/cvRequirements";
 import { Toaster } from "../ui/Toaster";
+import { ExportGateDialog } from "./ExportGateDialog";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
@@ -863,19 +868,13 @@ export const BuilderShell = ({
     }
   };
 
-  // Near-empty guard (audit ENG-11): the TopBar Download is live from the
-  // first second of a session, so a first-time tap used to hand out a
-  // blank-template PDF with zero warning. When BOTH Personal Info and
-  // Experience are incomplete we ask once — never a hard block.
+  // Export gate (guided feedback, 2026-06) — supersedes the wave-2
+  // near-empty guard. If ANY required content is missing (per the shared
+  // cvRequirements module), the export dialog lists it with "Go back and
+  // fix" / "Export anyway". The only blocking interaction in the system,
+  // and even it never hard-blocks.
   const handleDownload = async () => {
-    const personalStep = builderSteps.find((s) => s.id === "personal");
-    const experienceStep = builderSteps.find((s) => s.id === "experience");
-    const nearEmpty =
-      personalStep &&
-      experienceStep &&
-      !getStepCompletion(personalStep, data) &&
-      !getStepCompletion(experienceStep, data);
-    if (nearEmpty) {
+    if (getMissingItems(data).length > 0) {
       setDownloadGuardOpen(true);
       return;
     }
@@ -1240,88 +1239,21 @@ export const BuilderShell = ({
         {/* Guided-feedback toasts (section leave/done) — aria-live polite. */}
         <Toaster />
 
-        {/* Near-empty download confirm (audit ENG-11) — never a hard block. */}
-        {downloadGuardOpen && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Download confirmation"
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 90,
-              background: "rgba(11,15,12,0.45)",
-              display: "grid",
-              placeItems: "center",
-              padding: 16,
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setDownloadGuardOpen(false);
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 380,
-                background: "var(--ff-card)",
-                borderRadius: 16,
-                border: "1px solid var(--ff-line)",
-                padding: 22,
-                boxShadow: "0 24px 60px rgba(11,15,12,0.25)",
-              }}
-            >
-              <h2
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 17,
-                  fontWeight: 600,
-                  color: "var(--ff-ink)",
-                }}
-              >
-                Your CV is still mostly empty
-              </h2>
-              <p
-                style={{
-                  marginTop: 8,
-                  fontSize: 13.5,
-                  lineHeight: 1.55,
-                  color: "var(--ff-muted)",
-                }}
-              >
-                Personal Info and Work Experience aren&apos;t filled in yet —
-                the PDF will come out nearly blank. Download anyway?
-              </p>
-              <div
-                style={{
-                  marginTop: 16,
-                  display: "flex",
-                  gap: 8,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  type="button"
-                  className="cv-btn-secondary"
-                  style={{ padding: "11px 16px" }}
-                  onClick={async () => {
-                    setDownloadGuardOpen(false);
-                    await runDownload();
-                  }}
-                >
-                  Download anyway
-                </button>
-                <button
-                  type="button"
-                  className="cv-btn-primary"
-                  style={{ padding: "11px 16px" }}
-                  onClick={() => setDownloadGuardOpen(false)}
-                >
-                  Keep editing
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Export gate (guided feedback) — the only blocking dialog. */}
+        <ExportGateDialog
+          open={downloadGuardOpen}
+          missing={downloadGuardOpen ? getMissingItems(data) : []}
+          onClose={() => setDownloadGuardOpen(false)}
+          onGoFix={() => {
+            setDownloadGuardOpen(false);
+            const target = getFirstIncompleteSection(data);
+            if (target) onStepChange(target);
+          }}
+          onExportAnyway={async () => {
+            setDownloadGuardOpen(false);
+            await runDownload();
+          }}
+        />
 
         {/* Inline style block — keeps the responsive form-column rules close
             to the layout that uses them. */}
