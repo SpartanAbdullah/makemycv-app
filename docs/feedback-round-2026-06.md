@@ -1,5 +1,19 @@
 # Founder Feedback Round — 2026-06-11 — Verified Analysis
 
+> **STATUS 2026-06-12: ALL FOUR WAVES IMPLEMENTED & SHIPPED** on stagingmmc.
+> Commits: 9c1b657 (Wave 1 trust-the-pdf), 5b3dc2f (Wave 2 builder quick wins),
+> 2c43630 (Wave 3 preview overhaul), 3875c76 (Wave 4 resilience).
+> Verified: clean builds, 59 parser + 23 migrate tests green, all 6 PDFs
+> smoke-rendered & visually inspected (`npx tsx scripts/pdf-smoke.tsx`),
+> interactive flows exercised in the running app (collapse/undo/sticky/tint/
+> fit-width/popover). Deliberately deferred: Modern PDF structural redesign
+> (separate ticket — 2-col react-pdf pagination risk; the accent mismatch IS
+> fixed), PDF EducationEntry per-template parameterization (sweep #6),
+> keyboard reorder a11y (builder sweep #7). Wave 4 decisions taken with
+> founder's "use your defaults" authority: filled tier = border-only light
+> green, blur-trigger + hydration-aware seeding, no badge; Font scale
+> control REMOVED (was a no-op) rather than wired.
+
 Source: founder dogfooding session on app.makemycv.ae (built own CV, downloaded PDFs).
 Every item below was verified against the code by a 12-agent analysis run. Status legend:
 **Confirmed** = real, as described. **Partial** = real but root cause / coverage differs from assumption.
