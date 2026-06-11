@@ -1,6 +1,7 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange, getFullName } from "./utils";
+import { getFullName } from "./utils";
+import { formatDateRange, normalizeHref } from "../utils/format";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -76,11 +77,20 @@ export const CorpSidebarTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#0F172A");
 
-  const contactItems: Array<{ label: string; value: string }> = [];
+  const contactItems: Array<{ label: string; value: string; href?: string }> =
+    [];
   if (data.personal.email?.trim())
-    contactItems.push({ label: "Email", value: data.personal.email.trim() });
+    contactItems.push({
+      label: "Email",
+      value: data.personal.email.trim(),
+      href: `mailto:${data.personal.email.trim()}`,
+    });
   if (data.personal.phone?.trim())
-    contactItems.push({ label: "Phone", value: data.personal.phone.trim() });
+    contactItems.push({
+      label: "Phone",
+      value: data.personal.phone.trim(),
+      href: `tel:${data.personal.phone.trim()}`,
+    });
   if (data.personal.location?.trim())
     contactItems.push({
       label: "Location",
@@ -90,11 +100,13 @@ export const CorpSidebarTemplate = ({
     contactItems.push({
       label: "LinkedIn",
       value: shortenDisplayUrl(data.personal.linkedin),
+      href: normalizeHref(data.personal.linkedin),
     });
   if (data.personal.website?.trim())
     contactItems.push({
       label: "Web",
       value: shortenDisplayUrl(data.personal.website),
+      href: normalizeHref(data.personal.website),
     });
   if (data.personal.dateOfBirth?.trim())
     contactItems.push({
@@ -133,7 +145,7 @@ export const CorpSidebarTemplate = ({
         style={{
           flex: 1,
           minWidth: 0,
-          padding: "36px 28px 36px 48px",
+          padding: "36px 28px 36px 32px",
           boxSizing: "border-box" as const,
         }}
       >
@@ -231,7 +243,7 @@ export const CorpSidebarTemplate = ({
                         whiteSpace: "nowrap" as const,
                       }}
                     >
-                      {formatRange(
+                      {formatDateRange(
                         role.startDate,
                         role.endDate,
                         role.isCurrent,
@@ -329,7 +341,7 @@ export const CorpSidebarTemplate = ({
                         whiteSpace: "nowrap" as const,
                       }}
                     >
-                      {formatRange(edu.startDate, edu.endDate)}
+                      {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
                   <div
@@ -419,7 +431,17 @@ export const CorpSidebarTemplate = ({
                           marginTop: "1px",
                         }}
                       >
-                        {project.link!.trim()}
+                        <a
+                          href={normalizeHref(project.link)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            color: "#64748B",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          {project.link!.trim()}
+                        </a>
                       </div>
                     )}
                     {bullets.length > 0 && (
@@ -522,16 +544,31 @@ export const CorpSidebarTemplate = ({
                   >
                     {item.label}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#CBD5E1",
-                      lineHeight: 1.5,
-                      wordBreak: "break-all" as const,
-                    }}
-                  >
-                    {item.value}
-                  </div>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      style={{
+                        fontSize: "10px",
+                        color: "#CBD5E1",
+                        lineHeight: 1.5,
+                        wordBreak: "break-all" as const,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {item.value}
+                    </a>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#CBD5E1",
+                        lineHeight: 1.5,
+                        wordBreak: "break-all" as const,
+                      }}
+                    >
+                      {item.value}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -628,9 +665,9 @@ export const CorpSidebarTemplate = ({
                     lineHeight: 1.6,
                   }}
                 >
-                  {lang.name}
+                  <span style={{ fontWeight: 600 }}>{lang.name}</span>
                   {lang.level
-                    ? ` (${formatLanguageLevel(lang.level)})`
+                    ? ` — ${formatLanguageLevel(lang.level)}`
                     : ""}
                 </div>
               ))}

@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange } from "./utils";
+import { formatDateRange, normalizeHref } from "../utils/format";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -111,14 +111,14 @@ export const ExecutiveTemplate = ({
       ? {
           icon: "💼",
           text: shortenDisplayUrl(data.personal.linkedin),
-          href: data.personal.linkedin.trim(),
+          href: normalizeHref(data.personal.linkedin),
         }
       : null,
     data.personal.website?.trim()
       ? {
           icon: "🌐",
           text: shortenDisplayUrl(data.personal.website),
-          href: data.personal.website.trim(),
+          href: normalizeHref(data.personal.website),
         }
       : null,
     data.personal.dateOfBirth?.trim()
@@ -249,7 +249,7 @@ export const ExecutiveTemplate = ({
                         color: "#CBD5E1",
                         lineHeight: 1.6,
                         wordBreak: "break-all" as const,
-                        textDecoration: "none",
+                        textDecoration: "underline",
                       }}
                     >
                       {item.text}
@@ -313,7 +313,7 @@ export const ExecutiveTemplate = ({
                 >
                   <span
                     style={{
-                      color: "#4F46E5",
+                      color: "#94A3B8",
                       fontSize: "12px",
                       lineHeight: 1,
                       flexShrink: 0,
@@ -342,8 +342,8 @@ export const ExecutiveTemplate = ({
                   key={lang.id}
                   style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.7 }}
                 >
-                  {lang.name}
-                  {lang.level ? ` (${formatLanguageLevel(lang.level)})` : ""}
+                  <span style={{ fontWeight: 600 }}>{lang.name}</span>
+                  {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                 </div>
               ))}
             </div>
@@ -451,7 +451,7 @@ export const ExecutiveTemplate = ({
                         flexShrink: 0,
                       }}
                     >
-                      {formatRange(role.startDate, role.endDate, role.isCurrent)}
+                      {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                     </span>
                   </div>
                   {(role.company || role.location) && (
@@ -540,7 +540,7 @@ export const ExecutiveTemplate = ({
                         flexShrink: 0,
                       }}
                     >
-                      {formatRange(edu.startDate, edu.endDate)}
+                      {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
                   <div
@@ -558,8 +558,8 @@ export const ExecutiveTemplate = ({
                       <span
                         style={{
                           fontSize: "8px",
-                          color: "#1E2A4A",
-                          border: "1px solid #1E2A4A",
+                          color: theme.accent,
+                          border: `1px solid ${theme.accent}`,
                           borderRadius: "3px",
                           padding: "1px 4px",
                           lineHeight: 1.4,
@@ -623,10 +623,10 @@ export const ExecutiveTemplate = ({
                     </div>
                     {showLink && (
                       <a
-                        href={project.link!.trim()}
+                        href={normalizeHref(project.link)}
                         style={{
                           fontSize: "10px",
-                          color: "#4F46E5",
+                          color: theme.accent,
                           textDecoration: "none",
                           wordBreak: "break-all" as const,
                         }}

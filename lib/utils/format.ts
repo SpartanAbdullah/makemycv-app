@@ -70,3 +70,15 @@ export const compactContact = (items: Array<string | undefined | null>) =>
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item))
     .join(" • ");
+
+/**
+ * Users often store URLs without a scheme ("linkedin.com/in/x", "www.site.com").
+ * A PDF/HTML link with a scheme-less href is dead or treated as relative —
+ * prepend https:// unless an explicit scheme is already present.
+ */
+export const normalizeHref = (value?: string): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};

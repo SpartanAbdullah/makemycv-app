@@ -1,6 +1,7 @@
 import type { CvData } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange, getFullName } from "./utils";
+import { formatDateRange, normalizeHref } from "../utils/format";
+import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -52,13 +53,13 @@ export const ModernTemplate = ({
     data.personal.website?.trim()
       ? {
           text: shortenDisplayUrl(data.personal.website),
-          href: data.personal.website.trim(),
+          href: normalizeHref(data.personal.website),
         }
       : null,
     data.personal.linkedin?.trim()
       ? {
           text: shortenDisplayUrl(data.personal.linkedin),
-          href: data.personal.linkedin.trim(),
+          href: normalizeHref(data.personal.linkedin),
         }
       : null,
     data.personal.dateOfBirth?.trim()
@@ -70,7 +71,7 @@ export const ModernTemplate = ({
 
   return (
     <div
-      className="cv-print bg-white text-slate-900 px-10 py-10 text-[0.9rem] leading-relaxed"
+      className="cv-print bg-white text-slate-900 px-8 py-9 text-[0.9rem] leading-relaxed"
       style={{ fontFamily: theme.fontFamily }}
     >
       <header className="border-b border-slate-200 pb-4">
@@ -79,9 +80,11 @@ export const ModernTemplate = ({
             <h1 className="font-display text-3xl font-semibold tracking-tight">
               {name}
             </h1>
-            <p className="text-sm text-slate-500">
-              {data.personal.headline || "Headline"}
-            </p>
+            {data.personal.headline?.trim() && (
+              <p className="text-sm text-slate-500">
+                {data.personal.headline}
+              </p>
+            )}
             {contactItems.length > 0 && (
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                 {contactItems.map((item, index) =>
@@ -89,7 +92,7 @@ export const ModernTemplate = ({
                     <a
                       key={`${item.text}-${index}`}
                       href={item.href}
-                      className="min-w-0"
+                      className="min-w-0 underline decoration-slate-300 underline-offset-2"
                     >
                       <span className="break-words [overflow-wrap:anywhere]">
                         {item.text}
@@ -179,17 +182,21 @@ export const ModernTemplate = ({
                     <div className="flex items-center justify-between text-sm font-semibold">
                       <span>{role.role || "Role"}</span>
                       <span className="text-xs text-slate-400">
-                        {formatRange(
+                        {formatDateRange(
                           role.startDate,
                           role.endDate,
                           role.isCurrent,
                         )}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {role.company || "Company"}
-                      {role.location ? ` - ${role.location}` : ""}
-                    </div>
+                    {(role.company?.trim() || role.location) && (
+                      <div className="text-xs text-slate-500">
+                        {role.company?.trim() || ""}
+                        {role.company?.trim() && role.location
+                          ? ` - ${role.location}`
+                          : role.location || ""}
+                      </div>
+                    )}
                     <ul className="list-disc pl-5 text-sm text-slate-700 mt-2">
                       {role.bullets.filter(Boolean).map((bullet, index) => (
                         <li key={index}>{bullet}</li>
@@ -209,8 +216,10 @@ export const ModernTemplate = ({
               <ul className="mt-3 space-y-2 text-sm text-slate-700">
                 {data.languages.map((lang) => (
                   <li key={lang.id}>
-                    {lang.name}
-                    {lang.level ? ` - ${formatLanguageLevel(lang.level)}` : ""}
+                    <span className="font-semibold">{lang.name}</span>
+                    {lang.level
+                      ? ` — ${formatLanguageLevel(lang.level)}`
+                      : ""}
                   </li>
                 ))}
               </ul>
@@ -225,7 +234,12 @@ export const ModernTemplate = ({
               <ul className="mt-3 space-y-2 text-sm text-slate-700">
                 {data.certifications.map((cert) => (
                   <li key={cert.id}>
-                    {cert.name} - {cert.issuer}
+                    {cert.name}
+                    {cert.issuer || cert.date
+                      ? ` — ${[cert.issuer, cert.date]
+                          .filter(Boolean)
+                          .join(" · ")}`
+                      : ""}
                   </li>
                 ))}
               </ul>
@@ -244,7 +258,12 @@ export const ModernTemplate = ({
                   >
                     {project.name || "Project"}
                     {showLink ? (
-                      <span className="[overflow-wrap:anywhere]">{` - ${project.link?.trim()}`}</span>
+                      <a
+                        href={normalizeHref(project.link)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-slate-300 underline-offset-2 [overflow-wrap:anywhere]"
+                      >{` - ${project.link?.trim()}`}</a>
                     ) : (
                       ""
                     )}
@@ -317,7 +336,7 @@ export const ModernTemplate = ({
                       {edu.field ? ` - ${edu.field}` : ""}
                     </div>
                     <div className="text-xs text-slate-400">
-                      {formatRange(edu.startDate, edu.endDate)}
+                      {formatDateRange(edu.startDate, edu.endDate)}
                     </div>
                     {edu.attested && edu.attestingBody?.trim() && (
                       <p className="mt-0.5 text-xs font-medium text-green-700">

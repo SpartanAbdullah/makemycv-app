@@ -6,38 +6,19 @@ import {
   Image,
   StyleSheet,
   Link,
+  Font,
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
+import { formatDateRange, normalizeHref } from "../../lib/utils/format";
+
+// Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
+Font.registerHyphenationCallback((word) => [word]);
 
 /* ─── Helpers ─────────────────────────────────────────────── */
-
-const toTitleCase = (value: string) =>
-  value
-    .trim()
-    .split(/\s+/)
-    .map((word) => {
-      if (word.length <= 4 && word === word.toUpperCase()) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(" ");
-
-const formatDateRange = (start?: string, end?: string, isCurrent?: boolean) => {
-  const s = start?.trim() || "";
-  const e = end?.trim() || "";
-  if (!s && !e) return "";
-  if (isCurrent) return `${s} – Present`.trim();
-  if (s && e) return `${s} – ${e}`;
-  return s || e;
-};
-
-const formatLanguage = (name: string, level?: string) => {
-  const prettyLevel = level ? formatLanguageLevel(level) : "";
-  return `${toTitleCase(name)}${prettyLevel ? ` (${prettyLevel})` : ""}`;
-};
 
 /** Smart URL shortening matching Classic template logic */
 const shortenDisplayUrl = (value: string) => {
@@ -86,17 +67,18 @@ const SLATE_200 = "#E2E8F0";
  * Classic 11.5px → 8.6pt  (body, bullets, certs)
  * Classic 11px  → 8.25pt  (dates, contact, subtext)
  *
- * Spacing: Classic px-10 = 40px → 30pt, py-12 = 48px → 36pt
+ * Spacing: page padding = 27pt top/bottom, 24pt left/right
+ * (tightened from the live template's 36pt/30pt equivalent for better fit)
  * mt-6 = 24px → 18pt, space-y-3 = 12px → 9pt, pb-1 = 4px → 3pt
  * pl-4 = 16px → 12pt, space-y-1 = 4px → 3pt
  */
 
 const s = StyleSheet.create({
   page: {
-    paddingTop: 36,
-    paddingBottom: 36,
-    paddingLeft: 30,
-    paddingRight: 30,
+    paddingTop: 27,
+    paddingBottom: 27,
+    paddingLeft: 24,
+    paddingRight: 24,
     fontFamily: "Helvetica",
     fontSize: 8.6,
     lineHeight: 1.45,
@@ -142,7 +124,7 @@ const s = StyleSheet.create({
   contactLink: {
     fontSize: 8.25,
     color: SLATE_500,
-    textDecoration: "none",
+    textDecoration: "underline",
   },
   photo: {
     width: 60,
@@ -249,15 +231,15 @@ const s = StyleSheet.create({
 
   /* ── Executive sidebar ──────────────────────────────────── */
   /* Negative margins extend the navy panel to the page top/bottom/left
-     edges, escaping the page-level 36pt/30pt padding so the sidebar bleeds
+     edges, escaping the page-level 27pt/24pt padding so the sidebar bleeds
      edge-to-edge (matches the live preview). Width and padding mirror the
      live template's 200px sidebar with 28px/20px padding. */
   execSidebar: {
     width: 150,
     backgroundColor: "#1E2A4A",
-    marginTop: -36,
-    marginBottom: -36,
-    marginLeft: -30,
+    marginTop: -27,
+    marginBottom: -27,
+    marginLeft: -24,
     paddingTop: 21,
     paddingBottom: 21,
     paddingLeft: 15,
@@ -425,12 +407,12 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   if (data.personal.linkedin?.trim())
     contacts.push({
       text: shortenDisplayUrl(data.personal.linkedin),
-      href: data.personal.linkedin.trim(),
+      href: normalizeHref(data.personal.linkedin),
     });
   if (data.personal.website?.trim())
     contacts.push({
       text: shortenDisplayUrl(data.personal.website),
-      href: data.personal.website.trim(),
+      href: normalizeHref(data.personal.website),
     });
   if (data.personal.dateOfBirth?.trim())
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
@@ -532,18 +514,16 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
           {data.experience.map((role) => (
-            <View key={role.id} style={s.entryBlock} wrap={false}>
+            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
-                <View style={{ flexDirection: "row", flex: 1 }}>
-                  <Text style={s.entryTitle}>
-                    {role.role?.trim() || "Role"}
-                  </Text>
-                  {role.company && (
+                <Text style={{ ...s.entryTitle, flex: 1 }}>
+                  {role.role?.trim() || "Role"}
+                  {role.company ? (
                     <Text style={s.entryCompany}>
                       {` | ${role.company.trim()}`}
                     </Text>
-                  )}
-                </View>
+                  ) : null}
+                </Text>
                 <Text style={s.entryDate}>
                   {formatDateRange(
                     role.startDate,
@@ -580,7 +560,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.sectionHeading}>Skills</Text>
           </View>
           <Text style={s.body}>
-            {data.skills.map((sk) => toTitleCase(sk.name)).join(", ")}
+            {data.skills.map((sk) => sk.name).join(", ")}
           </Text>
         </View>
       )}
@@ -594,9 +574,17 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                 <Text style={s.sectionHeading}>Languages</Text>
               </View>
               <Text style={s.body}>
-                {data.languages
-                  .map((lang) => formatLanguage(lang.name, lang.level))
-                  .join(" | ")}
+                {data.languages.map((lang, i, arr) => (
+                  <Text key={lang.id}>
+                    <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                      {lang.name}
+                    </Text>
+                    {lang.level
+                      ? ` — ${formatLanguageLevel(lang.level)}`
+                      : ""}
+                    {i < arr.length - 1 ? "  |  " : ""}
+                  </Text>
+                ))}
               </Text>
             </View>
           )}
@@ -631,16 +619,24 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <View style={{ flexDirection: "row" }}>
-                  <Text style={s.entryTitle}>
-                    {project.name?.trim() || "Project"}
-                  </Text>
-                  {showLink && (
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {showLink ? (
                     <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                      {` | ${project.link?.trim()}`}
+                      {" | "}
+                      <Link
+                        src={normalizeHref(project.link)}
+                        style={{
+                          ...s.entryCompany,
+                          color: SLATE_500,
+                          textDecoration: "underline",
+                        }}
+                      >
+                        {project.link?.trim()}
+                      </Link>
                     </Text>
-                  )}
-                </View>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} />
               </View>
             );
@@ -656,10 +652,6 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
    ═══════════════════════════════════════════════════════════ */
 
 const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
-  const name =
-    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
-    "Your Name";
-
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
@@ -673,21 +665,41 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   );
 
   // Build sidebar contact lines — plain text label prefixes (no emoji — unreliable in react-pdf)
-  const sidebarContacts: string[] = [];
-  if (data.personal.email?.trim())
-    sidebarContacts.push(`Email: ${data.personal.email.trim()}`);
+  const sidebarContacts: Array<{
+    text: string;
+    href?: string;
+    fontSize?: number;
+  }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
+    sidebarContacts.push({
+      text: `Email: ${email}`,
+      href: `mailto:${email}`,
+      // Long emails must stay one unbroken string (ATS) — shrink to fit the narrow column.
+      fontSize: email.length > 26 ? 6.2 : undefined,
+    });
+  }
   if (data.personal.phone?.trim())
-    sidebarContacts.push(`Tel: ${data.personal.phone.trim()}`);
+    sidebarContacts.push({
+      text: `Tel: ${data.personal.phone.trim()}`,
+      href: `tel:${data.personal.phone.trim()}`,
+    });
   if (data.personal.location?.trim())
-    sidebarContacts.push(`Location: ${data.personal.location.trim()}`);
+    sidebarContacts.push({
+      text: `Location: ${data.personal.location.trim()}`,
+    });
   if (data.personal.linkedin?.trim())
-    sidebarContacts.push(
-      `LinkedIn: ${shortenDisplayUrl(data.personal.linkedin)}`,
-    );
+    sidebarContacts.push({
+      text: `LinkedIn: ${shortenDisplayUrl(data.personal.linkedin)}`,
+      href: normalizeHref(data.personal.linkedin),
+    });
   if (data.personal.website?.trim())
-    sidebarContacts.push(`Web: ${shortenDisplayUrl(data.personal.website)}`);
+    sidebarContacts.push({
+      text: `Web: ${shortenDisplayUrl(data.personal.website)}`,
+      href: normalizeHref(data.personal.website),
+    });
   if (data.personal.dateOfBirth?.trim())
-    sidebarContacts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
+    sidebarContacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
   const essentialChips = getEssentialChips(data.personal);
 
@@ -713,8 +725,19 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Name */}
-        <Text style={s.execName}>{name}</Text>
+        {/* Name — stacked first/last lines (mirrors live executive) */}
+        {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
+          <>
+            {data.personal.firstName?.trim() ? (
+              <Text style={s.execName}>{data.personal.firstName.trim()}</Text>
+            ) : null}
+            {data.personal.lastName?.trim() ? (
+              <Text style={s.execName}>{data.personal.lastName.trim()}</Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={s.execName}>Your Name</Text>
+        )}
 
         {/* Headline */}
         {data.personal.headline?.trim() ? (
@@ -725,11 +748,31 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {sidebarContacts.length > 0 && (
           <View>
             <Text style={s.execSideLabel}>CONTACT</Text>
-            {sidebarContacts.map((line, i) => (
-              <Text key={i} style={s.execContactItem}>
-                {line}
-              </Text>
-            ))}
+            {sidebarContacts.map((item, i) =>
+              item.href ? (
+                <Link
+                  key={i}
+                  src={item.href}
+                  style={{
+                    ...s.execContactItem,
+                    textDecoration: "underline",
+                    ...(item.fontSize ? { fontSize: item.fontSize } : {}),
+                  }}
+                >
+                  {item.text}
+                </Link>
+              ) : (
+                <Text
+                  key={i}
+                  style={{
+                    ...s.execContactItem,
+                    ...(item.fontSize ? { fontSize: item.fontSize } : {}),
+                  }}
+                >
+                  {item.text}
+                </Text>
+              ),
+            )}
           </View>
         )}
 
@@ -751,7 +794,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.execSideLabel}>SKILLS</Text>
             {data.skills.map((skill) => (
               <Text key={skill.id} style={s.execSkillItem}>
-                {toTitleCase(skill.name)}
+                <Text style={{ color: "#94A3B8" }}>{"·  "}</Text>
+                {skill.name}
               </Text>
             ))}
           </View>
@@ -763,7 +807,12 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.execSideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={s.execSkillItem}>
-                {formatLanguage(lang.name, lang.level)}
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {lang.name}
+                </Text>
+                {lang.level
+                  ? ` — ${formatLanguageLevel(lang.level)}`
+                  : ""}
               </Text>
             ))}
           </View>
@@ -823,18 +872,16 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
             {data.experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} wrap={false}>
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
-                  <View style={{ flexDirection: "row", flex: 1 }}>
-                    <Text style={s.entryTitle}>
-                      {role.role?.trim() || "Role"}
-                    </Text>
-                    {role.company && (
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
                       <Text style={s.entryCompany}>
                         {` | ${role.company.trim()}`}
                       </Text>
-                    )}
-                  </View>
+                    ) : null}
+                  </Text>
                   <Text style={s.entryDate}>
                     {formatDateRange(
                       role.startDate,
@@ -874,16 +921,24 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text style={s.entryTitle}>
-                      {project.name?.trim() || "Project"}
-                    </Text>
-                    {showLink && (
+                  <Text style={s.entryTitle}>
+                    {project.name?.trim() || "Project"}
+                    {showLink ? (
                       <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                        {` | ${project.link?.trim()}`}
+                        {" | "}
+                        <Link
+                          src={normalizeHref(project.link)}
+                          style={{
+                            ...s.entryCompany,
+                            color: theme.accent,
+                            textDecoration: "none",
+                          }}
+                        >
+                          {project.link?.trim()}
+                        </Link>
                       </Text>
-                    )}
-                  </View>
+                    ) : null}
+                  </Text>
                   <BulletList bullets={project.bullets ?? []} />
                 </View>
               );
@@ -905,19 +960,31 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   // Contact line — plain text only, no emoji, separated by middle dot
-  const contactParts: string[] = [];
+  const contactParts: Array<{ text: string; href?: string }> = [];
   if (data.personal.email?.trim())
-    contactParts.push(data.personal.email.trim());
+    contactParts.push({
+      text: data.personal.email.trim(),
+      href: `mailto:${data.personal.email.trim()}`,
+    });
   if (data.personal.phone?.trim())
-    contactParts.push(data.personal.phone.trim());
+    contactParts.push({
+      text: data.personal.phone.trim(),
+      href: `tel:${data.personal.phone.trim()}`,
+    });
   if (data.personal.location?.trim())
-    contactParts.push(data.personal.location.trim());
+    contactParts.push({ text: data.personal.location.trim() });
   if (data.personal.linkedin?.trim())
-    contactParts.push(shortenDisplayUrl(data.personal.linkedin));
+    contactParts.push({
+      text: shortenDisplayUrl(data.personal.linkedin),
+      href: normalizeHref(data.personal.linkedin),
+    });
   if (data.personal.website?.trim())
-    contactParts.push(shortenDisplayUrl(data.personal.website));
+    contactParts.push({
+      text: shortenDisplayUrl(data.personal.website),
+      href: normalizeHref(data.personal.website),
+    });
   if (data.personal.dateOfBirth?.trim())
-    contactParts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
+    contactParts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
   const essentialChips = getEssentialChips(data.personal);
   const essentialsLine = essentialChips
@@ -982,7 +1049,27 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
             </View>
           ) : null}
           {contactParts.length > 0 && (
-            <Text style={s.atsContactLine}>{contactParts.join(" · ")}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              {contactParts.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row" }}>
+                  {item.href ? (
+                    <Link
+                      src={item.href}
+                      style={{ ...s.atsContactLine, textDecoration: "none" }}
+                    >
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={s.atsContactLine}>{item.text}</Text>
+                  )}
+                  {i < contactParts.length - 1 && (
+                    <Text style={{ ...s.atsContactLine, marginHorizontal: 3 }}>
+                      ·
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
           )}
           {essentialsLine && (
             <Text style={{ ...s.atsContactLine, color: "#374151", marginTop: 2 }}>
@@ -1022,7 +1109,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("experience")}>Experience</Text>
           {data.experience.map((role) => (
-            <View key={role.id} style={{ marginBottom: 9 }} wrap={false}>
+            <View key={role.id} style={{ marginBottom: 9 }} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text
                   style={{
@@ -1091,7 +1178,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("skills")}>Skills</Text>
           <Text style={{ ...s.body, color: "#374151" }}>
-            {data.skills.map((sk) => toTitleCase(sk.name)).join(" · ")}
+            {data.skills.map((sk) => sk.name).join(" · ")}
           </Text>
         </View>
       )}
@@ -1101,11 +1188,17 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("languages")}>Languages</Text>
           <Text style={{ ...s.body, color: "#374151" }}>
-            {data.languages
-              .map((lang) =>
-                lang.level ? `${lang.name} (${formatLanguageLevel(lang.level)})` : lang.name,
-              )
-              .join(" · ")}
+            {data.languages.map((lang, i, arr) => (
+              <Text key={lang.id}>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {lang.name}
+                </Text>
+                {lang.level
+                  ? ` — ${formatLanguageLevel(lang.level)}`
+                  : ""}
+                {i < arr.length - 1 ? " · " : ""}
+              </Text>
+            ))}
           </Text>
         </View>
       )}
@@ -1154,7 +1247,18 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                       marginTop: 1,
                     }}
                   >
-                    ({project.link!.trim()})
+                    {"("}
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{
+                        fontSize: 7.5,
+                        color: "#6B7280",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {project.link!.trim()}
+                    </Link>
+                    {")"}
                   </Text>
                 )}
                 <BulletList bullets={project.bullets ?? []} />
@@ -1183,7 +1287,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
-  const theme = resolveTheme(data.settings, "#4F46E5");
+  const theme = resolveTheme(data.settings, "#1e5b54");
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1205,12 +1309,12 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   if (data.personal.linkedin?.trim())
     contacts.push({
       text: shortenDisplayUrl(data.personal.linkedin),
-      href: data.personal.linkedin.trim(),
+      href: normalizeHref(data.personal.linkedin),
     });
   if (data.personal.website?.trim())
     contacts.push({
       text: shortenDisplayUrl(data.personal.website),
-      href: data.personal.website.trim(),
+      href: normalizeHref(data.personal.website),
     });
   if (data.personal.dateOfBirth?.trim())
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
@@ -1318,18 +1422,16 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
           {data.experience.map((role) => (
-            <View key={role.id} style={s.entryBlock} wrap={false}>
+            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
-                <View style={{ flexDirection: "row", flex: 1 }}>
-                  <Text style={s.entryTitle}>
-                    {role.role?.trim() || "Role"}
-                  </Text>
-                  {role.company && (
+                <Text style={{ ...s.entryTitle, flex: 1 }}>
+                  {role.role?.trim() || "Role"}
+                  {role.company ? (
                     <Text style={s.entryCompany}>
                       {` | ${role.company.trim()}`}
                     </Text>
-                  )}
-                </View>
+                  ) : null}
+                </Text>
                 <Text style={s.entryDate}>
                   {formatDateRange(
                     role.startDate,
@@ -1366,7 +1468,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.sectionHeading}>Skills</Text>
           </View>
           <Text style={s.body}>
-            {data.skills.map((sk) => toTitleCase(sk.name)).join(", ")}
+            {data.skills.map((sk) => sk.name).join(", ")}
           </Text>
         </View>
       )}
@@ -1380,9 +1482,17 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                 <Text style={s.sectionHeading}>Languages</Text>
               </View>
               <Text style={s.body}>
-                {data.languages
-                  .map((lang) => formatLanguage(lang.name, lang.level))
-                  .join(" | ")}
+                {data.languages.map((lang, i, arr) => (
+                  <Text key={lang.id}>
+                    <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                      {lang.name}
+                    </Text>
+                    {lang.level
+                      ? ` — ${formatLanguageLevel(lang.level)}`
+                      : ""}
+                    {i < arr.length - 1 ? "  |  " : ""}
+                  </Text>
+                ))}
               </Text>
             </View>
           )}
@@ -1417,16 +1527,24 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <View style={{ flexDirection: "row" }}>
-                  <Text style={s.entryTitle}>
-                    {project.name?.trim() || "Project"}
-                  </Text>
-                  {showLink && (
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {showLink ? (
                     <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                      {` | ${project.link?.trim()}`}
+                      {" | "}
+                      <Link
+                        src={normalizeHref(project.link)}
+                        style={{
+                          ...s.entryCompany,
+                          color: SLATE_500,
+                          textDecoration: "underline",
+                        }}
+                      >
+                        {project.link?.trim()}
+                      </Link>
                     </Text>
-                  )}
-                </View>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} />
               </View>
             );
@@ -1454,19 +1572,31 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
 
-  const contactParts: string[] = [];
+  const contactParts: Array<{ text: string; href?: string }> = [];
   if (data.personal.email?.trim())
-    contactParts.push(data.personal.email.trim());
+    contactParts.push({
+      text: data.personal.email.trim(),
+      href: `mailto:${data.personal.email.trim()}`,
+    });
   if (data.personal.phone?.trim())
-    contactParts.push(data.personal.phone.trim());
+    contactParts.push({
+      text: data.personal.phone.trim(),
+      href: `tel:${data.personal.phone.trim()}`,
+    });
   if (data.personal.location?.trim())
-    contactParts.push(data.personal.location.trim());
+    contactParts.push({ text: data.personal.location.trim() });
   if (data.personal.linkedin?.trim())
-    contactParts.push(shortenDisplayUrl(data.personal.linkedin));
+    contactParts.push({
+      text: shortenDisplayUrl(data.personal.linkedin),
+      href: normalizeHref(data.personal.linkedin),
+    });
   if (data.personal.website?.trim())
-    contactParts.push(shortenDisplayUrl(data.personal.website));
+    contactParts.push({
+      text: shortenDisplayUrl(data.personal.website),
+      href: normalizeHref(data.personal.website),
+    });
   if (data.personal.dateOfBirth?.trim())
-    contactParts.push(`DOB: ${data.personal.dateOfBirth.trim()}`);
+    contactParts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#1B2A4A");
@@ -1480,9 +1610,9 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
       <View
         style={{
           backgroundColor: theme.accent,
-          marginTop: -36,
-          marginLeft: -30,
-          marginRight: -30,
+          marginTop: -27,
+          marginLeft: -24,
+          marginRight: -24,
           paddingTop: 24,
           paddingBottom: 20,
           paddingLeft: 30,
@@ -1516,16 +1646,57 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
             </Text>
           ) : null}
           {contactParts.length > 0 && (
-            <Text
+            <View
               style={{
-                fontSize: 7.5,
-                color: "#CBD5E1",
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
                 marginTop: 6,
-                lineHeight: 1.6,
               }}
             >
-              {contactParts.join("  \u00B7  ")}
-            </Text>
+              {contactParts.map((item, i) => (
+                <View
+                  key={i}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  {item.href ? (
+                    <Link
+                      src={item.href}
+                      style={{
+                        fontSize: 7.5,
+                        color: "#CBD5E1",
+                        lineHeight: 1.6,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 7.5,
+                        color: "#CBD5E1",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {item.text}
+                    </Text>
+                  )}
+                  {i < contactParts.length - 1 && (
+                    <Text
+                      style={{
+                        fontSize: 7.5,
+                        color: "#CBD5E1",
+                        lineHeight: 1.6,
+                        marginHorizontal: 4,
+                      }}
+                    >
+                      {"\u00B7"}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
           )}
           {essentialChips.length > 0 && (
             <View
@@ -1595,18 +1766,16 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                 <Text style={s.sectionHeading}>Experience</Text>
               </View>
               {data.experience.map((role) => (
-                <View key={role.id} style={s.entryBlock} wrap={false}>
+                <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                   <View style={s.entryRow}>
-                    <View style={{ flexDirection: "row", flex: 1 }}>
-                      <Text style={s.entryTitle}>
-                        {role.role?.trim() || "Role"}
-                      </Text>
-                      {role.company && (
+                    <Text style={{ ...s.entryTitle, flex: 1 }}>
+                      {role.role?.trim() || "Role"}
+                      {role.company ? (
                         <Text style={s.entryCompany}>
                           {` | ${role.company.trim()}`}
                         </Text>
-                      )}
-                    </View>
+                      ) : null}
+                    </Text>
                     <Text style={s.entryDate}>
                       {formatDateRange(
                         role.startDate,
@@ -1644,16 +1813,24 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                 const showLink = shouldShowProjectLink(project.link);
                 return (
                   <View key={project.id} style={s.entryBlock} wrap={false}>
-                    <View style={{ flexDirection: "row" }}>
-                      <Text style={s.entryTitle}>
-                        {project.name?.trim() || "Project"}
-                      </Text>
-                      {showLink && (
+                    <Text style={s.entryTitle}>
+                      {project.name?.trim() || "Project"}
+                      {showLink ? (
                         <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                          {` | ${project.link?.trim()}`}
+                          {" | "}
+                          <Link
+                            src={normalizeHref(project.link)}
+                            style={{
+                              ...s.entryCompany,
+                              color: SLATE_500,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            {project.link?.trim()}
+                          </Link>
                         </Text>
-                      )}
-                    </View>
+                      ) : null}
+                    </Text>
                     <BulletList bullets={project.bullets ?? []} />
                   </View>
                 );
@@ -1681,7 +1858,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                 <Text style={s.sectionHeading}>Skills</Text>
               </View>
               <Text style={{ ...s.body, fontSize: 8 }}>
-                {data.skills.map((sk) => toTitleCase(sk.name)).join(", ")}
+                {data.skills.map((sk) => sk.name).join(", ")}
               </Text>
             </View>
           )}
@@ -1696,7 +1873,12 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   key={lang.id}
                   style={{ fontSize: 8, color: SLATE_700, lineHeight: 1.6 }}
                 >
-                  {formatLanguage(lang.name, lang.level)}
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {lang.name}
+                  </Text>
+                  {lang.level
+                    ? ` — ${formatLanguageLevel(lang.level)}`
+                    : ""}
                 </Text>
               ))}
             </View>
@@ -1752,16 +1934,27 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = data.projects.length > 0;
 
-  const sidebarContacts: Array<{ label: string; value: string }> = [];
-  if (data.personal.email?.trim())
+  const sidebarContacts: Array<{
+    label: string;
+    value: string;
+    href?: string;
+    fontSize?: number;
+  }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
     sidebarContacts.push({
       label: "Email",
-      value: data.personal.email.trim(),
+      value: email,
+      href: `mailto:${email}`,
+      // Long emails must stay one unbroken string (ATS) — shrink to fit the narrow column.
+      fontSize: email.length > 26 ? 6.2 : undefined,
     });
+  }
   if (data.personal.phone?.trim())
     sidebarContacts.push({
       label: "Phone",
       value: data.personal.phone.trim(),
+      href: `tel:${data.personal.phone.trim()}`,
     });
   if (data.personal.location?.trim())
     sidebarContacts.push({
@@ -1772,11 +1965,13 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     sidebarContacts.push({
       label: "LinkedIn",
       value: shortenDisplayUrl(data.personal.linkedin),
+      href: normalizeHref(data.personal.linkedin),
     });
   if (data.personal.website?.trim())
     sidebarContacts.push({
       label: "Web",
       value: shortenDisplayUrl(data.personal.website),
+      href: normalizeHref(data.personal.website),
     });
   if (data.personal.dateOfBirth?.trim())
     sidebarContacts.push({
@@ -1841,18 +2036,16 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
             {data.experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} wrap={false}>
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
-                  <View style={{ flexDirection: "row", flex: 1 }}>
-                    <Text style={s.entryTitle}>
-                      {role.role?.trim() || "Role"}
-                    </Text>
-                    {role.company && (
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
                       <Text style={s.entryCompany}>
                         {` | ${role.company.trim()}`}
                       </Text>
-                    )}
-                  </View>
+                    ) : null}
+                  </Text>
                   <Text style={s.entryDate}>
                     {formatDateRange(
                       role.startDate,
@@ -1890,16 +2083,24 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text style={s.entryTitle}>
-                      {project.name?.trim() || "Project"}
-                    </Text>
-                    {showLink && (
+                  <Text style={s.entryTitle}>
+                    {project.name?.trim() || "Project"}
+                    {showLink ? (
                       <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                        {` | ${project.link?.trim()}`}
+                        {" | "}
+                        <Link
+                          src={normalizeHref(project.link)}
+                          style={{
+                            ...s.entryCompany,
+                            color: SLATE_500,
+                            textDecoration: "underline",
+                          }}
+                        >
+                          {project.link?.trim()}
+                        </Link>
                       </Text>
-                    )}
-                  </View>
+                    ) : null}
+                  </Text>
                   <BulletList bullets={project.bullets ?? []} />
                 </View>
               );
@@ -1914,9 +2115,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
           width: 155,
           flexShrink: 0,
           backgroundColor: theme.accent,
-          marginTop: -36,
-          marginBottom: -36,
-          marginRight: -30,
+          marginTop: -27,
+          marginBottom: -27,
+          marginRight: -24,
           paddingTop: 24,
           paddingBottom: 24,
           paddingLeft: 14,
@@ -1962,9 +2163,27 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 >
                   {item.label.toUpperCase()}
                 </Text>
-                <Text style={{ ...s.execContactItem, fontSize: 7.5 }}>
-                  {item.value}
-                </Text>
+                {item.href ? (
+                  <Link
+                    src={item.href}
+                    style={{
+                      ...s.execContactItem,
+                      fontSize: item.fontSize ?? 7.5,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    {item.value}
+                  </Link>
+                ) : (
+                  <Text
+                    style={{
+                      ...s.execContactItem,
+                      fontSize: item.fontSize ?? 7.5,
+                    }}
+                  >
+                    {item.value}
+                  </Text>
+                )}
               </View>
             ))}
           </View>
@@ -2005,7 +2224,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 lineHeight: 1.6,
               }}
             >
-              {data.skills.map((sk) => toTitleCase(sk.name)).join(", ")}
+              {data.skills.map((sk) => sk.name).join(", ")}
             </Text>
           </View>
         )}
@@ -2016,7 +2235,12 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={s.execSideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={s.execSkillItem}>
-                {formatLanguage(lang.name, lang.level)}
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {lang.name}
+                </Text>
+                {lang.level
+                  ? ` — ${formatLanguageLevel(lang.level)}`
+                  : ""}
               </Text>
             ))}
           </View>
