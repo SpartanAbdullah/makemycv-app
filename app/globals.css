@@ -418,6 +418,30 @@ body {
 }
 .cv-btn-ghost svg { transition: transform var(--transition-base); }
 .cv-btn-ghost:hover svg { transform: rotate(90deg); }
+/* Disabled ghost buttons previously looked fully clickable (e.g. "Add
+   bullet" at the MAX_BULLETS cap) — dim and freeze them. */
+.cv-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cv-btn-ghost:disabled:hover {
+  background: transparent;
+  border-color: var(--ff-line-strong);
+  color: var(--ff-muted);
+}
+.cv-btn-ghost:disabled:hover svg { transform: none; }
+
+/* Invisible tap-area extension for small icon buttons (28px visuals reach
+   the 44px touch floor — same pattern as .cv-skill-chip-remove::before).
+   Requires position:relative on the button, which the class provides. */
+.ff-hit-target {
+  position: relative;
+}
+.ff-hit-target::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
 
 /* Danger / remove button */
 .cv-btn-danger {

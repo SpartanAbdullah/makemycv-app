@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { certificationsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
@@ -46,6 +46,9 @@ export const CertificationsStep = ({
     name: "certifications",
   });
 
+  // First card opens by default — matching EducationStep's collapse pattern.
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
   useEffect(() => {
     if (!isDirty) reset({ certifications: safeCertifications });
   }, [safeCertifications, reset, isDirty]);
@@ -76,9 +79,31 @@ export const CertificationsStep = ({
     };
   }, [watch, updateSection]);
 
+  const handleAddEntry = () => {
+    append({
+      id: crypto.randomUUID(),
+      name: "",
+      issuer: "",
+      date: "",
+    });
+    setOpenIndex(fields.length);
+  };
+
+  // On failed submit, open the first card that has a validation error so the
+  // inline messages are actually reachable inside the collapsed list.
+  const onInvalid = (formErrors: FieldErrors<CertificationsForm>) => {
+    const entryErrors = formErrors.certifications;
+    if (!entryErrors) return;
+    const firstErrorIndex = Object.keys(entryErrors)
+      .map(Number)
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => a - b)[0];
+    if (firstErrorIndex !== undefined) setOpenIndex(firstErrorIndex);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, onInvalid)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
       <StepHeader stepId="certifications" />
@@ -102,54 +127,75 @@ export const CertificationsStep = ({
           )}
           <button
             type="button"
-            onClick={() =>
-              append({
-                id: crypto.randomUUID(),
-                name: "",
-                issuer: "",
-                date: "",
-              })
-            }
+            onClick={handleAddEntry}
             className="cv-btn-ghost"
           >
             <Icon name="plus" size={14} />
             Add certification
           </button>
 
-          {fields.map((field, index) => (
-            <div key={field.id} className="cv-entry-card" style={{ padding: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }}>
-                  Certification {index + 1}
-                </h4>
+          {fields.map((field, index) => {
+            const isOpen = openIndex === index;
+            const name = watch(`certifications.${index}.name`) || "";
+            const issuer = watch(`certifications.${index}.issuer`) || "";
+            const date = watch(`certifications.${index}.date`) || "";
+            const summaryLine = [name, issuer, date].filter(Boolean).join(" | ");
+
+            return (
+              <div key={field.id} className="cv-entry-card">
                 <button
                   type="button"
-                  onClick={() => remove(index)}
-                  className="cv-btn-danger"
+                  onClick={() => setOpenIndex(isOpen ? null : index)}
+                  className="flex w-full items-center justify-between px-5 py-3.5 text-left"
                 >
-                  <Icon name="trash" size={12} />
-                  Remove
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }} className="truncate">
+                    {summaryLine || `Certification ${index + 1}`}
+                  </span>
+                  <svg
+                    className={`h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    style={{ color: "var(--text-faint)" }}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
+
+                {isOpen && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
+                    <div className="flex items-center justify-end" style={{ gap: 6 }}>
+                      {/* No fields.length > 1 guard on purpose — certifications
+                          is optional, so removing the last entry is legitimate. */}
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="cv-btn-danger"
+                      >
+                        <Icon name="trash" size={12} />
+                        Remove
+                      </button>
+                    </div>
+                    <div className="mt-2 grid gap-4 md:grid-cols-2">
+                      <Field
+                        label="Name"
+                        error={errors.certifications?.[index]?.name?.message}
+                      >
+                        <input className="cv-input" placeholder="e.g. PMP - Project Management Professional" {...register(`certifications.${index}.name`)} />
+                      </Field>
+                      <Field
+                        label="Issuer"
+                        error={errors.certifications?.[index]?.issuer?.message}
+                      >
+                        <input className="cv-input" placeholder="e.g. PMI" {...register(`certifications.${index}.issuer`)} />
+                      </Field>
+                      <Field label="Date">
+                        <input className="cv-input" placeholder="e.g. 2024" {...register(`certifications.${index}.date`)} />
+                      </Field>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field
-                  label="Name"
-                  error={errors.certifications?.[index]?.name?.message}
-                >
-                  <input className="cv-input" placeholder="e.g. PMP - Project Management Professional" {...register(`certifications.${index}.name`)} />
-                </Field>
-                <Field
-                  label="Issuer"
-                  error={errors.certifications?.[index]?.issuer?.message}
-                >
-                  <input className="cv-input" placeholder="e.g. PMI" {...register(`certifications.${index}.issuer`)} />
-                </Field>
-                <Field label="Date">
-                  <input className="cv-input" placeholder="e.g. 2024" {...register(`certifications.${index}.date`)} />
-                </Field>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -163,7 +209,7 @@ export const CertificationsStep = ({
       )}
       <NavigationButtons
         onBack={onBack}
-        onNext={handleSubmit(onNext)}
+        onNext={handleSubmit(onNext, onInvalid)}
         showSkip
         onSkip={onSkip}
       />

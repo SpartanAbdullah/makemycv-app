@@ -6,10 +6,14 @@ import type { BuilderStep } from "../../lib/utils/steps";
  * UI-3/UX-7: 8 of 10 steps had no heading at all — the only wayfinding
  * was a 12px bead label that scrolls off-screen on phones).
  *
- * Gives every step: a "Step X of 10" position counter, an h1 landmark
- * for screen readers, a one-line plain-English purpose statement, and
- * the step's ATS tip (written in lib/utils/steps.ts but previously
- * rendered nowhere).
+ * Gives every step: an h1 landmark for screen readers with the
+ * "Step X of 10" counter inline on its right (kept for phone wayfinding,
+ * but no longer costing a line of vertical space), a one-line
+ * plain-English purpose statement, and the step's ATS tip.
+ *
+ * The h1 carries tabIndex={-1} so BuilderShell can move focus here on
+ * step change (keyboard/SR users land on the new step's heading instead
+ * of being dropped on <body>).
  */
 export const StepHeader = ({ stepId }: { stepId: BuilderStep["id"] }) => {
   const index = builderSteps.findIndex((s) => s.id === stepId);
@@ -18,21 +22,33 @@ export const StepHeader = ({ stepId }: { stepId: BuilderStep["id"] }) => {
 
   return (
     <div>
-      <p
+      <div
         style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "var(--ff-faint)",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
-        Step {index + 1} of {builderSteps.length}
-      </p>
-      <h1 className="cv-step-heading" style={{ marginTop: 4 }}>
-        {step.title}
-      </h1>
+        <h1 className="cv-step-heading" tabIndex={-1} style={{ outline: "none" }}>
+          {step.title}
+        </h1>
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--ff-faint)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          Step {index + 1} of {builderSteps.length}
+        </p>
+      </div>
       {step.subtitle && (
         <p className="cv-step-subtitle" style={{ marginTop: 6 }}>
           {step.subtitle}

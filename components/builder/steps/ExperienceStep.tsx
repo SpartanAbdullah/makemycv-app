@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
+import { AutoGrowTextarea } from "../../forms/AutoGrowTextarea";
 import { useBlurFeedback } from "../../forms/useBlurFeedback";
 import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
@@ -225,9 +226,19 @@ export const ExperienceStep = ({
     handleGenerateBullets(0);
   };
 
+  // Failed submit with errors inside a collapsed card is invisible — open
+  // the first entry that has a validation error so the user can see it.
+  const openFirstErroredEntry = (formErrors: FieldErrors<ExperienceForm>) => {
+    const firstErrored = Object.keys(formErrors.experience ?? {})
+      .map(Number)
+      .filter(Number.isInteger)
+      .sort((a, b) => a - b)[0];
+    if (typeof firstErrored === "number") setOpenIndex(firstErrored);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, openFirstErroredEntry)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
       <StepHeader stepId="experience" />
@@ -536,11 +547,10 @@ export const ExperienceStep = ({
                         key={bulletIndex}
                         showMarker
                       >
-                        <textarea
-                          rows={2}
+                        <AutoGrowTextarea
                           placeholder="What did you achieve? Start with a verb, add a number."
                           className="cv-input cv-textarea"
-                          style={{ minHeight: 56 }}
+                          minHeight={56}
                           {...register(
                             `experience.${index}.bullets.${bulletIndex}`,
                           )}
@@ -664,8 +674,9 @@ export const ExperienceStep = ({
                       onClick={() => addBullet(index)}
                       className="cv-btn-ghost"
                       disabled={filledBullets >= MAX_BULLETS}
+                      style={{ width: "auto", padding: "10px 14px" }}
                     >
-                      <Icon name="plus" size={13} />
+                      <Icon name="plus" size={14} />
                       Add bullet
                     </button>
                     <button
@@ -746,7 +757,7 @@ export const ExperienceStep = ({
       </p>
       <NavigationButtons
         onBack={onBack}
-        onNext={handleSubmit(onNext)}
+        onNext={handleSubmit(onNext, openFirstErroredEntry)}
         nextLabel="Continue to Education"
         showSkip={Boolean(onSkip)}
         onSkip={onSkip}
@@ -946,6 +957,7 @@ const CardIconBtn = ({
     disabled={disabled}
     aria-label={label}
     title={label}
+    className="ff-hit-target"
     style={{
       width: 28,
       height: 28,
@@ -1065,6 +1077,7 @@ const SuggestionBullet = ({
         onClick={onAccept}
         aria-label="Accept suggestion"
         title="Accept"
+        className="ff-hit-target"
         style={{
           width: 28,
           height: 28,
@@ -1085,6 +1098,7 @@ const SuggestionBullet = ({
         onClick={onReject}
         aria-label="Reject suggestion"
         title="Reject"
+        className="ff-hit-target"
         style={{
           width: 28,
           height: 28,

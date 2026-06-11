@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { projectsSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
+import { AutoGrowTextarea } from "../../forms/AutoGrowTextarea";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
@@ -51,6 +52,9 @@ export const ProjectsStep = ({
     itemIndex: number;
     bulletIndex: number;
   } | null>(null);
+
+  // First card opens by default — matching EducationStep's collapse pattern.
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   useEffect(() => {
     if (!isDirty) reset({ projects });
@@ -115,9 +119,26 @@ export const ProjectsStep = ({
     update(index, { ...currentItem, bullets: next.length ? next : [""] });
   };
 
+  const handleAddEntry = () => {
+    append(createEmptyItems.project());
+    setOpenIndex(fields.length);
+  };
+
+  // On failed submit, open the first card that has a validation error so the
+  // inline messages are actually reachable inside the collapsed list.
+  const onInvalid = (formErrors: FieldErrors<ProjectsForm>) => {
+    const entryErrors = formErrors.projects;
+    if (!entryErrors) return;
+    const firstErrorIndex = Object.keys(entryErrors)
+      .map(Number)
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => a - b)[0];
+    if (firstErrorIndex !== undefined) setOpenIndex(firstErrorIndex);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, onInvalid)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
       <StepHeader stepId="projects" />
@@ -143,7 +164,7 @@ export const ProjectsStep = ({
             action={
               <button
                 type="button"
-                onClick={() => append(createEmptyItems.project())}
+                onClick={handleAddEntry}
                 className="cv-btn-ghost"
                 style={{ width: "auto", padding: "10px 14px" }}
               >
@@ -152,82 +173,113 @@ export const ProjectsStep = ({
               </button>
             }
           >
-            {fields.map((field, index) => (
-              <div key={field.id} className="cv-entry-card" style={{ padding: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }}>
-                    Project {index + 1}
-                  </h4>
-                  {fields.length > 1 && (
-                    <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
-                      <Icon name="trash" size={12} />
-                      Remove
-                    </button>
+            {fields.map((field, index) => {
+              const isOpen = openIndex === index;
+              const name = watch(`projects.${index}.name`) || "";
+              const filledBullets = (watch(`projects.${index}.bullets`) || []).filter(
+                (bullet) => (bullet || "").trim().length > 0,
+              ).length;
+              const summaryLine = [
+                name,
+                filledBullets ? `${filledBullets} highlight${filledBullets === 1 ? "" : "s"}` : null,
+              ].filter(Boolean).join(" | ");
+
+              return (
+                <div key={field.id} className="cv-entry-card">
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between px-5 py-3.5 text-left"
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }} className="truncate">
+                      {summaryLine || `Project ${index + 1}`}
+                    </span>
+                    <svg
+                      className={`h-4 w-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      style={{ color: "var(--text-faint)" }}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {isOpen && (
+                    <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
+                      <div className="flex items-center justify-end" style={{ gap: 6 }}>
+                        {fields.length > 1 && (
+                          <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
+                            <Icon name="trash" size={12} />
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="mt-2 grid gap-4 md:grid-cols-2">
+                        <Field
+                          label="Project name"
+                          error={errors.projects?.[index]?.name?.message}
+                        >
+                          <input className="cv-input" placeholder="e.g. Dubai Mall Fit-Out Project" {...register(`projects.${index}.name`)} />
+                        </Field>
+                        <Field label="Link">
+                          <input className="cv-input" placeholder="e.g. www.projectsite.com" {...register(`projects.${index}.link`)} />
+                        </Field>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-heading)" }}>Highlights</p>
+                        <div className="cv-tip-box">
+                          <p>Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.</p>
+                          <p style={{ marginTop: 4 }}>Example: Built a search feature that cut average lookup time by 40%.</p>
+                          <p style={{ marginTop: 4 }}>Example: Increased daily active users by 15% after launching onboarding improvements.</p>
+                        </div>
+                        {(watch(`projects.${index}.bullets`) || []).map((_, bulletIndex) => (
+                          <div key={bulletIndex} className="space-y-1">
+                            <div className="flex items-start gap-2">
+                              <AutoGrowTextarea
+                                className="cv-input cv-textarea flex-1"
+                                minHeight={56}
+                                {...register(`projects.${index}.bullets.${bulletIndex}`)}
+                                onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
+                              />
+                              <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
+                                <Icon name="trash" size={12} />
+                                Remove
+                              </button>
+                            </div>
+                            {errors.projects?.[index]?.bullets?.[bulletIndex]?.message && (
+                              <p style={{ fontSize: 12, color: "var(--ff-red)" }}>
+                                {errors.projects?.[index]?.bullets?.[bulletIndex]?.message}
+                              </p>
+                            )}
+                            {(watch(`projects.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
+                              <p style={{ fontSize: 12, color: "var(--status-warning)" }}>
+                                Consider splitting into 2 bullets for readability.
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-ghost" style={{ width: "auto", padding: "10px 14px", fontSize: 12 }}>
+                            <Icon name="plus" size={14} />
+                            Add bullet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => splitFocusedBullet(index)}
+                            disabled={!focusedBullet || focusedBullet.itemIndex !== index}
+                            className="cv-btn-secondary"
+                            style={{ fontSize: 12, padding: "6px 14px", opacity: (!focusedBullet || focusedBullet.itemIndex !== index) ? 0.5 : 1 }}
+                          >
+                            Split pasted text
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <Field
-                    label="Project name"
-                    error={errors.projects?.[index]?.name?.message}
-                  >
-                    <input className="cv-input" placeholder="e.g. Dubai Mall Fit-Out Project" {...register(`projects.${index}.name`)} />
-                  </Field>
-                  <Field label="Link">
-                    <input className="cv-input" placeholder="e.g. www.projectsite.com" {...register(`projects.${index}.link`)} />
-                  </Field>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-heading)" }}>Highlights</p>
-                  <div className="cv-tip-box">
-                    <p>Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.</p>
-                    <p style={{ marginTop: 4 }}>Example: Built a search feature that cut average lookup time by 40%.</p>
-                    <p style={{ marginTop: 4 }}>Example: Increased daily active users by 15% after launching onboarding improvements.</p>
-                  </div>
-                  {(watch(`projects.${index}.bullets`) || []).map((_, bulletIndex) => (
-                    <div key={bulletIndex} className="space-y-1">
-                      <div className="flex items-start gap-2">
-                        <textarea
-                          rows={2}
-                          className="cv-input flex-1"
-                          {...register(`projects.${index}.bullets.${bulletIndex}`)}
-                          onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
-                        />
-                        <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
-                          <Icon name="trash" size={12} />
-                          Remove
-                        </button>
-                      </div>
-                      {errors.projects?.[index]?.bullets?.[bulletIndex]?.message && (
-                        <p style={{ fontSize: 12, color: "var(--ff-red)" }}>
-                          {errors.projects?.[index]?.bullets?.[bulletIndex]?.message}
-                        </p>
-                      )}
-                      {(watch(`projects.${index}.bullets.${bulletIndex}`) || "").length > 180 && (
-                        <p style={{ fontSize: 12, color: "var(--status-warning)" }}>
-                          Consider splitting into 2 bullets for readability.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={() => addBullet(index)} className="cv-btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }}>
-                      Add bullet
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => splitFocusedBullet(index)}
-                      disabled={!focusedBullet || focusedBullet.itemIndex !== index}
-                      className="cv-btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 14px", opacity: (!focusedBullet || focusedBullet.itemIndex !== index) ? 0.5 : 1 }}
-                    >
-                      Split pasted text
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </Repeater>
         </div>
 
@@ -243,7 +295,7 @@ export const ProjectsStep = ({
       )}
       <NavigationButtons
         onBack={onBack}
-        onNext={handleSubmit(onNext)}
+        onNext={handleSubmit(onNext, onInvalid)}
         showSkip
         onSkip={onSkip}
       />

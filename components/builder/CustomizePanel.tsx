@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
 
@@ -116,6 +117,24 @@ export const CustomizePanel = () => {
 
   const accentColor = settings.accentColor ?? "#1e5b54";
 
+  // Typeable hex field — local draft so the user can type freely; committed
+  // on blur/Enter. Invalid input quietly reverts to the current accent.
+  const [hexDraft, setHexDraft] = useState(accentColor);
+  useEffect(() => {
+    setHexDraft(accentColor);
+  }, [accentColor]);
+
+  const commitHexDraft = () => {
+    const match = hexDraft.trim().match(/^#?([0-9a-fA-F]{6})$/);
+    if (match) {
+      const normalized = `#${match[1].toLowerCase()}`;
+      setHexDraft(normalized);
+      setSetting("accentColor", normalized);
+    } else {
+      setHexDraft(accentColor);
+    }
+  };
+
   return (
     <div
       style={{
@@ -188,10 +207,13 @@ export const CustomizePanel = () => {
               marginLeft: 4,
             }}
           >
-            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>Hex</span>
+            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>
+              Choose your own colour
+            </span>
             <input
               type="color"
               value={accentColor}
+              aria-label="Choose your own colour"
               onChange={(e) => setSetting("accentColor", e.target.value)}
               style={{
                 width: 36,
@@ -201,6 +223,28 @@ export const CustomizePanel = () => {
                 background: "transparent",
                 cursor: "pointer",
                 padding: 0,
+              }}
+            />
+            <input
+              type="text"
+              value={hexDraft}
+              onChange={(e) => setHexDraft(e.target.value)}
+              onBlur={commitHexDraft}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitHexDraft();
+                }
+              }}
+              aria-label="Accent colour hex code"
+              spellCheck={false}
+              maxLength={7}
+              className="cv-input"
+              style={{
+                width: 84,
+                padding: "6px 8px",
+                fontSize: 12,
+                fontFamily: "var(--font-mono)",
               }}
             />
           </label>

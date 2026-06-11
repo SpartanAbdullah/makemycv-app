@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { educationSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
@@ -113,9 +113,21 @@ export const EducationStep = ({
     setOpenIndex(fields.length);
   };
 
+  // On failed submit, open the first card that has a validation error so the
+  // inline messages are actually reachable inside the collapsed list.
+  const onInvalid = (formErrors: FieldErrors<EducationForm>) => {
+    const entryErrors = formErrors.education;
+    if (!entryErrors) return;
+    const firstErrorIndex = Object.keys(entryErrors)
+      .map(Number)
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => a - b)[0];
+    if (firstErrorIndex !== undefined) setOpenIndex(firstErrorIndex);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, onInvalid)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
       <StepHeader stepId="education" />
@@ -400,7 +412,7 @@ export const EducationStep = ({
         </div>
       </section>
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} nextLabel="Continue to Skills" />
+      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext, onInvalid)} nextLabel="Continue to Skills" />
     </form>
   );
 };
