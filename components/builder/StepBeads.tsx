@@ -68,20 +68,28 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) =>
         const isActive = step.id === currentId;
         const isDone = status === "done";
         const isLocked = status === "locked";
+        // Amber "needs attention": required section, visited, still
+        // incomplete (guided feedback 2026-06). Untouched sections render
+        // the neutral future style.
+        const isAttention = status === "attention";
         const label = STEP_LABELS[step.id] ?? step.title;
         const beadClass = isActive
           ? "cv-bead cv-bead-active"
           : isDone
             ? "cv-bead cv-bead-done"
-            : isLocked
-              ? "cv-bead cv-bead-locked"
-              : "cv-bead cv-bead-future";
+            : isAttention
+              ? "cv-bead cv-bead-attention"
+              : isLocked
+                ? "cv-bead cv-bead-locked"
+                : "cv-bead cv-bead-future";
 
         const dotClass = isActive
           ? "cv-bead-dot cv-bead-dot-active"
           : isDone
             ? "cv-bead-dot cv-bead-dot-done"
-            : "cv-bead-dot cv-bead-dot-future";
+            : isAttention
+              ? "cv-bead-dot cv-bead-dot-attention"
+              : "cv-bead-dot cv-bead-dot-future";
 
         return (
           <div
@@ -94,7 +102,10 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) =>
               className={beadClass}
               onClick={() => onStepClick(step.id)}
               aria-current={isActive ? "step" : undefined}
-              title={label}
+              title={isAttention ? `${label} — a few details still missing` : label}
+              aria-label={
+                isAttention ? `${label} — a few details still missing` : label
+              }
             >
               <span className={dotClass}>
                 {isDone ? (

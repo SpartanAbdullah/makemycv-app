@@ -686,6 +686,17 @@ body {
   cursor: pointer;
 }
 .cv-bead-future:hover { border-color: var(--ff-line-strong); }
+/* Amber "needs attention" — required section, visited, still incomplete
+   (guided feedback 2026-06). Tooltip/aria-label carry the meaning too,
+   so the state isn't conveyed by color alone. */
+.cv-bead-attention {
+  background: var(--ff-warn-soft);
+  color: var(--ff-warn);
+  padding: 10px 12px;
+  border-color: #F7E2A3;
+  cursor: pointer;
+}
+.cv-bead-attention:hover { border-color: var(--ff-warn); }
 .cv-bead-locked {
   background: transparent;
   color: var(--ff-faint);
@@ -708,6 +719,7 @@ body {
 .cv-bead-dot-active   { background: var(--ff-accent); }
 .cv-bead-dot-done     { background: var(--ff-accent); }
 .cv-bead-dot-future   { background: transparent; border: 1.5px solid var(--ff-line-strong); color: var(--ff-faint); }
+.cv-bead-dot-attention { background: var(--ff-warn); color: white; }
 
 /* Mobile: hide the step beads scroller's separator. Beads keep their
    10px vertical padding — mobile is exactly where the touch-target

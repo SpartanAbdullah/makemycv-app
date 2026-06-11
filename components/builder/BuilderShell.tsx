@@ -16,6 +16,8 @@ import { UAEDot } from "./UAEDot";
 import { Icon } from "./Icon";
 import { builderSteps } from "../../lib/utils/steps";
 import { getStepCompletion } from "../../lib/utils/stepValidation";
+import { getSectionMissing } from "../../lib/validation/cvRequirements";
+import { Toaster } from "../ui/Toaster";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
@@ -679,6 +681,9 @@ export const BuilderShell = ({
   const updateSection = useCvStore((state) => state.updateSection);
   const previewOpen = useUiStore((s) => s.previewDrawerOpen);
   const setPreviewOpen = useUiStore((s) => s.setPreviewDrawerOpen);
+  const visitedSections = useUiStore((s) => s.visitedSections);
+  const markSectionVisited = useUiStore((s) => s.markSectionVisited);
+  const pushToast = useUiStore((s) => s.pushToast);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -720,25 +725,89 @@ export const BuilderShell = ({
   }, []);
 
   // No step is ever "locked" any more (audit UX-1/UX-2): the old gating made
-  // skipped steps unreachable except by walking Back N times, and a fresh
-  // graduate who couldn't satisfy the Experience schema had every later bead
-  // disabled. Beads now show honest done/incomplete state and navigate
-  // freely; the Review "Missing sections" chips and the download guard carry
-  // the consequences instead of a hard wall.
+  // skipped steps unreachable except by walking Back N times. Beads show
+  // honest state and navigate freely. Guided-feedback layering (2026-06):
+  // a REQUIRED section the user has visited and left incomplete gets the
+  // amber "attention" state; untouched sections stay neutral so a fresh
+  // user isn't greeted by four warnings. Completion comes from the shared
+  // cvRequirements module (via getStepCompletion) — the same definition the
+  // field badges and the export dialog read.
+  const completionMap = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    builderSteps.forEach((step) => {
+      m[step.id] = getStepCompletion(step, data);
+    });
+    return m;
+  }, [data]);
+
   const statuses = useMemo(() => {
     const result: Record<string, StepStatus> = {};
     builderSteps.forEach((step) => {
-      const completion = getStepCompletion(step, data);
       if (step.id === stepId) {
         result[step.id] = "active";
-      } else if (completion) {
+      } else if (completionMap[step.id]) {
         result[step.id] = "done";
+      } else if (step.required && visitedSections[step.id]) {
+        result[step.id] = "attention";
       } else {
         result[step.id] = "incomplete";
       }
     });
     return result;
-  }, [data, stepId]);
+  }, [completionMap, stepId, visitedSections]);
+
+  // Section-leave feedback: when the user navigates away from a required
+  // section that's still incomplete, mark it visited (amber bead) and show
+  // a dismissible, NON-blocking toast naming the first missing thing.
+  // Never a modal — movement is always free.
+  const prevStepRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevStepRef.current;
+    prevStepRef.current = stepId;
+    if (!prev || prev === stepId) return;
+    markSectionVisited(prev);
+    const prevStep = builderSteps.find((s) => s.id === prev);
+    if (prevStep?.required && !getStepCompletion(prevStep, data)) {
+      const first = getSectionMissing(prevStep.id, data)[0];
+      if (first) {
+        pushToast(
+          `${first.sectionTitle}: ${first.label.charAt(0).toLowerCase()}${first.label.slice(1)}. You can come back anytime.`,
+          { tone: "notice" },
+        );
+      }
+    }
+    // `data` is read at navigation time; re-runs on data change exit early
+    // because prev === stepId.
+  }, [stepId, data, markSectionVisited, pushToast]);
+
+  // Section-done celebration: fires when a section flips incomplete →
+  // complete, once per section per browser session (sessionStorage flag —
+  // revisits and reload-then-recomplete stay quiet). Skips until the store
+  // has hydrated so a returning user's already-complete sections don't
+  // toast on load.
+  const prevCompletionRef = useRef<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    const prev = prevCompletionRef.current;
+    prevCompletionRef.current = completionMap;
+    if (!prev) return;
+    for (const step of builderSteps) {
+      if (step.id === "review") continue; // derived — would be noise
+      if (!prev[step.id] && completionMap[step.id]) {
+        try {
+          const key = `mmcv_done_toast_${step.id}`;
+          if (window.sessionStorage.getItem(key)) continue;
+          window.sessionStorage.setItem(key, "1");
+        } catch {
+          /* sessionStorage unavailable — still toast, once per mount */
+        }
+        pushToast(`${step.title} section done ✓`, {
+          tone: "success",
+          duration: 3000,
+        });
+      }
+    }
+  }, [completionMap, hydrated, pushToast]);
 
   // Score report — shown in the TopBar (number + popover) and shared with
   // ReviewStep via ScoreReportContext. Computed on DEFERRED data (audit
@@ -1167,6 +1236,9 @@ export const BuilderShell = ({
           onClose={() => setDownloadTipOpen(false)}
           userName={data.personal.firstName?.trim() || undefined}
         />
+
+        {/* Guided-feedback toasts (section leave/done) — aria-live polite. */}
+        <Toaster />
 
         {/* Near-empty download confirm (audit ENG-11) — never a hard block. */}
         {downloadGuardOpen && (
