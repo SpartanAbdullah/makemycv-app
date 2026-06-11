@@ -23,14 +23,9 @@ import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
-import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
 import { ShareScoreCard } from "../../ShareScoreCard";
-import { useSharedScoreReport } from "../BuilderShell";
-import { ExportGateDialog } from "../ExportGateDialog";
-import {
-  getFirstIncompleteSection,
-  getMissingItems,
-} from "../../../lib/validation/cvRequirements";
+import { useSharedScoreReport, useGuardedDownload } from "../BuilderShell";
+import type { ExportKind } from "../BuilderShell";
 import type { CvData } from "../../../lib/types/cv";
 
 const A4_W = 794;
@@ -102,11 +97,8 @@ export const ReviewStep = ({
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
 
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
-  const [downloadTipOpen, setDownloadTipOpen] = useState(false);
 
   // Reuse BuilderShell's report instead of running the engine a second
   // time per commit (audit PERF-3). The local fallback only exists for
@@ -130,44 +122,26 @@ export const ReviewStep = ({
     data.personal.lastName?.trim() ||
     "friend";
 
-  // Export gate (guided feedback, 2026-06): both export formats check the
-  // shared cvRequirements module first. Missing required content opens the
-  // ONE blocking dialog in the system — "Go back and fix" / "Export anyway".
-  const [exportGate, setExportGate] = useState<null | "pdf" | "docx">(null);
-
-  // The PDF download runs immediately. On success, the post-download
-  // tip jar is scheduled ~1500ms later (suppressed if recently tipped
-  // or dismissed this session). Errors stay in the existing inline
-  // error UI — they don't open the modal.
-  const runDownloadPdf = async () => {
-    setIsDownloading(true);
-    setDownloadError(null);
+  // Exports delegate to BuilderShell's DownloadContext — ONE export gate,
+  // ONE downloading state, ONE error bar, ONE tip-jar trigger for the whole
+  // builder (this step used to duplicate all four, which drifted from the
+  // shell's behaviour). The un-gated fallback only exists for any future
+  // mount outside the shell.
+  const guarded = useGuardedDownload();
+  const [fallbackDownloading, setFallbackDownloading] = useState(false);
+  const fallbackExport = async (kind: ExportKind) => {
+    setFallbackDownloading(true);
     try {
-      await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-      if (shouldShowDownloadTip()) {
-        window.setTimeout(() => setDownloadTipOpen(true), 1500);
-      }
-    } catch {
-      setDownloadError("pdf-failed");
+      if (kind === "docx") await exportToDocx(data);
+      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
     } finally {
-      setIsDownloading(false);
+      setFallbackDownloading(false);
     }
   };
-
-  const runExport = async (kind: "pdf" | "docx") => {
-    if (kind === "docx") {
-      exportToDocx(data);
-      return;
-    }
-    await runDownloadPdf();
-  };
-
-  const requestExport = (kind: "pdf" | "docx") => {
-    if (getMissingItems(data).length > 0) {
-      setExportGate(kind);
-      return;
-    }
-    void runExport(kind);
+  const isDownloading = guarded?.isDownloading ?? fallbackDownloading;
+  const requestExport = (kind: ExportKind) => {
+    if (guarded) void guarded.requestDownload(kind);
+    else void fallbackExport(kind);
   };
 
   const handleExportDocx = () => requestExport("docx");
@@ -229,7 +203,11 @@ export const ReviewStep = ({
           style={{ display: "flex", flexDirection: "column", gap: 22 }}
         >
           <div>
-            <h1 className="cv-step-heading cv-step-heading-hero">
+            <h1
+              className="cv-step-heading cv-step-heading-hero"
+              tabIndex={-1}
+              style={{ outline: "none" }}
+            >
               {score.total >= 40 ? "Looking good," : "Let's build this out,"}
               <br />
               <span className="accent">{firstName}.</span>
@@ -422,26 +400,6 @@ export const ReviewStep = ({
                 </>
               )}
             </button>
-            {downloadError === "pdf-failed" && (
-              <div
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  background: "#FBEFED",
-                  border: "1px solid #F2D2CE",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 12.5,
-                    color: "var(--ff-red)",
-                    fontWeight: 500,
-                  }}
-                >
-                  PDF download failed. Try again or export as Word below.
-                </p>
-              </div>
-            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
@@ -552,28 +510,8 @@ export const ReviewStep = ({
         </button>
       </div>
 
-      <DownloadTipModal
-        open={downloadTipOpen}
-        onClose={() => setDownloadTipOpen(false)}
-        userName={data.personal.firstName?.trim() || undefined}
-      />
-
-      {/* Export gate — the only blocking dialog in the system. */}
-      <ExportGateDialog
-        open={exportGate !== null}
-        missing={exportGate ? getMissingItems(data) : []}
-        onClose={() => setExportGate(null)}
-        onGoFix={() => {
-          const target = getFirstIncompleteSection(data);
-          setExportGate(null);
-          if (target) onJump(target);
-        }}
-        onExportAnyway={() => {
-          const kind = exportGate;
-          setExportGate(null);
-          if (kind) void runExport(kind);
-        }}
-      />
+      {/* Export gate + tip jar render once at shell level (DownloadContext);
+          the local duplicates were removed when exports were unified. */}
 
       <TemplatePreviewModal
         templateId={previewTemplateId}
@@ -602,26 +540,54 @@ export const ReviewStep = ({
         .ff-review-templates { grid-area: templates; }
         .ff-review-customize { grid-area: customize; }
 
-        /* 2 columns at 1200px+: hero | templates, with customize beneath
-           templates (still in the right rail). */
+        /* Sticky design intent: the score hero and customize panel stay
+           pinned (position: sticky against <main>, the single scroll
+           container — top: 0, no topbar offset needed) while the template
+           gallery scrolls past. On short viewports the pinned columns scroll
+           internally via max-height + overflow-y. align-self: start is
+           mandatory — grid items stretch by default and sticky silently
+           no-ops on a stretched item. */
+
+        /* 2 columns at 1200px+: hero | templates, with customize joining the
+           left rail under hero. Sticky left rail, gallery scrolls. */
         @media (min-width: 1200px) {
           .ff-review-grid {
             grid-template-columns: 1fr 1.4fr;
             grid-template-areas:
               "hero templates"
-              "hero customize";
+              "customize templates";
             gap: 28px 32px;
           }
+          .ff-review-hero,
+          .ff-review-customize {
+            align-self: start;
+            position: sticky;
+            top: 0;
+            max-height: calc(100dvh - var(--topbar-h) - var(--progressbar-h) - 56px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+          }
+          .ff-review-hero { padding-bottom: 8px; }
         }
 
         /* 3 columns at 1500px+: hero | templates | customize. Fills the empty
-           right rail on wide displays. */
+           right rail on wide displays. Same sticky rails as the 2-col layout. */
         @media (min-width: 1500px) {
           .ff-review-grid {
             grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
             grid-template-areas: "hero templates customize";
             gap: 32px;
           }
+          .ff-review-hero,
+          .ff-review-customize {
+            align-self: start;
+            position: sticky;
+            top: 0;
+            max-height: calc(100dvh - var(--topbar-h) - var(--progressbar-h) - 56px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+          }
+          .ff-review-hero { padding-bottom: 8px; }
         }
 
         .ff-templates-grid {

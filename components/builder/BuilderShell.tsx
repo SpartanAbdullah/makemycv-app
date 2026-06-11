@@ -40,6 +40,7 @@ const MappingReview = dynamic(
 import type { CvData } from "../../lib/types/cv";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
+import { exportToDocx } from "../../lib/utils/docxExport";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
@@ -67,6 +68,21 @@ const ScoreReportContext = createContext<ScoreReport | null>(null);
 
 export const useSharedScoreReport = () => useContext(ScoreReportContext);
 
+// Guarded download (founder feedback round, B6): every export — TopBar,
+// ReviewStep actions, TemplatePreviewModal, PDF or DOCX — must flow through
+// the ExportGateDialog check. ReviewStep previously called downloadCV
+// directly and bypassed the gate.
+export type ExportKind = "pdf" | "docx";
+type DownloadContextValue = {
+  requestDownload: (kind: ExportKind) => void | Promise<void>;
+  isDownloading: boolean;
+};
+const DownloadContext = createContext<DownloadContextValue | null>(null);
+
+/** Null outside BuilderShell (e.g. isolated component tests) — callers
+ *  should fall back to a direct export in that case. */
+export const useGuardedDownload = () => useContext(DownloadContext);
+
 type ImportState =
   | { phase: "idle" }
   | { phase: "parsing"; source: string }
@@ -74,15 +90,38 @@ type ImportState =
 
 /* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
 const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  // Keep the latest onClose without re-running the mount effect (the parent
+  // re-renders on every keystroke; the inline closure changes each time).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    // Dialog semantics: focus moves in on open, Escape closes, and focus
+    // returns to the opener on close (the overlay previously trapped
+    // keyboard users with a mouse-only Close button).
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    closeBtnRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current();
+    };
+    document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
     };
   }, []);
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="CV preview"
       style={{
         position: "fixed",
         inset: 0,
@@ -111,6 +150,7 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
         </span>
         <button
           type="button"
+          ref={closeBtnRef}
           onClick={onClose}
           style={{
             background: "rgba(255,255,255,0.10)",
@@ -222,7 +262,7 @@ const TopBar = ({
             gap: 6,
           }}
         >
-          Templates
+          All templates
         </button>
         <button
           type="button"
@@ -272,22 +312,24 @@ const TopBar = ({
 };
 
 /* ─── Right preview drawer (xl+ only) ─────────────────────── */
+type PreviewFitMode = "width" | "page";
+
 const PreviewDrawer = ({
   templateId,
   onPrevTemplate,
   onNextTemplate,
   onFullscreen,
-  onDownload,
-  isDownloading,
 }: {
   templateId: string;
   onPrevTemplate: () => void;
   onNextTemplate: () => void;
   onFullscreen: () => void;
-  onDownload: () => void;
-  isDownloading: boolean;
 }) => {
   const template = getTemplateById(templateId);
+  // "width" (default) fills the drawer edge-to-edge and scrolls — readable
+  // while editing. "page" keeps the old fit-everything-at-once view for an
+  // at-a-glance check of the whole layout.
+  const [fitMode, setFitMode] = useState<PreviewFitMode>("width");
   return (
     <div
       style={{
@@ -310,12 +352,12 @@ const PreviewDrawer = ({
         zIndex: 5,
       }}
     >
-      {/* Drawer body — scrollable CV render area. Fills the drawer top-to-footer
-          so users see as much of their CV as possible while editing. The body
-          itself clips ~28px off the rendered CV's top so the template's own
-          page padding doesn't waste vertical space in the preview (the actual
-          exported PDF still keeps the full margin). */}
-      <DrawerPreviewBody />
+      {/* Drawer body — the CV render area. Default fit-width mode renders the
+          page at the drawer's full width and scrolls vertically (readable
+          text while editing); fit-page mode shrinks the whole CV into view
+          at once. The CV renders in full including its own page padding —
+          faithful to the export. */}
+      <DrawerPreviewBody fitMode={fitMode} />
 
       {/* Drawer footer — template cycler + action buttons. */}
       <div
@@ -358,6 +400,7 @@ const PreviewDrawer = ({
             type="button"
             onClick={onPrevTemplate}
             aria-label="Previous template"
+            className="ff-hit-target"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
@@ -366,10 +409,58 @@ const PreviewDrawer = ({
             type="button"
             onClick={onNextTemplate}
             aria-label="Next template"
+            className="ff-hit-target"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
           </button>
+        </div>
+        {/* Fit mode toggle — replaces the duplicate "Download PDF" button
+            (the TopBar Download is the single, export-gated CTA). */}
+        <div
+          role="group"
+          aria-label="Preview fit mode"
+          style={{
+            display: "inline-flex",
+            padding: 3,
+            background: "var(--ff-paper)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 999,
+            flexShrink: 0,
+            gap: 2,
+          }}
+        >
+          {(
+            [
+              { mode: "width" as PreviewFitMode, label: "Fit width" },
+              { mode: "page" as PreviewFitMode, label: "Fit page" },
+            ]
+          ).map(({ mode, label }) => {
+            const active = fitMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setFitMode(mode)}
+                aria-pressed={active}
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: active ? "var(--ff-ink)" : "transparent",
+                  color: active ? "white" : "var(--ff-muted)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "background 120ms, color 120ms",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
         <button
           type="button"
@@ -389,45 +480,34 @@ const PreviewDrawer = ({
         >
           Fullscreen
         </button>
-        <button
-          type="button"
-          onClick={onDownload}
-          disabled={isDownloading}
-          style={{
-            flex: 1,
-            fontFamily: "var(--font-body)",
-            fontSize: 12.5,
-            color: "white",
-            background: "var(--ff-accent)",
-            border: "none",
-            padding: "9px",
-            borderRadius: 8,
-            fontWeight: 600,
-            cursor: isDownloading ? "wait" : "pointer",
-            opacity: isDownloading ? 0.7 : 1,
-          }}
-        >
-          {isDownloading ? "Preparing…" : "Download PDF"}
-        </button>
       </div>
     </div>
   );
 };
 
-/* Preview body — scales the 794-px-wide PreviewPanel to fit the drawer
- * BOTH horizontally and vertically, so the entire CV is always visible at
- * once with no scrolling (the original "full page compacted into a small
- * area" behaviour). scale = min(wrapW / A4_W, wrapH / contentH).
+/* Preview body — two fit modes (the founder feedback round, B6):
  *
- * Two ResizeObservers feed the calculation: one on the wrap (the drawer
- * body — its width/height changes with the layout), and one on the inner
- * content (its unscaled height changes with the CV content). When either
- * changes, recompute scale. */
+ * "width" (default): scale = min(wrapW / A4_W, 1). The page fills the
+ * drawer edge-to-edge and the body scrolls vertically — 1.3×–2.9× larger
+ * than the old fit-page view, so body text is actually readable while
+ * editing. Same proven pattern as MobilePreviewView (spacer div carries
+ * the scaled height; content stays 794px wide so scrollHeight is
+ * scale-independent — no ResizeObserver feedback loop).
+ *
+ * "page": the original behaviour — scale = min(wrapW / A4_W, wrapH /
+ * contentH, 1) so the entire CV is visible at once with no scrolling.
+ *
+ * Two ResizeObservers feed the calculation: one on the wrap (drawer size)
+ * and one on the inner content (unscaled CV height). The live preview
+ * renders the CV in full, including each template's own page padding —
+ * faithful to the export (an earlier top-clipping experiment broke the
+ * full-bleed sidebar templates; don't reintroduce it). */
 const A4_W = 794;
-const DrawerPreviewBody = () => {
+const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.45);
+  const [contentHeight, setContentHeight] = useState(1123);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -439,11 +519,11 @@ const DrawerPreviewBody = () => {
       const h = wrap.clientHeight;
       const ch = content.scrollHeight;
       if (w <= 0 || h <= 0 || ch <= 0) return;
-      const scaleW = w / A4_W;
-      const scaleH = h / ch;
       // Cap at 1 so single-page CVs in a generously-sized drawer don't
       // up-scale and look pixelated.
-      setScale(Math.min(scaleW, scaleH, 1));
+      const scaleW = Math.min(w / A4_W, 1);
+      setScale(fitMode === "page" ? Math.min(scaleW, h / ch) : scaleW);
+      setContentHeight(ch);
     };
 
     update();
@@ -455,38 +535,45 @@ const DrawerPreviewBody = () => {
       wrapObs.disconnect();
       contentObs.disconnect();
     };
-  }, []);
+  }, [fitMode]);
 
-  // The live preview must be faithful to what will be exported — so we render
-  // the CV in full, including each template's own page padding. (Earlier we
-  // tried clipping the top to save vertical space, but that broke full-bleed
-  // sidebar templates like Executive: the sidebar/headers ended up flush
-  // against the top edge with no margin and looked unfinished.)
-
+  const fitWidth = fitMode === "width";
   return (
     <div
       ref={wrapRef}
       style={{
         flex: 1,
-        background: "white",
-        // No scroll — the CV always fits because scale shrinks to match.
-        overflow: "hidden",
+        // Sunken canvas in width mode so any residual gutter reads as a
+        // deliberate desk surface, not dead whitespace.
+        background: fitWidth ? "var(--ff-sunken, #F1F2F0)" : "white",
+        overflowY: fitWidth ? "auto" : "hidden",
+        overflowX: "hidden",
         position: "relative",
       }}
     >
+      {/* Spacer carries the scaled height in width mode so the wrap can
+          scroll; in page mode everything fits and the height is moot. */}
       <div
-        ref={contentRef}
         style={{
-          position: "absolute",
-          top: 0,
-          left: "50%",
-          width: A4_W,
-          transformOrigin: "top center",
-          transform: `translateX(-50%) scale(${scale})`,
-          background: "white",
+          position: "relative",
+          height: fitWidth ? contentHeight * scale : "100%",
         }}
       >
-        <PreviewPanel sticky={false} />
+        <div
+          ref={contentRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "50%",
+            width: A4_W,
+            transformOrigin: "top center",
+            transform: `translateX(-50%) scale(${scale})`,
+            background: "white",
+            boxShadow: fitWidth ? "0 6px 24px rgba(11,15,12,0.08)" : undefined,
+          }}
+        >
+          <PreviewPanel sticky={false} />
+        </div>
       </div>
     </div>
   );
@@ -729,6 +816,24 @@ export const BuilderShell = ({
     bindCvStorage();
   }, []);
 
+  // Step navigation lands at the top of the new step with focus on its h1.
+  // The scroll container (<main>) persists across step swaps, so without
+  // this a user who clicked Continue at the bottom of a long step opened
+  // the next one mid-scroll, and keyboard/SR focus fell back to <body>.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const prevStepIdRef = useRef(stepId);
+  useEffect(() => {
+    if (prevStepIdRef.current === stepId) return;
+    prevStepIdRef.current = stepId;
+    const main = mainRef.current;
+    if (!main) return;
+    main.scrollTo({ top: 0 });
+    const heading = main.querySelector("h1");
+    if (heading instanceof HTMLElement && heading.tabIndex === -1) {
+      heading.focus({ preventScroll: true });
+    }
+  }, [stepId]);
+
   // No step is ever "locked" any more (audit UX-1/UX-2): the old gating made
   // skipped steps unreachable except by walking Back N times. Beads show
   // honest state and navigate freely. Guided-feedback layering (2026-06):
@@ -847,22 +952,30 @@ export const BuilderShell = ({
     });
   };
 
-  // ---- Download (TopBar + drawer) ----
+  // ---- Download (TopBar + ReviewStep + TemplatePreviewModal) ----
   // The download runs IMMEDIATELY on click — no modal in the way. On
   // success, the post-download tip jar is scheduled to appear ~1500ms
   // later, but only if the user is eligible (no recent tip + not
   // dismissed this session). Errors do NOT open the modal; the existing
   // downloadError bar handles them.
-  const runDownload = async () => {
+  const runDownload = async (kind: ExportKind = "pdf") => {
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      if (kind === "docx") {
+        await exportToDocx(data);
+      } else {
+        await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      }
       if (shouldShowDownloadTip()) {
         window.setTimeout(() => setDownloadTipOpen(true), 1500);
       }
     } catch {
-      setDownloadError("Couldn't generate PDF. Try again or export as DOCX.");
+      setDownloadError(
+        kind === "docx"
+          ? "Couldn't generate DOCX. Try again or export as PDF."
+          : "Couldn't generate PDF. Try again or export as DOCX.",
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -872,13 +985,16 @@ export const BuilderShell = ({
   // near-empty guard. If ANY required content is missing (per the shared
   // cvRequirements module), the export dialog lists it with "Go back and
   // fix" / "Export anyway". The only blocking interaction in the system,
-  // and even it never hard-blocks.
-  const handleDownload = async () => {
+  // and even it never hard-blocks. ALL exports (PDF + DOCX, every button)
+  // flow through here via the DownloadContext.
+  const [pendingExportKind, setPendingExportKind] = useState<ExportKind>("pdf");
+  const handleDownload = async (kind: ExportKind = "pdf") => {
     if (getMissingItems(data).length > 0) {
+      setPendingExportKind(kind);
       setDownloadGuardOpen(true);
       return;
     }
-    await runDownload();
+    await runDownload(kind);
   };
 
   // ---- Import flow ----
@@ -949,6 +1065,9 @@ export const BuilderShell = ({
   return (
     <ImportContext.Provider value={{ handleImport }}>
       <ScoreReportContext.Provider value={scoreReport}>
+      <DownloadContext.Provider
+        value={{ requestDownload: handleDownload, isDownloading }}
+      >
       <div
         style={{
           display: "flex",
@@ -964,7 +1083,7 @@ export const BuilderShell = ({
           cvName={cvName}
           scoreReport={scoreReport}
           onTemplates={() => onStepChange("review")}
-          onDownload={handleDownload}
+          onDownload={() => handleDownload("pdf")}
           isDownloading={isDownloading}
         />
 
@@ -1071,6 +1190,7 @@ export const BuilderShell = ({
             }
           >
             <main
+              ref={mainRef}
               style={{
                 flex: 1,
                 display: "flex",
@@ -1158,8 +1278,6 @@ export const BuilderShell = ({
                 onPrevTemplate={() => handleCycleTemplate(-1)}
                 onNextTemplate={() => handleCycleTemplate(1)}
                 onFullscreen={() => setPreviewOpen(true)}
-                onDownload={handleDownload}
-                isDownloading={isDownloading}
               />
             </div>
           )}
@@ -1251,7 +1369,7 @@ export const BuilderShell = ({
           }}
           onExportAnyway={async () => {
             setDownloadGuardOpen(false);
-            await runDownload();
+            await runDownload(pendingExportKind);
           }}
         />
 
@@ -1293,6 +1411,7 @@ export const BuilderShell = ({
           .cv-bead-strip::-webkit-scrollbar { display: none; }
         `}</style>
       </div>
+      </DownloadContext.Provider>
       </ScoreReportContext.Provider>
     </ImportContext.Provider>
   );
