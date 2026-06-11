@@ -277,6 +277,21 @@ body {
   background: var(--ff-card);
 }
 
+/* ─── Blur-feedback states (guided feedback, 2026-06) ──────────
+   Applied by the Field wrapper AFTER blur, never per keystroke.
+   :not(:focus) keeps the focus ring's appearance authoritative
+   while the user is in the field. The green state pairs with a
+   check badge inside the input; padding makes room for it. */
+.cv-input.cv-input-valid:not(:focus) {
+  border-color: var(--ff-accent);
+}
+.cv-input.cv-input-valid {
+  padding-right: 38px;
+}
+.cv-input.cv-input-error:not(:focus) {
+  border-color: var(--ff-red);
+}
+
 /* Textarea variant */
 .cv-textarea {
   resize: vertical;

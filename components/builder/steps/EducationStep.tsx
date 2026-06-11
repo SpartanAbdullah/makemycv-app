@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { educationSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
@@ -48,6 +50,8 @@ export const EducationStep = ({
   // user lands on a typeable form, not a collapsed "Education 1" mystery
   // card (audit UX-12). This is a REQUIRED step.
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  // Blur-time validity feedback for required entry fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
 
   const {
     register,
@@ -200,7 +204,15 @@ export const EducationStep = ({
                         )}
                       </div>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        <Field label="Degree / Qualification" error={errors.education?.[index]?.degree?.message}>
+                        <Field
+                          label="Degree / Qualification"
+                          error={errors.education?.[index]?.degree?.message}
+                          feedback={{
+                            state: fieldState(`degree-${index}`),
+                            message:
+                              "Degree is still empty — you can come back anytime",
+                          }}
+                        >
                           <input
                             className="cv-input"
                             placeholder="e.g. Bachelor of Business Administration"
@@ -208,15 +220,25 @@ export const EducationStep = ({
                             onChange={(e) => {
                               e.target.value = sanitizeJobTitleLive(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
+                              changeField(`degree-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                             onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
                               register(`education.${index}.degree`).onBlur(e);
+                              blurField(`degree-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                           />
                         </Field>
-                        <Field label="School / University" error={errors.education?.[index]?.school?.message}>
+                        <Field
+                          label="School / University"
+                          error={errors.education?.[index]?.school?.message}
+                          feedback={{
+                            state: fieldState(`school-${index}`),
+                            message:
+                              "School is still empty — you can come back anytime",
+                          }}
+                        >
                           <input
                             className="cv-input"
                             placeholder="e.g. American University of Sharjah"
@@ -224,11 +246,13 @@ export const EducationStep = ({
                             onChange={(e) => {
                               e.target.value = sanitizeCompanyNameLive(e.target.value);
                               register(`education.${index}.school`).onChange(e);
+                              changeField(`school-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                             onBlur={(e) => {
                               e.target.value = sanitizeCompanyName(e.target.value);
                               register(`education.${index}.school`).onChange(e);
                               register(`education.${index}.school`).onBlur(e);
+                              blurField(`school-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                           />
                         </Field>
@@ -248,8 +272,28 @@ export const EducationStep = ({
                             }}
                           />
                         </Field>
-                        <Field label="Start year" error={errors.education?.[index]?.startDate?.message}>
-                          <input className="cv-input" placeholder="e.g. 2018" {...register(`education.${index}.startDate`)} />
+                        <Field
+                          label="Start year"
+                          error={errors.education?.[index]?.startDate?.message}
+                          feedback={{
+                            state: fieldState(`startDate-${index}`),
+                            message:
+                              "Start year is still empty — you can come back anytime",
+                          }}
+                        >
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. 2018"
+                            {...register(`education.${index}.startDate`)}
+                            onChange={(e) => {
+                              register(`education.${index}.startDate`).onChange(e);
+                              changeField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                            }}
+                            onBlur={(e) => {
+                              register(`education.${index}.startDate`).onBlur(e);
+                              blurField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                            }}
+                          />
                         </Field>
                         <Field label="End year">
                           <input className="cv-input" placeholder="e.g. 2022" {...register(`education.${index}.endDate`)} />

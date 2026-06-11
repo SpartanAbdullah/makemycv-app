@@ -8,6 +8,12 @@ import {
 } from "react";
 import { Icon, type IconName } from "../builder/Icon";
 
+export type FieldFeedback = {
+  state: "valid" | "invalid" | "neutral";
+  /** Helper text shown when state === "invalid" (and no `error` prop). */
+  message?: string;
+};
+
 type Props = {
   label: string;
   /** Sub-line shown under the input — for ATS hints like "Mirrors the role you want." */
@@ -22,6 +28,14 @@ type Props = {
   optional?: boolean;
   /** Left-anchored icon name shown inside the input pill. */
   leftIcon?: IconName;
+  /**
+   * Blur-time validity feedback (guided-feedback work, 2026-06).
+   * "valid" draws a green border + a small check badge inside the input
+   * (the glyph carries meaning — not color alone); "invalid" draws a red
+   * border, sets aria-invalid, and shows `message` as the helper line.
+   * Drive it with useBlurFeedback — never per keystroke.
+   */
+  feedback?: FieldFeedback;
   children: ReactNode;
 };
 
@@ -48,17 +62,40 @@ export const Field = ({
   required,
   optional,
   leftIcon,
+  feedback,
   children,
 }: Props) => {
   const fieldId = useId();
   const childArray = Children.toArray(children);
   const single =
     childArray.length === 1 && isValidElement(childArray[0])
-      ? (childArray[0] as ReactElement<{ id?: string }>)
+      ? (childArray[0] as ReactElement<{
+          id?: string;
+          className?: string;
+          "aria-invalid"?: boolean;
+        }>)
       : null;
   const assignedId = single && !single.props.id ? fieldId : single?.props.id;
-  const content =
-    single && !single.props.id ? cloneElement(single, { id: fieldId }) : children;
+
+  const showInvalid = Boolean(error) || feedback?.state === "invalid";
+  const showValid = !showInvalid && feedback?.state === "valid";
+  const feedbackClass = showValid
+    ? "cv-input-valid"
+    : showInvalid && feedback
+      ? "cv-input-error"
+      : "";
+
+  const content = single
+    ? cloneElement(single, {
+        id: single.props.id ?? fieldId,
+        className: feedbackClass
+          ? `${single.props.className ?? ""} ${feedbackClass}`.trim()
+          : single.props.className,
+        "aria-invalid": showInvalid || undefined,
+      })
+    : children;
+
+  const helperError = error ?? (feedback?.state === "invalid" ? feedback.message : undefined);
 
   return (
   <div className="cv-field" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -120,27 +157,53 @@ export const Field = ({
         </span>
       )}
     </div>
-    {leftIcon ? (
+    {leftIcon || showValid ? (
       <div style={{ position: "relative" }}>
-        <span
-          style={{
-            position: "absolute",
-            left: 14,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: "var(--ff-faint)",
-            display: "inline-flex",
-            pointerEvents: "none",
-          }}
-        >
-          <Icon name={leftIcon} size={15} />
-        </span>
+        {leftIcon && (
+          <span
+            style={{
+              position: "absolute",
+              left: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--ff-faint)",
+              display: "inline-flex",
+              pointerEvents: "none",
+            }}
+          >
+            <Icon name={leftIcon} size={15} />
+          </span>
+        )}
         {content}
+        {showValid && (
+          /* Quiet success badge — the check GLYPH carries the meaning, not
+             just the green (a11y rule). aria-hidden: success is decorative
+             reassurance, not something to announce over the user. */
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              right: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "var(--ff-accent)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+            }}
+          >
+            <Icon name="check" size={9} color="white" strokeWidth={3.5} />
+          </span>
+        )}
       </div>
     ) : (
       content
     )}
-    {hint && !error && (
+    {hint && !helperError && (
       <span
         style={{
           fontSize: 12,
@@ -151,7 +214,7 @@ export const Field = ({
         {hint}
       </span>
     )}
-    {error && (
+    {helperError && (
       <span
         style={{
           fontSize: 12,
@@ -159,7 +222,7 @@ export const Field = ({
           marginTop: 6,
         }}
       >
-        {error}
+        {helperError}
       </span>
     )}
   </div>

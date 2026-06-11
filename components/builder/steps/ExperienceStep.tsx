@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
@@ -95,6 +97,8 @@ export const ExperienceStep = ({
   // Suggestions queue per role. Accepting merges into bullets[]; rejecting
   // drops the suggestion from the queue.
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
+  // Blur-time validity feedback for required entry fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
   // When the hook returns results, route them into the active role's queue.
   useEffect(() => {
     if (aiActiveIndex === null) return;
@@ -372,6 +376,11 @@ export const ExperienceStep = ({
                     <Field
                       label="Job title"
                       error={errors.experience?.[index]?.role?.message}
+                      feedback={{
+                        state: fieldState(`role-${index}`),
+                        message:
+                          "Job title is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
@@ -380,17 +389,24 @@ export const ExperienceStep = ({
                         onChange={(e) => {
                           e.target.value = sanitizeJobTitleLive(e.target.value);
                           register(`experience.${index}.role`).onChange(e);
+                          changeField(`role-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                         onBlur={(e) => {
                           e.target.value = sanitizeJobTitle(e.target.value);
                           register(`experience.${index}.role`).onChange(e);
                           register(`experience.${index}.role`).onBlur(e);
+                          blurField(`role-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                       />
                     </Field>
                     <Field
                       label="Company"
                       error={errors.experience?.[index]?.company?.message}
+                      feedback={{
+                        state: fieldState(`company-${index}`),
+                        message:
+                          "Company is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
@@ -399,22 +415,37 @@ export const ExperienceStep = ({
                         onChange={(e) => {
                           e.target.value = sanitizeCompanyNameLive(e.target.value);
                           register(`experience.${index}.company`).onChange(e);
+                          changeField(`company-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                         onBlur={(e) => {
                           e.target.value = sanitizeCompanyName(e.target.value);
                           register(`experience.${index}.company`).onChange(e);
                           register(`experience.${index}.company`).onBlur(e);
+                          blurField(`company-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                       />
                     </Field>
                     <Field
                       label="Start"
                       error={errors.experience?.[index]?.startDate?.message}
+                      feedback={{
+                        state: fieldState(`startDate-${index}`),
+                        message:
+                          "Start date is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
                         placeholder="e.g. Jan 2024"
                         {...register(`experience.${index}.startDate`)}
+                        onChange={(e) => {
+                          register(`experience.${index}.startDate`).onChange(e);
+                          changeField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                        }}
+                        onBlur={(e) => {
+                          register(`experience.${index}.startDate`).onBlur(e);
+                          blurField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                        }}
                       />
                     </Field>
                     <Field label="End">

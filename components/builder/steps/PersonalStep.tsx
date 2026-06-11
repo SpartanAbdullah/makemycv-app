@@ -11,7 +11,8 @@ import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
 import { StepHeader } from "../StepHeader";
 import { Field } from "../../forms/Field";
-import { FieldError } from "../../FieldError";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import {
   sanitizeName,
   sanitizeNameLive,
@@ -22,7 +23,6 @@ import {
   sanitizeJobTitleLive,
   sanitizeLocation,
   sanitizeLocationLive,
-  validateEmail,
 } from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
@@ -53,14 +53,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<
-    Record<string, string | null>
-  >({});
   // True once the user explicitly picks "Other city…" in the emirate select.
   const [customLocation, setCustomLocation] = useState(false);
-
-  const setFieldError = (field: string, error: string | null) =>
-    setFieldErrors((prev) => ({ ...prev, [field]: error }));
+  // Blur-time validity feedback for the required fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
 
   const setPhotoShape = (shape: PhotoShape) => {
     updateSection("settings", { ...settings, photoShape: shape });
@@ -207,6 +203,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           label="First name"
           required
           error={errors.firstName?.message}
+          feedback={{
+            state: fieldState("firstName"),
+            message: "First name is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
@@ -215,11 +215,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
               register("firstName").onChange(e);
+              changeField("firstName", fieldValidators.firstName(e.target.value));
             }}
             onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("firstName").onChange(e);
               register("firstName").onBlur(e);
+              blurField("firstName", fieldValidators.firstName(e.target.value));
             }}
           />
         </Field>
@@ -227,6 +229,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           label="Last name"
           required
           error={errors.lastName?.message}
+          feedback={{
+            state: fieldState("lastName"),
+            message: "Last name is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
@@ -235,11 +241,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
               register("lastName").onChange(e);
+              changeField("lastName", fieldValidators.lastName(e.target.value));
             }}
             onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("lastName").onChange(e);
               register("lastName").onBlur(e);
+              blurField("lastName", fieldValidators.lastName(e.target.value));
             }}
           />
         </Field>
@@ -341,6 +349,12 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           leftIcon="mail"
           required
           error={errors.email?.message}
+          feedback={{
+            state: fieldState("email"),
+            message: (watch("email") ?? "").trim()
+              ? "Email doesn't look complete yet"
+              : "Email is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
@@ -350,13 +364,13 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             onChange={(e) => {
               e.target.value = sanitizeEmail(e.target.value);
               register("email").onChange(e);
+              changeField("email", fieldValidators.email(e.target.value));
             }}
             onBlur={(e) => {
               register("email").onBlur(e);
-              setFieldError("email", validateEmail(e.target.value));
+              blurField("email", fieldValidators.email(e.target.value));
             }}
           />
-          <FieldError message={fieldErrors.email ?? null} />
         </Field>
         </div>
 
