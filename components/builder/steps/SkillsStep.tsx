@@ -11,6 +11,7 @@ import { StepHeader } from "../StepHeader";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
+import { softSkillSuggestions } from "../../../lib/data/softSkills";
 import { Icon } from "../Icon";
 import { AiDisclosure } from "../AiDisclosure";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
@@ -32,6 +33,7 @@ export const SkillsStep = ({
   onBack: () => void;
 }) => {
   const skills = useCvStore((state) => state.data.skills);
+  const recentRole = useCvStore((state) => state.data.experience[0]?.role ?? "");
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(skills));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -160,6 +162,20 @@ export const SkillsStep = ({
     setDuplicateWarning(false);
   };
 
+  // Add a skill by name (used by the UAE soft-skill chips). Mirrors
+  // handleAddSkill but takes the name directly and silently no-ops on dupes.
+  const addSkillByName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (fields.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) return;
+    const current = fields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      level: toSkillLevel(f.level ?? "intermediate"),
+    }));
+    replace([...current, { id: createId(), name: trimmed, level: toSkillLevel("intermediate") }]);
+  };
+
   const removeSkill = (index: number) => {
     const updated = fields
       .filter((_, i) => i !== index)
@@ -265,6 +281,60 @@ export const SkillsStep = ({
         <div style={{ marginBottom: 14 }}>
           <AiDisclosure align="left" />
         </div>
+
+        {/* UAE soft-skill chips — instant, no AI. Culture-aware skills that
+            UAE recruiters screen for (cross-cultural, multilingual, etc.),
+            layered with role-specific picks. Tap to add. */}
+        {(() => {
+          const picks = softSkillSuggestions(
+            recentRole,
+            fields.map((f) => f.name),
+            10,
+          );
+          if (picks.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--ff-muted)",
+                  marginBottom: 8,
+                }}
+              >
+                Popular in the UAE · tap to add
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {picks.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => addSkillByName(name)}
+                    className="ff-hit-target"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      background: "var(--ff-card)",
+                      border: "1px dashed var(--ff-line-strong)",
+                      color: "var(--ff-ink-2)",
+                      fontSize: 13,
+                      fontFamily: "var(--font-body)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Icon name="plus" size={11} />
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Skills pills — draggable */}
         {fields.length === 0 ? (

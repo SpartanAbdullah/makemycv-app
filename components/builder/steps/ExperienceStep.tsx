@@ -16,6 +16,7 @@ import { Icon } from "../Icon";
 import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
+import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
@@ -113,6 +114,8 @@ export const ExperienceStep = ({
     clearResults: aiClear,
   } = useAIImprove();
   const [aiActiveIndex, setAiActiveIndex] = useState<number | null>(null);
+  // Which role's static UAE idea panel is expanded (zero-AI suggestions).
+  const [ideasOpenIndex, setIdeasOpenIndex] = useState<number | null>(null);
   // Suggestions queue per role. Accepting merges into bullets[]; rejecting
   // drops the suggestion from the queue.
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
@@ -161,6 +164,21 @@ export const ExperienceStep = ({
       ...prev,
       [index]: (prev[index] ?? []).filter((s) => s !== suggestion),
     }));
+  };
+
+  // Insert a static UAE idea bullet. If the last bullet is empty, fill it in
+  // place (so the user isn't left with a dangling blank); otherwise append.
+  const insertIdeaBullet = (index: number, text: string) => {
+    const entry = getValues(`experience.${index}`);
+    if (!entry) return;
+    const current = entry.bullets ?? [];
+    const filled = current.filter(Boolean);
+    if (filled.length >= MAX_BULLETS) return;
+    const lastIsEmpty = current.length > 0 && !current[current.length - 1]?.trim();
+    const next = lastIsEmpty
+      ? [...current.slice(0, -1), text]
+      : [...current, text];
+    update(index, { ...entry, bullets: next });
   };
 
   useEffect(() => {
@@ -711,6 +729,20 @@ export const ExperienceStep = ({
                     </button>
                   </div>
 
+                  {/* UAE Idea Suggestions — instant, no AI quota used.
+                      Click a ready-made, UAE-flavored bullet to insert it,
+                      then fill in the blank (AED/%/headcount). */}
+                  <IdeaPanel
+                    open={ideasOpenIndex === index}
+                    onToggle={() =>
+                      setIdeasOpenIndex(ideasOpenIndex === index ? null : index)
+                    }
+                    role={role}
+                    disabled={filledBullets >= MAX_BULLETS}
+                    onInsert={(text) => insertIdeaBullet(index, text)}
+                    existingBullets={bullets.filter(Boolean)}
+                  />
+
                   {focusedBullet?.itemIndex === index && (
                     <button
                       type="button"
@@ -1136,6 +1168,146 @@ const SuggestionBullet = ({
     </div>
   </div>
 );
+
+/* ─── UAE Idea Suggestions panel (static, zero-AI) ───────────
+   Replicates the cvtoolspro "Idea Suggestion" affordance with a
+   UAE-flavored phrase library. Collapsed by default to avoid clutter;
+   when open, lists role-matched bullets with a one-tap insert. */
+const IdeaPanel = ({
+  open,
+  onToggle,
+  role,
+  disabled,
+  onInsert,
+  existingBullets,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  role: string;
+  disabled: boolean;
+  onInsert: (text: string) => void;
+  existingBullets: string[];
+}) => {
+  const match = suggestionsForRole(role, existingBullets);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "var(--font-body)",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--ff-ink)",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+        }}
+        aria-expanded={open}
+      >
+        <Icon name="lightbulb" size={14} />
+        {open ? "Hide idea bullets" : "Need ideas? See ready-made bullets"}
+        <span
+          style={{
+            transition: "transform 150ms",
+            transform: open ? "rotate(180deg)" : "none",
+            display: "inline-flex",
+            color: "var(--ff-muted)",
+          }}
+        >
+          <Icon name="chevron-down" size={12} />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 14,
+            background: "var(--ff-sunken)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 12,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--ff-muted)",
+              marginBottom: 10,
+            }}
+          >
+            {match.label} · tap to add, then fill the blank
+          </div>
+
+          {match.bullets.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--ff-muted)" }}>
+              You&apos;ve used all the ready-made ideas for this role — try
+              &quot;Generate more&quot; for fresh AI bullets.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {match.bullets.map((idea) => (
+                <button
+                  key={idea}
+                  type="button"
+                  onClick={() => onInsert(idea)}
+                  disabled={disabled}
+                  className="ff-hit-target"
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    background: "var(--ff-card)",
+                    border: "1px solid var(--ff-line)",
+                    borderRadius: 10,
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    opacity: disabled ? 0.5 : 1,
+                    width: "100%",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 6,
+                      background: "var(--ff-accent-soft)",
+                      color: "var(--ff-accent-dark)",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    <Icon name="plus" size={11} />
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 13.5,
+                      color: "var(--ff-ink-2)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {idea}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SuggestionLoading = () => (
   <div

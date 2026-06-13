@@ -38,7 +38,8 @@ export type IconName =
   | "x"
   | "menu"
   | "search"
-  | "star";
+  | "star"
+  | "lightbulb";
 
 export const Icon = ({
   name,
@@ -127,6 +128,14 @@ export const Icon = ({
       return (
         <svg {...common}>
           <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+        </svg>
+      );
+    case "lightbulb":
+      return (
+        <svg {...common}>
+          <path d="M9 18h6" />
+          <path d="M10 22h4" />
+          <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5" />
         </svg>
       );
     case "drag":
