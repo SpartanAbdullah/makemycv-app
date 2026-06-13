@@ -14,7 +14,7 @@
  * UNIVERSAL skills suit any UAE role; FAMILY skills are layered in when the
  * job title matches, reusing the same RoleFamily keys as ideaSuggestions.
  */
-import type { RoleFamily } from "./ideaSuggestions";
+import { matchesRoleKeyword, type RoleFamily } from "./ideaSuggestions";
 
 // Soft skills relevant to virtually every UAE role, regardless of function.
 export const UNIVERSAL_SOFT_SKILLS: string[] = [
@@ -48,15 +48,20 @@ const FAMILY_SOFT_SKILLS: Partial<Record<RoleFamily, string[]>> = {
   customerservice: ["Active Listening", "Patience", "Multilingual Communication", "De-escalation"],
 };
 
+// Keywords follow the same trailing-space whole-word convention as
+// ideaSuggestions (see matchesRoleKeyword): short/ambiguous abbreviations carry
+// a trailing space ("ops ", "hr ", "pro ") so they only match a standalone word
+// — e.g. "pro " must not leak into "process", nor "hr " into "through". Longer,
+// unambiguous keywords stay plain substrings.
 const FAMILY_KEYWORDS: Array<{ family: RoleFamily; keywords: string[] }> = [
   { family: "sales", keywords: ["sales", "business development", "account", "relationship manager"] },
   { family: "marketing", keywords: ["marketing", "digital", "brand", "social media", "content", "seo"] },
   { family: "finance", keywords: ["finance", "financial", "fp&a", "treasury", "investment"] },
   { family: "accounting", keywords: ["account", "audit", "bookkeep", "ledger", "vat", "tax"] },
-  { family: "operations", keywords: ["operations", "operation", "general manager", "coo", "ops"] },
+  { family: "operations", keywords: ["operations", "operation", "general manager", "coo", "ops "] },
   { family: "logistics", keywords: ["logistics", "supply chain", "procurement", "warehouse", "fleet"] },
-  { family: "hr", keywords: ["hr", "human resources", "recruit", "talent", "people"] },
-  { family: "admin", keywords: ["admin", "secretary", "assistant", "pro", "office", "coordinator", "reception"] },
+  { family: "hr", keywords: ["hr ", "human resources", "recruit", "talent", "people"] },
+  { family: "admin", keywords: ["admin", "secretary", "assistant", "pro ", "public relations", "office", "coordinator", "reception"] },
   { family: "engineering", keywords: ["engineer", "construction", "civil", "mechanical", "electrical", "mep", "site"] },
   { family: "it", keywords: ["developer", "software", "data", "system", "network", "devops", "programmer"] },
   { family: "hospitality", keywords: ["hospitality", "hotel", "f&b", "chef", "restaurant", "guest", "concierge"] },
@@ -86,7 +91,7 @@ export function softSkillSuggestions(
   let familySkills: string[] = [];
   if (title) {
     const match = FAMILY_KEYWORDS.find((f) =>
-      f.keywords.some((kw) => title.includes(kw)),
+      f.keywords.some((kw) => matchesRoleKeyword(title, kw)),
     );
     if (match) familySkills = FAMILY_SOFT_SKILLS[match.family] ?? [];
   }

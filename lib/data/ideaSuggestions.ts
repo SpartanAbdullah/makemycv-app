@@ -40,7 +40,10 @@ export type RoleFamily =
 type RoleMatcher = {
   family: RoleFamily;
   label: string;
-  // Lowercased substrings tested against the job title.
+  // Lowercased keywords tested against the job title (see matchesRoleKeyword).
+  // A keyword that ends with a SPACE ("pro ", "bd ", "gm ", "ops ") is a
+  // whole-word marker — matched only as a standalone word. Keywords without a
+  // trailing space ("sales", "account", "engineer") are plain substrings.
   keywords: string[];
   bullets: string[];
 };
@@ -138,7 +141,7 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "admin",
     label: "Administration & PRO",
-    keywords: ["admin", "secretary", "executive assistant", "pro ", "office manager", "coordinator", "receptionist"],
+    keywords: ["admin", "secretary", "executive assistant", "pro ", "public relations", "office manager", "coordinator", "receptionist"],
     bullets: [
       "Processed visa, Emirates ID, and labour-card renewals via Tasheel and GDRFA for __ employees.",
       "Coordinated diaries, travel, and meetings for __ senior executives across time zones.",
@@ -261,6 +264,29 @@ export type IdeaMatch = {
 };
 
 /**
+ * Whole-word-aware keyword test honoring the trailing-space convention.
+ *
+ * A keyword that ends with a space (e.g. "pro ", "bd ", "gm ", "ops ", and in
+ * other families "it ", "qa ", "hr ", "kg ") is a whole-word marker: it must
+ * match a standalone word in the title, never a substring of a larger word —
+ * so "pro " fires on the title "PRO" but NOT on "Process Excellence Manager".
+ * Keywords without a trailing space ("sales", "account", "engineer") stay
+ * plain substrings, as intended.
+ *
+ * The previous implementation did `title.includes(kw.trim())`, which stripped
+ * the marker space and let "pro " leak into "process", "bd " into "brand", etc.
+ *
+ * @param title    already lowercased + trimmed job title
+ * @param keyword  a keyword from a role family's list (may carry a trailing space)
+ */
+export function matchesRoleKeyword(title: string, keyword: string): boolean {
+  if (keyword.endsWith(" ")) {
+    return ` ${title} `.includes(` ${keyword.trim()} `);
+  }
+  return title.includes(keyword);
+}
+
+/**
  * Returns role-matched idea bullets for a job title. Falls back to GENERIC
  * when the title is empty or unmatched, so the panel is never empty.
  *
@@ -277,7 +303,7 @@ export function suggestionsForRole(
   let match: RoleMatcher | undefined;
   if (title) {
     match = ROLE_LIBRARY.find((r) =>
-      r.keywords.some((kw) => title.includes(kw.trim())),
+      r.keywords.some((kw) => matchesRoleKeyword(title, kw)),
     );
   }
 
