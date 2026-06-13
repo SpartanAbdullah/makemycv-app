@@ -66,7 +66,8 @@ const SYSTEM_PROMPT =
   "jobTitle (string), hardSkills (string[]), tools (string[]), certifications " +
   "(string[]), softSkills (string[]), keywords (string[]). Each array max 12 items, " +
   "each item max 5 words. keywords = important domain terms not already in the other " +
-  "buckets.";
+  "buckets. Where the JD states a requirement with a specific phrase, use that " +
+  "phrase's exact wording from the text (so it can be located in the description).";
 
 function buildUser(jobText: string): string {
   return (

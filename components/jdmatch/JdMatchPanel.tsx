@@ -18,7 +18,9 @@ import {
   type JdCategoryResult,
 } from "../../lib/jdMatch/types";
 import type { CvExperience } from "../../lib/types/cv";
+import { buildHeatmap } from "../../lib/jdMatch/heatmap";
 import { JdCvPreview, type JdChange } from "./JdCvPreview";
+import { JdHeatmap } from "./JdHeatmap";
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -55,6 +57,9 @@ export const JdMatchPanel = () => {
   const setData = useCvStore((s) => s.setData);
   const { run, requirements, isLoading, error, clear } = useJdMatch();
   const [jobText, setJobText] = useState("");
+  // The exact JD text we analysed, snapshotted at analyse time, so the heatmap
+  // highlights against the analysed text even if the user edits the box after.
+  const [analyzedText, setAnalyzedText] = useState("");
   const [weave, setWeave] = useState<{ category: JdCategory; term: string } | null>(null);
   // Staged fixes (committed only on Accept all). The working CV = base + these.
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
@@ -106,6 +111,27 @@ export const JdMatchPanel = () => {
     [requirements, workingCv],
   );
 
+  // Heatmap of the analysed JD (terms located in the text). Recomputes with the
+  // result, so spans flip green as fixes stage.
+  const heatmap = useMemo(
+    () => (result && analyzedText ? buildHeatmap(analyzedText, result.terms) : null),
+    [result, analyzedText],
+  );
+
+  // Categories shown as chips BELOW the heatmap = only the terms NOT already
+  // highlighted in the JD text (so every term appears exactly once).
+  const unlocatedCategories = useMemo(() => {
+    if (!result) return [];
+    const located = heatmap?.located ?? new Set<string>();
+    return result.categories
+      .map((cat) => ({
+        ...cat,
+        matched: cat.matched.filter((t) => !located.has(t)),
+        missing: cat.missing.filter((t) => !located.has(t)),
+      }))
+      .filter((c) => c.matched.length + c.missing.length > 0);
+  }, [result, heatmap]);
+
   // Only roles with a non-empty bullet are weave targets — we never rewrite an
   // empty bullet (that would be fabricating). Read from the working CV so a
   // weave operates on already-staged text.
@@ -139,6 +165,7 @@ export const JdMatchPanel = () => {
     setLastChange(null);
     setSavedCount(null);
     setMobileView("work");
+    setAnalyzedText(jobText.trim());
     run(jobText.trim());
   };
 
@@ -535,6 +562,17 @@ export const JdMatchPanel = () => {
                     </p>
                   )}
 
+                  {/* JD heatmap — read the job with your matches highlighted */}
+                  {heatmap && heatmap.located.size > 0 && (
+                    <JdHeatmap
+                      segments={heatmap.segments}
+                      fixable={fixable}
+                      weaveDisabled={weavableRoles.length === 0}
+                      onAdd={handleAdd}
+                      onWeave={(category, term) => setWeave({ category, term })}
+                    />
+                  )}
+
                   {/* Helper / locked CTA */}
                   {hydrated && isPro && hasGaps && (
                     <p style={{ fontSize: 12.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: 0 }}>
@@ -615,20 +653,39 @@ export const JdMatchPanel = () => {
                     )
                   )}
 
-                  {/* Categories with per-chip fixes */}
-                  {result.categories.map((cat) => (
-                    <CategoryBlock
-                      key={cat.category}
-                      cat={cat}
-                      fixable={fixable}
-                      weaveDisabled={weavableRoles.length === 0}
-                      activeWeaveTerm={weave?.term ?? null}
-                      onAdd={handleAdd}
-                      onWeave={(category, term) => {
-                        setWeave({ category, term });
-                      }}
-                    />
-                  ))}
+                  {/* Remaining terms not found verbatim in the JD text, as chips.
+                      (Located terms live in the heatmap above — no duplication.) */}
+                  {unlocatedCategories.length > 0 && (
+                    <>
+                      {heatmap && heatmap.located.size > 0 && (
+                        <p
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            color: "var(--ff-faint)",
+                            margin: "2px 0 -4px",
+                          }}
+                        >
+                          Also detected (not worded the same in the JD)
+                        </p>
+                      )}
+                      {unlocatedCategories.map((cat) => (
+                        <CategoryBlock
+                          key={cat.category}
+                          cat={cat}
+                          fixable={fixable}
+                          weaveDisabled={weavableRoles.length === 0}
+                          activeWeaveTerm={weave?.term ?? null}
+                          onAdd={handleAdd}
+                          onWeave={(category, term) => {
+                            setWeave({ category, term });
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
 
                   {/* Inline bullet weaver (truthful AI rewrite of one bullet) */}
                   {weave && fixable && weavableRoles.length > 0 && (
