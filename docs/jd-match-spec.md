@@ -8,7 +8,7 @@ A UAE job seeker applies to many roles with one CV. They can't tell how well the
 
 ## Phases
 - **Phase A (free, ships now):** *Diagnosis only.* Paste a JD → get a match score (0–100) + the keywords/skills the JD wants, split into **matched** and **missing**, grouped by category (hard skills, tools/software, soft skills, certifications, other keywords). No edits applied.
-- **Phase B (Pro, later):** one-click "apply fix" actions (add missing skill, rewrite a bullet to include a keyword). Requires the paid tier + stable bullet IDs. Out of scope now; UI shows a non-functional teaser only.
+- **Phase B (Pro, SHIPPED 2026-06-13):** one-click "apply fix" actions on each *missing* chip. Two fix types: **Add to CV** — local, deterministic, no AI — inserts a missing skill/tool/soft-skill/keyword as a `CvSkill` (level `intermediate`) or a missing certification as a `CvCertification` (issuer blank), deduped case-insensitively; and **Weave into a bullet** (hard skills + keywords) — sends only `{ bullet, keyword, roleTitle }` to `POST /api/jd-match/rewrite-bullet` (Haiku) for a truthful rewrite that **never fabricates** (returns `[]` when the keyword can't be added without inventing experience), reviewed then applied by the user. Gated behind `isPro` (force-true today). The result re-matches the live CV after every fix so the score and chips update instantly.
 - **Phase C (later):** caching, history, multi-JD compare.
 
 ## Privacy / PDPL (decided)
@@ -37,6 +37,12 @@ A UAE job seeker applies to many roles with one CV. They can't tell how well the
 - Rate limit returns the same friendly 429 + Ko-fi support copy.
 - Type-clean; deterministic matcher unit-sanity-checked.
 
-## Open for Phase B
-- Stable bullet IDs (already present: `CvExperience.id`; bullets are index-addressed — need per-bullet IDs for "apply fix").
-- Pro gating reuses the retained `isPro` scaffolding.
+## Phase B — addressing decision (shipped)
+- **Bullets are addressed by `{ experienceId, bulletIndex }`, resolved at apply-time** against the live store CV. We deliberately did **not** migrate bullets to objects-with-ids: that would touch every PDF/DOCX/template render path and the scoring engine. The `{id, index}` pair is resolved the moment "Use this" is clicked (via `lib/jdMatch/applyFix.ts#applyBulletRewrite`), so the only staleness window is a concurrent reorder of the same role's bullets (rare, user-driven, and a no-op or visibly-wrong-and-undoable at worst). Per-bullet stable IDs remain a future refactor if Phase C needs them.
+- **Recompute is reactive:** `useJdMatch` now exposes the extracted `requirements`; the panel derives the result via `useMemo(matchRequirementsToCv(requirements, liveCv))`, so any store mutation (an applied fix) recomputes the score and flips chips — alias resolution included (adding "Excel" matches a "Microsoft Excel" requirement).
+- **Truthfulness:** "Add" is a user-confirmed assertion (their click); "Weave" only ever REPLACES an existing bullet in place (never appends — a new bullet would be a fabricated achievement, and replace-in-place keeps `MAX_BULLETS` intact). The rewrite endpoint's system prompt forbids inventing metrics/tools/dates/certs and returns `[]` rather than force a keyword.
+- **Pro gating** reuses the retained `isPro` scaffolding (force-true today); the locked state is built but not runtime-reachable until the paid tier returns.
+
+## Open for Phase C
+- Per-bullet stable IDs (only if a future feature needs to address a bullet across reorders/edits).
+- Caching, JD history, multi-JD compare.

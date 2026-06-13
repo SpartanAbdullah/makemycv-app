@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { matchRequirementsToCv } from "../lib/jdMatch/match";
-import type { JdMatchResult, JdRequirements } from "../lib/jdMatch/types";
-import type { CvData } from "../lib/types/cv";
+import type { JdRequirements } from "../lib/jdMatch/types";
 
 // Same error shape as useAIImprove so the UI can reuse the rate-limit pattern.
 export type JdMatchError = {
@@ -14,19 +12,24 @@ export type JdMatchError = {
 };
 
 /**
- * JD Match hook (Phase A). Sends ONLY the JD text to the server for
- * extraction, then runs the deterministic matcher against the CV locally —
- * the CV never leaves the browser.
+ * JD Match hook. Sends ONLY the JD text to the server for extraction and
+ * exposes the structured `requirements` — the CV never leaves the browser.
+ *
+ * It deliberately does NOT run the matcher itself: the panel derives the live
+ * result with useMemo(matchRequirementsToCv(requirements, cv)) against the
+ * store CV, so Phase B apply-fixes (which mutate the CV) recompute the score
+ * and flip chips to matched automatically. (Phase A snapshotted the result,
+ * which would have gone stale the moment a fix changed the CV.)
  */
 export function useJdMatch() {
-  const [result, setResult] = useState<JdMatchResult | null>(null);
+  const [requirements, setRequirements] = useState<JdRequirements | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<JdMatchError | null>(null);
 
-  const run = useCallback(async (jobText: string, cv: CvData) => {
+  const run = useCallback(async (jobText: string) => {
     setIsLoading(true);
     setError(null);
-    setResult(null);
+    setRequirements(null);
 
     try {
       const res = await fetch("/api/jd-match", {
@@ -65,8 +68,7 @@ export function useJdMatch() {
         return;
       }
 
-      // Local match — CV stays in the browser.
-      setResult(matchRequirementsToCv(data.requirements, cv));
+      setRequirements(data.requirements);
     } catch {
       setError({ code: "OTHER", message: "Something went wrong analysing the job." });
     } finally {
@@ -75,9 +77,9 @@ export function useJdMatch() {
   }, []);
 
   const clear = useCallback(() => {
-    setResult(null);
+    setRequirements(null);
     setError(null);
   }, []);
 
-  return { run, result, isLoading, error, clear };
+  return { run, requirements, isLoading, error, clear };
 }
