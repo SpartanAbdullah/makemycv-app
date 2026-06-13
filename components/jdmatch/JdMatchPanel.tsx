@@ -19,6 +19,7 @@ import {
   type JdCategoryResult,
 } from "../../lib/jdMatch/types";
 import type { CvExperience } from "../../lib/types/cv";
+import { JdCvPreview, type JdChange } from "./JdCvPreview";
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -58,14 +59,28 @@ export const JdMatchPanel = () => {
   // Which missing term is mid-weave (keyed by term string — chip positions
   // shift as fixes flip terms from missing to matched).
   const [weave, setWeave] = useState<{ category: JdCategory; term: string } | null>(null);
-  // Set after applying a weave whose wording paraphrased the keyword instead
-  // of using it literally, so the term's chip won't flip (the matcher is
-  // literal/alias-based) — we tell the user rather than leave them puzzled.
-  const [weaveNote, setWeaveNote] = useState<string | null>(null);
+  // The most recent applied fix: drives the confirmation note (what + where)
+  // and the flash in the live CV preview. Carries an optional warning when a
+  // woven keyword stayed a paraphrase the literal matcher won't credit.
+  const [lastChange, setLastChange] = useState<JdChange | null>(null);
+  // Side-by-side on desktop; a toggle swaps work / CV below it. Starts false so
+  // SSR and the first client render agree (no hydration mismatch), then the
+  // matchMedia effect upgrades to the split.
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [mobileView, setMobileView] = useState<"work" | "cv">("work");
 
   // Standalone page: hydrate the store ourselves (idempotent). See Phase A.
   useEffect(() => {
     bindCvStorage();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   // Reactive result: re-runs the deterministic matcher against the LIVE store
@@ -89,7 +104,8 @@ export const JdMatchPanel = () => {
   const onAnalyze = () => {
     if (disabled) return;
     setWeave(null);
-    setWeaveNote(null);
+    setLastChange(null);
+    setMobileView("work");
     run(jobText.trim());
   };
 
@@ -98,11 +114,15 @@ export const JdMatchPanel = () => {
   // dedupe case-insensitively.
   const handleAdd = (category: JdCategory, term: string) => {
     const fresh = useCvStore.getState().data;
-    setData(
-      category === "certifications"
-        ? addCertificationToCv(fresh, term)
-        : addSkillToCv(fresh, term),
-    );
+    const isCert = category === "certifications";
+    setData(isCert ? addCertificationToCv(fresh, term) : addSkillToCv(fresh, term));
+    setLastChange({
+      kind: isCert ? "cert" : "skill",
+      text: term,
+      label: isCert
+        ? `Added “${term}” to your Certifications`
+        : `Added “${term}” to your Skills`,
+    });
   };
 
   const handleApplyWeave = (
@@ -110,12 +130,9 @@ export const JdMatchPanel = () => {
     bulletIndex: number,
     text: string,
   ) => {
-    const next = applyBulletRewrite(
-      useCvStore.getState().data,
-      experienceId,
-      bulletIndex,
-      text,
-    );
+    const fresh = useCvStore.getState().data;
+    const role = fresh.experience.find((e) => e.id === experienceId);
+    const next = applyBulletRewrite(fresh, experienceId, bulletIndex, text);
     setData(next);
     // If the woven wording paraphrased the keyword instead of using it
     // literally, the (literal/alias) matcher won't credit it — surface that
@@ -127,11 +144,14 @@ export const JdMatchPanel = () => {
       matchRequirementsToCv(requirements, next).categories.some((c) =>
         c.missing.includes(term),
       );
-    setWeaveNote(
-      stillMissing
-        ? `Applied to your bullet. “${term}” now reads as a close paraphrase rather than the exact keyword, so its chip stays a gap — that's fine for a human reader, but Weave it again and pick the variant that uses “${term}” word-for-word if you want it to count toward the match.`
-        : null,
-    );
+    setLastChange({
+      kind: "bullet",
+      text,
+      label: `Rewrote a bullet in “${role?.role?.trim() || "your experience"}”`,
+      warning: stillMissing
+        ? `Heads up — “${term}” reads as a close paraphrase here, not the exact keyword, so its chip stays a gap. Weave it again and pick the variant that uses “${term}” word-for-word if you want it to count toward the match.`
+        : undefined,
+    });
     setWeave(null);
   };
 
@@ -139,7 +159,46 @@ export const JdMatchPanel = () => {
   const hasGaps = result ? result.matchedCount < result.totalRequirements : false;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
+      {!isDesktop && (
+        <MobileViewToggle value={mobileView} onChange={setMobileView} />
+      )}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          gap: 20,
+          width: "100%",
+          maxWidth: 1500,
+          margin: "0 auto",
+          padding: isDesktop ? "18px 24px 22px" : "12px 16px 16px",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* LEFT — gap-closing work (paste, score, fixes) */}
+        {(isDesktop || mobileView === "work") && (
+          <div
+            className="jd-work"
+            style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 20,
+                maxWidth: 600,
+                margin: "0 auto",
+              }}
+            >
       <div>
         <h1
           style={{
@@ -349,8 +408,9 @@ export const JdMatchPanel = () => {
           )}
           {hydrated && !isPro && hasGaps && <ProLockBanner />}
 
-          {/* Post-apply note when a woven keyword stayed a paraphrase */}
-          {weaveNote && (
+          {/* Confirmation of the most recent applied fix — what changed and
+              where. The CV preview flashes the same change in parallel. */}
+          {lastChange && (
             <div
               style={{
                 display: "flex",
@@ -358,27 +418,57 @@ export const JdMatchPanel = () => {
                 gap: 10,
                 padding: "12px 14px",
                 borderRadius: 10,
-                background: "var(--ff-sunken)",
-                border: "1px solid var(--ff-line)",
+                background: "var(--ff-accent-soft)",
+                border: "1px solid var(--ff-accent-ring)",
               }}
             >
-              <p style={{ flex: 1, fontSize: 12.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: 0 }}>
-                {weaveNote}
-              </p>
+              <span style={{ color: "var(--ff-accent-dark)", marginTop: 1, flexShrink: 0 }}>
+                <Icon name="check" size={14} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, color: "var(--ff-accent-dark)", fontWeight: 600, margin: 0 }}>
+                  {lastChange.label}
+                </p>
+                {lastChange.warning && (
+                  <p style={{ fontSize: 12, color: "var(--ff-muted)", lineHeight: 1.5, margin: "5px 0 0" }}>
+                    {lastChange.warning}
+                  </p>
+                )}
+              </div>
+              {!isDesktop && (
+                <button
+                  type="button"
+                  onClick={() => setMobileView("cv")}
+                  style={{
+                    flexShrink: 0,
+                    background: "none",
+                    border: "none",
+                    color: "var(--ff-accent-dark)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  View in CV →
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setWeaveNote(null)}
+                onClick={() => setLastChange(null)}
+                aria-label="Dismiss"
                 style={{
                   flexShrink: 0,
                   background: "none",
                   border: "none",
                   color: "var(--ff-muted)",
-                  fontSize: 12,
                   cursor: "pointer",
-                  textDecoration: "underline",
+                  display: "inline-flex",
+                  padding: 2,
                 }}
               >
-                Dismiss
+                <Icon name="x" size={13} />
               </button>
             </div>
           )}
@@ -393,7 +483,7 @@ export const JdMatchPanel = () => {
               activeWeaveTerm={weave?.term ?? null}
               onAdd={handleAdd}
               onWeave={(category, term) => {
-                setWeaveNote(null);
+                setLastChange(null);
                 setWeave({ category, term });
               }}
             />
@@ -411,9 +501,78 @@ export const JdMatchPanel = () => {
           )}
         </div>
       )}
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT — the live CV, full A4, updating as fixes apply */}
+        {(isDesktop || mobileView === "cv") && (
+          <div
+            className="jd-preview"
+            style={{ flex: 1.05, minWidth: 0, minHeight: 0, display: "flex" }}
+          >
+            <JdCvPreview lastChange={lastChange} autoFocusOnMount={!isDesktop} />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
+
+/* ─── Mobile work / CV toggle (below the desktop split breakpoint) ───────── */
+const MobileViewToggle = ({
+  value,
+  onChange,
+}: {
+  value: "work" | "cv";
+  onChange: (v: "work" | "cv") => void;
+}) => (
+  <div style={{ display: "flex", justifyContent: "center", padding: "10px 16px 0", flexShrink: 0 }}>
+    <div
+      role="tablist"
+      aria-label="Switch between fixing gaps and your CV"
+      style={{
+        display: "inline-flex",
+        padding: 4,
+        gap: 2,
+        background: "var(--ff-sunken)",
+        border: "1px solid var(--ff-line)",
+        borderRadius: 999,
+      }}
+    >
+      {(["work", "cv"] as const).map((v) => {
+        const active = v === value;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(v)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 18px",
+              borderRadius: 999,
+              border: "none",
+              background: active ? "var(--ff-card)" : "transparent",
+              color: active ? "var(--ff-ink)" : "var(--ff-muted)",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: active ? "0 1px 3px rgba(11,15,12,0.10)" : "none",
+            }}
+          >
+            <Icon name={v === "work" ? "sparkle" : "eye"} size={13} />
+            {v === "work" ? "Fix gaps" : "Your CV"}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
 
 /* ─── Locked-state CTA (renders only when isPro is false) ───────────────────
    isPro is force-true today, so this is dead at runtime; it is built for when

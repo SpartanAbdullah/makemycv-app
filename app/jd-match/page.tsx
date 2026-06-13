@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { JdMatchPanel } from "../../components/jdmatch/JdMatchPanel";
+import { Logo } from "../../components/Logo";
+import { Icon } from "../../components/builder/Icon";
 
 export const metadata: Metadata = {
   title: "JD Match — Check Your CV Against a Job",
@@ -14,14 +17,40 @@ export default function JdMatchPage() {
   return (
     <main
       style={{
-        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
         background: "var(--ff-paper)",
         fontFamily: "var(--font-body)",
+        overflow: "hidden",
       }}
     >
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 24px 80px" }}>
-        <JdMatchPanel />
-      </div>
+      {/* Top bar — brand + a clean way back to the builder (no browser back) */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "0 20px",
+          height: 60,
+          flexShrink: 0,
+          background: "var(--ff-card)",
+          borderBottom: "1px solid var(--ff-line)",
+        }}
+      >
+        <Logo variant="horizontal" height={28} href="/builder" />
+        <Link
+          href="/builder"
+          className="cv-btn-secondary"
+          style={{ padding: "9px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
+        >
+          <Icon name="chevron-left" size={13} />
+          Back to the builder
+        </Link>
+      </header>
+
+      <JdMatchPanel />
     </main>
   );
 }
