@@ -701,6 +701,150 @@ function stripLanguageLevel(name: string): string {
     .trim();
 }
 
+// ── Mis-bucket rescue (two-column header merges) ─────────────────────────────
+//
+// pdf.js linearises two-column layouts so side-by-side section headers can land
+// on ONE text line — e.g. "Languages Certifications" — which detectSection
+// (anchored to a whole-line heading) misses. The section boundary is lost and
+// the interleaved languages + certifications fall into the Skills bucket
+// (founder bug report 2026-06: languages & certs imported as skills). Reading
+// order can't be un-interleaved reliably, so we re-route by CONTENT: a Skills
+// entry that is clearly a language or a certification is moved to the right
+// field, and pure header / date / domain artifacts are dropped. Conservative
+// by design — anything ambiguous stays a skill for the user to fix on the
+// review screen, and a correctly-parsed CV is left untouched.
+
+const KNOWN_LANGUAGES = new Set<string>([
+  "english", "arabic", "urdu", "hindi", "punjabi", "pashto", "persian", "farsi",
+  "dari", "malayalam", "tamil", "telugu", "kannada", "bengali", "bangla",
+  "marathi", "gujarati", "sinhala", "nepali", "tagalog", "filipino", "cebuano",
+  "french", "spanish", "german", "italian", "portuguese", "dutch", "russian",
+  "ukrainian", "polish", "romanian", "greek", "turkish", "mandarin", "chinese",
+  "cantonese", "japanese", "korean", "vietnamese", "thai", "indonesian", "malay",
+  "swahili", "amharic", "tigrinya", "somali", "hausa", "yoruba", "igbo",
+  "afrikaans", "hebrew", "kurdish", "azerbaijani", "uzbek", "kazakh", "sindhi",
+]);
+
+// Only true SECTION-NAME words — deliberately NOT generic skill-ish words like
+// "professional", "development", "training", "expertise", so a real skill made
+// of those (e.g. "Professional Development") is never dropped. A column-merged
+// header is always a pair of section names ("Languages Certifications").
+const HEADING_WORD_RE =
+  /^(?:skills?|languages?|certif(?:ications?|icates?|s)?|certs?|licen[cs]es?|accreditations?|education|experience|projects?|summary|profile|objective|references?|interests?|hobbies|awards?|achievements?|publications?|portfolio|memberships?|volunteering)$/i;
+
+/** A line made up ONLY of section-name words — i.e. a column-merged header pair
+ *  like "Languages Certifications" that leaked into a content bucket. Requires
+ *  ≥2 such words so a single legitimately-named entry isn't dropped. */
+function isHeadingOnlyLine(s: string): boolean {
+  const cleaned = normalizeHeader(s);
+  if (!cleaned || cleaned.length > 50) return false;
+  const tokens = cleaned.split(/\s+/);
+  return tokens.length >= 2 && tokens.length <= 4 && tokens.every((t) => HEADING_WORD_RE.test(t));
+}
+
+/** A single token that is just a cert issuer's website (e.g. "mckinsey.org").
+ *  The TLD allowlist is deliberately narrow — only issuer-style TLDs — so it
+ *  never eats tech-skill tokens like "ASP.NET", "Socket.io", "Node.js". */
+function isBareDomain(s: string): boolean {
+  return /^[\w-]{2,}\.(?:com|org|edu|gov)(?:\.[a-z]{2})?$/i.test(s.trim());
+}
+
+/** If the entry begins with a known language name (before any level/qualifier
+ *  delimiter), return that name in its original casing; else null. Requires the
+ *  HEAD to equal a known language, so multi-word skills like "English Teaching"
+ *  are left alone. */
+function knownLanguageName(s: string): string | null {
+  const head = s.split(/[([:/\-–—]/)[0].trim();
+  return head && KNOWN_LANGUAGES.has(head.toLowerCase()) ? head : null;
+}
+
+/** A proficiency qualifier — only reclassify a language-named Skills entry when
+ *  it carries one (e.g. "English (C1)", "Arabic – Native"), so a bare "Arabic"
+ *  or "Mandarin" listed as a skill is never moved. Two-column language blocks
+ *  almost always show a level, so the real bug case still matches. */
+function hasLevelQualifier(s: string): boolean {
+  return (
+    /[([]/.test(s) ||
+    /\b(?:native|fluent|professional|conversational|elementary|intermediate|advanced|basic|beginner|bilingual|proficient|working)\b/i.test(s) ||
+    /\bmother\s*tongue\b/i.test(s) ||
+    /\b[abc][12]\b/i.test(s)
+  );
+}
+
+/** Conservative certification signal: an explicit credential KEYWORD as a whole
+ *  word. Deliberately NOT "license" (would catch "License Plate Recognition")
+ *  and NOT a trailing "program" (would catch "Affiliate Program" / "Loyalty
+ *  Program") — those broke real skills. A borderline "X Program" stays a skill
+ *  for the user to move on the review screen. */
+function looksLikeCertEntry(s: string): boolean {
+  return /\b(?:certif(?:icate|ication|ied)|diplomas?|accreditation|credential|nanodegree)\b/i.test(
+    s,
+  );
+}
+
+/** Normalised key for cert de-dupe: lowercased, trailing "certificate/
+ *  certification" stripped, so "PMP Certification" (rescued) doesn't duplicate
+ *  a "PMP" already parsed from a real Certifications section. */
+function certKey(name: string): string {
+  return name.toLowerCase().replace(/\s*certif(?:icate|ication)s?\s*$/i, "").trim();
+}
+
+/** Re-route languages/certifications that fell into Skills and drop header /
+ *  date / domain artifacts. Mutates `result`. See block comment above.
+ *
+ *  GATED: runs ONLY when a column-merged section header ("Languages
+ *  Certifications") actually leaked into Skills — the signature of the
+ *  two-column boundary loss this targets. A cleanly-parsed CV has no such line,
+ *  so its Skills are left exactly as the user wrote them (a skill literally
+ *  named "Arabic" or "Affiliate Program" is never touched). */
+function rescueMisbucketedSkills(result: ParsedDocument): void {
+  const skills = result.skills ?? [];
+  if (!skills.some(isHeadingOnlyLine)) return;
+
+  const languages = result.languages ?? [];
+  const certifications = result.certifications ?? [];
+  const langSeen = new Set(languages.map((l) => l.toLowerCase()));
+  const certSeen = new Set(certifications.map((c) => certKey(c.name ?? "")));
+  const kept: string[] = [];
+  const keptSeen = new Set<string>();
+
+  for (const raw of skills) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (isHeadingOnlyLine(s) || isDateOnlyLine(s) || isBareDomain(s)) continue;
+
+    const lang = knownLanguageName(s);
+    if (lang && hasLevelQualifier(s)) {
+      const key = lang.toLowerCase();
+      if (!langSeen.has(key)) {
+        languages.push(lang);
+        langSeen.add(key);
+      }
+      continue;
+    }
+
+    if (looksLikeCertEntry(s)) {
+      const cert = parseCertificationsBlock([s])[0];
+      const key = cert?.name ? certKey(cert.name) : "";
+      if (cert && key && !certSeen.has(key)) {
+        certifications.push(cert);
+        certSeen.add(key);
+      }
+      continue;
+    }
+
+    const key = s.toLowerCase();
+    if (!keptSeen.has(key)) {
+      kept.push(s);
+      keptSeen.add(key);
+    }
+  }
+
+  result.skills = kept;
+  result.languages = languages;
+  result.certifications = certifications;
+}
+
 // ── UAE labeled-field harvesting ─────────────────────────────────────────────
 //
 // GCC CVs routinely carry labeled personal-detail lines ("Visa Status:
@@ -1054,6 +1198,11 @@ export function parseTextToDocument(text: string): ParsedDocument {
   result.languages = flattenList(buffers.languages)
     .map(stripLanguageLevel)
     .filter(Boolean);
+
+  // Two-column PDFs merge section headers onto one line, so languages and
+  // certifications can land in Skills — re-route them by content (see
+  // rescueMisbucketedSkills). No-op on cleanly-parsed CVs.
+  rescueMisbucketedSkills(result);
 
   return result;
 }

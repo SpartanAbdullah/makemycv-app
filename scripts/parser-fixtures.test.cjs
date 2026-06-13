@@ -167,5 +167,46 @@ const run = (name) => {
   check(f, "project description kept as bullet", (d.projects?.[0]?.bullets ?? []).length === 1, d.projects?.[0]?.bullets);
 }
 
+/* ── (f) two-column MERGED headers — languages/certs must NOT become skills ──
+   Founder bug 2026-06: pdf.js glued "Languages" + "Certifications" onto one
+   line, so the section boundary was missed and the interleaved languages and
+   certifications all imported as Skills. The content-based rescue must fix it. */
+{
+  const f = "two-column-merged-headers.txt";
+  const d = run(f);
+  const has = (arr, sub) => arr.some((x) => String(x).toLowerCase().includes(sub.toLowerCase()));
+  const skillsLc = d.skills.map((s) => s.toLowerCase());
+  // The merged "Languages Certifications" header is dropped, not a skill.
+  check(f, "merged header dropped from skills", !has(d.skills, "languages certifications"), d.skills);
+  // Real skills survive.
+  check(f, "real skills kept (Odoo + SQL)", has(d.skills, "Odoo") && has(d.skills, "SQL"), d.skills);
+  // No language / cert / date / domain artifacts left in skills.
+  check(f, "no language entries left in skills", !skillsLc.some((s) => /^(?:english|arabic|urdu)\b/.test(s)), d.skills);
+  check(f, "no certificate left in skills", !has(d.skills, "certificate"), d.skills);
+  check(f, "bare date dropped from skills", !d.skills.includes("April 2025"), d.skills);
+  check(f, "issuer domain dropped from skills", !has(d.skills, "mckinsey.org"), d.skills);
+  // Languages routed to the languages field (names only).
+  check(f, "languages = English/Arabic/Urdu", ["English", "Arabic", "Urdu"].every((l) => d.languages.includes(l)), d.languages);
+  // The clear certificate routes to certifications.
+  check(f, "Google PM certificate routed to certifications", d.certifications.some((c) => /project management professional certificate/i.test(c.name)), d.certifications);
+  // A bare "... Program" is NOT auto-classified as a cert (would over-fire on
+  // real skills like "Affiliate Program"); it stays a skill for the user.
+  check(f, "borderline 'Forward Program' stays a skill (not guessed as a cert)", !d.certifications.some((c) => /forward program/i.test(c.name)) && has(d.skills, "Forward Program"), { skills: d.skills, certs: d.certifications });
+}
+
+/* ── (g) clean CV — rescue must NOT fire (no merged header) ──────────────────
+   Guards the review findings: languages-as-skills ("Arabic", "English") and a
+   real "Affiliate Program" skill must stay in Skills on a cleanly-parsed CV. */
+{
+  const f = "clean-skills-no-rescue.txt";
+  const d = run(f);
+  const has = (arr, sub) => arr.some((x) => String(x).toLowerCase().includes(sub.toLowerCase()));
+  check(f, "language-named skills stay in skills", has(d.skills, "Arabic") && has(d.skills, "English"), d.skills);
+  check(f, "languages NOT invented from skills", (d.languages ?? []).length === 0, d.languages);
+  check(f, "'Affiliate Program' stays a skill", has(d.skills, "Affiliate Program"), d.skills);
+  check(f, "'Affiliate Program' not moved to certifications", !d.certifications.some((c) => /affiliate program/i.test(c.name)), d.certifications);
+  check(f, "real skills intact (Salesforce, Customer Service)", has(d.skills, "Salesforce") && has(d.skills, "Customer Service"), d.skills);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
