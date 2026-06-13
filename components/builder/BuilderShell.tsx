@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { StepStatus } from "./Stepper";
 import { StepBeads } from "./StepBeads";
 import { UAEDot } from "./UAEDot";
@@ -266,9 +267,33 @@ const TopBar = ({
         )}
       </div>
 
-      {/* Right — score chip + templates + download */}
+      {/* Right — score chip + JD match + templates + download */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <ScoreChip report={scoreReport} />
+        {/* Free CV-vs-job diagnosis. Hidden below lg so the bar stays
+            uncluttered on smaller screens; the Review step carries the same
+            entry point for everyone else. */}
+        <Link
+          href="/jd-match"
+          className="hidden lg:inline-flex"
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            color: "var(--ff-ink)",
+            background: "transparent",
+            border: "1px solid var(--ff-line)",
+            padding: "11px 14px",
+            borderRadius: 999,
+            cursor: "pointer",
+            alignItems: "center",
+            gap: 6,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Icon name="lightbulb" size={13} />
+          Check vs job
+        </Link>
         <button
           type="button"
           onClick={onTemplates}

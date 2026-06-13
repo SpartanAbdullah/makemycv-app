@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
@@ -428,6 +429,17 @@ export const ReviewStep = ({
             >
               PDF is best for applications. DOCX is editable.
             </p>
+            {/* Free CV-vs-job diagnosis — a natural next step once the CV is
+                built. Routes to the standalone JD Match page; the CV stays in
+                this browser and only the pasted job text is sent. */}
+            <Link
+              href="/jd-match"
+              className="cv-btn-secondary"
+              style={{ width: "100%", padding: "12px", textDecoration: "none" }}
+            >
+              <Icon name="lightbulb" size={14} />
+              Check against a job
+            </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
             </div>
