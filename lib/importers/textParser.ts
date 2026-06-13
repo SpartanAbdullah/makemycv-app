@@ -220,13 +220,22 @@ function isDateOnlyLine(line: string): boolean {
   return residue.length <= 3;
 }
 
+// Pipe / middot / bullet are pure separators — they never appear inside a real
+// word, so we split on them even when glued to adjacent text. PDF text
+// extraction frequently drops the space before a pipe ("Role| Company"), which
+// previously left role+company fused in one field (and seeded a broken
+// headline). Dash and the word "at" still require surrounding whitespace so
+// hyphenated words ("Co-founder") and "at" inside words stay intact.
+const GLUED_SEP = /[|·•]/;
+const SPACED_SEP = /\s+(?:—|–|-{1,2}|at)\s+/i;
+// Combined splitter: pipe/middot/bullet with optional surrounding space, OR a
+// space-delimited dash / "at".
+const HEADER_SPLIT_RE = /\s*[|·•]\s*|\s+(?:—|–|-{1,2}|at)\s+/i;
+
 function splitHeaderParts(text: string): string[] {
-  // Strong separators: " | ", " · ", " — ", " – ", " - ", " at ", " • ".
-  // We require whitespace on both sides so "Co-founder" stays intact.
-  const STRONG_SEP = /\s+(?:\||·|—|–|-{1,2}|at|•)\s+/i;
   let parts: string[];
-  if (STRONG_SEP.test(text)) {
-    parts = text.split(STRONG_SEP);
+  if (GLUED_SEP.test(text) || SPACED_SEP.test(text)) {
+    parts = text.split(HEADER_SPLIT_RE);
     // DOCX-style "Role  Company" inside a part: also break on 2+ spaces.
     parts = parts.flatMap((p) => p.split(/[ \t]{2,}/));
   } else if (/[ \t]{2,}/.test(text)) {
@@ -455,6 +464,46 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   return entries;
 }
 
+// ── Attestation detection ────────────────────────────────────────────────────
+//
+// UAE CVs list degree attestation under the relevant education entry ("Attested
+// — MOFA"), and the builder models it as `attested` + `attestingBody` on the
+// education record (not a separate block). We fold any attestation line into the
+// preceding entry rather than letting it spawn a phantom degree.
+//
+// The labels below MUST stay byte-identical to ATTESTING_BODIES in
+// components/builder/steps/EducationStep.tsx (en dash "–", curly quote "’") so
+// an imported value selects an existing dropdown option instead of free text.
+const ATTESTING_BODY_OPTIONS: Array<{ re: RegExp; label: string }> = [
+  { re: /\bmofaic\b/i, label: "MOFAIC – Ministry of Foreign Affairs & Int’l Cooperation" },
+  { re: /\bmofa\b|ministry of foreign affairs/i, label: "MOFA – UAE Ministry of Foreign Affairs" },
+  { re: /\bhec\b|higher education commission/i, label: "HEC – Higher Education Commission (Pakistan)" },
+  { re: /\bwes\b|world education services/i, label: "WES – World Education Services (Canada)" },
+  { re: /\bnaric\b|uk enic/i, label: "NARIC – UK ENIC National Recognition" },
+  { re: /\bnoosr\b/i, label: "NOOSR – Australia" },
+  { re: /\bdataflow\b|\bdha\b|\bhaad\b/i, label: "DATAFLOW – Healthcare / DHA / HAAD Verification" },
+  { re: /embassy attestation/i, label: "Embassy Attestation – Home Country" },
+  { re: /\bnotar/i, label: "Notary / Legal Attestation" },
+];
+
+function isAttestationLine(line: string): boolean {
+  return (
+    /\battest(?:ed|ation|s)?\b/i.test(line) ||
+    /\bmofaic?\b/i.test(line) ||
+    /ministry of foreign affairs/i.test(line) ||
+    /\bequivalen(?:cy|ce)\b/i.test(line) ||
+    /\b(?:dataflow|naric|noosr)\b/i.test(line) ||
+    /embassy attestation/i.test(line)
+  );
+}
+
+function matchAttestingBody(line: string): string {
+  for (const { re, label } of ATTESTING_BODY_OPTIONS) {
+    if (re.test(line)) return label;
+  }
+  return "";
+}
+
 // ── Education block parser ───────────────────────────────────────────────────
 
 function parseEducationBlock(lines: string[]): ParsedEducation[] {
@@ -484,6 +533,22 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
+
+    // Attestation lines fold into the current (or most recent) education entry's
+    // attested + attestingBody fields instead of spawning a fake degree entry.
+    // We only fold when there is an entry to attach to — otherwise we let the
+    // line fall through to normal parsing so nothing is silently dropped.
+    if (isAttestationLine(line)) {
+      const target = current ?? entries[entries.length - 1];
+      if (target) {
+        target.attested = true;
+        if (!target.attestingBody) {
+          const body = matchAttestingBody(line);
+          if (body) target.attestingBody = body;
+        }
+        continue;
+      }
+    }
 
     if (isBulletLine(line)) {
       // Bullet inside education = notes / coursework. Append to current notes.
@@ -724,13 +789,25 @@ function parseProjectsBlock(lines: string[]): ParsedProject[] {
     // New project header. "Name — detail" puts the detail into the first
     // bullet so nothing the user wrote is dropped.
     push();
-    const parts = line.split(/\s+(?:—|–|\|)\s+/).map((p) => p.trim());
+    // Detect a link anywhere in the header: an explicit URL first, else a bare
+    // domain ("usehisaab.com") — our exports strip http/www, so project links
+    // arrive as bare domains and used to get stranded inside the name.
+    const urlMatch = line.match(GENERIC_URL_RE) ?? line.match(BARE_DOMAIN_RE);
+    const link = urlMatch
+      ? urlMatch[0].replace(/[.,;:)]+$/, "")
+      : undefined;
+    // Split on glued/spaced separators (pipe/middot/bullet glue-safe), then
+    // drop the link token so it doesn't double up as the name or a bullet.
+    const parts = line
+      .split(/\s*[|·•]\s*|\s+(?:—|–)\s+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const nonLink = parts.filter((p) => !link || p !== link);
     current = {
-      name: parts[0],
-      bullets: parts.slice(1).filter(Boolean),
+      name: nonLink[0] ?? parts[0] ?? "",
+      link,
+      bullets: nonLink.slice(1).filter(Boolean),
     };
-    const url = line.match(GENERIC_URL_RE);
-    if (url) current.link = url[0];
   }
   push();
   return out;
@@ -847,6 +924,37 @@ function harvestContact(lines: string[]): {
     consumed.add(i);
     nameLine = i;
     break;
+  }
+
+  // Headline / tagline: the title line that sits with the name in the header
+  // block (e.g. "Senior Operations Manager", "Odoo Administrator"). The parser
+  // used to drop this into the unplaced bucket; we now lift it into the contact
+  // so it seeds the builder's headline directly. We look just below the name,
+  // skip any already-consumed contact lines, and accept a line that reads like a
+  // job title or carries a title separator ("Accountant | CMA Candidate").
+  if (nameLine >= 0 && !contact.headline) {
+    for (let i = nameLine + 1; i < depth; i++) {
+      if (consumed.has(i)) continue;
+      const line = lines[i]?.trim();
+      if (!line) continue;
+      if (detectSection(line)) break;
+      if (line.length > 90) continue;
+      // Skip contact-value lines — those aren't the headline.
+      if (
+        line.match(EMAIL_RE) ||
+        line.match(GENERIC_URL_RE) ||
+        line.match(BARE_DOMAIN_RE) ||
+        line.match(PHONE_RE)
+      ) {
+        continue;
+      }
+      const titleish = looksLikeRole(line) || /\s[|·•—–]\s/.test(line);
+      if (titleish) {
+        contact.headline = line;
+        consumed.add(i);
+        break;
+      }
+    }
   }
 
   return { contact, nameLine, consumedLines: consumed };

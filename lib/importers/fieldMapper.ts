@@ -96,6 +96,8 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
         startDate: edu.startDate ?? "",
         endDate: edu.endDate ?? "",
         notes: edu.notes ?? "",
+        attested: edu.attested ?? false,
+        attestingBody: edu.attestingBody ?? "",
       }));
   }
 
@@ -179,6 +181,8 @@ export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
     startDate: e.startDate,
     endDate: e.endDate,
     notes: e.notes,
+    attested: e.attested,
+    attestingBody: e.attestingBody,
   })),
   skills: cv.skills.map((s) => s.name).filter(Boolean),
   languages: cv.languages.map((l) => l.name).filter(Boolean),

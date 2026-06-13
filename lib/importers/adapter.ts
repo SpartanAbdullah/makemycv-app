@@ -4,8 +4,10 @@
 
 export type ParsedContact = {
   name?: string;
-  /** Set when the source already carries a headline (e.g. the report→builder
-   *  path round-trips a full CvData); the text parser never extracts one. */
+  /** Professional headline / tagline. Set either when the source already
+   *  carries one (the report->builder path round-trips a full CvData) or when
+   *  the text parser lifts the title line that sits under the name in the
+   *  header block (e.g. "Odoo Administrator"). */
   headline?: string;
   email?: string;
   phone?: string;
@@ -31,6 +33,12 @@ export type ParsedEducation = {
   startDate?: string;
   endDate?: string;
   notes?: string;
+  /** Degree attestation captured from an "Attested - MOFA" line folded into
+   *  this entry (UAE CVs list it under the degree, not as a separate block). */
+  attested?: boolean;
+  /** Canonical attesting-body label, matched to the builder's dropdown
+   *  options when recognisable (e.g. "MOFA - UAE Ministry of Foreign Affairs"). */
+  attestingBody?: string;
 };
 
 export type ParsedCertification = {
@@ -46,7 +54,7 @@ export type ParsedProject = {
 };
 
 /** UAE recruiter-signal fields harvested from labeled lines
- *  ("Visa Status: …", "Nationality: …", "Notice Period: …"). */
+ *  ("Visa Status: ...", "Nationality: ...", "Notice Period: ..."). */
 export type ParsedUaeFields = {
   nationality?: string;
   visaStatus?: string;
@@ -62,21 +70,21 @@ export type ParsedDocument = {
   skills?: string[];
   languages?: string[];
   certifications?: ParsedCertification[];
-  /** Detected Projects section — was silently discarded before the 2026-06
+  /** Detected Projects section - was silently discarded before the 2026-06
    *  wave-3 parser work. */
   projects?: ParsedProject[];
   uae?: ParsedUaeFields;
   /** Header-block lines the parser detected but could not map to any field
    *  (taglines, headlines, decorative text). Surfaced in MappingReview as a
-   *  copyable "we couldn't place this" bucket — never silently dropped. */
+   *  copyable "we couldn't place this" bucket - never silently dropped. */
   unplaced?: string[];
 };
 
-/** Why a parse failed — lets the UI route each failure mode differently
+/** Why a parse failed - lets the UI route each failure mode differently
  *  instead of collapsing everything into an empty review screen
  *  (audit UX-18). */
 export type ImportFailureKind =
-  /** File opened but yielded (almost) no text — typical of scanned/image
+  /** File opened but yielded (almost) no text - typical of scanned/image
    *  PDFs that would need OCR. */
   | "empty-text"
   /** The file could not be opened/decoded at all. */
@@ -92,7 +100,7 @@ export class ImportParseError extends Error {
   }
 }
 
-/** Swappable parser adapter interface — implement to add new import sources.
+/** Swappable parser adapter interface - implement to add new import sources.
  *  parse() THROWS ImportParseError on failure (it used to swallow errors and
  *  resolve `{}`, which made every failure look like an empty success). */
 export interface ImportAdapter {

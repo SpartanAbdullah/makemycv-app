@@ -1,0 +1,24 @@
+Abdullah Muhammad
+Odoo Administrator
+sendmailtoabdullah@example.com | +971 56 910 9798 | Dubai, UAE | linkedin.com/in/abdullah2431 | makemycv.ae
+
+Summary
+IT and operations specialist administering Odoo across sales, purchase and inventory for a UAE trading company.
+
+Experience
+Odoo Administrator| Interior360 General Trading LLC    Jan 2024 – Present
+Dubai, UAE
+• Administer Odoo 17 across sales, purchase, inventory and manufacturing
+• Resolved purchase-order sequencing and helpdesk dashboard issues
+
+Education
+BBA | University of Karachi    2014 – 2018
+Attested | MOFA
+UAE Ministry of Foreign Affairs
+
+Projects
+Hisaab | usehisaab.com
+• Built an app for expats to manage their expenses, splits and shared accommodation costs
+
+Skills
+Odoo, SQL, Operations

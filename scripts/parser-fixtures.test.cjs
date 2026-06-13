@@ -74,7 +74,8 @@ const run = (name) => {
   check(f, "5 skills", d.skills.length === 5, d.skills);
   check(f, "3 languages, levels stripped", d.languages.length === 3 && d.languages.includes("English") && d.languages.includes("Arabic"), d.languages);
   check(f, "certification PMP/PMI/2023", d.certifications[0]?.name === "PMP" && d.certifications[0]?.issuer === "PMI" && (d.certifications[0]?.date ?? "").includes("2023"), d.certifications[0]);
-  check(f, "headline lands in the unplaced bucket, not dropped", (d.unplaced ?? []).includes("Senior Operations Manager"), d.unplaced);
+  check(f, "headline extracted to contact.headline", d.contact.headline === "Senior Operations Manager", d.contact.headline);
+  check(f, "headline no longer in unplaced", !(d.unplaced ?? []).includes("Senior Operations Manager"), d.unplaced);
 }
 
 /* ── (b) two-column, pdf.js-linearized ──────────────────────────────────── */
@@ -125,7 +126,8 @@ const run = (name) => {
   // Projects section is no longer silently discarded (new in wave 3)
   check(f, "2 projects kept", (d.projects ?? []).length === 2, d.projects);
   check(f, "project 1 name + detail-as-bullet", (d.projects?.[0]?.name ?? "") === "Dubai Hills Mall fit-out" && (d.projects?.[0]?.bullets ?? []).length === 1, d.projects?.[0]);
-  check(f, "headline in unplaced bucket", (d.unplaced ?? []).includes("Procurement Specialist"), d.unplaced);
+  check(f, "headline extracted to contact.headline", d.contact.headline === "Procurement Specialist", d.contact.headline);
+  check(f, "headline no longer in unplaced", !(d.unplaced ?? []).includes("Procurement Specialist"), d.unplaced);
 }
 
 /* ── (d) scanned / near-empty text layer ────────────────────────────────── */
@@ -138,6 +140,31 @@ const run = (name) => {
   check(f, "no summary", (d.summary ?? "") === "", d.summary);
   check(f, "no email/phone", !d.contact.email && !d.contact.phone, d.contact);
   check(f, "garbage lines preserved in unplaced (not invented as fields)", (d.unplaced ?? []).length === 2, d.unplaced);
+}
+
+/* ── (e) glued-pipe UAE export (regression for the 2026-06 import fixes) ──── */
+{
+  const f = "glued-uae-export.txt";
+  const d = run(f);
+  // Bug 3/4 — headline is the tagline under the name, not a seeded role+company.
+  check(f, "headline = tagline under name", d.contact.headline === "Odoo Administrator", d.contact.headline);
+  check(f, "headline not in unplaced", !(d.unplaced ?? []).includes("Odoo Administrator"), d.unplaced);
+  // Bug 3 — glued pipe "Role| Company" splits into role + company.
+  check(f, "exp1 role split off glued pipe", d.experience[0]?.role === "Odoo Administrator", d.experience[0]?.role);
+  check(f, "exp1 company split off glued pipe", d.experience[0]?.company === "Interior360 General Trading LLC", d.experience[0]?.company);
+  check(f, "exp1 current", d.experience[0]?.isCurrent === true, d.experience[0]?.isCurrent);
+  // Bug 1 — attestation folds into the education entry, no phantom degree.
+  check(f, "single education entry (no attestation entry)", d.education.length === 1, d.education.length);
+  check(f, "education degree BBA", (d.education[0]?.degree ?? "").includes("BBA"), d.education[0]?.degree);
+  check(f, "education school Karachi", (d.education[0]?.school ?? "").includes("Karachi"), d.education[0]?.school);
+  check(f, "education attested flag", d.education[0]?.attested === true, d.education[0]?.attested);
+  check(f, "education attesting body = MOFA dropdown label", d.education[0]?.attestingBody === "MOFA – UAE Ministry of Foreign Affairs", d.education[0]?.attestingBody);
+  check(f, "attestation text not in school/degree of a second entry", d.education.every((e) => !/attested/i.test(e.school ?? "") && !/attested/i.test(e.degree ?? "")), d.education);
+  // Bug 2 — bare-domain project link lands in link, name stays clean.
+  check(f, "1 project", (d.projects ?? []).length === 1, d.projects?.length);
+  check(f, "project name without the link", d.projects?.[0]?.name === "Hisaab", d.projects?.[0]?.name);
+  check(f, "project link = bare domain", d.projects?.[0]?.link === "usehisaab.com", d.projects?.[0]?.link);
+  check(f, "project description kept as bullet", (d.projects?.[0]?.bullets ?? []).length === 1, d.projects?.[0]?.bullets);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);
