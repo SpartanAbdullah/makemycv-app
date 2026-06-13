@@ -1,10 +1,55 @@
 # JD Match — Evidence pass (keystone spec)
 
 > Draft 2026-06-13. The strategic "stop selling a score, sell evidence" redesign.
-> This doc specifies **only the keystone**: the bullet-evidence pass + the third
-> `evidenced` chip state. The other moves (named-vs-demonstrated dot, refusal
-> trust card, tiered batch, per-application versions) build on this and are
-> scoped in their own follow-ups — see *Out of scope* below.
+> This doc specifies the keystone: the third `evidenced` chip state. The other
+> moves (named-vs-demonstrated dot, refusal trust card, tiered batch,
+> per-application versions) build on this and are scoped in their own follow-ups.
+
+## ⚠️ Status — deterministic version built, reviewed, and REVERTED (2026-06-13)
+
+The **deterministic** (client-side, lexical) bullet-evidence detector below was
+built, unit-tested, live-verified, then **reverted after adversarial review
+proved it cannot be both safe and useful**. Recorded here so we don't rebuild
+the same dead end.
+
+- **What broke:** the matcher located a requirement in a bullet by token
+  proximity (all significant stems within a small window). With no order /
+  phrase-boundary constraint this produced realistic **false "you already prove
+  this"** claims — the one error this feature must never make:
+  - "machine learning" ⇐ *"…washing **machine**; **learning** curve was steep…"*
+  - "network engineering" ⇐ *"attended a **network** event; met an **engineer**…"*
+  - "financial analysis" ⇐ *"owned financial close; a junior **analyst** supported…"*
+- **Why it can't be patched:** tightening to contiguous/in-order to kill those
+  also rejects the *legitimate* rewordings (e.g. "infrastructure management" ⇐
+  *"managing the company's IT infrastructure"* — reordered and 3 words apart).
+  Distinguishing "managing … infrastructure" (real) from "washing machine …
+  learning" (coincidence) is a **semantic** judgment; lexical proximity is
+  either unsafe (loose) or near-useless (strict, ~redundant with literal match).
+- **Also surfaced (pre-existing, not introduced):** `corpusHas` does plain
+  substring containment for multi-word phrases, so punctuation that
+  `normalizeText` strips can glue unrelated words ("washing machine; learning
+  curve" → "machine learning" literal match). Worth a separate look.
+
+### The evidenced state needs SEMANTIC detection (LLM) — a founder decision
+
+The honest, safe version asks an LLM, for each missing requirement: *"does any
+of these bullets unambiguously demonstrate this? default to NO."* (refuse-first,
+same discipline as the bullet rewriter). This catches real rewordings without
+false positives.
+
+**But it changes the privacy posture and must be decided before building:** the
+matcher is currently **100% client-side** — only `{ jobText }` ever leaves the
+browser, and the UI promises "your CV stays in your browser". A semantic
+detector would send **experience bullets** to the server on analysis. Options:
+1. **Explicit + disclosed** — send bullets only when the user opts in ("find
+   skills you already show"), with copy that says the bullets are sent; or
+2. **Skip evidenced** for now and build a presentation concept (e.g. the JD
+   Heatmap) on the solid matched/missing data we already have; or
+3. Drop the evidenced state entirely.
+
+Everything below is the original deterministic plan, kept for reference only.
+
+---
 
 ## Problem
 
