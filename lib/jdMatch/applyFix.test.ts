@@ -17,8 +17,10 @@ import {
   addCertificationToCv,
   addSkillToCv,
   applyBulletRewrite,
+  applyPendingChanges,
   hasCertification,
   hasSkill,
+  type PendingChange,
 } from "./applyFix";
 import type { CvData } from "../types/cv";
 
@@ -141,5 +143,37 @@ describe("predicates", () => {
     assert.equal(hasSkill(cv, "Power BI"), false);
     assert.equal(hasCertification(cv, "lean six sigma"), true);
     assert.equal(hasCertification(cv, "PMP"), false);
+  });
+});
+
+describe("applyPendingChanges", () => {
+  test("folds skills, certs and a bullet rewrite in order, immutably", () => {
+    const cv = makeCv();
+    const changes: PendingChange[] = [
+      { id: "1", kind: "skill", term: "Power BI" },
+      { id: "2", kind: "cert", term: "PMP" },
+      { id: "3", kind: "bullet", experienceId: "exp-1", bulletIndex: 1, text: "Cut cost 18% via data analysis." },
+    ];
+    const next = applyPendingChanges(cv, changes);
+    assert.ok(next.skills.some((s) => s.name === "Power BI"));
+    assert.ok(next.certifications.some((c) => c.name === "PMP"));
+    assert.equal(next.experience[0].bullets[1], "Cut cost 18% via data analysis.");
+    // base untouched (immutability) — discard is just dropping the list
+    assert.equal(cv.skills.length, 1);
+    assert.equal(cv.certifications.length, 1);
+  });
+
+  test("empty list returns the same base reference", () => {
+    const cv = makeCv();
+    assert.equal(applyPendingChanges(cv, []), cv);
+  });
+
+  test("two rewrites of the same bullet apply in order (last wins)", () => {
+    const cv = makeCv();
+    const next = applyPendingChanges(cv, [
+      { id: "1", kind: "bullet", experienceId: "exp-1", bulletIndex: 0, text: "First." },
+      { id: "2", kind: "bullet", experienceId: "exp-1", bulletIndex: 0, text: "Second." },
+    ]);
+    assert.equal(next.experience[0].bullets[0], "Second.");
   });
 });

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import type { CvData } from "../../lib/types/cv";
 
 /* Preview crash fallback (audit 2026-06-12, gap #2).
  * A template render crash must NOT take the form down with it — the
@@ -75,12 +76,18 @@ export const PreviewPanel = ({
   sticky = true,
   collapsed = false,
   onToggle,
+  data: dataOverride,
 }: {
   sticky?: boolean;
   collapsed?: boolean;
   onToggle?: () => void;
+  /** Render this CV instead of the store's — used by JD Match to preview
+   *  staged-but-not-yet-saved changes without mutating the store. Omit it
+   *  (the builder) to track the live store. */
+  data?: CvData;
 }) => {
-  const data = useCvStore((state) => state.data);
+  const storeData = useCvStore((state) => state.data);
+  const data = dataOverride ?? storeData;
   const updateSection = useCvStore((state) => state.updateSection);
   const templateId = data.settings.templateId;
   const template = useMemo(

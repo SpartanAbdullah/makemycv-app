@@ -87,3 +87,33 @@ export function applyBulletRewrite(
   );
   return { ...cv, experience };
 }
+
+/**
+ * One staged JD-Match fix. Fixes accumulate as pending changes and are only
+ * committed to the store when the user clicks "Accept all" — so they can
+ * review them against the live CV and "Discard all" to revert. Replaying them
+ * over the base CV (applyPendingChanges) is the working CV the preview and the
+ * match score reflect.
+ */
+export type PendingChange =
+  | { id: string; kind: "skill"; term: string }
+  | { id: string; kind: "cert"; term: string }
+  | {
+      id: string;
+      kind: "bullet";
+      experienceId: string;
+      bulletIndex: number;
+      text: string;
+    };
+
+/** Fold an ordered list of staged changes onto a base CV (pure, immutable). */
+export function applyPendingChanges(
+  base: CvData,
+  changes: PendingChange[],
+): CvData {
+  return changes.reduce((cv, ch) => {
+    if (ch.kind === "skill") return addSkillToCv(cv, ch.term);
+    if (ch.kind === "cert") return addCertificationToCv(cv, ch.term);
+    return applyBulletRewrite(cv, ch.experienceId, ch.bulletIndex, ch.text);
+  }, base);
+}

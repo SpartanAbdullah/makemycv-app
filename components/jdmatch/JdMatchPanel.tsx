@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useJdMatch } from "../../hooks/useJdMatch";
 import { useBulletRewrite } from "../../hooks/useBulletRewrite";
 import { matchRequirementsToCv } from "../../lib/jdMatch/match";
-import {
-  addCertificationToCv,
-  addSkillToCv,
-  applyBulletRewrite,
-} from "../../lib/jdMatch/applyFix";
+import { applyPendingChanges, type PendingChange } from "../../lib/jdMatch/applyFix";
+import { createId } from "../../lib/utils/id";
 import { Icon } from "../builder/Icon";
+import { Logo } from "../Logo";
 import {
   JD_BAND_LABELS,
   JD_CATEGORY_LABELS,
@@ -28,10 +27,9 @@ const BAND_COLOR: Record<string, string> = {
   low: "var(--ff-red)",
 };
 
-// Which fix affordance each JD category gets on its MISSING chips. Per the
-// Phase B spec: all non-cert buckets can be added as a skill; certifications
-// add as a certification; hard skills and domain keywords (the ones better
-// evidenced in experience) ALSO offer a truthful bullet "weave".
+// Which fix affordance each JD category gets on its MISSING chips: all non-cert
+// buckets add as a skill; certifications add as a certification; hard skills and
+// domain keywords (better evidenced in experience) ALSO offer a truthful weave.
 const ADD_SKILL_CATEGORIES: JdCategory[] = ["hardSkills", "tools", "softSkills", "keywords"];
 const WEAVE_CATEGORIES: JdCategory[] = ["hardSkills", "keywords"];
 const canAddSkill = (c: JdCategory) => ADD_SKILL_CATEGORIES.includes(c);
@@ -39,35 +37,37 @@ const canAddCert = (c: JdCategory) => c === "certifications";
 const canWeave = (c: JdCategory) => WEAVE_CATEGORIES.includes(c);
 
 /**
- * JD Match panel.
- *  - Phase A: paste a JD → match score + matched/missing keywords by category.
- *  - Phase B: one-click apply-fixes on missing chips — "Add" a skill/cert
- *    (local, instant, deduped) or "Weave" a keyword into a bullet (AI rewrite
- *    that never fabricates). Gated behind isPro. The result is derived live
- *    from the store CV, so every fix recomputes the score and flips chips.
+ * JD Match — split view. Left: paste a JD, see the score + matched/missing
+ * keywords, and apply one-click fixes. Right: the user's live full-A4 CV.
  *
- * Privacy: the CV never leaves the browser. Only the JD text (analyse) and a
- * single bullet+keyword+roleTitle (weave) are ever sent to the server.
+ * Fixes are STAGED, not saved instantly: "Add" and "Weave" push a pending
+ * change that is replayed onto the CV preview (highlighted) and reflected in the
+ * score, but the store is only mutated on "Accept all" — so the user can review
+ * with the eye toggle and "Discard all" to revert. Privacy is unchanged: the CV
+ * never leaves the browser; only JD text and a single bullet+keyword+role are
+ * ever sent.
  */
 export const JdMatchPanel = () => {
+  const router = useRouter();
   const cv = useCvStore((s) => s.data);
   const hydrated = useCvStore((s) => s.hydrated);
   const isPro = useCvStore((s) => s.isPro);
   const setData = useCvStore((s) => s.setData);
   const { run, requirements, isLoading, error, clear } = useJdMatch();
   const [jobText, setJobText] = useState("");
-  // Which missing term is mid-weave (keyed by term string — chip positions
-  // shift as fixes flip terms from missing to matched).
   const [weave, setWeave] = useState<{ category: JdCategory; term: string } | null>(null);
-  // The most recent applied fix: drives the confirmation note (what + where)
-  // and the flash in the live CV preview. Carries an optional warning when a
-  // woven keyword stayed a paraphrase the literal matcher won't credit.
+  // Staged fixes (committed only on Accept all). The working CV = base + these.
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [showChanges, setShowChanges] = useState(true);
+  // Most recent staged change — drives the confirmation note + the CV flash.
   const [lastChange, setLastChange] = useState<JdChange | null>(null);
-  // Side-by-side on desktop; a toggle swaps work / CV below it. Starts false so
-  // SSR and the first client render agree (no hydration mismatch), then the
-  // matchMedia effect upgrades to the split.
+  // Brief "saved to your CV" notice after Accept all.
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  // Split on desktop; a toggle swaps work / CV below. Starts false so SSR and
+  // the first client render agree (no hydration mismatch), then upgrades.
   const [isDesktop, setIsDesktop] = useState(false);
   const [mobileView, setMobileView] = useState<"work" | "cv">("work");
+  const [backPrompt, setBackPrompt] = useState(false);
 
   // Standalone page: hydrate the store ourselves (idempotent). See Phase A.
   useEffect(() => {
@@ -83,45 +83,71 @@ export const JdMatchPanel = () => {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Reactive result: re-runs the deterministic matcher against the LIVE store
-  // CV whenever a fix mutates it, so chips flip to matched (aliases included)
-  // and the score updates with zero extra bookkeeping.
+  // Working CV = base store CV + staged changes (pure replay). The preview and
+  // the score both reflect this so fixes are visible before they are saved.
+  const workingCv = useMemo(
+    () => applyPendingChanges(cv, pendingChanges),
+    [cv, pendingChanges],
+  );
+  const previewCv = showChanges ? workingCv : cv;
+
   const result = useMemo(
-    () => (requirements ? matchRequirementsToCv(requirements, cv) : null),
-    [requirements, cv],
+    () => (requirements ? matchRequirementsToCv(requirements, workingCv) : null),
+    [requirements, workingCv],
   );
 
-  // Roles that have at least one non-empty bullet are the only valid weave
-  // targets — we never "rewrite" an empty bullet (that would be fabricating).
+  // Only roles with a non-empty bullet are weave targets — we never rewrite an
+  // empty bullet (that would be fabricating). Read from the working CV so a
+  // weave operates on already-staged text.
   const weavableRoles = useMemo(
-    () => cv.experience.filter((r) => r.bullets.some((b) => b.trim())),
-    [cv.experience],
+    () => workingCv.experience.filter((r) => r.bullets.some((b) => b.trim())),
+    [workingCv],
   );
 
+  const hasPending = pendingChanges.length > 0;
+  // A human summary of what's staged, so "Accept all (N)" is never opaque —
+  // e.g. after "Clear" removes the per-chip context (review finding).
+  const pendingSummary = pendingChanges
+    .map((c) =>
+      c.kind === "bullet"
+        ? "Rewrite a bullet"
+        : c.kind === "cert"
+          ? `Add certification “${c.term}”`
+          : `Add skill “${c.term}”`,
+    )
+    .join("  ·  ");
   const tooShort = jobText.trim().length < JD_MIN_TEXT;
   const disabled = tooShort || isLoading || !hydrated;
+  const fixable = isPro && hydrated;
+  const hasGaps = result ? result.matchedCount < result.totalRequirements : false;
+  const showWork = isDesktop || mobileView === "work";
+  const showPreview = isDesktop || mobileView === "cv";
 
   const onAnalyze = () => {
     if (disabled) return;
     setWeave(null);
     setLastChange(null);
+    setSavedCount(null);
     setMobileView("work");
     run(jobText.trim());
   };
 
-  // Writes read FRESH store state (avoid stale-closure lost updates when chips
-  // are clicked in quick succession); the applyFix helpers are immutable and
-  // dedupe case-insensitively.
   const handleAdd = (category: JdCategory, term: string) => {
-    const fresh = useCvStore.getState().data;
     const isCert = category === "certifications";
-    setData(isCert ? addCertificationToCv(fresh, term) : addSkillToCv(fresh, term));
+    setSavedCount(null);
+    setShowChanges(true); // a just-applied fix should always be visible
+    setPendingChanges((prev) => [
+      ...prev,
+      isCert
+        ? { id: createId(), kind: "cert", term }
+        : { id: createId(), kind: "skill", term },
+    ]);
     setLastChange({
       kind: isCert ? "cert" : "skill",
       text: term,
       label: isCert
-        ? `Added “${term}” to your Certifications`
-        : `Added “${term}” to your Skills`,
+        ? `Staged: added “${term}” to your Certifications`
+        : `Staged: added “${term}” to your Skills`,
     });
   };
 
@@ -130,24 +156,31 @@ export const JdMatchPanel = () => {
     bulletIndex: number,
     text: string,
   ) => {
-    const fresh = useCvStore.getState().data;
-    const role = fresh.experience.find((e) => e.id === experienceId);
-    const next = applyBulletRewrite(fresh, experienceId, bulletIndex, text);
-    setData(next);
-    // If the woven wording paraphrased the keyword instead of using it
-    // literally, the (literal/alias) matcher won't credit it — surface that
-    // rather than silently leaving the chip a gap after an apply.
+    const change: PendingChange = {
+      id: createId(),
+      kind: "bullet",
+      experienceId,
+      bulletIndex,
+      text,
+    };
+    const role = workingCv.experience.find((e) => e.id === experienceId);
     const term = weave?.term;
+    // Does the woven wording surface the keyword literally? (The matcher is
+    // literal/alias-based; a paraphrase reads well but won't flip the chip.)
+    const nextWorking = applyPendingChanges(cv, [...pendingChanges, change]);
     const stillMissing =
       !!term &&
       !!requirements &&
-      matchRequirementsToCv(requirements, next).categories.some((c) =>
+      matchRequirementsToCv(requirements, nextWorking).categories.some((c) =>
         c.missing.includes(term),
       );
+    setSavedCount(null);
+    setShowChanges(true); // a just-applied fix should always be visible
+    setPendingChanges((prev) => [...prev, change]);
     setLastChange({
       kind: "bullet",
       text,
-      label: `Rewrote a bullet in “${role?.role?.trim() || "your experience"}”`,
+      label: `Staged: rewrote a bullet in “${role?.role?.trim() || "your experience"}”`,
       warning: stillMissing
         ? `Heads up — “${term}” reads as a close paraphrase here, not the exact keyword, so its chip stays a gap. Weave it again and pick the variant that uses “${term}” word-for-word if you want it to count toward the match.`
         : undefined,
@@ -155,8 +188,27 @@ export const JdMatchPanel = () => {
     setWeave(null);
   };
 
-  const fixable = isPro && hydrated;
-  const hasGaps = result ? result.matchedCount < result.totalRequirements : false;
+  const acceptAll = () => {
+    if (!hasPending) return;
+    const n = pendingChanges.length;
+    setData(workingCv); // commit → autosaves → the builder/PDF reflect it
+    setPendingChanges([]);
+    setLastChange(null);
+    setWeave(null);
+    setSavedCount(n);
+  };
+
+  const discardAll = () => {
+    setPendingChanges([]);
+    setLastChange(null);
+    setWeave(null);
+    setSavedCount(null);
+  };
+
+  const goBack = () => {
+    if (hasPending) setBackPrompt(true);
+    else router.push("/builder");
+  };
 
   return (
     <div
@@ -168,27 +220,83 @@ export const JdMatchPanel = () => {
         width: "100%",
       }}
     >
-      {!isDesktop && (
-        <MobileViewToggle value={mobileView} onChange={setMobileView} />
-      )}
+      {/* Top bar — brand + prominent Back (left), change controls (right) */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          rowGap: 8,
+          padding: "10px 20px",
+          flexShrink: 0,
+          background: "var(--ff-card)",
+          borderBottom: "1px solid var(--ff-line)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Logo variant="horizontal" height={26} href={null} />
+          <button
+            type="button"
+            onClick={goBack}
+            className="cv-btn-secondary"
+            style={{ padding: "9px 16px", fontWeight: 600 }}
+          >
+            <Icon name="chevron-left" size={14} />
+            Back to the builder
+          </button>
+        </div>
+        {fixable && (savedCount !== null ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--ff-accent-dark)",
+            }}
+          >
+            <Icon name="check" size={14} />
+            {savedCount} change{savedCount > 1 ? "s" : ""} saved to your CV
+          </span>
+        ) : (
+          <ChangeControls
+            count={pendingChanges.length}
+            summary={pendingSummary}
+            showChanges={showChanges}
+            onToggle={() => setShowChanges((v) => !v)}
+            onAccept={acceptAll}
+            onDiscard={discardAll}
+          />
+        ))}
+      </header>
+
+      {!isDesktop && <MobileViewToggle value={mobileView} onChange={setMobileView} />}
+
       <div
         style={{
           flex: 1,
           minHeight: 0,
           display: "flex",
-          gap: 20,
+          gap: 24,
           width: "100%",
-          maxWidth: 1500,
+          maxWidth: 1760,
           margin: "0 auto",
           padding: isDesktop ? "18px 24px 22px" : "12px 16px 16px",
           boxSizing: "border-box",
         }}
       >
-        {/* LEFT — gap-closing work (paste, score, fixes) */}
-        {(isDesktop || mobileView === "work") && (
+        {/* LEFT — gap-closing work */}
+        {showWork && (
           <div
             className="jd-work"
-            style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden" }}
+            style={
+              isDesktop
+                ? { flex: "0 1 560px", minWidth: 0, overflowY: "auto", overflowX: "hidden" }
+                : { flex: 1, minWidth: 0, width: "100%", overflowY: "auto", overflowX: "hidden" }
+            }
           >
             <div
               style={{
@@ -199,321 +307,541 @@ export const JdMatchPanel = () => {
                 margin: "0 auto",
               }}
             >
-      <div>
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 26,
-            fontWeight: 700,
-            color: "var(--ff-ink)",
-            letterSpacing: "-0.01em",
-            marginBottom: 6,
-          }}
-        >
-          JD Match
-        </h1>
-        <p style={{ fontSize: 14, color: "var(--ff-muted)", lineHeight: 1.55, maxWidth: 560 }}>
-          Paste a job description and see how well your CV matches it — the
-          score, the keywords you already cover, and the ones you&apos;re
-          missing. Your CV stays in your browser; only the job text is sent to
-          analyse it, and it&apos;s never stored.
-        </p>
-      </div>
-
-      {/* Paste box */}
-      <div>
-        <textarea
-          className="cv-input"
-          value={jobText}
-          onChange={(e) => setJobText(e.target.value)}
-          placeholder="Paste the full job description here…"
-          rows={9}
-          style={{
-            width: "100%",
-            resize: "vertical",
-            minHeight: 160,
-            fontFamily: "var(--font-body)",
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 10,
-            gap: 12,
-          }}
-        >
-          <span style={{ fontSize: 12, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
-            {jobText.trim().length} chars
-            {tooShort && jobText.length > 0 ? " · paste a bit more" : ""}
-          </span>
-          <button
-            type="button"
-            onClick={onAnalyze}
-            disabled={disabled}
-            className="cv-btn-primary"
-            style={{
-              padding: "11px 20px",
-              opacity: disabled ? 0.6 : 1,
-              cursor: disabled ? "not-allowed" : "pointer",
-            }}
-          >
-            <Icon name="sparkle" size={13} />
-            {isLoading ? "Analysing…" : "Check match"}
-          </button>
-        </div>
-        {!hydrated && (
-          <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-faint)" }}>
-            Loading your saved CV…
-          </p>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div
-          style={{
-            padding: "12px 14px",
-            borderRadius: 10,
-            background: "#FBEFED",
-            border: "1px solid #F2D2CE",
-          }}
-        >
-          <p style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}>
-            {error.message}
-          </p>
-          {error.code === "RATE_LIMITED" && error.supportUrl ? (
-            <a
-              href={error.supportUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "var(--ff-accent-dark)",
-                textDecoration: "underline",
-                textUnderlineOffset: 2,
-              }}
-            >
-              Support MakeMyCV
-            </a>
-          ) : (
-            <button
-              type="button"
-              onClick={onAnalyze}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "var(--ff-ink)",
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                textDecoration: "underline",
-                textUnderlineOffset: 2,
-              }}
-            >
-              Try again
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Result */}
-      {result && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* Score header (recomputes live as fixes apply) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 18,
-              padding: 18,
-              background: "var(--ff-card)",
-              border: "1px solid var(--ff-line)",
-              borderRadius: 14,
-            }}
-          >
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-                border: `3px solid ${BAND_COLOR[result.band]}`,
-                fontFamily: "var(--font-display)",
-                fontWeight: 700,
-                fontSize: 24,
-                color: "var(--ff-ink)",
-                transition: "border-color 300ms",
-              }}
-            >
-              {result.score}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: BAND_COLOR[result.band],
-                }}
-              >
-                {JD_BAND_LABELS[result.band]}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--ff-muted)", marginTop: 2 }}>
-                {result.matchedCount} of {result.totalRequirements} requirements covered
-                {result.jobTitle ? ` · ${result.jobTitle}` : ""}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={clear}
-              style={{
-                marginLeft: "auto",
-                alignSelf: "flex-start",
-                background: "none",
-                border: "none",
-                color: "var(--ff-muted)",
-                fontSize: 12,
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
-            >
-              Clear
-            </button>
-          </div>
-
-          {/* Fix helper (Pro, unlocked) or locked CTA */}
-          {hydrated && isPro && hasGaps && (
-            <p
-              style={{
-                fontSize: 12.5,
-                color: "var(--ff-muted)",
-                lineHeight: 1.55,
-                margin: 0,
-              }}
-            >
-              Close the gaps without leaving this page: <strong style={{ color: "var(--ff-ink-2)" }}>Add</strong> a
-              missing skill to your CV, or <strong style={{ color: "var(--ff-ink-2)" }}>Weave</strong> a
-              keyword into one of your bullets. Nothing changes until you click —
-              and rewrites only re-word what you already wrote, never inventing
-              anything.
-            </p>
-          )}
-          {hydrated && !isPro && hasGaps && <ProLockBanner />}
-
-          {/* Confirmation of the most recent applied fix — what changed and
-              where. The CV preview flashes the same change in parallel. */}
-          {lastChange && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: "var(--ff-accent-soft)",
-                border: "1px solid var(--ff-accent-ring)",
-              }}
-            >
-              <span style={{ color: "var(--ff-accent-dark)", marginTop: 1, flexShrink: 0 }}>
-                <Icon name="check" size={14} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, color: "var(--ff-accent-dark)", fontWeight: 600, margin: 0 }}>
-                  {lastChange.label}
+              <div>
+                <h1
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 26,
+                    fontWeight: 700,
+                    color: "var(--ff-ink)",
+                    letterSpacing: "-0.01em",
+                    marginBottom: 6,
+                  }}
+                >
+                  JD Match
+                </h1>
+                <p style={{ fontSize: 14, color: "var(--ff-muted)", lineHeight: 1.55 }}>
+                  Paste a job description to see how well your CV matches it.
+                  Apply one-click fixes and watch them appear on your live CV
+                  on the right — they&apos;re <strong style={{ color: "var(--ff-ink-2)" }}>staged for review</strong>,
+                  so nothing is saved until you <strong style={{ color: "var(--ff-ink-2)" }}>Accept all</strong>.
+                  Your CV stays in your browser; only the job text is sent to
+                  analyse it, and it&apos;s never stored.
                 </p>
-                {lastChange.warning && (
-                  <p style={{ fontSize: 12, color: "var(--ff-muted)", lineHeight: 1.5, margin: "5px 0 0" }}>
-                    {lastChange.warning}
+              </div>
+
+              {/* Paste box */}
+              <div>
+                <textarea
+                  className="cv-input"
+                  value={jobText}
+                  onChange={(e) => setJobText(e.target.value)}
+                  placeholder="Paste the full job description here…"
+                  rows={7}
+                  style={{
+                    width: "100%",
+                    resize: "vertical",
+                    minHeight: 130,
+                    fontFamily: "var(--font-body)",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: 10,
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
+                    {jobText.trim().length} chars
+                    {tooShort && jobText.length > 0 ? " · paste a bit more" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onAnalyze}
+                    disabled={disabled}
+                    className="cv-btn-primary"
+                    style={{
+                      padding: "11px 20px",
+                      opacity: disabled ? 0.6 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <Icon name="sparkle" size={13} />
+                    {isLoading ? "Analysing…" : "Check match"}
+                  </button>
+                </div>
+                {!hydrated && (
+                  <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-faint)" }}>
+                    Loading your saved CV…
                   </p>
                 )}
               </div>
-              {!isDesktop && (
-                <button
-                  type="button"
-                  onClick={() => setMobileView("cv")}
+
+              {/* Error */}
+              {error && (
+                <div
                   style={{
-                    flexShrink: 0,
-                    background: "none",
-                    border: "none",
-                    color: "var(--ff-accent-dark)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    whiteSpace: "nowrap",
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "#FBEFED",
+                    border: "1px solid #F2D2CE",
                   }}
                 >
-                  View in CV →
-                </button>
+                  <p style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}>
+                    {error.message}
+                  </p>
+                  {error.code === "RATE_LIMITED" && error.supportUrl ? (
+                    <a
+                      href={error.supportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ff-accent-dark)",
+                        textDecoration: "underline",
+                        textUnderlineOffset: 2,
+                      }}
+                    >
+                      Support MakeMyCV
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onAnalyze}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ff-ink)",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        textUnderlineOffset: 2,
+                      }}
+                    >
+                      Try again
+                    </button>
+                  )}
+                </div>
               )}
-              <button
-                type="button"
-                onClick={() => setLastChange(null)}
-                aria-label="Dismiss"
-                style={{
-                  flexShrink: 0,
-                  background: "none",
-                  border: "none",
-                  color: "var(--ff-muted)",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  padding: 2,
-                }}
-              >
-                <Icon name="x" size={13} />
-              </button>
-            </div>
-          )}
 
-          {/* Categories with per-chip fixes */}
-          {result.categories.map((cat) => (
-            <CategoryBlock
-              key={cat.category}
-              cat={cat}
-              fixable={fixable}
-              weaveDisabled={weavableRoles.length === 0}
-              activeWeaveTerm={weave?.term ?? null}
-              onAdd={handleAdd}
-              onWeave={(category, term) => {
-                setLastChange(null);
-                setWeave({ category, term });
-              }}
-            />
-          ))}
+              {/* Result */}
+              {result && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                  {/* Score header (recomputes live as fixes are staged) */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 18,
+                      padding: 18,
+                      background: "var(--ff-card)",
+                      border: "1px solid var(--ff-line)",
+                      borderRadius: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
+                        border: `3px solid ${BAND_COLOR[result.band]}`,
+                        fontFamily: "var(--font-display)",
+                        fontWeight: 700,
+                        fontSize: 24,
+                        color: "var(--ff-ink)",
+                        transition: "border-color 300ms",
+                      }}
+                    >
+                      {result.score}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: 18,
+                          fontWeight: 600,
+                          color: BAND_COLOR[result.band],
+                        }}
+                      >
+                        {JD_BAND_LABELS[result.band]}
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--ff-muted)", marginTop: 2 }}>
+                        {result.matchedCount} of {result.totalRequirements} requirements covered
+                        {result.jobTitle ? ` · ${result.jobTitle}` : ""}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clear}
+                      style={{
+                        marginLeft: "auto",
+                        alignSelf: "flex-start",
+                        background: "none",
+                        border: "none",
+                        color: "var(--ff-muted)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
 
-          {/* Inline bullet weaver (truthful AI rewrite of one chosen bullet) */}
-          {weave && fixable && weavableRoles.length > 0 && (
-            <BulletWeaver
-              key={weave.term}
-              term={weave.term}
-              roles={weavableRoles}
-              onApply={handleApplyWeave}
-              onClose={() => setWeave(null)}
-            />
-          )}
-        </div>
-      )}
+                  {/* Eye toggle is hiding staged changes — the preview shows
+                      the "before" CV while the score/chips reflect the staged
+                      plan; say so to avoid the two panels looking inconsistent. */}
+                  {!showChanges && hasPending && (
+                    <p
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 12,
+                        color: "var(--ff-muted)",
+                        lineHeight: 1.5,
+                        margin: 0,
+                      }}
+                    >
+                      <Icon name="eye" size={12} />
+                      Preview is showing your CV{" "}
+                      <strong style={{ color: "var(--ff-ink-2)" }}>before</strong> these
+                      fixes — your score already counts the staged changes. Use
+                      “Show changes” to see them applied.
+                    </p>
+                  )}
+
+                  {/* Helper / locked CTA */}
+                  {hydrated && isPro && hasGaps && (
+                    <p style={{ fontSize: 12.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: 0 }}>
+                      <strong style={{ color: "var(--ff-ink-2)" }}>Add</strong> a missing
+                      skill or <strong style={{ color: "var(--ff-ink-2)" }}>Weave</strong> a
+                      keyword into a bullet — each is staged on your CV (right) and
+                      flashed so you can see exactly what changed. Review with the
+                      eye toggle, then Accept all or Discard all up top. Rewrites
+                      only re-word what you already wrote, never inventing anything.
+                    </p>
+                  )}
+                  {hydrated && !isPro && hasGaps && <ProLockBanner />}
+
+                  {/* Most recent staged fix (or the saved confirmation) */}
+                  {savedCount !== null ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "12px 14px",
+                        borderRadius: 10,
+                        background: "var(--ff-accent-soft)",
+                        border: "1px solid var(--ff-accent-ring)",
+                      }}
+                    >
+                      <Icon name="check" size={14} color="var(--ff-accent-dark)" />
+                      <p style={{ flex: 1, fontSize: 13, color: "var(--ff-accent-dark)", fontWeight: 600, margin: 0 }}>
+                        Saved to your CV — these changes are now in your builder.
+                      </p>
+                    </div>
+                  ) : (
+                    lastChange && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          padding: "12px 14px",
+                          borderRadius: 10,
+                          background: "var(--ff-accent-soft)",
+                          border: "1px solid var(--ff-accent-ring)",
+                        }}
+                      >
+                        <span style={{ color: "var(--ff-accent-dark)", marginTop: 1, flexShrink: 0 }}>
+                          <Icon name="check" size={14} />
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, color: "var(--ff-accent-dark)", fontWeight: 600, margin: 0 }}>
+                            {lastChange.label}
+                          </p>
+                          {lastChange.warning && (
+                            <p style={{ fontSize: 12, color: "var(--ff-muted)", lineHeight: 1.5, margin: "5px 0 0" }}>
+                              {lastChange.warning}
+                            </p>
+                          )}
+                        </div>
+                        {!isDesktop && (
+                          <button
+                            type="button"
+                            onClick={() => setMobileView("cv")}
+                            style={{
+                              flexShrink: 0,
+                              background: "none",
+                              border: "none",
+                              color: "var(--ff-accent-dark)",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              textDecoration: "underline",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            View in CV →
+                          </button>
+                        )}
+                      </div>
+                    )
+                  )}
+
+                  {/* Categories with per-chip fixes */}
+                  {result.categories.map((cat) => (
+                    <CategoryBlock
+                      key={cat.category}
+                      cat={cat}
+                      fixable={fixable}
+                      weaveDisabled={weavableRoles.length === 0}
+                      activeWeaveTerm={weave?.term ?? null}
+                      onAdd={handleAdd}
+                      onWeave={(category, term) => {
+                        setWeave({ category, term });
+                      }}
+                    />
+                  ))}
+
+                  {/* Inline bullet weaver (truthful AI rewrite of one bullet) */}
+                  {weave && fixable && weavableRoles.length > 0 && (
+                    <BulletWeaver
+                      key={weave.term}
+                      term={weave.term}
+                      roles={weavableRoles}
+                      onApply={handleApplyWeave}
+                      onClose={() => setWeave(null)}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* RIGHT — the live CV, full A4, updating as fixes apply */}
-        {(isDesktop || mobileView === "cv") && (
+        {/* RIGHT — the live CV, stretched to fill, updating as fixes stage */}
+        {showPreview && (
           <div
             className="jd-preview"
-            style={{ flex: 1.05, minWidth: 0, minHeight: 0, display: "flex" }}
+            style={
+              isDesktop
+                ? { flex: "1 1 0", minWidth: 0, minHeight: 0, display: "flex" }
+                : { flex: 1, minWidth: 0, minHeight: 0, width: "100%", display: "flex" }
+            }
           >
-            <JdCvPreview lastChange={lastChange} autoFocusOnMount={!isDesktop} />
+            <JdCvPreview
+              data={previewCv}
+              lastChange={showChanges ? lastChange : null}
+              autoFocusOnMount={!isDesktop}
+            />
           </div>
         )}
+      </div>
+
+      {backPrompt && (
+        <BackConfirmDialog
+          count={pendingChanges.length}
+          onCancel={() => setBackPrompt(false)}
+          onDiscard={() => {
+            setPendingChanges([]);
+            router.push("/builder");
+          }}
+          onAccept={() => {
+            setData(workingCv);
+            setPendingChanges([]);
+            router.push("/builder");
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ─── Header change controls: eye-toggle + Accept all + Discard all ──────── */
+const ghostPill: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "9px 14px",
+  borderRadius: 999,
+  border: "1px solid var(--ff-line)",
+  background: "var(--ff-paper)",
+  color: "var(--ff-ink)",
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  fontWeight: 600,
+  whiteSpace: "nowrap",
+};
+
+const ChangeControls = ({
+  count,
+  summary,
+  showChanges,
+  onToggle,
+  onAccept,
+  onDiscard,
+}: {
+  count: number;
+  summary: string;
+  showChanges: boolean;
+  onToggle: () => void;
+  onAccept: () => void;
+  onDiscard: () => void;
+}) => {
+  const has = count > 0;
+  const dim = (on: boolean): React.CSSProperties => ({
+    opacity: on ? 1 : 0.45,
+    cursor: on ? "pointer" : "not-allowed",
+  });
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!has}
+        title="Show or hide your staged changes in the preview"
+        style={{ ...ghostPill, ...dim(has) }}
+      >
+        <Icon name="eye" size={14} />
+        {showChanges ? "Hide changes" : "Show changes"}
+      </button>
+      <button
+        type="button"
+        onClick={onAccept}
+        disabled={!has}
+        title={has ? `Save to your CV — ${summary}` : undefined}
+        className="cv-btn-primary"
+        style={{ padding: "9px 14px", ...dim(has) }}
+      >
+        <Icon name="check" size={14} />
+        Accept all{has ? ` (${count})` : ""}
+      </button>
+      <button
+        type="button"
+        onClick={onDiscard}
+        disabled={!has}
+        className="cv-btn-secondary"
+        style={{ padding: "9px 14px", ...dim(has) }}
+      >
+        <Icon name="trash" size={14} />
+        Discard all
+      </button>
+    </div>
+  );
+};
+
+/* ─── Warn-before-leave dialog (staged changes not yet saved) ───────────── */
+const BackConfirmDialog = ({
+  count,
+  onCancel,
+  onDiscard,
+  onAccept,
+}: {
+  count: number;
+  onCancel: () => void;
+  onDiscard: () => void;
+  onAccept: () => void;
+}) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    ref.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      // Trap Tab within the dialog (mirrors ExportGateDialog) so focus can't
+      // reach the still-mounted background controls — honours aria-modal.
+      if (e.key === "Tab" && ref.current) {
+        const focusables = ref.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || active === ref.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, [onCancel]);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        background: "rgba(11,15,12,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Save your staged changes?"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--ff-card)",
+          borderRadius: 16,
+          border: "1px solid var(--ff-line)",
+          boxShadow: "0 18px 48px rgba(11,15,12,0.22)",
+          padding: 24,
+          maxWidth: 440,
+          width: "100%",
+          outline: "none",
+        }}
+      >
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ff-ink)", margin: 0 }}>
+          Save your staged changes?
+        </h2>
+        <p style={{ fontSize: 13.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: "8px 0 20px" }}>
+          You have {count} staged change{count > 1 ? "s" : ""} that aren&apos;t
+          saved to your CV yet. Accept them before leaving, or discard them.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button type="button" onClick={onCancel} className="cv-btn-secondary" style={{ padding: "9px 14px" }}>
+            Cancel
+          </button>
+          <button type="button" onClick={onDiscard} className="cv-btn-secondary" style={{ padding: "9px 14px" }}>
+            Discard &amp; leave
+          </button>
+          <button type="button" onClick={onAccept} className="cv-btn-primary" style={{ padding: "9px 14px" }}>
+            <Icon name="check" size={13} />
+            Accept &amp; leave
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -575,8 +903,8 @@ const MobileViewToggle = ({
 );
 
 /* ─── Locked-state CTA (renders only when isPro is false) ───────────────────
-   isPro is force-true today, so this is dead at runtime; it is built for when
-   the paid tier returns. Honest, no fake urgency, no countdown. */
+   isPro is force-true today, so this is dead at runtime; built for the
+   returning paid tier. Honest, no fake urgency. */
 const ProLockBanner = () => (
   <div
     style={{
@@ -661,12 +989,7 @@ const MissingFix = ({
       ) : (
         <span style={{ display: "inline-flex", gap: 4 }}>
           {showAdd && (
-            <button
-              type="button"
-              title={addTitle}
-              onClick={() => onAdd(category, term)}
-              style={miniBtn}
-            >
+            <button type="button" title={addTitle} onClick={() => onAdd(category, term)} style={miniBtn}>
               <Icon name="plus" size={10} />
               Add
             </button>
@@ -674,11 +997,7 @@ const MissingFix = ({
           {showWeave && (
             <button
               type="button"
-              title={
-                weaveDisabled
-                  ? "Add an experience bullet first"
-                  : `Weave “${term}” into one of your bullets`
-              }
+              title={weaveDisabled ? "Add an experience bullet first" : `Weave “${term}” into one of your bullets`}
               onClick={() => !weaveDisabled && onWeave(category, term)}
               disabled={weaveDisabled}
               style={{
@@ -783,8 +1102,7 @@ const CategoryBlock = ({
 /* ─── Inline bullet weaver ──────────────────────────────────────────────────
    Pick a role + an existing non-empty bullet, ask the server for a truthful
    rewrite that surfaces the keyword (only { bullet, keyword, roleTitle } is
-   sent), review, and apply. An empty result is an honest "can't do that
-   truthfully", not an error. */
+   sent), review, and stage it. An empty result is an honest refusal. */
 const fieldLabelText: React.CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontSize: 10,
@@ -823,19 +1141,14 @@ const BulletWeaver = ({
     longestNonEmpty(roles[0]?.bullets ?? []),
   );
 
-  // On role switch: default to that role's longest bullet and drop stale
-  // variants (they belonged to the previous bullet).
   useEffect(() => {
     if (role) setBulletIndex(longestNonEmpty(role.bullets));
     clear();
-    // role and clear are stable for a given roleId; key the reset on roleId.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleId]);
 
   const bulletOptions = role
-    ? role.bullets
-        .map((text, index) => ({ text, index }))
-        .filter((o) => o.text.trim())
+    ? role.bullets.map((text, index) => ({ text, index })).filter((o) => o.text.trim())
     : [];
   const selectedBullet = role?.bullets[bulletIndex] ?? "";
 
@@ -844,8 +1157,7 @@ const BulletWeaver = ({
     rewrite(selectedBullet, term, role?.role ?? "");
   };
 
-  const refused =
-    variants !== null && variants.length === 0 && !isLoading && !error;
+  const refused = variants !== null && variants.length === 0 && !isLoading && !error;
 
   return (
     <div
@@ -897,7 +1209,6 @@ const BulletWeaver = ({
         </button>
       </div>
 
-      {/* Role selector (only when there is a choice) */}
       {roles.length > 1 && (
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={fieldLabelText}>Role</span>
@@ -923,7 +1234,6 @@ const BulletWeaver = ({
         </label>
       )}
 
-      {/* Bullet picker */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={fieldLabelText}>Which bullet to improve?</span>
         {bulletOptions.map((opt) => {
@@ -944,9 +1254,7 @@ const BulletWeaver = ({
                 padding: "9px 11px",
                 borderRadius: 9,
                 background: "var(--ff-card)",
-                border: selected
-                  ? "1px solid var(--ff-accent)"
-                  : "1px solid var(--ff-line)",
+                border: selected ? "1px solid var(--ff-accent)" : "1px solid var(--ff-line)",
                 cursor: "pointer",
                 width: "100%",
               }}
@@ -954,9 +1262,7 @@ const BulletWeaver = ({
               <span style={{ marginTop: 1, flexShrink: 0, color: selected ? "var(--ff-accent)" : "var(--ff-faint)" }}>
                 <Icon name={selected ? "check" : "plus"} size={11} />
               </span>
-              <span style={{ fontSize: 13, color: "var(--ff-ink-2)", lineHeight: 1.45 }}>
-                {opt.text}
-              </span>
+              <span style={{ fontSize: 13, color: "var(--ff-ink-2)", lineHeight: 1.45 }}>{opt.text}</span>
             </button>
           );
         })}
@@ -978,7 +1284,6 @@ const BulletWeaver = ({
         {isLoading ? "Rewriting…" : variants !== null ? "Suggest again" : "Suggest a rewrite"}
       </button>
 
-      {/* Error (rate-limit / other) */}
       {error && (
         <div style={{ padding: "10px 12px", borderRadius: 9, background: "#FBEFED", border: "1px solid #F2D2CE" }}>
           <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500, margin: 0 }}>{error.message}</p>
@@ -995,19 +1300,17 @@ const BulletWeaver = ({
         </div>
       )}
 
-      {/* Truthful refusal */}
       {refused && (
         <p style={{ fontSize: 12.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: 0 }}>
           We couldn&apos;t add “{term}” to this bullet without inventing
-          something that isn&apos;t there. Try a different bullet, or add it as
-          a skill instead.
+          something that isn&apos;t there. Try a different bullet, or add it as a
+          skill instead.
         </p>
       )}
 
-      {/* Variants */}
       {variants && variants.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={fieldLabelText}>Pick a rewrite to apply</span>
+          <span style={fieldLabelText}>Pick a rewrite to stage</span>
           {variants.map((v, i) => (
             <div
               key={i}
