@@ -10,7 +10,8 @@
     "test:parser": "tsc lib/importers/textParser.ts --outDir .parser-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node scripts/parser-fixtures.test.cjs",
     "test:migrate": "tsc lib/store/migrate.ts lib/store/migrate.test.ts --outDir .migrate-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .migrate-test-build/store/migrate.test.js",
     "test:jdmatch": "tsc lib/jdMatch/match.ts lib/jdMatch/match.test.ts --rootDir lib --outDir .jdmatch-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .jdmatch-test-build/jdMatch/match.test.js",
-    "test:rolematch": "tsc lib/data/ideaSuggestions.ts lib/data/softSkills.ts lib/data/roleMatch.test.ts --rootDir lib --outDir .rolematch-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .rolematch-test-build/data/roleMatch.test.js"
+    "test:rolematch": "tsc lib/data/ideaSuggestions.ts lib/data/softSkills.ts lib/data/roleMatch.test.ts --rootDir lib --outDir .rolematch-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .rolematch-test-build/data/roleMatch.test.js",
+    "test:applyfix": "tsc lib/jdMatch/applyFix.ts lib/jdMatch/applyFix.test.ts --rootDir lib --outDir .applyfix-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .applyfix-test-build/jdMatch/applyFix.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
