@@ -37,7 +37,7 @@ const canAddCert = (c: JdCategory) => c === "certifications";
 const canWeave = (c: JdCategory) => WEAVE_CATEGORIES.includes(c);
 
 /**
- * JD Match — split view. Left: paste a JD, see the score + matched/missing
+ * JD Match — split view . Left: paste a JD, see the score + matched/missing
  * keywords, and apply one-click fixes. Right: the user's live full-A4 CV.
  *
  * Fixes are STAGED, not saved instantly: "Add" and "Weave" push a pending
