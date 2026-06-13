@@ -38,9 +38,10 @@ const CATEGORY_ORDER: JdCategory[] = [
 ];
 
 /**
- * Small alias map so common variants count as a match. Keys and values are
- * normalized (lowercase). If a requirement term equals a key, any of its
- * aliases also counts as present in the CV (and vice-versa).
+ * True synonym / variant groups — fully SYMMETRIC. Every member is the same
+ * thing as the key and as its siblings (Excel = MS Excel = spreadsheets), so a
+ * requirement matching any one of them is satisfied by any other. Keys and
+ * values are normalized (lowercase).
  */
 const ALIASES: Record<string, string[]> = {
   excel: ["microsoft excel", "ms excel", "spreadsheets"],
@@ -53,32 +54,49 @@ const ALIASES: Record<string, string[]> = {
   "google ads": ["adwords", "google adwords"],
   ga4: ["google analytics", "google analytics 4"],
   "google analytics": ["ga4"],
-  sql: ["mysql", "postgresql", "t sql", "pl sql"],
   javascript: ["js", "es6", "ecmascript"],
   typescript: ["ts"],
   "react": ["react.js", "reactjs"],
   "node": ["node.js", "nodejs"],
   ifrs: ["international financial reporting standards"],
   vat: ["value added tax", "fta vat"],
-  "project management": ["pmp", "prince2", "project manager"],
-  crm: ["salesforce", "hubspot", "zoho crm"],
-  erp: ["sap", "oracle erp", "odoo", "ms dynamics", "microsoft dynamics"],
   communication: ["communication skills", "verbal communication", "written communication"],
   leadership: ["team leadership", "people management", "team management"],
   "customer service": ["client service", "customer support", "client relations"],
 };
 
+/**
+ * Category (hypernym) groups — DELIBERATELY ONE-DIRECTIONAL. The key is a broad
+ * category; the values are distinct, non-interchangeable products under it.
+ * A requirement for the CATEGORY is satisfied by any member in the CV
+ * ("CRM" ← a CV that lists "Salesforce"), but a requirement for a SPECIFIC
+ * product is NOT satisfied by a sibling: a JD asking for "Salesforce" must not
+ * be reported covered because the CV mentions "HubSpot", nor "SAP" by "Odoo",
+ * nor the cert "PMP" by the role title "Project Manager". Specific members
+ * therefore expand only to themselves (matched literally).
+ */
+const CATEGORY_MEMBERS: Record<string, string[]> = {
+  crm: ["salesforce", "hubspot", "zoho crm"],
+  erp: ["sap", "oracle erp", "odoo", "ms dynamics", "microsoft dynamics"],
+  "project management": ["pmp", "prince2", "project manager"],
+  sql: ["mysql", "postgresql", "t sql", "pl sql"],
+};
+
 function aliasForms(term: string): string[] {
   const t = normalizeText(term);
   const forms = new Set<string>([t]);
+  // Symmetric synonyms: key → variants, and variant → {key, siblings}.
   if (ALIASES[t]) ALIASES[t].forEach((a) => forms.add(normalizeText(a)));
-  // Reverse lookup: term might be an alias of a canonical key.
   for (const [key, vals] of Object.entries(ALIASES)) {
     if (vals.map(normalizeText).includes(t)) {
       forms.add(normalizeText(key));
       vals.forEach((v) => forms.add(normalizeText(v)));
     }
   }
+  // Category hypernyms: ONLY a requirement that IS the category key expands to
+  // its members ("CRM" → salesforce/hubspot/…). A specific member never pulls
+  // in its key or siblings, so "Salesforce" ≠ "HubSpot".
+  if (CATEGORY_MEMBERS[t]) CATEGORY_MEMBERS[t].forEach((m) => forms.add(normalizeText(m)));
   return [...forms].filter(Boolean);
 }
 
@@ -97,6 +115,95 @@ function corpusHas(paddedCorpus: string, form: string): boolean {
 
 function isMatched(paddedCorpus: string, term: string): boolean {
   return aliasForms(term).some((f) => corpusHas(paddedCorpus, f));
+}
+
+// ── Variant / abbreviation matching ──────────────────────────────────────────
+//
+// The corpus check above is literal (token / phrase containment). Real CVs word
+// the same competency differently — "M365" vs "Microsoft 365", "Odoo
+// Administration" vs "Odoo ERP Administration". So we ALSO compare each
+// requirement against the CV's discrete skill / cert / role phrases by
+// significant-token overlap, after expanding common abbreviations and
+// light-stemming word families (administration↔administrator, etc.).
+// Deliberately conservative: a match needs one phrase's significant tokens to
+// be a SUBSET of the other's, so "java" never matches "javascript" and
+// "Data Engineering" never matches "Data Management".
+
+const ABBREVIATIONS: Array<[RegExp, string]> = [
+  [/\bm[\s-]?365\b/g, "microsoft 365"],
+  [/\bms[\s-]?365\b/g, "microsoft 365"],
+  [/\bo[\s-]?365\b/g, "office 365"],
+  [/\bms office\b/g, "microsoft office"],
+  [/\bms teams\b/g, "microsoft teams"],
+  [/\bms dynamics\b/g, "microsoft dynamics"],
+  [/\bgcp\b/g, "google cloud platform"],
+  [/\bk8s\b/g, "kubernetes"],
+];
+
+// Light, curated stems — collapse a word family to a shared root so
+// "administration"/"administrator" and "management"/"manager" line up. NOT a
+// general stemmer (too false-positive-prone).
+const STEM_RULES: Array<[RegExp, string]> = [
+  [/^admin(?:istrat(?:ion|or|ors|ive)|ister(?:ing)?)?$/, "admin"],
+  [/^manag(?:ement|er|ers|ing|e)$/, "manage"],
+  [/^develop(?:ment|er|ers|ing)?$/, "develop"],
+  [/^engineer(?:ing|s)?$/, "engineer"],
+  [/^analy(?:sis|st|sts|tics|ze|se|zing|sing)$/, "analy"],
+  [/^config(?:uration|ure|uring)?$/, "config"],
+  [/^implement(?:ation|ing|s)?$/, "implement"],
+  [/^operat(?:ions?|ional|e|ing)$/, "operate"],
+];
+
+const TOKEN_STOPWORDS = new Set(["the", "of", "and", "in", "with", "for", "to", "on", "an", "a", "at", "by"]);
+
+function stemToken(t: string): string {
+  for (const [re, rep] of STEM_RULES) if (re.test(t)) return rep;
+  return t;
+}
+
+// A phrase tokenised two ways: `raw` is the significant words after
+// abbreviation expansion but BEFORE stemming; `stem` is the same words with
+// word-families collapsed. We keep both so a variant match can require a
+// verbatim shared anchor (raw) while still aligning families via the stem.
+type TokenSets = { raw: Set<string>; stem: Set<string> };
+
+function tokenize(s: string): TokenSets {
+  let expanded = ` ${normalizeText(s)} `;
+  for (const [re, rep] of ABBREVIATIONS) expanded = expanded.replace(re, ` ${rep} `);
+  const raw = new Set<string>();
+  for (const piece of expanded.split(/\s+/)) {
+    const t = piece.trim();
+    if (t.length < 2 || TOKEN_STOPWORDS.has(t)) continue;
+    raw.add(t);
+  }
+  const stem = new Set<string>();
+  for (const t of raw) stem.add(stemToken(t));
+  return { raw, stem };
+}
+
+function isSubset(small: Set<string>, big: Set<string>): boolean {
+  for (const t of small) if (!big.has(t)) return false;
+  return true;
+}
+
+function variantMatchTokens(a: TokenSets, b: TokenSets): boolean {
+  if (a.stem.size === 0 || b.stem.size === 0) return false;
+  const [small, big] = a.stem.size <= b.stem.size ? [a.stem, b.stem] : [b.stem, a.stem];
+  if (!isSubset(small, big)) return false;
+  // The match must rest on a DISTINCTIVE token (len ≥ 3) the two phrases share
+  // VERBATIM (before stemming) — so stemming only aligns the *other* words
+  // around a real shared anchor. This keeps "Project Manager" ↔ "Project
+  // Management" (shared "project") and "Odoo Administration" ↔ "Odoo ERP
+  // Administration" (shared "odoo"), but rejects "Manager" ↔ "Management",
+  // whose only overlap is the collapsed stem "manage".
+  for (const t of a.raw) if (t.length >= 3 && b.raw.has(t)) return true;
+  return false;
+}
+
+/** True when two skill phrases are the same competency up to wording — used by
+ *  the matcher (requirement ↔ CV phrase) and by add-skill de-dupe. */
+export function skillVariantMatch(a: string, b: string): boolean {
+  return variantMatchTokens(tokenize(a), tokenize(b));
 }
 
 function bandFor(score: number): JdMatchBand {
@@ -127,10 +234,30 @@ export function matchRequirementsToCv(
 ): JdMatchResult {
   const paddedCorpus = ` ${extractCvCorpus(cv)} `;
 
+  // Discrete CV phrases for variant matching (skills, certs, role titles,
+  // headline) — pre-tokenised once so the per-term check is cheap.
+  const cvPhraseTokens = [
+    ...cv.skills.map((s) => s.name),
+    ...cv.certifications.map((c) => c.name),
+    ...cv.experience.map((e) => e.role),
+    cv.personal.headline,
+  ]
+    .map((x) => (x ?? "").trim())
+    .filter(Boolean)
+    .map(tokenize)
+    .filter((ts) => ts.stem.size > 0);
+
+  const variantMatches = (term: string): boolean => {
+    const tt = tokenize(term);
+    if (tt.stem.size === 0) return false;
+    return cvPhraseTokens.some((p) => variantMatchTokens(tt, p));
+  };
+
   const terms: JdTerm[] = [];
   for (const category of CATEGORY_ORDER) {
     for (const term of cleanList(requirements[category])) {
-      terms.push({ term, category, matched: isMatched(paddedCorpus, term) });
+      const matched = isMatched(paddedCorpus, term) || variantMatches(term);
+      terms.push({ term, category, matched });
     }
   }
 

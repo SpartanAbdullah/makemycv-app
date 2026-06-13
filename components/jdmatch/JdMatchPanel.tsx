@@ -91,6 +91,16 @@ export const JdMatchPanel = () => {
   );
   const previewCv = showChanges ? workingCv : cv;
 
+  // Exact texts to tint in the CV preview — each staged skill/cert term and
+  // each rewritten bullet. Empty when changes are hidden.
+  const highlights = useMemo(
+    () =>
+      showChanges
+        ? pendingChanges.map((c) => (c.kind === "bullet" ? c.text : c.term))
+        : [],
+    [showChanges, pendingChanges],
+  );
+
   const result = useMemo(
     () => (requirements ? matchRequirementsToCv(requirements, workingCv) : null),
     [requirements, workingCv],
@@ -645,6 +655,7 @@ export const JdMatchPanel = () => {
           >
             <JdCvPreview
               data={previewCv}
+              highlights={highlights}
               lastChange={showChanges ? lastChange : null}
               autoFocusOnMount={!isDesktop}
             />

@@ -23,13 +23,16 @@
  */
 import type { CvData, CvCertification, CvSkill } from "../types/cv";
 import { createId } from "../utils/id";
+import { skillVariantMatch } from "./match";
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** True if a skill with this name (case-insensitive) already exists. */
+/** True if this skill already exists — case-insensitively OR as a wording
+ *  variant (so "Microsoft 365" is a no-op when the CV already lists "M365",
+ *  and "Odoo Administration" when it lists "Odoo ERP Administration"). */
 export function hasSkill(cv: CvData, term: string): boolean {
   const t = norm(term);
-  return cv.skills.some((s) => norm(s.name) === t);
+  return cv.skills.some((s) => norm(s.name) === t || skillVariantMatch(s.name, term));
 }
 
 /** True if a certification with this name (case-insensitive) already exists. */

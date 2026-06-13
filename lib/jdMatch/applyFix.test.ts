@@ -81,6 +81,11 @@ describe("addSkillToCv", () => {
     assert.equal(addSkillToCv(cv, "   "), cv);
   });
 
+  test("variant de-dupe: 'Microsoft Excel' is a no-op when 'Excel' exists", () => {
+    const cv = makeCv(); // skills include "Excel"
+    assert.equal(addSkillToCv(cv, "Microsoft Excel"), cv, "wording variant not re-added");
+  });
+
   test("does not mutate the input CV", () => {
     const cv = makeCv();
     addSkillToCv(cv, "Kubernetes");
