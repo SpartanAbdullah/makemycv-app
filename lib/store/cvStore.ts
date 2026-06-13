@@ -174,13 +174,17 @@ const PRO_STORAGE_KEY = "makemycv:isPro";
 const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
 const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 
-// TODO: Remove isPro flag entirely in next release — kept for backward compat
-// with localStorage from previous version. See DECISION_LOG.md 2026-05-31
-// (pricing model pivot: paid Pro → free + voluntary support).
+// KEEP — DO NOT REMOVE (decision reversed 2026-06-12, see DECISION_LOG.md).
+// The 2026-05-31 pivot made everything free and flagged isPro for deletion.
+// That deletion is now CANCELLED: trade license obtained June 2026, payments
+// (Stripe + Tap) are back on the roadmap, and this access-state scaffolding
+// (isPro / coupons / proAccessSource) will be revived for the paid tier
+// rather than rebuilt from scratch.
 //
-// Until then: isPro is force-set to `true` so no UI condition can hide a
-// feature. The localStorage keys are still read so we don't trample old user
-// state, but their values no longer gate anything.
+// Current behavior (unchanged): isPro is force-set to `true` so no UI
+// condition can hide a feature while the product is free. localStorage keys
+// are still read so we don't trample old user state, but their values do not
+// gate anything yet.
 const loadAccessState = (): AccessState => {
   if (typeof window === "undefined") {
     return {
@@ -210,7 +214,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
   saveError: false,
-  // TODO: Remove isPro flag in next release. See DECISION_LOG.md 2026-05-31.
+  // KEEP — isPro deletion cancelled 2026-06-12 (paid tier returning).
   isPro: true,
   hasUsedFreeDownload: false,
   appliedCouponCode: "",
@@ -220,9 +224,9 @@ export const useCvStore = create<CvStore>((set, get) => ({
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
     set((state) => ({ data: { ...state.data, [key]: value } })),
-  // TODO: Remove setIsPro in next release. Currently a no-op that always
-  // settles isPro=true; localStorage write preserved so old code paths that
-  // still call it don't crash. See DECISION_LOG.md 2026-05-31.
+  // KEEP — setIsPro deletion cancelled 2026-06-12 (paid tier returning).
+  // Currently a no-op that always settles isPro=true; localStorage write
+  // preserved so old code paths that still call it don't crash.
   setIsPro: (value) => {
     if (typeof window !== "undefined")
       window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
