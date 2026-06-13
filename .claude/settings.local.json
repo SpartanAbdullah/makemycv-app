@@ -23,7 +23,10 @@
       "Bash(npx eslint *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\MuhammadAbdullah\\\\Desktop\\\\makemycv-app\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")",
+      "Bash(git rm *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git commit *)"
     ]
   }
 }
