@@ -292,7 +292,7 @@ const TopBar = ({
           }}
         >
           <Icon name="lightbulb" size={13} />
-          Check vs job
+          Match to a job
         </Link>
         <button
           type="button"

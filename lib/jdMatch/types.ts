@@ -60,9 +60,9 @@ export type JdMatchResult = {
 
 export const JD_BAND_LABELS: Record<JdMatchBand, string> = {
   strong: "Strong match",
-  good: "Good match — close the gaps",
-  partial: "Partial — tailor your CV",
-  low: "Low match — significant gaps",
+  good: "Good match — a few gaps to close",
+  partial: "Partial match — worth tailoring",
+  low: "Low match — see what you can honestly close",
 };
 
 export const JD_MIN_TEXT = 40; // chars; below this we ask for a fuller paste

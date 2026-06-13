@@ -328,15 +328,17 @@ export const JdMatchPanel = () => {
                     marginBottom: 6,
                   }}
                 >
-                  JD Match
+                  Match your CV to a job
                 </h1>
                 <p style={{ fontSize: 14, color: "var(--ff-muted)", lineHeight: 1.55 }}>
-                  Paste a job description to see how well your CV matches it.
-                  Apply one-click fixes and watch them appear on your live CV
-                  on the right — they&apos;re <strong style={{ color: "var(--ff-ink-2)" }}>staged for review</strong>,
+                  Paste a job description and we&apos;ll find the gaps between it
+                  and your CV. Apply one-click fixes and watch them appear on your
+                  live CV on the right — they&apos;re <strong style={{ color: "var(--ff-ink-2)" }}>staged for review</strong>,
                   so nothing is saved until you <strong style={{ color: "var(--ff-ink-2)" }}>Accept all</strong>.
-                  Your CV stays in your browser; only the job text is sent to
-                  analyse it, and it&apos;s never stored.
+                  When the AI rewords a bullet to fit the job it won&apos;t invent
+                  experience — if your wording can&apos;t honestly back the keyword,
+                  it declines. Your CV stays in your browser; only the job text is
+                  sent, and it&apos;s never stored.
                 </p>
               </div>
 
@@ -382,7 +384,7 @@ export const JdMatchPanel = () => {
                     }}
                   >
                     <Icon name="sparkle" size={13} />
-                    {isLoading ? "Analysing…" : "Check match"}
+                    {isLoading ? "Reading the job…" : "Find my gaps"}
                   </button>
                 </div>
                 {!hydrated && (
@@ -458,6 +460,7 @@ export const JdMatchPanel = () => {
                     }}
                   >
                     <div
+                      title="A private tailoring checklist — recruiters never see this score."
                       style={{
                         width: 72,
                         height: 72,
@@ -487,7 +490,7 @@ export const JdMatchPanel = () => {
                         {JD_BAND_LABELS[result.band]}
                       </div>
                       <div style={{ fontSize: 13, color: "var(--ff-muted)", marginTop: 2 }}>
-                        {result.matchedCount} of {result.totalRequirements} requirements covered
+                        You already cover {result.matchedCount} of {result.totalRequirements} — let&apos;s tailor the rest
                         {result.jobTitle ? ` · ${result.jobTitle}` : ""}
                       </div>
                     </div>

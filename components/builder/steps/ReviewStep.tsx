@@ -438,7 +438,7 @@ export const ReviewStep = ({
               style={{ width: "100%", padding: "12px", textDecoration: "none" }}
             >
               <Icon name="lightbulb" size={14} />
-              Check against a job
+              Tailor to a job
             </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
