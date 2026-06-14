@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "../builder/Icon";
 import { WEIGHTS } from "../../lib/jdMatch/match";
 import type { JdCategory, JdTerm } from "../../lib/jdMatch/types";
@@ -62,18 +62,10 @@ export const JdCoach = ({
   /** Rendered in the all-clear state (e.g. the tailored-download CTA). */
   doneCta?: React.ReactNode;
 }) => {
+  // `skipped` is pure user intent for this analysis (reset per new analysis via
+  // the parent's key). A skipped term that is later resolved simply leaves the
+  // gap list; if it ever returns, "Revisit skipped" brings it back.
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
-
-  // Drop any skip once its term is no longer a gap (it got matched elsewhere) —
-  // so if that fix is later discarded, the term returns to the active queue
-  // instead of being stranded under "Revisit skipped".
-  useEffect(() => {
-    const stillMissing = new Set(terms.filter((t) => !t.matched).map((t) => t.term));
-    setSkipped((prev) => {
-      const next = new Set([...prev].filter((s) => stillMissing.has(s)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [terms]);
 
   const total = terms.length;
   const covered = useMemo(() => terms.filter((t) => t.matched).length, [terms]);
