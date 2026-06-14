@@ -236,6 +236,8 @@ export const SkillsStep = ({
             className="cv-input"
             style={{ flex: 1 }}
             placeholder="e.g. Project Management, SAP, AutoCAD"
+            aria-label="Add a skill"
+            spellCheck={false}
             value={inputValue}
             onChange={(e) => {
               setInputValue(sanitizeSkillLive(e.target.value));

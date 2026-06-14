@@ -458,6 +458,7 @@ export const JdMatchPanel = () => {
                   value={jobText}
                   onChange={(e) => setJobText(e.target.value)}
                   placeholder="Paste the full job description here…"
+                  aria-label="Job description"
                   rows={7}
                   style={{
                     width: "100%",

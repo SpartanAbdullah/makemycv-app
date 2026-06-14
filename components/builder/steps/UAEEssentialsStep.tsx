@@ -205,6 +205,7 @@ export const UAEEssentialsStep = ({
             <input
               className="cv-input"
               placeholder="e.g. Emirati, Pakistani, Indian"
+              spellCheck={false}
               {...register("nationality")}
               onChange={(e) => {
                 e.target.value = sanitizeNameLive(e.target.value);
@@ -287,6 +288,9 @@ export const UAEEssentialsStep = ({
                 extrasFilled.linkedin ? "cv-input cv-input-filled" : "cv-input"
               }
               placeholder="linkedin.com/in/yourname"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("linkedin")}
               onBlur={(e) => {
@@ -313,6 +317,9 @@ export const UAEEssentialsStep = ({
                 extrasFilled.website ? "cv-input cv-input-filled" : "cv-input"
               }
               placeholder="www.yourportfolio.com"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("website")}
               onBlur={(e) => {
@@ -337,6 +344,8 @@ export const UAEEssentialsStep = ({
             <input
               className="cv-input"
               placeholder="e.g. United Arab Emirates"
+              autoComplete="country-name"
+              spellCheck={false}
               {...register("country")}
               onChange={(e) => {
                 e.target.value = sanitizeLocationLive(e.target.value);
@@ -353,6 +362,7 @@ export const UAEEssentialsStep = ({
             <input
               className="cv-input"
               placeholder="e.g. 15/03/1990"
+              autoComplete="bday"
               {...register("dateOfBirth")}
             />
           </Field>

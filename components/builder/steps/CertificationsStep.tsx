@@ -204,7 +204,7 @@ export const CertificationsStep = ({
                         label="Issuer"
                         error={errors.certifications?.[index]?.issuer?.message}
                       >
-                        <input className="cv-input" placeholder="e.g. PMI" {...register(`certifications.${index}.issuer`)} />
+                        <input className="cv-input" placeholder="e.g. PMI" autoComplete="organization" spellCheck={false} {...register(`certifications.${index}.issuer`)} />
                       </Field>
                       <Field label="Date">
                         <input className="cv-input" placeholder="e.g. 2024" {...register(`certifications.${index}.date`)} />

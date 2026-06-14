@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type {
   CvCertification,
@@ -289,11 +289,17 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 />
                 <TextField
                   label="Email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={edited.personal?.email ?? ""}
                   onChange={(v) => updatePersonal("email", v)}
                 />
                 <TextField
                   label="Phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={edited.personal?.phone ?? ""}
                   onChange={(v) => updatePersonal("phone", v)}
                 />
@@ -304,11 +310,17 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 />
                 <TextField
                   label="LinkedIn"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
                   value={edited.personal?.linkedin ?? ""}
                   onChange={(v) => updatePersonal("linkedin", v)}
                 />
                 <TextField
                   label="Website"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
                   value={edited.personal?.website ?? ""}
                   onChange={(v) => updatePersonal("website", v)}
                   fullSpan
@@ -419,6 +431,9 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                       />
                       <TextField
                         label="Link"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="url"
                         value={p.link ?? ""}
                         onChange={(v) => updateProject(i, { link: v })}
                       />
@@ -558,28 +573,45 @@ const TextField = ({
   value,
   onChange,
   fullSpan,
+  type,
+  inputMode,
+  autoComplete,
 }: {
   label: string;
   hint?: string;
   value: string;
   onChange: (v: string) => void;
   fullSpan?: boolean;
-}) => (
-  <div className={fullSpan ? "sm:col-span-2" : ""}>
-    <label className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-      {label}
-    </label>
-    <input
-      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-slate-400 focus:outline-none"
-      value={value}
-      dir={getDir(value)}
-      onChange={(e) => onChange(e.target.value)}
-    />
-    {hint ? (
-      <p className="mt-1 text-[11px] leading-snug text-slate-400">{hint}</p>
-    ) : null}
-  </div>
-);
+  type?: "text" | "email" | "tel" | "url";
+  inputMode?: "text" | "email" | "tel" | "url";
+  autoComplete?: string;
+}) => {
+  // Programmatically associate the label with the input (was a bare <label>).
+  const id = useId();
+  return (
+    <div className={fullSpan ? "sm:col-span-2" : ""}>
+      <label
+        htmlFor={id}
+        className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-slate-400 focus:outline-none"
+        value={value}
+        dir={getDir(value)}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {hint ? (
+        <p className="mt-1 text-[11px] leading-snug text-slate-400">{hint}</p>
+      ) : null}
+    </div>
+  );
+};
 
 const Chip = ({
   label,

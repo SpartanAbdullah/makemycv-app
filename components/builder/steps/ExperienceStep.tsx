@@ -432,6 +432,7 @@ export const ExperienceStep = ({
                       <input
                         className="cv-input"
                         placeholder="e.g. Operations Manager"
+                        autoComplete="organization-title"
                         {...register(`experience.${index}.role`)}
                         onChange={(e) => {
                           e.target.value = sanitizeJobTitleLive(e.target.value);
@@ -458,6 +459,8 @@ export const ExperienceStep = ({
                       <input
                         className="cv-input"
                         placeholder="e.g. Emaar Properties"
+                        autoComplete="organization"
+                        spellCheck={false}
                         {...register(`experience.${index}.company`)}
                         onChange={(e) => {
                           e.target.value = sanitizeCompanyNameLive(e.target.value);
@@ -507,6 +510,7 @@ export const ExperienceStep = ({
                       <input
                         className="cv-input"
                         placeholder="e.g. Dubai"
+                        autoComplete="address-level2"
                         {...register(`experience.${index}.location`)}
                         onChange={(e) => {
                           e.target.value = sanitizeLocationLive(e.target.value);
@@ -585,6 +589,7 @@ export const ExperienceStep = ({
                       >
                         <AutoGrowTextarea
                           placeholder="What did you achieve? Start with a verb, add a number."
+                          aria-label={`Achievement ${bulletIndex + 1}`}
                           className="cv-input cv-textarea"
                           minHeight={56}
                           {...register(

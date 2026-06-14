@@ -273,6 +273,8 @@ export const EducationStep = ({
                           <input
                             className="cv-input"
                             placeholder="e.g. American University of Sharjah"
+                            autoComplete="organization"
+                            spellCheck={false}
                             {...register(`education.${index}.school`)}
                             onChange={(e) => {
                               e.target.value = sanitizeCompanyNameLive(e.target.value);
@@ -315,6 +317,7 @@ export const EducationStep = ({
                           <input
                             className="cv-input"
                             placeholder="e.g. 2018"
+                            inputMode="numeric"
                             {...register(`education.${index}.startDate`)}
                             onChange={(e) => {
                               register(`education.${index}.startDate`).onChange(e);
@@ -379,8 +382,9 @@ export const EducationStep = ({
 
                         {watch(`education.${index}.attested`) && (
                           <div style={{ marginTop: 12 }}>
-                            <label className="cv-label">Attesting Body</label>
+                            <label className="cv-label" htmlFor={`attestingBody-${index}`}>Attesting Body</label>
                             <select
+                              id={`attestingBody-${index}`}
                               value={watch(`education.${index}.attestingBody`) ?? ""}
                               onChange={(e) => {
                                 if (e.target.value === "__custom__") {
@@ -406,6 +410,7 @@ export const EducationStep = ({
                                 value={watch(`education.${index}.attestingBody`) ?? ""}
                                 onChange={(e) => setValue(`education.${index}.attestingBody`, e.target.value, { shouldDirty: true })}
                                 placeholder="Type attesting body name..."
+                                aria-label="Custom attesting body name"
                                 className="cv-input"
                                 style={{ marginTop: 8 }}
                                 autoFocus

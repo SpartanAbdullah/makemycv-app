@@ -240,7 +240,7 @@ export const ProjectsStep = ({
                           <input className="cv-input" placeholder="e.g. Dubai Mall Fit-Out Project" {...register(`projects.${index}.name`)} />
                         </Field>
                         <Field label="Link">
-                          <input className="cv-input" placeholder="e.g. www.projectsite.com" {...register(`projects.${index}.link`)} />
+                          <input className="cv-input" placeholder="e.g. www.projectsite.com" type="url" inputMode="url" autoComplete="url" {...register(`projects.${index}.link`)} />
                         </Field>
                       </div>
 
@@ -256,6 +256,8 @@ export const ProjectsStep = ({
                             <div className="flex items-start gap-2">
                               <AutoGrowTextarea
                                 className="cv-input cv-textarea flex-1"
+                                placeholder="What did you do or deliver? Start with a verb, add a result."
+                                aria-label={`Project highlight ${bulletIndex + 1}`}
                                 minHeight={56}
                                 {...register(`projects.${index}.bullets.${bulletIndex}`)}
                                 onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}

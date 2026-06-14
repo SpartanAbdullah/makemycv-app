@@ -211,6 +211,8 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           <input
             className="cv-input"
             placeholder="e.g. Muhammad"
+            autoComplete="given-name"
+            spellCheck={false}
             {...register("firstName")}
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
@@ -237,6 +239,8 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           <input
             className="cv-input"
             placeholder="e.g. Al-Rashidi"
+            autoComplete="family-name"
+            spellCheck={false}
             {...register("lastName")}
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
@@ -259,6 +263,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           <input
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
+            autoComplete="organization-title"
             {...register("headline")}
             onChange={(e) => {
               e.target.value = sanitizeJobTitleLive(e.target.value);
@@ -310,6 +315,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
               <input
                 className="cv-input"
                 placeholder="e.g. Muscat, Oman"
+                autoComplete="address-level2"
                 {...register("location")}
                 onChange={(e) => {
                   e.target.value = sanitizeLocationLive(e.target.value);
@@ -331,6 +337,9 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           <input
             className="cv-input"
             placeholder="+971 50 123 4567"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("phone")}
             onChange={(e) => {
@@ -359,6 +368,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           <input
             className="cv-input"
             placeholder="yourname@email.com"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            spellCheck={false}
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("email")}
             onChange={(e) => {
