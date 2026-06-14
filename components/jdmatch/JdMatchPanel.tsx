@@ -19,9 +19,13 @@ import {
 } from "../../lib/jdMatch/types";
 import type { CvExperience } from "../../lib/types/cv";
 import { buildHeatmap } from "../../lib/jdMatch/heatmap";
+import { buildTailoredCv } from "../../lib/jdMatch/tailorCv";
+import { downloadCV } from "../../hooks/useDownloadCV";
+import { exportToDocx } from "../../lib/utils/docxExport";
 import { JdCvPreview, type JdChange } from "./JdCvPreview";
 import { JdHeatmap } from "./JdHeatmap";
 import { JdCoach } from "./JdCoach";
+import { JdTailor } from "./JdTailor";
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -64,6 +68,13 @@ export const JdMatchPanel = () => {
   const [weave, setWeave] = useState<{ category: JdCategory; term: string } | null>(null);
   // The bullet weaver scrolls into view when opened (Coach / heatmap / chip).
   const weaverRef = useRef<HTMLDivElement | null>(null);
+  // Per-job tailoring: focus the skills section on this job for the downloaded
+  // copy (master CV untouched). keptSkills = irrelevant skills the user restored.
+  const [focusSkills, setFocusSkills] = useState(false);
+  const [keptSkills, setKeptSkills] = useState<Set<string>>(new Set());
+  const [tailorDownloading, setTailorDownloading] = useState(false);
+  const [tailorError, setTailorError] = useState<string | null>(null);
+  const tailorRef = useRef<HTMLDivElement | null>(null);
   // Staged fixes (committed only on Accept all). The working CV = base + these.
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [showChanges, setShowChanges] = useState(true);
@@ -97,7 +108,6 @@ export const JdMatchPanel = () => {
     () => applyPendingChanges(cv, pendingChanges),
     [cv, pendingChanges],
   );
-  const previewCv = showChanges ? workingCv : cv;
 
   // Exact texts to tint in the CV preview — each staged skill/cert term and
   // each rewritten bullet. Empty when changes are hidden.
@@ -135,6 +145,19 @@ export const JdMatchPanel = () => {
       .filter((c) => c.matched.length + c.missing.length > 0);
   }, [result, heatmap]);
 
+  // Per-job tailored copy (skills focused on the JD). Built from the working CV
+  // so staged additions are included; the master CV in the store is untouched.
+  const reqTerms = useMemo(() => result?.terms.map((t) => t.term) ?? [], [result]);
+  const tailored = useMemo(
+    () => (result ? buildTailoredCv(workingCv, reqTerms, keptSkills) : null),
+    [result, workingCv, reqTerms, keptSkills],
+  );
+
+  // What the right-hand preview shows: the focused copy when "focus" is on, else
+  // the working CV (or the base CV when staged changes are hidden).
+  const previewCv =
+    focusSkills && tailored ? tailored.tailoredCv : showChanges ? workingCv : cv;
+
   // Only roles with a non-empty bullet are weave targets — we never rewrite an
   // empty bullet (that would be fabricating). Read from the working CV so a
   // weave operates on already-staged text.
@@ -168,6 +191,9 @@ export const JdMatchPanel = () => {
     setLastChange(null);
     setSavedCount(null);
     setMobileView("work");
+    setFocusSkills(false);
+    setKeptSkills(new Set());
+    setTailorError(null);
     setAnalyzedText(jobText.trim());
     run(jobText.trim());
   };
@@ -198,6 +224,37 @@ export const JdMatchPanel = () => {
     setMobileView("work");
     setTimeout(
       () => weaverRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      90,
+    );
+  };
+
+  // Keep a hidden (irrelevant) skill on the tailored copy.
+  const keepSkill = (name: string) =>
+    setKeptSkills((prev) => new Set(prev).add(name));
+
+  // Download the per-job copy (focused when the toggle is on) — NEVER mutates the
+  // store, so the master CV keeps every skill. Pure data → exporter, like the
+  // builder's own fallback export.
+  const downloadTailored = async (kind: "pdf" | "docx") => {
+    const data = focusSkills && tailored ? tailored.tailoredCv : workingCv;
+    setTailorError(null);
+    setTailorDownloading(true);
+    try {
+      if (kind === "docx") await exportToDocx(data);
+      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+    } catch {
+      setTailorError("Download failed — please try again.");
+    } finally {
+      setTailorDownloading(false);
+    }
+  };
+
+  // Jump to the download panel and turn focus on (Coach hand-off / done-state).
+  const goToDownload = () => {
+    setFocusSkills(true);
+    setMobileView("work");
+    setTimeout(
+      () => tailorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
       90,
     );
   };
@@ -585,6 +642,17 @@ export const JdMatchPanel = () => {
                       weaveDisabled={weavableRoles.length === 0}
                       onAdd={handleAdd}
                       onWeave={openWeave}
+                      doneCta={
+                        <button
+                          type="button"
+                          className="cv-btn-primary"
+                          style={{ padding: "10px 16px" }}
+                          onClick={goToDownload}
+                        >
+                          <Icon name="download" size={13} />
+                          Download your tailored CV
+                        </button>
+                      }
                     />
                   )}
 
@@ -709,6 +777,23 @@ export const JdMatchPanel = () => {
                         roles={weavableRoles}
                         onApply={handleApplyWeave}
                         onClose={() => setWeave(null)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Tailor & download — focus the skills on this job, master kept */}
+                  {hydrated && isPro && tailored && (
+                    <div ref={tailorRef}>
+                      <JdTailor
+                        focused={focusSkills}
+                        onToggleFocus={setFocusSkills}
+                        totalSkills={workingCv.skills.length}
+                        hiddenSkills={tailored.hiddenSkills}
+                        onKeep={keepSkill}
+                        onDownloadPdf={() => downloadTailored("pdf")}
+                        onDownloadDocx={() => downloadTailored("docx")}
+                        downloading={tailorDownloading}
+                        error={tailorError}
                       />
                     </div>
                   )}
