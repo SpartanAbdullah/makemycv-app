@@ -47,6 +47,9 @@ const TIER_STYLE: Record<
   },
 };
 
+// Circumference of the score dial ring (r = 13).
+const RING_CIRC = 2 * Math.PI * 13;
+
 export const ScoreChip = ({
   report,
   delta,
@@ -113,44 +116,71 @@ export const ScoreChip = ({
       <button
         ref={triggerRef}
         type="button"
+        className="cv-score-chip"
         onClick={() => (open ? setOpen(false) : openPopover())}
         aria-label={`CV Score: ${report.total} out of 100. Click for details.`}
         aria-expanded={open}
         aria-haspopup="dialog"
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "9px 9px 9px 12px",
           background: style.bg,
           border: `1px solid ${style.border}`,
-          borderRadius: 999,
-          cursor: "pointer",
-          transition: "border-color 120ms, background 120ms",
         }}
       >
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            color: style.labelFg,
-            letterSpacing: "0.12em",
-            fontWeight: 600,
-          }}
-        >
-          SCORE
+        {/* Score dial — ring fills with the score, exact number inside */}
+        <span style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 32 32"
+            style={{ display: "block", transform: "rotate(-90deg)" }}
+            aria-hidden="true"
+          >
+            <circle cx="16" cy="16" r="13" fill="none" stroke={style.border} strokeWidth="3" />
+            <circle
+              cx="16"
+              cy="16"
+              r="13"
+              fill="none"
+              stroke={style.fg}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRC}
+              strokeDashoffset={RING_CIRC * (1 - Math.min(100, Math.max(0, report.total)) / 100)}
+              style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.2,0.8,0.2,1)" }}
+            />
+          </svg>
+          <span
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              fontFamily: "var(--font-display)",
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: style.fg,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {animated}
+          </span>
         </span>
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 15,
-            color: style.fg,
-            fontWeight: 700,
-            minWidth: 22,
-            textAlign: "center",
-          }}
-        >
-          {animated}
+        {/* Label + grade — hidden on the tightest screens (the dial stands alone) */}
+        <span className="hidden sm:flex" style={{ flexDirection: "column", lineHeight: 1.15, textAlign: "left" }}>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              fontWeight: 600,
+              color: style.labelFg,
+            }}
+          >
+            CV SCORE
+          </span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: style.fg }}>
+            {GRADE_CHIP_LABELS[report.grade]}
+          </span>
         </span>
         {delta !== undefined && delta !== 0 && (
           <span

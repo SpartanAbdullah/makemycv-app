@@ -275,21 +275,7 @@ const TopBar = ({
             entry point for everyone else. */}
         <Link
           href="/jd-match"
-          className="hidden lg:inline-flex"
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            color: "var(--ff-ink)",
-            background: "transparent",
-            border: "1px solid var(--ff-line)",
-            padding: "11px 14px",
-            borderRadius: 999,
-            cursor: "pointer",
-            alignItems: "center",
-            gap: 6,
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-          }}
+          className="hidden lg:inline-flex cv-top-btn cv-top-btn-secondary"
         >
           <Icon name="lightbulb" size={13} />
           Match to a job
@@ -297,41 +283,31 @@ const TopBar = ({
         <button
           type="button"
           onClick={onTemplates}
-          className="hidden sm:inline-flex"
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            color: "var(--ff-ink)",
-            background: "transparent",
-            border: "1px solid var(--ff-line)",
-            padding: "11px 14px",
-            borderRadius: 999,
-            cursor: "pointer",
-            alignItems: "center",
-            gap: 6,
-          }}
+          className="hidden sm:inline-flex cv-top-btn cv-top-btn-secondary"
         >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
           All templates
         </button>
         <button
           type="button"
           onClick={onDownload}
           disabled={isDownloading}
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            color: "white",
-            background: "var(--ff-accent)",
-            border: "none",
-            padding: "11px 16px",
-            borderRadius: 999,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            cursor: isDownloading ? "wait" : "pointer",
-            opacity: isDownloading ? 0.7 : 1,
-            fontWeight: 500,
-          }}
+          className="inline-flex cv-top-btn cv-top-btn-primary"
         >
           {isDownloading ? (
             <>
