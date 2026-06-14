@@ -21,7 +21,7 @@ import {
 
 // How much each category counts toward the score. Hard skills and tools are
 // what ATS keyword filters weight most; generic keywords least.
-const WEIGHTS: Record<JdCategory, number> = {
+export const WEIGHTS: Record<JdCategory, number> = {
   hardSkills: 3,
   tools: 3,
   certifications: 2,

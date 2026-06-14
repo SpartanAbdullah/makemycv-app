@@ -21,6 +21,7 @@ import type { CvExperience } from "../../lib/types/cv";
 import { buildHeatmap } from "../../lib/jdMatch/heatmap";
 import { JdCvPreview, type JdChange } from "./JdCvPreview";
 import { JdHeatmap } from "./JdHeatmap";
+import { JdCoach } from "./JdCoach";
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -61,6 +62,8 @@ export const JdMatchPanel = () => {
   // highlights against the analysed text even if the user edits the box after.
   const [analyzedText, setAnalyzedText] = useState("");
   const [weave, setWeave] = useState<{ category: JdCategory; term: string } | null>(null);
+  // The bullet weaver scrolls into view when opened (Coach / heatmap / chip).
+  const weaverRef = useRef<HTMLDivElement | null>(null);
   // Staged fixes (committed only on Accept all). The working CV = base + these.
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [showChanges, setShowChanges] = useState(true);
@@ -186,6 +189,17 @@ export const JdMatchPanel = () => {
         ? `Staged: added “${term}” to your Certifications`
         : `Staged: added “${term}” to your Skills`,
     });
+  };
+
+  // Open the bullet weaver AND bring it into view — the guided flow should never
+  // leave the next action off-screen (founder feedback: no auto-scroll today).
+  const openWeave = (category: JdCategory, term: string) => {
+    setWeave({ category, term });
+    setMobileView("work");
+    setTimeout(
+      () => weaverRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      90,
+    );
   };
 
   const handleApplyWeave = (
@@ -562,6 +576,18 @@ export const JdMatchPanel = () => {
                     </p>
                   )}
 
+                  {/* Guided coach — the next highest-impact fix, front and centre */}
+                  {hydrated && isPro && (
+                    <JdCoach
+                      key={analyzedText}
+                      terms={result.terms}
+                      fixable={fixable}
+                      weaveDisabled={weavableRoles.length === 0}
+                      onAdd={handleAdd}
+                      onWeave={openWeave}
+                    />
+                  )}
+
                   {/* JD heatmap — read the job with your matches highlighted */}
                   {heatmap && heatmap.located.size > 0 && (
                     <JdHeatmap
@@ -569,21 +595,10 @@ export const JdMatchPanel = () => {
                       fixable={fixable}
                       weaveDisabled={weavableRoles.length === 0}
                       onAdd={handleAdd}
-                      onWeave={(category, term) => setWeave({ category, term })}
+                      onWeave={openWeave}
                     />
                   )}
 
-                  {/* Helper / locked CTA */}
-                  {hydrated && isPro && hasGaps && (
-                    <p style={{ fontSize: 12.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: 0 }}>
-                      <strong style={{ color: "var(--ff-ink-2)" }}>Add</strong> a missing
-                      skill or <strong style={{ color: "var(--ff-ink-2)" }}>Weave</strong> a
-                      keyword into a bullet — each is staged on your CV (right) and
-                      flashed so you can see exactly what changed. Review with the
-                      eye toggle, then Accept all or Discard all up top. Rewrites
-                      only re-word what you already wrote, never inventing anything.
-                    </p>
-                  )}
                   {hydrated && !isPro && hasGaps && <ProLockBanner />}
 
                   {/* Most recent staged fix (or the saved confirmation) */}
@@ -679,9 +694,7 @@ export const JdMatchPanel = () => {
                           weaveDisabled={weavableRoles.length === 0}
                           activeWeaveTerm={weave?.term ?? null}
                           onAdd={handleAdd}
-                          onWeave={(category, term) => {
-                            setWeave({ category, term });
-                          }}
+                          onWeave={openWeave}
                         />
                       ))}
                     </>
@@ -689,13 +702,15 @@ export const JdMatchPanel = () => {
 
                   {/* Inline bullet weaver (truthful AI rewrite of one bullet) */}
                   {weave && fixable && weavableRoles.length > 0 && (
-                    <BulletWeaver
-                      key={weave.term}
-                      term={weave.term}
-                      roles={weavableRoles}
-                      onApply={handleApplyWeave}
-                      onClose={() => setWeave(null)}
-                    />
+                    <div ref={weaverRef}>
+                      <BulletWeaver
+                        key={weave.term}
+                        term={weave.term}
+                        roles={weavableRoles}
+                        onApply={handleApplyWeave}
+                        onClose={() => setWeave(null)}
+                      />
+                    </div>
                   )}
                 </div>
               )}
