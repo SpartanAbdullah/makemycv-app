@@ -23,6 +23,7 @@ import {
   getSectionMissing,
 } from "../../lib/validation/cvRequirements";
 import { Toaster } from "../ui/Toaster";
+import { ProcessSteps } from "../ui/ProcessSteps";
 import { ExportGateDialog } from "./ExportGateDialog";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
@@ -1087,6 +1088,10 @@ export const BuilderShell = ({
       } else {
         await downloadCV(data, "pro", data.settings.templateId ?? "classic");
       }
+      pushToast(
+        `Your ${kind === "docx" ? "Word file" : "PDF"} downloaded — check your Downloads folder.`,
+        { tone: "success", duration: 4000 },
+      );
       if (shouldShowDownloadTip()) {
         window.setTimeout(() => setDownloadTipOpen(true), 1500);
       }
@@ -1178,6 +1183,19 @@ export const BuilderShell = ({
   ) => {
     importCvVersion(partial, mode);
     setImportState({ phase: "idle" });
+    const n = [
+      partial.personal?.firstName || partial.personal?.email ? 1 : 0,
+      partial.experience?.length ? 1 : 0,
+      partial.education?.length ? 1 : 0,
+      partial.skills?.length ? 1 : 0,
+      partial.languages?.length ? 1 : 0,
+      partial.certifications?.length ? 1 : 0,
+      partial.projects?.length ? 1 : 0,
+    ].reduce((a, b) => a + b, 0);
+    pushToast(
+      `${mode === "merge" ? "Merged" : "Imported"} ${n} section${n === 1 ? "" : "s"} — review the steps below and tweak anything.`,
+      { tone: "success" },
+    );
   };
 
   const stepIsReview = stepId === "review";
@@ -1430,32 +1448,44 @@ export const BuilderShell = ({
             <div
               style={{
                 background: "var(--ff-card)",
-                borderRadius: 14,
+                borderRadius: 16,
                 border: "1px solid var(--ff-line)",
-                padding: "32px 40px",
-                textAlign: "center",
+                padding: "26px 28px",
+                width: "min(360px, calc(100vw - 32px))",
                 boxShadow: "var(--shadow-xl)",
               }}
             >
               <div
                 style={{
-                  width: 32,
-                  height: 32,
-                  border: "4px solid var(--ff-line)",
-                  borderTopColor: "var(--ff-accent)",
-                  borderRadius: "50%",
-                  margin: "0 auto 12px",
-                  animation: "spin 1s linear infinite",
+                  fontFamily: "var(--font-display)",
+                  fontSize: 17,
+                  fontWeight: 700,
+                  color: "var(--ff-ink)",
+                  marginBottom: 14,
                 }}
+              >
+                Reading your {importState.source}
+              </div>
+              <ProcessSteps
+                steps={[
+                  "Reading the file",
+                  "Extracting the text",
+                  "Detecting sections",
+                  "Mapping to your CV",
+                ]}
               />
               <p
                 style={{
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: "var(--ff-ink-2)",
+                  fontSize: 12,
+                  color: "var(--ff-faint)",
+                  lineHeight: 1.5,
+                  margin: "16px 0 0",
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--ff-line)",
                 }}
               >
-                Parsing {importState.source}...
+                This happens in your browser — your file is never uploaded. You&apos;ll
+                review everything before it&apos;s added.
               </p>
             </div>
           </div>

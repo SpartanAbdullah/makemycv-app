@@ -26,6 +26,7 @@ import { JdCvPreview, type JdChange } from "./JdCvPreview";
 import { JdHeatmap } from "./JdHeatmap";
 import { JdCoach } from "./JdCoach";
 import { JdTailor } from "./JdTailor";
+import { ProcessSteps } from "../ui/ProcessSteps";
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -74,6 +75,8 @@ export const JdMatchPanel = () => {
   const [keptSkills, setKeptSkills] = useState<Set<string>>(new Set());
   const [tailorDownloading, setTailorDownloading] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
+  // Brief "downloaded ✓" confirmation after a successful tailored export.
+  const [tailorDone, setTailorDone] = useState(false);
   const tailorRef = useRef<HTMLDivElement | null>(null);
   // One-shot "scroll to this section once it has rendered" (robust on mobile
   // where the work column mounts only after the view switch).
@@ -242,9 +245,16 @@ export const JdMatchPanel = () => {
     setScrollIntent("weaver");
   };
 
-  // Keep a hidden (irrelevant) skill on the tailored copy.
-  const keepSkill = (name: string) =>
+  // Keep a hidden (irrelevant) skill on the tailored copy. Re-tailoring clears
+  // any stale "downloaded ✓" confirmation.
+  const keepSkill = (name: string) => {
+    setTailorDone(false);
     setKeptSkills((prev) => new Set(prev).add(name));
+  };
+  const toggleFocus = (next: boolean) => {
+    setTailorDone(false);
+    setFocusSkills(next);
+  };
 
   // Download the per-job copy (focused when the toggle is on) — NEVER mutates the
   // store, so the master CV keeps every skill. Pure data → exporter, like the
@@ -252,10 +262,12 @@ export const JdMatchPanel = () => {
   const downloadTailored = async (kind: "pdf" | "docx") => {
     const data = previewCv; // export exactly what the preview shows
     setTailorError(null);
+    setTailorDone(false);
     setTailorDownloading(true);
     try {
       if (kind === "docx") await exportToDocx(data);
       else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      setTailorDone(true);
     } catch {
       setTailorError("Download failed — please try again.");
     } finally {
@@ -493,7 +505,21 @@ export const JdMatchPanel = () => {
                       cursor: disabled ? "not-allowed" : "pointer",
                     }}
                   >
-                    <Icon name="sparkle" size={13} />
+                    {isLoading ? (
+                      <span
+                        style={{
+                          width: 12,
+                          height: 12,
+                          border: "2px solid rgba(255,255,255,0.45)",
+                          borderTopColor: "#fff",
+                          borderRadius: "50%",
+                          display: "inline-block",
+                          animation: "spin 0.8s linear infinite",
+                        }}
+                      />
+                    ) : (
+                      <Icon name="sparkle" size={13} />
+                    )}
                     {isLoading ? "Reading the job…" : "Find my gaps"}
                   </button>
                 </div>
@@ -551,6 +577,50 @@ export const JdMatchPanel = () => {
                       Try again
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* Analysing — surface progress in the results area, not just the
+                  button, so the user knows work is happening here. */}
+              {isLoading && (
+                <div
+                  style={{
+                    padding: 18,
+                    borderRadius: 14,
+                    background: "var(--ff-card)",
+                    border: "1px solid var(--ff-line)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: "var(--ff-ink)",
+                      marginBottom: 12,
+                    }}
+                  >
+                    Matching the job to your CV
+                  </div>
+                  <ProcessSteps
+                    steps={[
+                      "Reading the job",
+                      "Pulling out the requirements",
+                      "Matching against your CV",
+                    ]}
+                  />
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--ff-faint)",
+                      lineHeight: 1.5,
+                      margin: "16px 0 0",
+                      paddingTop: 12,
+                      borderTop: "1px solid var(--ff-line)",
+                    }}
+                  >
+                    Only the job text is sent for this — your CV stays in your browser.
+                  </p>
                 </div>
               )}
 
@@ -798,13 +868,14 @@ export const JdMatchPanel = () => {
                     <div ref={tailorRef}>
                       <JdTailor
                         focused={focusSkills}
-                        onToggleFocus={setFocusSkills}
+                        onToggleFocus={toggleFocus}
                         totalSkills={sourceCv.skills.length}
                         hiddenSkills={tailored.hiddenSkills}
                         onKeep={keepSkill}
                         onDownloadPdf={() => downloadTailored("pdf")}
                         onDownloadDocx={() => downloadTailored("docx")}
                         downloading={tailorDownloading}
+                        done={tailorDone}
                         error={tailorError}
                       />
                     </div>

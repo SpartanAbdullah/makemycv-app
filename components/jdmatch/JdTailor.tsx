@@ -18,6 +18,7 @@ export const JdTailor = ({
   onDownloadPdf,
   onDownloadDocx,
   downloading,
+  done,
   error,
 }: {
   focused: boolean;
@@ -28,6 +29,7 @@ export const JdTailor = ({
   onDownloadPdf: () => void;
   onDownloadDocx: () => void;
   downloading: boolean;
+  done?: boolean;
   error: string | null;
 }) => {
   const kept = totalSkills - hiddenSkills.length;
@@ -135,17 +137,31 @@ export const JdTailor = ({
         <button
           type="button"
           className="cv-btn-primary"
-          style={{ padding: "11px 18px", opacity: downloading ? 0.6 : 1, cursor: downloading ? "not-allowed" : "pointer" }}
+          style={{ padding: "11px 18px", opacity: downloading ? 0.7 : 1, cursor: downloading ? "wait" : "pointer" }}
           onClick={onDownloadPdf}
           disabled={downloading}
         >
-          <Icon name="download" size={14} />
-          {downloading ? "Preparing…" : focused ? "Download tailored CV" : "Download CV"}
+          {downloading ? (
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                border: "2px solid rgba(255,255,255,0.45)",
+                borderTopColor: "#fff",
+                borderRadius: "50%",
+                display: "inline-block",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+          ) : (
+            <Icon name="download" size={14} />
+          )}
+          {downloading ? "Building your CV…" : focused ? "Download tailored CV" : "Download CV"}
         </button>
         <button
           type="button"
           className="cv-btn-secondary"
-          style={{ padding: "11px 16px", opacity: downloading ? 0.6 : 1, cursor: downloading ? "not-allowed" : "pointer" }}
+          style={{ padding: "11px 16px", opacity: downloading ? 0.6 : 1, cursor: downloading ? "wait" : "pointer" }}
           onClick={onDownloadDocx}
           disabled={downloading}
         >
@@ -153,9 +169,24 @@ export const JdTailor = ({
         </button>
       </div>
 
-      {error && (
+      {error ? (
         <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500, margin: "10px 0 0" }}>{error}</p>
-      )}
+      ) : done ? (
+        <p
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12.5,
+            color: "var(--ff-accent-dark)",
+            fontWeight: 600,
+            margin: "10px 0 0",
+          }}
+        >
+          <Icon name="check" size={13} />
+          Downloaded — check your Downloads folder. Your master CV is unchanged.
+        </p>
+      ) : null}
     </div>
   );
 };
