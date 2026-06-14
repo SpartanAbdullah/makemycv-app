@@ -75,6 +75,9 @@ export const JdMatchPanel = () => {
   const [tailorDownloading, setTailorDownloading] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const tailorRef = useRef<HTMLDivElement | null>(null);
+  // One-shot "scroll to this section once it has rendered" (robust on mobile
+  // where the work column mounts only after the view switch).
+  const [scrollIntent, setScrollIntent] = useState<null | "weaver" | "tailor">(null);
   // Staged fixes (committed only on Accept all). The working CV = base + these.
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [showChanges, setShowChanges] = useState(true);
@@ -101,6 +104,18 @@ export const JdMatchPanel = () => {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  // Scroll to a section once it has actually rendered. Re-runs as the relevant
+  // state settles; clears the intent only once the target node exists, so the
+  // scroll never fires against an unmounted ref (e.g. mobile view switch).
+  useEffect(() => {
+    if (!scrollIntent) return;
+    const node = scrollIntent === "weaver" ? weaverRef.current : tailorRef.current;
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollIntent(null);
+    }
+  }, [scrollIntent, weave, focusSkills, mobileView]);
 
   // Working CV = base store CV + staged changes (pure replay). The preview and
   // the score both reflect this so fixes are visible before they are saved.
@@ -145,18 +160,20 @@ export const JdMatchPanel = () => {
       .filter((c) => c.matched.length + c.missing.length > 0);
   }, [result, heatmap]);
 
-  // Per-job tailored copy (skills focused on the JD). Built from the working CV
-  // so staged additions are included; the master CV in the store is untouched.
+  // The CV the eye-toggle is showing: staged (working) or the base "before".
+  const sourceCv = showChanges ? workingCv : cv;
+
+  // Per-job tailored copy (skills focused on the JD), built from whatever the
+  // eye-toggle currently shows; the master CV in the store is untouched.
   const reqTerms = useMemo(() => result?.terms.map((t) => t.term) ?? [], [result]);
   const tailored = useMemo(
-    () => (result ? buildTailoredCv(workingCv, reqTerms, keptSkills) : null),
-    [result, workingCv, reqTerms, keptSkills],
+    () => (result ? buildTailoredCv(sourceCv, reqTerms, keptSkills) : null),
+    [result, sourceCv, reqTerms, keptSkills],
   );
 
-  // What the right-hand preview shows: the focused copy when "focus" is on, else
-  // the working CV (or the base CV when staged changes are hidden).
-  const previewCv =
-    focusSkills && tailored ? tailored.tailoredCv : showChanges ? workingCv : cv;
+  // What the right-hand preview shows — and EXACTLY what a download exports, so
+  // the file always matches what the user sees.
+  const previewCv = focusSkills && tailored ? tailored.tailoredCv : sourceCv;
 
   // Only roles with a non-empty bullet are weave targets — we never rewrite an
   // empty bullet (that would be fabricating). Read from the working CV so a
@@ -222,10 +239,7 @@ export const JdMatchPanel = () => {
   const openWeave = (category: JdCategory, term: string) => {
     setWeave({ category, term });
     setMobileView("work");
-    setTimeout(
-      () => weaverRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      90,
-    );
+    setScrollIntent("weaver");
   };
 
   // Keep a hidden (irrelevant) skill on the tailored copy.
@@ -236,7 +250,7 @@ export const JdMatchPanel = () => {
   // store, so the master CV keeps every skill. Pure data → exporter, like the
   // builder's own fallback export.
   const downloadTailored = async (kind: "pdf" | "docx") => {
-    const data = focusSkills && tailored ? tailored.tailoredCv : workingCv;
+    const data = previewCv; // export exactly what the preview shows
     setTailorError(null);
     setTailorDownloading(true);
     try {
@@ -253,10 +267,7 @@ export const JdMatchPanel = () => {
   const goToDownload = () => {
     setFocusSkills(true);
     setMobileView("work");
-    setTimeout(
-      () => tailorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      90,
-    );
+    setScrollIntent("tailor");
   };
 
   const handleApplyWeave = (
@@ -634,7 +645,7 @@ export const JdMatchPanel = () => {
                   )}
 
                   {/* Guided coach — the next highest-impact fix, front and centre */}
-                  {hydrated && isPro && (
+                  {hydrated && isPro && result.totalRequirements > 0 && (
                     <JdCoach
                       key={analyzedText}
                       terms={result.terms}
@@ -787,7 +798,7 @@ export const JdMatchPanel = () => {
                       <JdTailor
                         focused={focusSkills}
                         onToggleFocus={setFocusSkills}
-                        totalSkills={workingCv.skills.length}
+                        totalSkills={sourceCv.skills.length}
                         hiddenSkills={tailored.hiddenSkills}
                         onKeep={keepSkill}
                         onDownloadPdf={() => downloadTailored("pdf")}
