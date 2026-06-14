@@ -1232,18 +1232,13 @@ export const BuilderShell = ({
           isDownloading={isDownloading}
         />
 
-        {/* Progress bar — step beads + UAE-optimised pill */}
+        {/* Progress bar — segmented step focus + UAE-optimised pill */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            padding: "12px 28px",
+            padding: "8px 28px",
             background: "var(--ff-card)",
             borderBottom: "1px solid var(--ff-line)",
             flexShrink: 0,
-            minHeight: "var(--progressbar-h)",
-            overflowX: "auto",
           }}
         >
           <StepBeads
@@ -1251,24 +1246,24 @@ export const BuilderShell = ({
             statuses={statuses}
             currentId={stepId}
             onStepClick={(id) => onStepChange(id)}
+            rightSlot={
+              <span
+                className="hidden md:inline-flex"
+                style={{
+                  alignItems: "center",
+                  gap: 8,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--ff-muted)",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                }}
+              >
+                <UAEDot size={11} />
+                UAE-Optimised
+              </span>
+            }
           />
-          <div
-            className="hidden md:inline-flex"
-            style={{
-              marginLeft: "auto",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--ff-muted)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              flexShrink: 0,
-            }}
-          >
-            <UAEDot size={11} />
-            UAE-Optimised
-          </div>
         </div>
 
         {/* Error bar */}

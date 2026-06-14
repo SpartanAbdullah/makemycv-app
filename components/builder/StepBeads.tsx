@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import type { BuilderStep } from "../../lib/utils/steps";
 import type { StepStatus } from "./Stepper";
-import { Icon } from "./Icon";
 
 type Props = {
   steps: BuilderStep[];
   statuses: Record<string, StepStatus>;
   currentId: string;
   onStepClick: (id: BuilderStep["id"]) => void;
+  /** Optional right-aligned content on the context line (e.g. the UAE pill). */
+  rightSlot?: React.ReactNode;
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -25,111 +25,160 @@ const STEP_LABELS: Record<string, string> = {
   review: "Review",
 };
 
-/**
- * Horizontal step-bead strip. Replaces the legacy dark sidebar Stepper. Beads
- * are pill-shaped: future steps render outlined and muted, done steps render
- * filled-soft with an accent check, the active step renders solid black.
- *
- * Every bead navigates (audit UX-1) — done, incomplete, and future steps
- * alike. The bead styling stays honest about completion state; navigation
- * freedom is the point (skipped steps used to be unreachable except by
- * walking Back one step at a time).
- *
- * The strip hides its scrollbar, so on narrow viewports the active bead can
- * sit off-screen with nothing signalling more content — we scroll it into
- * view whenever the step changes (audit PERF-7).
- */
-export const StepBeads = ({ steps, statuses, currentId, onStepClick }: Props) => {
-  const activeRef = useRef<HTMLButtonElement | null>(null);
+// Shorter labels for the tiny under-bar row so 10 fit without truncating.
+const SHORT_LABELS: Record<string, string> = {
+  uaeEssentials: "UAE Ess.",
+  certifications: "Certs",
+};
 
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({
-      inline: "center",
-      block: "nearest",
-      behavior: "smooth",
-    });
-  }, [currentId]);
+const stateText = (status: StepStatus | undefined, isActive: boolean) =>
+  isActive
+    ? "current step"
+    : status === "done"
+      ? "completed"
+      : status === "attention"
+        ? "needs attention"
+        : "not started";
+
+// Map each step's state to our palette (not the mockup's hardcoded hex).
+const segColor = (status: StepStatus | undefined, isActive: boolean) =>
+  isActive
+    ? "var(--ff-ink)"
+    : status === "done"
+      ? "var(--ff-accent)"
+      : status === "attention"
+        ? "var(--ff-warn)"
+        : "var(--ff-line-strong)";
+
+/**
+ * "Segmented focus" stepper (founder design Concept 03). A context line names
+ * the moment — "Step 06 / 10 · Skills · next: Languages" — over a ten-segment
+ * progress bar; tiny labels ride beneath on desktop. Far lighter than the old
+ * chunky capsule row, and the segment bar flexes to any width so it never
+ * scrolls sideways (the labels hide on mobile; the context line still says
+ * where you are).
+ *
+ * Every segment stays a real button — done/current/future alike navigate
+ * (audit UX-1) — with a tooltip + aria-label so nothing is lost when the labels
+ * are hidden. The amber "needs attention" state (a required, visited, still
+ * incomplete section) is preserved.
+ */
+export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }: Props) => {
+  const total = steps.length;
+  const currentIndex = Math.max(0, steps.findIndex((s) => s.id === currentId));
+  const activeLabel = STEP_LABELS[currentId] ?? steps[currentIndex]?.title ?? "";
+  const next = steps[currentIndex + 1];
+  const nextLabel = next ? STEP_LABELS[next.id] ?? next.title : null;
 
   return (
-    <div
-      className="cv-bead-strip"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        overflowX: "auto",
-        scrollbarWidth: "none",
-      }}
-      aria-label="CV builder progress"
-      role="navigation"
-    >
-      {steps.map((step, i) => {
-        const status = statuses[step.id];
-        const isActive = step.id === currentId;
-        const isDone = status === "done";
-        const isLocked = status === "locked";
-        // Amber "needs attention": required section, visited, still
-        // incomplete (guided feedback 2026-06). Untouched sections render
-        // the neutral future style.
-        const isAttention = status === "attention";
-        const label = STEP_LABELS[step.id] ?? step.title;
-        const beadClass = isActive
-          ? "cv-bead cv-bead-active"
-          : isDone
-            ? "cv-bead cv-bead-done"
-            : isAttention
-              ? "cv-bead cv-bead-attention"
-              : isLocked
-                ? "cv-bead cv-bead-locked"
-                : "cv-bead cv-bead-future";
+    <div style={{ width: "100%", minWidth: 0 }} role="navigation" aria-label="CV builder progress">
+      {/* Context line — where you are, what's next */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap", lineHeight: 1.1 }}>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--ff-faint)",
+          }}
+        >
+          Step {String(currentIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+            color: "var(--ff-ink)",
+          }}
+        >
+          {activeLabel}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ff-faint)" }}>
+          {nextLabel ? `· next: ${nextLabel}` : "· final step"}
+        </span>
+        {rightSlot && <span style={{ marginLeft: "auto" }}>{rightSlot}</span>}
+      </div>
 
-        const dotClass = isActive
-          ? "cv-bead-dot cv-bead-dot-active"
-          : isDone
-            ? "cv-bead-dot cv-bead-dot-done"
-            : isAttention
-              ? "cv-bead-dot cv-bead-dot-attention"
-              : "cv-bead-dot cv-bead-dot-future";
-
-        return (
-          <div
-            key={step.id}
-            style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
-          >
+      {/* Segmented bar — one segment per step, each a navigable button */}
+      <div style={{ display: "flex", gap: 5, marginTop: 7 }}>
+        {steps.map((step) => {
+          const status = statuses[step.id];
+          const isActive = step.id === currentId;
+          const label = STEP_LABELS[step.id] ?? step.title;
+          const shortLabel = SHORT_LABELS[step.id] ?? label;
+          return (
             <button
+              key={step.id}
               type="button"
-              ref={isActive ? activeRef : undefined}
-              className={beadClass}
+              className="cv-step-seg"
               onClick={() => onStepClick(step.id)}
               aria-current={isActive ? "step" : undefined}
-              title={isAttention ? `${label} — a few details still missing` : label}
-              aria-label={
-                isAttention ? `${label} — a few details still missing` : label
-              }
+              aria-label={`${label} — ${stateText(status, isActive)}`}
+              title={label}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                padding: "2px 0 0",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
-              <span className={dotClass}>
-                {isDone ? (
-                  <Icon name="check" size={9} strokeWidth={3} />
-                ) : (
-                  <span>{i + 1}</span>
-                )}
-              </span>
-              <span>{label}</span>
-            </button>
-            {i < steps.length - 1 && (
               <span
-                aria-hidden="true"
+                className="cv-step-seg-bar"
                 style={{
-                  width: 8,
-                  height: 1,
-                  background: "var(--ff-line)",
-                  flexShrink: 0,
+                  display: "block",
+                  height: 7,
+                  borderRadius: 999,
+                  background: segColor(status, isActive),
+                  boxShadow: isActive ? "0 0 0 3px var(--ff-line)" : undefined,
+                  transition: "background 200ms ease",
                 }}
               />
-            )}
-          </div>
-        );
-      })}
+              <span
+                className="cv-step-seg-label"
+                style={{
+                  textAlign: "center",
+                  fontSize: 10,
+                  lineHeight: 1,
+                  fontWeight: isActive ? 800 : 600,
+                  color: isActive
+                    ? "var(--ff-ink)"
+                    : status === "done"
+                      ? "var(--ff-muted)"
+                      : status === "attention"
+                        ? "var(--ff-warn)"
+                        : "var(--ff-faint)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {shortLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <style>{`
+        .cv-step-seg:hover .cv-step-seg-bar { filter: brightness(0.92); }
+        .cv-step-seg:focus-visible {
+          outline: 2px solid var(--ff-accent);
+          outline-offset: 3px;
+          border-radius: 6px;
+        }
+        @media (max-width: 640px) {
+          .cv-step-seg-label { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 };

@@ -126,7 +126,9 @@
 
   /* Builder shell metrics */
   --topbar-h:     64px;
-  --progressbar-h:58px;
+  /* Segmented-focus stepper height (context line + bar + tiny labels). The
+     labels hide ≤640px, so the bar is shorter there — overridden below. */
+  --progressbar-h:64px;
   --drawer-w:     clamp(460px, 48vw, 820px);
   --drawer-gap:   24px;
   --form-max:     clamp(540px, 44vw, 780px);
@@ -168,6 +170,12 @@
   --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
   --shadow-cta: 0 6px 20px rgba(14, 124, 74, 0.30);
   --shadow-cta-hover: 0 10px 28px rgba(14, 124, 74, 0.40);
+}
+
+/* The stepper's tiny per-step labels hide on small screens, so the bar is
+   shorter — keep --progressbar-h in sync (used by the Review preview height). */
+@media (max-width: 640px) {
+  :root { --progressbar-h: 48px; }
 }
 
 @theme inline {
