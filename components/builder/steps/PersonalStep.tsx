@@ -9,8 +9,10 @@ import { PhotoUpload } from "../PhotoUpload";
 import { TodaysTipCard } from "../TodaysTipCard";
 import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
+import { StepHeader } from "../StepHeader";
 import { Field } from "../../forms/Field";
-import { FieldError } from "../../FieldError";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import {
   sanitizeName,
   sanitizeNameLive,
@@ -21,11 +23,25 @@ import {
   sanitizeJobTitleLive,
   sanitizeLocation,
   sanitizeLocationLive,
-  validateEmail,
 } from "../../../lib/sanitize";
 import type { CvPersonal, PhotoShape } from "../../../lib/types/cv";
 
 const ICON_INPUT_PAD = 40;
+
+// Emirate options for the location select (audit UX-9). Values are the
+// exact strings written into personal.location — emirate is a primary
+// recruiter filter on Bayt/NaukriGulf, so a structured choice beats free
+// text for the common case. "Other city…" reveals a free-text input.
+const EMIRATE_OPTIONS = [
+  "Dubai, UAE",
+  "Abu Dhabi, UAE",
+  "Sharjah, UAE",
+  "Ajman, UAE",
+  "Ras Al Khaimah, UAE",
+  "Fujairah, UAE",
+  "Umm Al Quwain, UAE",
+  "Al Ain, UAE",
+];
 
 export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const personal = useCvStore((state) => state.data.personal);
@@ -37,12 +53,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const { handleImport } = useImport();
   const lastSerializedRef = useRef<string>(JSON.stringify(personal));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<
-    Record<string, string | null>
-  >({});
-
-  const setFieldError = (field: string, error: string | null) =>
-    setFieldErrors((prev) => ({ ...prev, [field]: error }));
+  // True once the user explicitly picks "Other city…" in the emirate select.
+  const [customLocation, setCustomLocation] = useState(false);
+  // Blur-time validity feedback for the required fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
 
   const setPhotoShape = (shape: PhotoShape) => {
     updateSection("settings", { ...settings, photoShape: shape });
@@ -63,6 +77,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
@@ -104,15 +119,30 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="personal" />
 
-      {/* Import row — PDF/DOCX is the only working source, so it takes the
-          full-width primary slot. LinkedIn paste-import was a dead placeholder
-          (see git history for removal). */}
-      <ImportButton
-        icon="upload"
-        label="Import existing CV (PDF / DOCX)"
-        onClick={() => handleImport("pdf")}
-      />
+      {/* Import row — one picker for PDF and DOCX, routed by extension in
+          BuilderShell (the DOCX adapter was unreachable until the 2026-06
+          wave-3 work). LinkedIn paste-import was a dead placeholder (see
+          git history for removal). */}
+      <div>
+        <ImportButton
+          icon="upload"
+          label="Import existing CV (PDF / DOCX)"
+          onClick={() => handleImport()}
+        />
+        <p
+          style={{
+            marginTop: 6,
+            fontSize: 11.5,
+            color: "var(--ff-faint)",
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          Your file is read in this browser — it is never uploaded.
+        </p>
+      </div>
 
       {/* OR divider */}
       <div
@@ -173,19 +203,27 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           label="First name"
           required
           error={errors.firstName?.message}
+          feedback={{
+            state: fieldState("firstName"),
+            message: "First name is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
             placeholder="e.g. Muhammad"
+            autoComplete="given-name"
+            spellCheck={false}
             {...register("firstName")}
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
               register("firstName").onChange(e);
+              changeField("firstName", fieldValidators.firstName(e.target.value));
             }}
             onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("firstName").onChange(e);
               register("firstName").onBlur(e);
+              blurField("firstName", fieldValidators.firstName(e.target.value));
             }}
           />
         </Field>
@@ -193,30 +231,39 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           label="Last name"
           required
           error={errors.lastName?.message}
+          feedback={{
+            state: fieldState("lastName"),
+            message: "Last name is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
             placeholder="e.g. Al-Rashidi"
+            autoComplete="family-name"
+            spellCheck={false}
             {...register("lastName")}
             onChange={(e) => {
               e.target.value = sanitizeNameLive(e.target.value);
               register("lastName").onChange(e);
+              changeField("lastName", fieldValidators.lastName(e.target.value));
             }}
             onBlur={(e) => {
               e.target.value = sanitizeName(e.target.value);
               register("lastName").onChange(e);
               register("lastName").onBlur(e);
+              blurField("lastName", fieldValidators.lastName(e.target.value));
             }}
           />
         </Field>
         <Field
           label="Headline"
-          hint="Mirrors the role you want, not the one you held."
+          hint="Write the job title you want next."
           error={errors.headline?.message}
         >
           <input
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
+            autoComplete="organization-title"
             {...register("headline")}
             onChange={(e) => {
               e.target.value = sanitizeJobTitleLive(e.target.value);
@@ -229,27 +276,70 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             }}
           />
         </Field>
-        <Field label="City" leftIcon="pin">
-          <input
-            className="cv-input"
-            placeholder="e.g. Dubai, UAE"
-            style={{ paddingLeft: ICON_INPUT_PAD }}
-            {...register("location")}
-            onChange={(e) => {
-              e.target.value = sanitizeLocationLive(e.target.value);
-              register("location").onChange(e);
-            }}
-            onBlur={(e) => {
-              e.target.value = sanitizeLocation(e.target.value);
-              register("location").onChange(e);
-              register("location").onBlur(e);
-            }}
-          />
+        {/* Emirate select (audit UX-9): emirate is a primary recruiter
+            filter on Bayt/NaukriGulf, but location was a bare free-text
+            input. The select writes into the SAME personal.location string —
+            no store-shape change — with an "Other" escape to free text. */}
+        <Field label="City / Emirate" leftIcon="pin">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <select
+              className="cv-select"
+              style={{ paddingLeft: ICON_INPUT_PAD }}
+              value={
+                EMIRATE_OPTIONS.includes(watch("location") ?? "")
+                  ? (watch("location") as string)
+                  : customLocation || (watch("location") ?? "").trim() !== ""
+                    ? "__other__"
+                    : ""
+              }
+              onChange={(e) => {
+                if (e.target.value === "__other__") {
+                  setCustomLocation(true);
+                } else {
+                  setCustomLocation(false);
+                  setValue("location", e.target.value, { shouldDirty: true });
+                }
+              }}
+            >
+              <option value="">Select your emirate…</option>
+              {EMIRATE_OPTIONS.map((em) => (
+                <option key={em} value={em}>
+                  {em}
+                </option>
+              ))}
+              <option value="__other__">Other city…</option>
+            </select>
+            {(customLocation ||
+              ((watch("location") ?? "").trim() !== "" &&
+                !EMIRATE_OPTIONS.includes(watch("location") ?? ""))) && (
+              <input
+                className="cv-input"
+                placeholder="e.g. Muscat, Oman"
+                autoComplete="address-level2"
+                {...register("location")}
+                onChange={(e) => {
+                  e.target.value = sanitizeLocationLive(e.target.value);
+                  register("location").onChange(e);
+                }}
+                onBlur={(e) => {
+                  e.target.value = sanitizeLocation(e.target.value);
+                  register("location").onChange(e);
+                  register("location").onBlur(e);
+                }}
+              />
+            )}
+          </div>
         </Field>
-        <Field label="Phone" leftIcon="phone" required>
+        {/* Not marked required: the schema allows an empty phone, and the
+            label must not overstate (audit UX-19). The +971 tip still nudges
+            users to add one. */}
+        <Field label="Phone" leftIcon="phone">
           <input
             className="cv-input"
             placeholder="+971 50 123 4567"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("phone")}
             onChange={(e) => {
@@ -268,22 +358,32 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           leftIcon="mail"
           required
           error={errors.email?.message}
+          feedback={{
+            state: fieldState("email"),
+            message: (watch("email") ?? "").trim()
+              ? "Email doesn't look complete yet"
+              : "Email is still empty — you can come back anytime",
+          }}
         >
           <input
             className="cv-input"
             placeholder="yourname@email.com"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            spellCheck={false}
             style={{ paddingLeft: ICON_INPUT_PAD }}
             {...register("email")}
             onChange={(e) => {
               e.target.value = sanitizeEmail(e.target.value);
               register("email").onChange(e);
+              changeField("email", fieldValidators.email(e.target.value));
             }}
             onBlur={(e) => {
               register("email").onBlur(e);
-              setFieldError("email", validateEmail(e.target.value));
+              blurField("email", fieldValidators.email(e.target.value));
             }}
           />
-          <FieldError message={fieldErrors.email ?? null} />
         </Field>
         </div>
 

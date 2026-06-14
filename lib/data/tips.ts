@@ -30,7 +30,7 @@ export const tips: UaeTip[] = [
     id: "visa-status-first",
     quote:
       "UAE recruiters scan visa status in the first three seconds. Put yours up top, not buried at the bottom.",
-    citation: "Based on 1,200+ Bayt & LinkedIn UAE listings, 2024.",
+    citation: "From our review of UAE job listings on Bayt and LinkedIn, 2024.",
     stepId: "personal",
   },
   {
@@ -43,8 +43,8 @@ export const tips: UaeTip[] = [
   {
     id: "english-arabic-bilingual",
     quote:
-      "Bilingual Arabic-English candidates receive 38% more interview callbacks for UAE government and semi-government roles.",
-    citation: "Interior360 internal hiring review, Q1 2025.",
+      "Bilingual Arabic-English candidates get noticeably more interview callbacks for UAE government and semi-government roles.",
+    citation: "Pattern from hands-on hiring reviews at Interior360, 2025.",
     stepId: "languages",
   },
   {
@@ -57,8 +57,8 @@ export const tips: UaeTip[] = [
   {
     id: "experience-quantify",
     quote:
-      "‘Led a team’ tells nothing. ‘Led 14 people across 3 sites to AED 42M revenue’ tells a story.",
-    citation: "Internal review of 850 UAE operations CVs, 2024.",
+      "‘Led a team’ says nothing. ‘Led 14 people across 3 sites to AED 42M revenue’ shows what you did.",
+    citation: "From hands-on reviews of UAE operations CVs, 2024.",
     stepId: "experience",
   },
   {
@@ -85,8 +85,8 @@ export const tips: UaeTip[] = [
   {
     id: "skills-mirror-jd",
     quote:
-      "Mirror the exact wording of the job description. ‘Stakeholder management’ and ‘client liaison’ are not the same string to an ATS.",
-    citation: "Internal Interior360 ATS audit, 2024.",
+      "Copy the exact wording of the job description. To an ATS, ‘stakeholder management’ and ‘client liaison’ are different skills.",
+    citation: "From hands-on ATS testing at Interior360, 2024.",
     stepId: "skills",
   },
   {
@@ -99,14 +99,14 @@ export const tips: UaeTip[] = [
   {
     id: "projects-tools",
     quote:
-      "On project bullets, name the tools. ‘Built a dashboard in Power BI’ outperforms ‘Built a dashboard’ by 22% on first-pass ATS matches.",
-    citation: "Internal Interior360 ATS audit, 2024.",
+      "On project bullets, name the tools. ‘Built a dashboard in Power BI’ beats ‘Built a dashboard’ in ATS keyword matching.",
+    citation: "From hands-on ATS testing at Interior360, 2024.",
     stepId: "projects",
   },
   {
     id: "review-length",
     quote:
-      "One page for under five years, two for five plus. Three is for academics and C-suite, not the rest of us.",
+      "One page if you have under five years of experience, two pages for more. Three pages is only for academics and executives.",
     citation: "Bayt UAE recruiter panel, 2024.",
     stepId: "review",
   },
@@ -122,6 +122,10 @@ export const tips: UaeTip[] = [
     quote:
       "Photos are accepted by most UAE employers but toggle them off when applying to blind-hiring international companies.",
     citation: "ILO global hiring practices brief, 2023.",
+    // Scoped to the step that owns the photo control — as a universal tip it
+    // was mathematically unreachable (personal has scoped tips that always
+    // win the rotation; audit UX-10).
+    stepId: "personal",
   },
   {
     id: "headline-mirror-role",
@@ -134,7 +138,7 @@ export const tips: UaeTip[] = [
     id: "summary-length",
     quote:
       "Aim for 40 to 80 words in the summary. Anything shorter reads like a placeholder; anything longer gets skipped.",
-    citation: "Internal Interior360 writing review, Q4 2024.",
+    citation: "From hands-on CV writing reviews at Interior360, 2024.",
     stepId: "summary",
   },
   {
@@ -155,13 +159,13 @@ export const tips: UaeTip[] = [
     id: "languages-cefr",
     quote:
       "Use ‘Native’, ‘Fluent’, ‘Professional’ or ‘Conversational’ — not numeric scales. UAE recruiters scan by label, not band.",
-    citation: "Internal Interior360 writing review, 2024.",
+    citation: "From hands-on CV writing reviews at Interior360, 2024.",
     stepId: "languages",
   },
   {
     id: "availability-immediate",
     quote:
-      "If you can start within 30 days, write ‘Immediate’ or ‘30 days notice’. Vague ‘negotiable’ entries drop down the pile.",
+      "If you can start within 30 days, write ‘Immediate’ or ‘30 days notice’. A vague ‘negotiable’ gets your CV skipped.",
     citation: "Bayt UAE recruiter survey, 2024.",
     stepId: "personal",
   },

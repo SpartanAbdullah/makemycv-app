@@ -4,7 +4,13 @@
 // unspecified: worker CDN URL must be reachable; swap for local path in offline envs.
 
 import type { ImportAdapter, ParsedDocument } from "./adapter";
+import { ImportParseError } from "./adapter";
 import { parseTextToDocument } from "./textParser";
+
+// Below this many characters of extracted text, the PDF is almost
+// certainly a scanned image with no usable text layer (mirrors the
+// /resume-checker dropzone's guard).
+const MIN_TEXT_LENGTH = 200;
 
 type PdfTextItemLike = {
   str: string;
@@ -121,12 +127,26 @@ export async function extractPdfTextInBrowser(input: File): Promise<string> {
 
   const pdfjsLib = await import("pdfjs-dist");
 
-  // Point worker to CDN — avoids shipping the large worker bundle.
-  // unspecified: replace with a local /public path if CDN is unavailable.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-
   const arrayBuffer = await input.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  // Worker is self-hosted (audit PERF-8): the old cdnjs URL failed at the
+  // exact moment a user uploads on corporate networks and under ad/privacy
+  // blockers — common for job seekers uploading from office machines. The
+  // vendored copy in /public is version-locked to the installed pdfjs-dist;
+  // after upgrading the package, re-run:
+  //   Copy-Item node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/
+  // The CDN stays as a catch-retry fallback. Each attempt gets its own
+  // buffer copy because pdfjs transfers (detaches) the ArrayBuffer it
+  // receives.
+  let pdf;
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+  } catch (err) {
+    console.warn("[pdfAdapter] local worker failed, retrying via CDN:", err);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+  }
 
   const pageTexts: string[] = [];
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -146,12 +166,27 @@ export const pdfAdapter: ImportAdapter = {
   async parse(input: File): Promise<ParsedDocument> {
     if (typeof window === "undefined") return {};
 
+    // Failures THROW typed errors instead of resolving `{}` (audit UX-18) —
+    // the old swallow-to-empty behavior made every failure mode (corrupt
+    // file, scanned image, odd layout) land on the same dead-end "No fields
+    // could be extracted" review screen, and BuilderShell's error UI was
+    // unreachable.
+    let fullText: string;
     try {
-      const fullText = await extractPdfTextInBrowser(input);
-      return parseTextToDocument(fullText);
+      fullText = await extractPdfTextInBrowser(input);
     } catch (err) {
-      console.warn("[pdfAdapter] Parse failed:", err);
-      return {};
+      console.warn("[pdfAdapter] Extraction failed:", err);
+      throw new ImportParseError(
+        "corrupt-file",
+        "This PDF could not be opened. It may be corrupted or password-protected.",
+      );
     }
+    if (fullText.trim().length < MIN_TEXT_LENGTH) {
+      throw new ImportParseError(
+        "empty-text",
+        "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again.",
+      );
+    }
+    return parseTextToDocument(fullText);
   },
 };

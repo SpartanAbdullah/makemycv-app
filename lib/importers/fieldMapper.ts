@@ -44,7 +44,11 @@ function seedHeadline(experience: ParsedExperience[] | undefined): string {
 export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
   const result: Partial<CvData> = {};
 
-  if (parsed.contact || parsed.summary) {
+  const hasUae =
+    parsed.uae &&
+    Object.values(parsed.uae).some((v) => (v ?? "").trim().length > 0);
+
+  if (parsed.contact || parsed.summary || hasUae) {
     const nameParts = (parsed.contact?.name ?? "").trim().split(/\s+/);
     result.personal = {
       ...defaultCvData.personal,
@@ -56,7 +60,13 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       linkedin: parsed.contact?.linkedin ?? "",
       website: parsed.contact?.website ?? "",
       summary: parsed.summary ?? "",
-      headline: seedHeadline(parsed.experience),
+      headline: parsed.contact?.headline?.trim() || seedHeadline(parsed.experience),
+      // UAE recruiter signals from labeled lines (wave-3 parser work) —
+      // these land directly in the UAE Essentials fields.
+      nationality: parsed.uae?.nationality ?? "",
+      visaStatus: parsed.uae?.visaStatus ?? "",
+      availability: parsed.uae?.availability ?? "",
+      drivingLicense: parsed.uae?.drivingLicense ?? "",
     };
   }
 
@@ -86,6 +96,8 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
         startDate: edu.startDate ?? "",
         endDate: edu.endDate ?? "",
         notes: edu.notes ?? "",
+        attested: edu.attested ?? false,
+        attestingBody: edu.attestingBody ?? "",
       }));
   }
 
@@ -112,5 +124,82 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       }));
   }
 
+  // Projects were detected by the parser but silently discarded before the
+  // 2026-06 wave-3 work — now they round-trip into the builder.
+  if (parsed.projects?.length) {
+    result.projects = parsed.projects
+      .filter((p) => (p.name ?? "").trim() || p.bullets?.length)
+      .map((p) => ({
+        id: createId(),
+        name: p.name ?? "",
+        link: p.link ?? "",
+        bullets: p.bullets?.filter(Boolean).length
+          ? p.bullets.filter(Boolean)
+          : [""],
+      }));
+  }
+
   return result;
 };
+
+/**
+ * Inverse mapping: CvData → ParsedDocument. Used by the report→builder
+ * handoff so the AI-parsed CV flows through the SAME MappingReview screen
+ * as the heuristic import, instead of landing in the store unreviewed
+ * (audit UX-8). Skill/language levels aren't representable in
+ * ParsedDocument, but the checker's CVs never carry them anyway — they
+ * were produced by mapParsedToCv in the first place.
+ */
+export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
+  contact: {
+    name:
+      [cv.personal.firstName, cv.personal.lastName]
+        .map((s) => (s ?? "").trim())
+        .filter(Boolean)
+        .join(" ") || undefined,
+    headline: cv.personal.headline || undefined,
+    email: cv.personal.email || undefined,
+    phone: cv.personal.phone || undefined,
+    location: cv.personal.location || undefined,
+    linkedin: cv.personal.linkedin || undefined,
+    website: cv.personal.website || undefined,
+  },
+  summary: cv.personal.summary ?? "",
+  experience: cv.experience.map((e) => ({
+    company: e.company,
+    role: e.role,
+    location: e.location,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    isCurrent: e.isCurrent,
+    bullets: e.bullets.filter(Boolean),
+  })),
+  education: cv.education.map((e) => ({
+    school: e.school,
+    degree: e.degree,
+    field: e.field,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    notes: e.notes,
+    attested: e.attested,
+    attestingBody: e.attestingBody,
+  })),
+  skills: cv.skills.map((s) => s.name).filter(Boolean),
+  languages: cv.languages.map((l) => l.name).filter(Boolean),
+  certifications: cv.certifications.map((c) => ({
+    name: c.name,
+    issuer: c.issuer,
+    date: c.date,
+  })),
+  projects: (cv.projects ?? []).map((p) => ({
+    name: p.name,
+    link: p.link,
+    bullets: p.bullets.filter(Boolean),
+  })),
+  uae: {
+    nationality: cv.personal.nationality || undefined,
+    visaStatus: cv.personal.visaStatus || undefined,
+    availability: cv.personal.availability || undefined,
+    drivingLicense: cv.personal.drivingLicense || undefined,
+  },
+});

@@ -218,6 +218,10 @@ export default function UploadDropzone() {
               <div className="text-sm text-slate-500">
                 PDF only · max 5MB · no sign-up
               </div>
+              <div className="mt-1 text-xs text-slate-400">
+                Your file is read in this browser — only the extracted text
+                is sent to build your report.
+              </div>
             </div>
           )}
 
@@ -286,7 +290,7 @@ export default function UploadDropzone() {
             }
           />
           <TrustChip
-            label="Result in 30 seconds"
+            label="Results in under a minute"
             icon={
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />

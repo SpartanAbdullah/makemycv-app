@@ -140,7 +140,20 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
   const handleKofi = () => markTippedAndAdvance(KOFI_URL);
   const handlePaypal = () => markTippedAndAdvance(PAYPAL_URL);
 
+  // Native share sheet first (WhatsApp is the default share channel for the
+  // UAE audience — audit ENG-18), clipboard as the desktop fallback.
   const handleCopyShare = async () => {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "MakeMyCV — free UAE CV builder",
+          url: SHARE_URL,
+        });
+      } catch {
+        /* share sheet dismissed */
+      }
+      return;
+    }
     try {
       await navigator.clipboard.writeText(SHARE_URL);
       setShareCopied(true);
@@ -197,7 +210,7 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
             right: 0,
             height: 4,
             background:
-              "linear-gradient(90deg, #2563eb 0%, #4f46e5 50%, #2563eb 100%)",
+              "linear-gradient(90deg, var(--ff-accent) 0%, var(--ff-accent-dark) 50%, var(--ff-accent) 100%)",
           }}
         />
 
@@ -310,7 +323,7 @@ function PickingView({
       <button
         type="button"
         onClick={onKofi}
-        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--ff-accent)] px-6 py-4 text-base font-bold text-white transition-colors hover:bg-[var(--ff-accent-dark)] active:bg-[var(--ff-accent-dark)]"
       >
         <KofiIcon size={22} />
         <span>Tip via Ko-fi</span>
@@ -437,7 +450,7 @@ function ThanksView({
             cursor: "pointer",
           }}
         >
-          {shareCopied ? "Link copied ✓" : "Copy share link"}
+          {shareCopied ? "Link copied ✓" : "Share with a friend"}
         </button>
       </div>
 

@@ -137,3 +137,27 @@ Ko-fi offers PayPal as a payout method alternative. The supporter pays via Ko-fi
 - → When triggered: obtain UAE freelance permit, reinstate Pro tier, integrate Stripe direct
 
 ---
+
+## 2026-06-12 — Path B UNLOCKED: Trade Licence Obtained; Pro/Coupon Deletion Cancelled
+
+### What changed
+1. **Founder obtained a UAE business licence (June 2026); corporate bank account opening starts next.** The legal blocker behind the 2026-05-31 free pivot is resolved.
+2. **The planned deletion of the Pro/coupon scaffolding is CANCELLED.** `isPro`, `proAccessSource`, `lib/config/coupons.ts`, `/api/coupons/apply`, and `lib/server/couponRedemptions.ts` stay in the codebase. They will be revived for the paid tier rather than rebuilt. Code comments updated from "TODO: remove" to "KEEP".
+3. Tip jar remains live during the transition; paid plans/models/offers to be designed next (Stripe + Tap, UAE-localized pricing).
+
+### Why
+- The free pivot was a licensing workaround, not a business-model conviction. With the licence in hand, monetization work resumes deliberately: payment plans, models, offers — sequenced after the cvtoolspro-style builder upgrade and JD Match.
+- Keeping the dormant scaffolding saves rebuild effort and preserves the documented access-state patterns (localStorage keys, coupon validation, redemption flow). Known caveat to fix on revival: JSON-file coupon redemptions are broken on serverless — move to Vercel KV/DB before any real gating.
+
+### Also shipped today (2026-06-12)
+- Error boundaries across both repos: `app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx` in both; `app/builder/error.tsx`, `app/resume-checker/error.tsx`, and a reusable `components/ui/ErrorBoundary.tsx` isolating the template preview island in the app. All copy reassures users their CV data is browser-local and safe.
+- Stale-doc banners added: AUDIT_APP.md (historical), smoke-test docs ($5 CTA renamed).
+
+### New product directions registered (specs/strategy to follow)
+- cvtoolspro.com-style split-screen builder UX with custom actions + user-controlled CV formatting (UAE essentials retained).
+- JD Match (existing spec) with a hardened parser.
+- Soft-skills mapping for UAE work culture (expat-focused).
+- Admin portal (founder), Partner program (typing centers + HR professionals).
+- Pipeline (explicitly deferred): cover letter generator, application tracker.
+
+---

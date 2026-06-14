@@ -58,14 +58,14 @@ function BulletsView({
         {cards.map((card, i) => (
           <div
             key={i}
-            className={`rounded-xl border p-3 transition ${card.selected ? "border-indigo-300 bg-indigo-50/50" : "border-gray-200 bg-gray-50"}`}
+            className={`rounded-xl border p-3 transition ${card.selected ? "border-[var(--ff-accent)] bg-[var(--ff-accent-soft)]" : "border-gray-200 bg-gray-50"}`}
           >
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={card.selected}
                 onChange={() => toggle(i)}
-                className="mt-1 accent-indigo-600"
+                className="mt-1 accent-[var(--ff-accent)]"
               />
               {!card.editing && (
                 <span className="text-sm text-gray-800 flex-1">{card.text}</span>
@@ -76,13 +76,13 @@ function BulletsView({
                 rows={2}
                 value={card.text}
                 onChange={(e) => setText(i, e.target.value)}
-                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
               />
             )}
             <button
               type="button"
               onClick={() => toggleEdit(i)}
-              className="mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              className="mt-1 text-xs font-medium text-[var(--ff-accent)] hover:text-[var(--ff-accent-dark)]"
             >
               {card.editing ? "Done" : "Edit"}
             </button>
@@ -93,7 +93,7 @@ function BulletsView({
         type="button"
         disabled={selected.length === 0}
         onClick={() => onApply(selected)}
-        className="mt-4 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-40"
+        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
       >
         Apply Selected Bullets
       </button>
@@ -138,8 +138,8 @@ function SkillsView({
             onClick={() => toggle(i)}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               selected.has(i)
-                ? "border-indigo-600 bg-indigo-600 text-white"
-                : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                ? "border-[var(--ff-accent)] bg-[var(--ff-accent)] text-white"
+                : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)] hover:bg-[var(--ff-accent-soft)]"
             }`}
           >
             {skill}
@@ -150,7 +150,7 @@ function SkillsView({
         type="button"
         disabled={count === 0}
         onClick={() => onApply(results.filter((_, i) => selected.has(i)))}
-        className="mt-4 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-40"
+        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
       >
         Add {count} Skill{count !== 1 ? "s" : ""} to My CV
       </button>
@@ -194,7 +194,7 @@ function SummaryView({
             }}
             className={`cursor-pointer rounded-xl border-2 p-4 transition ${
               selectedIdx === i
-                ? "border-indigo-500 bg-indigo-50"
+                ? "border-[var(--ff-accent)] bg-[var(--ff-accent-soft)]"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
@@ -207,7 +207,7 @@ function SummaryView({
                 value={text}
                 onChange={(e) => setText(i, e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
               />
             ) : (
               <p className="text-sm leading-relaxed text-gray-700">{text}</p>
@@ -218,7 +218,7 @@ function SummaryView({
                 e.stopPropagation();
                 setEditingIdx(editingIdx === i ? null : i);
               }}
-              className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              className="mt-2 text-xs font-medium text-[var(--ff-accent)] hover:text-[var(--ff-accent-dark)]"
             >
               {editingIdx === i ? "Done editing" : "Edit this variation"}
             </button>
@@ -228,7 +228,7 @@ function SummaryView({
       <button
         type="button"
         onClick={() => onApply([texts[selectedIdx]])}
-        className="mt-4 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
       >
         Use This Summary
       </button>
@@ -292,11 +292,11 @@ export function AIResultsModal({
         {/* Loading state */}
         {isLoading && (
           <div className="flex flex-col items-center py-12">
-            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-indigo-600" />
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[var(--ff-accent)]" />
             <p className="text-sm font-medium text-gray-600">
               Claude is writing for you...
             </p>
-            <span className="mt-2 inline-block h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
+            <span className="mt-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--ff-accent)]" />
           </div>
         )}
 
@@ -315,11 +315,38 @@ export function AIResultsModal({
                 href={error.supportUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                className="mt-4 rounded-xl bg-[var(--ff-accent)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
               >
                 Support MakeMyCV
               </a>
             )}
+            {/* Free third exit — peak appreciation, possibly zero budget
+                (audit ENG-18). Native share sheet first, clipboard fallback. */}
+            <button
+              type="button"
+              onClick={async () => {
+                const url = "https://makemycv.ae";
+                if (typeof navigator.share === "function") {
+                  try {
+                    await navigator.share({
+                      title: "MakeMyCV — free UAE CV builder",
+                      url,
+                    });
+                  } catch {
+                    /* share sheet dismissed */
+                  }
+                  return;
+                }
+                try {
+                  await navigator.clipboard.writeText(url);
+                } catch {
+                  /* clipboard blocked */
+                }
+              }}
+              className="mt-3 text-sm text-gray-500 underline cursor-pointer hover:text-gray-700"
+            >
+              Can&apos;t tip? Sharing helps too &rarr;
+            </button>
             <button
               type="button"
               onClick={onClose}

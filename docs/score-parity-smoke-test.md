@@ -1,5 +1,9 @@
 # Score Parity — Manual Smoke Test
 
+> **⚠️ Stale-copy note (added 2026-06-12):** "Fix in Builder — $5" below refers to the
+> pre-2026-05-31 paid CTA; the $5 label was removed with the paywall (DECISION_LOG.md).
+> Read it as the plain "Fix in Builder" CTA. Parity methodology is unchanged and current.
+
 The ATS Checker and the Builder pill must produce the **same score** on the same CV. This doc is how we verify that.
 
 ## Why parity matters

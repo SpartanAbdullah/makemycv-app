@@ -105,8 +105,9 @@ export default async function ReportPage({
             {firstName === "your" ? "your" : `${firstName}'s`} CV.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Save this URL if you want to return. Reports are anonymous and
-            auto-delete in 24 hours.
+            Save this URL if you want to return. Not linked to any account —
+            anyone with this link can view it until it auto-deletes in 24
+            hours.
           </p>
         </div>
       </section>
@@ -119,6 +120,9 @@ export default async function ReportPage({
             {score.categories.map((cat) => (
               <CategoryCard key={cat.category} category={cat} />
             ))}
+            {/* Sentinel for PostReportTipJar — the tip prompt waits until
+                the reader actually reaches the end of the report. */}
+            <div data-report-end aria-hidden />
           </div>
         </div>
       </section>
@@ -140,9 +144,9 @@ export default async function ReportPage({
         <FixInBuilderButton reportId={reportId} />
       </div>
 
-      {/* Tip jar — fires 1500ms after the report mounts (the ATS check success
-          moment). Suppressed for 90 days after a tip or dismissal, and once
-          per session. NOT a blocker. */}
+      {/* Tip jar — opens when the reader reaches the end of the report (or
+          after 45s dwell). Suppressed for 90 days after a tip or dismissal,
+          and once per session. NOT a blocker. */}
       <PostReportTipJar />
     </main>
   );

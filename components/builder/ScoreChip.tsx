@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ScoreReport } from "../../lib/resumeChecker/types";
+import type { ScoreGrade, ScoreReport } from "../../lib/resumeChecker/types";
+import { GRADE_CHIP_LABELS } from "../../lib/scoreEngine";
 import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 
 type Tier = "danger" | "warn" | "ok" | "great";
 
-function tierFor(score: number): Tier {
-  if (score < 50) return "danger";
-  if (score < 70) return "warn";
-  if (score < 85) return "ok";
-  return "great";
-}
+// Tier (color treatment) derives from the engine grade — the chip used to
+// hardcode its own 50/70/85 thresholds, so a 65–69 CV showed "Strong CV"
+// on the Review step and amber "Fair" here simultaneously (audit §4).
+const TIER_BY_GRADE: Record<ScoreGrade, Tier> = {
+  poor: "danger",
+  "needs-work": "warn",
+  good: "ok",
+  excellent: "great",
+};
 
 const TIER_STYLE: Record<
   Tier,
@@ -43,6 +47,9 @@ const TIER_STYLE: Record<
   },
 };
 
+// Circumference of the score dial ring (r = 13).
+const RING_CIRC = 2 * Math.PI * 13;
+
 export const ScoreChip = ({
   report,
   delta,
@@ -51,10 +58,25 @@ export const ScoreChip = ({
   delta?: number;
 }) => {
   const animated = useAnimatedNumber(report.total);
-  const tier = tierFor(report.total);
+  const tier = TIER_BY_GRADE[report.grade];
   const style = TIER_STYLE[tier];
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // How far (px) the popover shifts right of its default right:0 anchor so it
+  // stays on-screen on narrow phones — anchored to the chip's right edge, a
+  // 320px panel can spill past the LEFT viewport edge on ~360px screens.
+  const [shiftRight, setShiftRight] = useState(0);
+
+  const openPopover = () => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (rect) {
+      const width = Math.min(320, window.innerWidth - 32);
+      const left = rect.right - width;
+      setShiftRight(left < 16 ? 16 - left : 0);
+    }
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +87,18 @@ export const ScoreChip = ({
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   // Pull the top open issues (errors first, then reviews), capped at 3.
@@ -80,43 +114,73 @@ export const ScoreChip = ({
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        className="cv-score-chip"
+        onClick={() => (open ? setOpen(false) : openPopover())}
         aria-label={`CV Score: ${report.total} out of 100. Click for details.`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "5px 5px 5px 12px",
           background: style.bg,
           border: `1px solid ${style.border}`,
-          borderRadius: 999,
-          cursor: "pointer",
-          transition: "border-color 120ms, background 120ms",
         }}
       >
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            color: style.labelFg,
-            letterSpacing: "0.12em",
-            fontWeight: 600,
-          }}
-        >
-          SCORE
+        {/* Score dial — ring fills with the score, exact number inside */}
+        <span style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 32 32"
+            style={{ display: "block", transform: "rotate(-90deg)" }}
+            aria-hidden="true"
+          >
+            <circle cx="16" cy="16" r="13" fill="none" stroke={style.border} strokeWidth="3" />
+            <circle
+              cx="16"
+              cy="16"
+              r="13"
+              fill="none"
+              stroke={style.fg}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRC}
+              strokeDashoffset={RING_CIRC * (1 - Math.min(100, Math.max(0, report.total)) / 100)}
+              style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.2,0.8,0.2,1)" }}
+            />
+          </svg>
+          <span
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              fontFamily: "var(--font-display)",
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: style.fg,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {animated}
+          </span>
         </span>
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 15,
-            color: style.fg,
-            fontWeight: 700,
-            minWidth: 22,
-            textAlign: "center",
-          }}
-        >
-          {animated}
+        {/* Label + grade — hidden on the tightest screens (the dial stands alone) */}
+        <span className="hidden sm:flex" style={{ flexDirection: "column", lineHeight: 1.15, textAlign: "left" }}>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.12em",
+              fontWeight: 600,
+              color: style.labelFg,
+            }}
+          >
+            CV SCORE
+          </span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: style.fg }}>
+            {GRADE_CHIP_LABELS[report.grade]}
+          </span>
         </span>
         {delta !== undefined && delta !== 0 && (
           <span
@@ -142,8 +206,8 @@ export const ScoreChip = ({
           style={{
             position: "absolute",
             top: "calc(100% + 8px)",
-            right: 0,
-            width: 320,
+            right: -shiftRight,
+            width: "min(320px, calc(100vw - 32px))",
             background: "var(--ff-card)",
             border: "1px solid var(--ff-line)",
             borderRadius: 14,
@@ -178,10 +242,7 @@ export const ScoreChip = ({
                 fontWeight: 600,
               }}
             >
-              {tier === "danger" && "Needs work"}
-              {tier === "warn" && "Fair"}
-              {tier === "ok" && "Strong"}
-              {tier === "great" && "Excellent"}
+              {GRADE_CHIP_LABELS[report.grade]}
             </span>
           </div>
 

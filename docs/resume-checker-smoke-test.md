@@ -1,5 +1,11 @@
 # Resume Checker — Manual Smoke Test
 
+> **⚠️ Stale-copy note (added 2026-06-12):** the "Fix in Builder — $5" CTA referenced
+> below was renamed when the $5 paywall was removed (DECISION_LOG.md 2026-05-31).
+> The CTA is now free/unlabelled-by-price — read "$5" steps as the plain
+> "Fix in Builder" CTA. Steps otherwise remain valid. Update the labels here
+> when the paid tier returns (license obtained June 2026; payments on roadmap).
+
 Run these before promoting to production. Nothing here is automated — there is no test runner in the repo yet.
 
 ## Prerequisites

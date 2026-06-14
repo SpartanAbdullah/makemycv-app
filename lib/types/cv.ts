@@ -7,7 +7,11 @@ export type LanguageLevel =
   | "native"
   | "beginner"
   | "intermediate"
-  | "advanced";
+  | "advanced"
+  // Written by the v1→v2 migration (lib/store/migrate.ts maps the legacy
+  // "advanced" language level to "fluent"); the union was missing it, so
+  // migrated users carried a level the type system didn't model.
+  | "fluent";
 export type PlanTier = "free" | "pro";
 
 export type CvPersonal = {

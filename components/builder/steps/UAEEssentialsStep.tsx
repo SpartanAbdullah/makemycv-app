@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { personalSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { FieldError } from "../../FieldError";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import {
@@ -28,9 +27,11 @@ const ICON_INPUT_PAD = 40;
  * licence) plus optional extras (LinkedIn, Website, Nationality, Country,
  * Date of birth). Sits between Contact and Summary in the builder flow.
  *
- * Shares the `personal` store slice with PersonalStep — both bind to
- * `personalSchema` with `defaultValues: personal`. Only one step is
- * mounted at a time so there's no write race.
+ * Shares the `personal` store slice with PersonalStep (only one step is
+ * mounted at a time so there's no write race). Deliberately has NO zod
+ * resolver: every field on this screen is optional, and binding the full
+ * personalSchema meant an invalid firstName/email — fields that are not
+ * even on this screen — silently killed the Continue button (audit UX-3).
  */
 export const UAEEssentialsStep = ({
   onNext,
@@ -52,6 +53,16 @@ export const UAEEssentialsStep = ({
   const setFieldError = (field: string, error: string | null) =>
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
 
+  // Local "has content" tint (B7) for the two fields whose <Field> wraps
+  // TWO children (input + FieldError) — the Field-level default tint only
+  // reaches single-child fields. Same contract: seed from the stored
+  // value, update on blur, border-only via .cv-input-filled. A URL
+  // warning suppresses the tint (explicit feedback always wins).
+  const [extrasFilled, setExtrasFilled] = useState(() => ({
+    linkedin: (personal.linkedin ?? "").trim() !== "",
+    website: (personal.website ?? "").trim() !== "",
+  }));
+
   const {
     register,
     handleSubmit,
@@ -60,7 +71,6 @@ export const UAEEssentialsStep = ({
     setValue,
     formState: { isDirty },
   } = useForm<CvPersonal>({
-    resolver: zodResolver(personalSchema),
     defaultValues: personal,
   });
 
@@ -95,19 +105,7 @@ export const UAEEssentialsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Intro */}
-      <div>
-        <h1
-          className="cv-step-heading"
-          style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em" }}
-        >
-          UAE essentials
-        </h1>
-        <p className="cv-step-subtitle" style={{ marginTop: 6 }}>
-          Visa status, notice period, and driving licence let UAE recruiters
-          pre-screen in seconds. All optional, all valuable.
-        </p>
-      </div>
+      <StepHeader stepId="uaeEssentials" />
 
       {/* UAE Essentials block */}
       <section
@@ -137,6 +135,8 @@ export const UAEEssentialsStep = ({
           >
             UAE essentials
           </span>
+          {/* No invented point values here — the engine doesn't score these
+              fields directly (same class of claim as the removed "+4 pts"). */}
           <span
             style={{
               fontFamily: "var(--font-mono)",
@@ -145,15 +145,16 @@ export const UAEEssentialsStep = ({
               fontWeight: 600,
               letterSpacing: "0.04em",
               marginLeft: "auto",
+              textTransform: "uppercase",
             }}
           >
-            +8 pts
+            Recruiter signal
           </span>
         </div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1fr",
             gap: 12,
           }}
           className="ff-uae-grid"
@@ -175,7 +176,7 @@ export const UAEEssentialsStep = ({
               </option>
             </select>
           </Field>
-          <Field label="Availability">
+          <Field label="Availability / notice period">
             <select className="cv-select" {...register("availability")}>
               <option value="">Select availability…</option>
               <option value="Immediate">Immediate</option>
@@ -196,6 +197,26 @@ export const UAEEssentialsStep = ({
               </option>
               <option value="None">None</option>
             </select>
+          </Field>
+          {/* Promoted from "Extras" (audit UX-9): nationality is a hard
+              pre-screen field in most UAE postings — it belongs with the
+              recruiter signals and counts toward step completion. */}
+          <Field label="Nationality">
+            <input
+              className="cv-input"
+              placeholder="e.g. Emirati, Pakistani, Indian"
+              spellCheck={false}
+              {...register("nationality")}
+              onChange={(e) => {
+                e.target.value = sanitizeNameLive(e.target.value);
+                register("nationality").onChange(e);
+              }}
+              onBlur={(e) => {
+                e.target.value = sanitizeName(e.target.value);
+                register("nationality").onChange(e);
+                register("nationality").onBlur(e);
+              }}
+            />
           </Field>
         </div>
       </section>
@@ -263,8 +284,13 @@ export const UAEEssentialsStep = ({
         >
           <Field label="LinkedIn" optional leftIcon="linkedin">
             <input
-              className="cv-input"
+              className={
+                extrasFilled.linkedin ? "cv-input cv-input-filled" : "cv-input"
+              }
               placeholder="linkedin.com/in/yourname"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("linkedin")}
               onBlur={(e) => {
@@ -272,7 +298,12 @@ export const UAEEssentialsStep = ({
                 const url = sanitizeURL(e.target.value);
                 if (url !== e.target.value)
                   setValue("linkedin", url, { shouldDirty: true });
-                setFieldError("linkedin", validateLinkedIn(url));
+                const warning = validateLinkedIn(url);
+                setFieldError("linkedin", warning);
+                setExtrasFilled((prev) => ({
+                  ...prev,
+                  linkedin: !warning && url.trim() !== "",
+                }));
               }}
             />
             <FieldError
@@ -282,8 +313,13 @@ export const UAEEssentialsStep = ({
           </Field>
           <Field label="Website" optional leftIcon="globe">
             <input
-              className="cv-input"
+              className={
+                extrasFilled.website ? "cv-input cv-input-filled" : "cv-input"
+              }
               placeholder="www.yourportfolio.com"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               {...register("website")}
               onBlur={(e) => {
@@ -291,7 +327,12 @@ export const UAEEssentialsStep = ({
                 const url = sanitizeURL(e.target.value);
                 if (url !== e.target.value)
                   setValue("website", url, { shouldDirty: true });
-                setFieldError("website", validateURL(url));
+                const warning = validateURL(url);
+                setFieldError("website", warning);
+                setExtrasFilled((prev) => ({
+                  ...prev,
+                  website: !warning && url.trim() !== "",
+                }));
               }}
             />
             <FieldError
@@ -299,26 +340,12 @@ export const UAEEssentialsStep = ({
               type="warning"
             />
           </Field>
-          <Field label="Nationality" optional>
-            <input
-              className="cv-input"
-              placeholder="e.g. Emirati, Pakistani, Indian"
-              {...register("nationality")}
-              onChange={(e) => {
-                e.target.value = sanitizeNameLive(e.target.value);
-                register("nationality").onChange(e);
-              }}
-              onBlur={(e) => {
-                e.target.value = sanitizeName(e.target.value);
-                register("nationality").onChange(e);
-                register("nationality").onBlur(e);
-              }}
-            />
-          </Field>
           <Field label="Country" optional>
             <input
               className="cv-input"
               placeholder="e.g. United Arab Emirates"
+              autoComplete="country-name"
+              spellCheck={false}
               {...register("country")}
               onChange={(e) => {
                 e.target.value = sanitizeLocationLive(e.target.value);
@@ -335,6 +362,7 @@ export const UAEEssentialsStep = ({
             <input
               className="cv-input"
               placeholder="e.g. 15/03/1990"
+              autoComplete="bday"
               {...register("dateOfBirth")}
             />
           </Field>

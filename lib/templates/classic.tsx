@@ -1,5 +1,5 @@
-import type { CvData, CvSkill, PlanTier } from "../types/cv";
-import { formatDateRange } from "../utils/format";
+import type { CvData, PlanTier } from "../types/cv";
+import { formatDateRange, normalizeHref } from "../utils/format";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
@@ -7,7 +7,7 @@ import { resolveTheme } from "./theme";
 
 export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: PlanTier }) => {
   const name = getFullName(data) || "Your Name";
-  const headline = data.personal.headline || "Your Headline";
+  const headline = data.personal.headline?.trim();
   const theme = resolveTheme(data.settings, "#1e5b54");
   const photoVisible = theme.photoVisible;
   const hasSummary = Boolean(data.personal.summary);
@@ -76,7 +76,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       ? {
           icon: "💼",
           text: shortenDisplayUrl(data.personal.linkedin),
-          href: data.personal.linkedin.trim(),
+          href: normalizeHref(data.personal.linkedin),
           wrapAnywhere: true,
         }
       : null,
@@ -84,7 +84,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
       ? {
           icon: "🌐",
           text: shortenDisplayUrl(data.personal.website),
-          href: data.personal.website.trim(),
+          href: normalizeHref(data.personal.website),
           wrapAnywhere: true,
         }
       : null,
@@ -95,21 +95,9 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
   const essentialChips = getEssentialChips(data.personal);
 
-  const toTitleCase = (value: string) =>
-    value
-      .trim()
-      .split(/\s+/)
-      .map((word) => {
-        if (word.length <= 4 && word === word.toUpperCase()) return word;
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      })
-      .join(" ");
-
-  const formatSkill = (skill: CvSkill) => toTitleCase(skill.name);
-
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white px-10 py-12 text-[11.5px] leading-[1.45] text-slate-700"
+      className="cv-print relative overflow-hidden bg-white px-8 py-9 text-[11.5px] leading-[1.45] text-slate-700"
       style={{ fontFamily: theme.fontFamily }}
     >
       {plan === "free" && (
@@ -151,7 +139,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                         {item.icon}
                       </span>
                       {item.href ? (
-                        <a href={item.href} className="min-w-0 hover:text-slate-700">
+                        <a href={item.href} className="min-w-0 underline decoration-slate-300 underline-offset-2 hover:text-slate-700">
                           <span className={item.wrapAnywhere ? "break-words [overflow-wrap:anywhere]" : ""}>
                             {item.text}
                           </span>
@@ -300,7 +288,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             <div className={headingWrapClass}>
               <h2 className={headingClass}>Skills</h2>
             </div>
-            <p className={`mt-2 ${bodyClass}`}>{data.skills.map(formatSkill).join(", ")}</p>
+            <p className={`mt-2 ${bodyClass}`}>{data.skills.map((skill) => skill.name).join(", ")}</p>
           </section>
         )}
 
@@ -312,9 +300,13 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                   <h2 className={headingClass}>Languages</h2>
                 </div>
                 <p className={`mt-2 ${bodyClass}`}>
-                  {data.languages
-                    .map((lang) => `${toTitleCase(lang.name)}${lang.level ? ` (${formatLanguageLevel(lang.level)})` : ""}`)
-                    .join(" | ")}
+                  {data.languages.map((lang, index) => (
+                    <span key={lang.id}>
+                      <span className="font-semibold">{lang.name}</span>
+                      {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+                      {index < data.languages.length - 1 ? " | " : ""}
+                    </span>
+                  ))}
                 </p>
               </div>
             )}
@@ -349,7 +341,17 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 <div className={`${index === 0 ? "mt-2 " : ""}text-[12px] font-semibold text-slate-800`}>
                   {project.name?.trim() || "Project"}
                   {showLink ? (
-                    <span className="font-normal text-slate-500 break-words [overflow-wrap:anywhere]">{` | ${project.link?.trim()}`}</span>
+                    <span className="font-normal text-slate-500 break-words [overflow-wrap:anywhere]">
+                      {" | "}
+                      <a
+                        href={normalizeHref(project.link)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-slate-300 underline-offset-2"
+                      >
+                        {project.link?.trim()}
+                      </a>
+                    </span>
                   ) : null}
                 </div>
               );

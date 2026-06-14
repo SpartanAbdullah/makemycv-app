@@ -1,10 +1,8 @@
 /* Focus Flow display & UI fonts — Bricolage Grotesque (display), Inter (UI),
    Instrument Serif (editorial italic for Today's Tip), JetBrains Mono (badges
-   and counters). All Google Fonts. Local Sora/Fraunces from layout.tsx remain
-   exposed via --font-sora / --font-fraunces for any legacy callers. The
-   Google Fonts @import has to precede the Tailwind @import to satisfy the
-   CSS @import-ordering rule. */
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap');
+   and counters). All four are self-hosted via next/font in app/layout.tsx —
+   the render-blocking Google @import chain was removed in the 2026-06 audit
+   (PERF-2), along with the dead Sora/Fraunces/Poppins/Plus Jakarta loaders. */
 @import "tailwindcss";
 
 /* ─── MakeMyCV Design System v3 — "Focus Flow" ───────────────
@@ -103,13 +101,15 @@
   --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
   --space-8: 32px;  --space-10: 40px; --space-12: 48px;
 
-  /* Typography stacks */
-  --font-display: 'Bricolage Grotesque', var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body:    'Inter', var(--font-inter), system-ui, sans-serif;
-  --font-serif:   'Instrument Serif', Georgia, 'Times New Roman', serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* Brand wordmark — Poppins (loaded via next/font in app/layout.tsx). */
-  --font-brand:   var(--font-poppins), 'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
+  /* Typography stacks — next/font variables first (self-hosted), then the
+     plain family name for any environment without the loader. */
+  --font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono:    var(--font-jetbrains), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Brand wordmark token kept for back-compat; the Poppins loader was dead
+     weight (the Logo renders SVG files) and was removed in the 2026-06 audit. */
+  --font-brand:   'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
 
   /* ─── Brand tokens (May 2026 handoff) ──────────────────────
      Source of truth for marketing surfaces, social cards, and
@@ -126,7 +126,9 @@
 
   /* Builder shell metrics */
   --topbar-h:     64px;
-  --progressbar-h:58px;
+  /* Segmented-focus stepper height (context line + bar + tiny labels). The
+     labels hide ≤640px, so the bar is shorter there — overridden below. */
+  --progressbar-h:64px;
   --drawer-w:     clamp(460px, 48vw, 820px);
   --drawer-gap:   24px;
   --form-max:     clamp(540px, 44vw, 780px);
@@ -168,6 +170,12 @@
   --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
   --shadow-cta: 0 6px 20px rgba(14, 124, 74, 0.30);
   --shadow-cta-hover: 0 10px 28px rgba(14, 124, 74, 0.40);
+}
+
+/* The stepper's tiny per-step labels hide on small screens, so the bar is
+   shorter — keep --progressbar-h in sync (used by the Review preview height). */
+@media (max-width: 640px) {
+  :root { --progressbar-h: 48px; }
 }
 
 @theme inline {
@@ -236,6 +244,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ─── Keyboard focus (audit UI-4) ──────────────────────────────
+   focus-visible appeared ZERO times in the repo before 2026-06: every
+   button across all three button systems relied on the unstyled browser
+   default. One low-specificity rule (:where keeps specificity at 0 so
+   component styles can still override) gives keyboard users a visible
+   green ring without ringing mouse clicks. */
+:where(button, a, [role="button"], [role="tab"], summary):focus-visible {
+  outline: 2px solid var(--ff-accent);
+  outline-offset: 2px;
+}
+
 .font-display { font-family: var(--font-display); }
 .font-serif   { font-family: var(--font-serif); }
 .font-mono    { font-family: var(--font-mono); }
@@ -264,6 +283,32 @@ body {
   border-color: var(--ff-accent);
   box-shadow: 0 0 0 3px var(--ff-accent-ring);
   background: var(--ff-card);
+}
+
+/* ─── "Has content" tint (founder request B7, 2026-06) ─────────
+   Decorative tier applied by Field after blur when a field simply
+   has text in it. Border-only BY DESIGN — no badge: the check-glyph
+   rule applies to validity claims only, and this tier makes none.
+   Must sit BEFORE the .cv-input-valid / .cv-input-error rules so
+   equal-specificity explicit feedback wins the cascade. */
+.cv-input.cv-input-filled:not(:focus),
+.cv-select.cv-input-filled:not(:focus) {
+  border-color: color-mix(in srgb, var(--ff-accent) 38%, var(--ff-line));
+}
+
+/* ─── Blur-feedback states (guided feedback, 2026-06) ──────────
+   Applied by the Field wrapper AFTER blur, never per keystroke.
+   :not(:focus) keeps the focus ring's appearance authoritative
+   while the user is in the field. The green state pairs with a
+   check badge inside the input; padding makes room for it. */
+.cv-input.cv-input-valid:not(:focus) {
+  border-color: var(--ff-accent);
+}
+.cv-input.cv-input-valid {
+  padding-right: 38px;
+}
+.cv-input.cv-input-error:not(:focus) {
+  border-color: var(--ff-red);
 }
 
 /* Textarea variant */
@@ -367,6 +412,71 @@ body {
   border-color: var(--ff-line-strong);
 }
 
+/* ── Top-bar toolbar buttons (Score / Templates / Download) ──────────────────
+   Crisp rounded-rects with a clear hierarchy and tactile hover — a fintech /
+   SaaS product feel rather than generic marketing pills. `display` is left to
+   the element (Tailwind responsive hidden/inline-flex) so visibility rules win. */
+.cv-top-btn {
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease,
+              box-shadow 140ms ease, transform 90ms ease, color 140ms ease;
+}
+.cv-top-btn:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+.cv-top-btn:active { transform: translateY(0.5px) scale(0.99); }
+
+.cv-top-btn-secondary {
+  color: var(--ff-ink);
+  background: var(--ff-sunken);
+  border: 1px solid var(--ff-line);
+}
+.cv-top-btn-secondary:hover {
+  background: var(--ff-card);
+  border-color: var(--ff-line-strong);
+  box-shadow: 0 1px 2px rgba(11, 15, 12, 0.05);
+}
+
+.cv-top-btn-primary {
+  color: #ffffff;
+  background: var(--ff-accent);
+  border: 1px solid transparent;
+  padding: 9px 18px;
+  box-shadow: var(--shadow-cta);
+}
+.cv-top-btn-primary:hover {
+  background: var(--ff-accent-dark);
+  box-shadow: var(--shadow-cta-hover);
+  transform: translateY(-1px);
+}
+.cv-top-btn-primary:disabled {
+  cursor: wait;
+  opacity: 0.75;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Score dial chip — credit-score-style ring + number, tier-coloured inline. */
+.cv-score-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.cv-score-chip:hover { box-shadow: 0 1px 2px rgba(11, 15, 12, 0.06); }
+.cv-score-chip:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+
 /* Ghost dashed button — used for "Add another" rows */
 .cv-btn-ghost {
   display: inline-flex;
@@ -392,6 +502,30 @@ body {
 }
 .cv-btn-ghost svg { transition: transform var(--transition-base); }
 .cv-btn-ghost:hover svg { transform: rotate(90deg); }
+/* Disabled ghost buttons previously looked fully clickable (e.g. "Add
+   bullet" at the MAX_BULLETS cap) — dim and freeze them. */
+.cv-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cv-btn-ghost:disabled:hover {
+  background: transparent;
+  border-color: var(--ff-line-strong);
+  color: var(--ff-muted);
+}
+.cv-btn-ghost:disabled:hover svg { transform: none; }
+
+/* Invisible tap-area extension for small icon buttons (28px visuals reach
+   the 44px touch floor — same pattern as .cv-skill-chip-remove::before).
+   Requires position:relative on the button, which the class provides. */
+.ff-hit-target {
+  position: relative;
+}
+.ff-hit-target::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
 
 /* Danger / remove button */
 .cv-btn-danger {
@@ -546,8 +680,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: rgba(14,124,74,0.18);
   color: var(--ff-accent-dark);
@@ -556,6 +690,14 @@ body {
   flex-shrink: 0;
   border: none;
   padding: 0;
+  position: relative;
+}
+/* Invisible tap-area extension — the visible circle stays 22px but the
+   touch target reaches ~44px (audit UI-5). */
+.cv-skill-chip-remove::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
 }
 .cv-skill-chip-remove:hover {
   background: var(--ff-accent);
@@ -573,6 +715,13 @@ body {
   margin: 0;
 }
 .cv-step-heading .accent { color: var(--ff-accent); }
+/* Two-size heading scale: 32px default, 42px hero (Review step only).
+   Inline fontSize overrides on cv-step-heading are not allowed — add a
+   size class here instead (audit UI-3). */
+.cv-step-heading-hero {
+  font-size: 42px;
+  letter-spacing: -0.03em;
+}
 .cv-step-subtitle {
   font-size: 15px;
   color: var(--ff-muted);
@@ -620,17 +769,19 @@ body {
   white-space: nowrap;
   cursor: default;
 }
+/* 10px vertical padding lifts beads toward the 44px touch floor —
+   these are tappable navigation on mobile (audit UI-5). */
 .cv-bead-active {
   background: var(--ff-ink);
   color: white;
-  padding: 6px 14px;
+  padding: 10px 14px;
   font-weight: 600;
   border-color: var(--ff-ink);
 }
 .cv-bead-done {
   background: var(--ff-accent-soft);
   color: var(--ff-accent-dark);
-  padding: 6px 12px;
+  padding: 10px 12px;
   border-color: rgba(14,124,74,0.26);
   cursor: pointer;
 }
@@ -638,13 +789,26 @@ body {
 .cv-bead-future {
   background: transparent;
   color: var(--ff-muted);
-  padding: 6px 12px;
+  padding: 10px 12px;
   border-color: var(--ff-line);
+  cursor: pointer;
 }
+.cv-bead-future:hover { border-color: var(--ff-line-strong); }
+/* Amber "needs attention" — required section, visited, still incomplete
+   (guided feedback 2026-06). Tooltip/aria-label carry the meaning too,
+   so the state isn't conveyed by color alone. */
+.cv-bead-attention {
+  background: var(--ff-warn-soft);
+  color: var(--ff-warn);
+  padding: 10px 12px;
+  border-color: #F7E2A3;
+  cursor: pointer;
+}
+.cv-bead-attention:hover { border-color: var(--ff-warn); }
 .cv-bead-locked {
   background: transparent;
   color: var(--ff-faint);
-  padding: 6px 12px;
+  padding: 10px 12px;
   border-color: var(--ff-line);
   cursor: not-allowed;
   opacity: 0.7;
@@ -663,10 +827,13 @@ body {
 .cv-bead-dot-active   { background: var(--ff-accent); }
 .cv-bead-dot-done     { background: var(--ff-accent); }
 .cv-bead-dot-future   { background: transparent; border: 1.5px solid var(--ff-line-strong); color: var(--ff-faint); }
+.cv-bead-dot-attention { background: var(--ff-warn); color: white; }
 
-/* Mobile: hide the step beads scroller's separator, keep beads compact */
+/* Mobile: hide the step beads scroller's separator. Beads keep their
+   10px vertical padding — mobile is exactly where the touch-target
+   floor matters most (audit UI-5). */
 @media (max-width: 1023px) {
-  .cv-bead { font-size: 11.5px; padding-top: 5px; padding-bottom: 5px; }
+  .cv-bead { font-size: 11.5px; }
 }
 
 /* ─── Score Widget AI Border Animation (legacy) ──────────── */
@@ -865,21 +1032,11 @@ body {
 
 /* ─── TipJar component utilities ─────────────────────────────
    Ported from the marketing site so the TipJar JSX can stay
-   byte-identical to its original. Four small classes, scoped
-   tight; do not generalise without crediting the brand pack.
+   byte-identical to its original. Scoped tight; do not
+   generalise without crediting the brand pack. (.btn-primary
+   was deleted 2026-06 — zero consumers, and its blue/indigo
+   gradient clashed with the near-namesake green .cv-btn-primary.)
    Print: tip jar must never render on paper — hide it. */
-.btn-primary {
-  background-image: linear-gradient(135deg, #2563eb 0%, #4338ca 100%);
-  color: #ffffff;
-  transition: filter 150ms ease, transform 150ms ease;
-}
-.btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-.btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
 .shadow-card-blue {
   box-shadow:
     0 10px 30px -10px rgba(37, 99, 235, 0.18),

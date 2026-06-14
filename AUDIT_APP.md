@@ -1,5 +1,19 @@
 # AUDIT_APP.md — MakeMyCV Builder App
 
+> ## ⚠️ HISTORICAL DOCUMENT — DO NOT TREAT AS CURRENT STATE
+> **Status note added 2026-06-12.** This audit predates the 2026-05-31 monetization
+> pivot (see `DECISION_LOG.md`). Since it was written:
+> - The "Coming Soon" UpgradeModal was **removed**; all "$5 per download" copy was **removed** from the UI.
+> - The product shipped as fully free with a Ko-fi tip jar (`/support` on the marketing site).
+> - `isPro` is force-set to `true` as a no-op; the coupon system is **dormant but intentionally retained** —
+>   trade license obtained June 2026, payment plans (Stripe + Tap) are now back on the roadmap,
+>   and the Pro/coupon scaffolding will be revived rather than rebuilt.
+> - Error boundaries (`app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx`,
+>   segment boundaries, preview ErrorBoundary) were added 2026-06-12.
+>
+> Keep this file for historical reference only. For current state see
+> `DECISION_LOG.md`, `ROADMAP.md`, and `../MARKET-READINESS-AUDIT-2026-06-12.md`.
+
 **Audit date:** 2026-04-25
 **Auditor scope:** Repo at `C:/Users/MuhammadAbdullah/Desktop/makemycv-app/` against the UAE-first CV product strategy.
 **Method:** Static code/route/dependency audit. No code written.

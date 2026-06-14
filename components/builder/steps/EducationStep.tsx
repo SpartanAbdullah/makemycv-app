@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { educationSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { Repeater } from "../../forms/Repeater";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import {
   sanitizeCompanyName,
   sanitizeCompanyNameLive,
@@ -41,15 +45,22 @@ export const EducationStep = ({
 }) => {
   const education = useCvStore((state) => state.data.education);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(education));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // First card opens by default — matching ExperienceStep — so a first-time
+  // user lands on a typeable form, not a collapsed "Education 1" mystery
+  // card (audit UX-12). This is a REQUIRED step.
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  // Blur-time validity feedback for required entry fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
 
   const {
     register,
     handleSubmit,
     control,
     watch,
+    getValues,
     reset,
     setValue,
     formState: { errors, isDirty },
@@ -58,10 +69,26 @@ export const EducationStep = ({
     defaultValues: { education },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move, insert } = useFieldArray({
     control,
     name: "education",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveEntry = (index: number) => {
+    const removed = getValues(`education.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Education entry removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ education });
@@ -74,8 +101,13 @@ export const EducationStep = ({
   useEffect(() => {
     const subscription = watch((value) => {
       if (value.education) {
+        // id-only filter, matching every other step. The old
+        // `e.school && e.degree` condition silently DROPPED half-entered
+        // entries from the store — type a university name, tap Back, and
+        // it was gone (audit UX-6). Completion is gated separately by
+        // educationSchema in lib/utils/stepValidation.ts.
         const next = (value.education ?? []).filter(
-          (e): e is CvEducation => Boolean(e && e.id && e.school && e.degree),
+          (e): e is CvEducation => Boolean(e && e.id),
         );
         const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
@@ -100,11 +132,24 @@ export const EducationStep = ({
     setOpenIndex(fields.length);
   };
 
+  // On failed submit, open the first card that has a validation error so the
+  // inline messages are actually reachable inside the collapsed list.
+  const onInvalid = (formErrors: FieldErrors<EducationForm>) => {
+    const entryErrors = formErrors.education;
+    if (!entryErrors) return;
+    const firstErrorIndex = Object.keys(entryErrors)
+      .map(Number)
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => a - b)[0];
+    if (firstErrorIndex !== undefined) setOpenIndex(firstErrorIndex);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, onInvalid)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="education" />
 
       <section className="cv-step-card">
         <div>
@@ -146,16 +191,59 @@ export const EducationStep = ({
 
                   {isOpen && (
                     <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end" style={{ gap: 6 }}>
+                        {/* Reorder — education order (most-recent-first) is one
+                            of the app's own ATS tips, but had no affordance
+                            here (audit UX-13). */}
                         {fields.length > 1 && (
-                          <button type="button" onClick={() => remove(index)} className="cv-btn-danger">
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                move(index, index - 1);
+                                setOpenIndex(index - 1);
+                              }}
+                              disabled={index === 0}
+                              className="cv-btn-ghost"
+                              aria-label="Move entry up"
+                              title="Move up"
+                              style={{ padding: "8px 10px", opacity: index === 0 ? 0.4 : 1 }}
+                            >
+                              <Icon name="chevron-up" size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                move(index, index + 1);
+                                setOpenIndex(index + 1);
+                              }}
+                              disabled={index === fields.length - 1}
+                              className="cv-btn-ghost"
+                              aria-label="Move entry down"
+                              title="Move down"
+                              style={{ padding: "8px 10px", opacity: index === fields.length - 1 ? 0.4 : 1 }}
+                            >
+                              <Icon name="chevron-down" size={12} />
+                            </button>
+                          </>
+                        )}
+                        {fields.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveEntry(index)} className="cv-btn-danger">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                             Remove
                           </button>
                         )}
                       </div>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        <Field label="Degree / Qualification" error={errors.education?.[index]?.degree?.message}>
+                        <Field
+                          label="Degree / Qualification"
+                          error={errors.education?.[index]?.degree?.message}
+                          feedback={{
+                            state: fieldState(`degree-${index}`),
+                            message:
+                              "Degree is still empty — you can come back anytime",
+                          }}
+                        >
                           <input
                             className="cv-input"
                             placeholder="e.g. Bachelor of Business Administration"
@@ -163,27 +251,41 @@ export const EducationStep = ({
                             onChange={(e) => {
                               e.target.value = sanitizeJobTitleLive(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
+                              changeField(`degree-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                             onBlur={(e) => {
                               e.target.value = sanitizeJobTitle(e.target.value);
                               register(`education.${index}.degree`).onChange(e);
                               register(`education.${index}.degree`).onBlur(e);
+                              blurField(`degree-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                           />
                         </Field>
-                        <Field label="School / University" error={errors.education?.[index]?.school?.message}>
+                        <Field
+                          label="School / University"
+                          error={errors.education?.[index]?.school?.message}
+                          feedback={{
+                            state: fieldState(`school-${index}`),
+                            message:
+                              "School is still empty — you can come back anytime",
+                          }}
+                        >
                           <input
                             className="cv-input"
                             placeholder="e.g. American University of Sharjah"
+                            autoComplete="organization"
+                            spellCheck={false}
                             {...register(`education.${index}.school`)}
                             onChange={(e) => {
                               e.target.value = sanitizeCompanyNameLive(e.target.value);
                               register(`education.${index}.school`).onChange(e);
+                              changeField(`school-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                             onBlur={(e) => {
                               e.target.value = sanitizeCompanyName(e.target.value);
                               register(`education.${index}.school`).onChange(e);
                               register(`education.${index}.school`).onBlur(e);
+                              blurField(`school-${index}`, fieldValidators.entryText(e.target.value));
                             }}
                           />
                         </Field>
@@ -203,14 +305,35 @@ export const EducationStep = ({
                             }}
                           />
                         </Field>
-                        <Field label="Start year" error={errors.education?.[index]?.startDate?.message}>
-                          <input className="cv-input" placeholder="e.g. 2018" {...register(`education.${index}.startDate`)} />
+                        <Field
+                          label="Start year"
+                          error={errors.education?.[index]?.startDate?.message}
+                          feedback={{
+                            state: fieldState(`startDate-${index}`),
+                            message:
+                              "Start year is still empty — you can come back anytime",
+                          }}
+                        >
+                          <input
+                            className="cv-input"
+                            placeholder="e.g. 2018"
+                            inputMode="numeric"
+                            {...register(`education.${index}.startDate`)}
+                            onChange={(e) => {
+                              register(`education.${index}.startDate`).onChange(e);
+                              changeField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                            }}
+                            onBlur={(e) => {
+                              register(`education.${index}.startDate`).onBlur(e);
+                              blurField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                            }}
+                          />
                         </Field>
                         <Field label="End year">
                           <input className="cv-input" placeholder="e.g. 2022" {...register(`education.${index}.endDate`)} />
                         </Field>
                         <Field label="Notes">
-                          <input className="cv-input" placeholder="e.g. Sharjah" {...register(`education.${index}.notes`)} />
+                          <input className="cv-input" placeholder="e.g. Graduated with distinction / GPA 3.8" {...register(`education.${index}.notes`)} />
                         </Field>
                       </div>
 
@@ -259,8 +382,9 @@ export const EducationStep = ({
 
                         {watch(`education.${index}.attested`) && (
                           <div style={{ marginTop: 12 }}>
-                            <label className="cv-label">Attesting Body</label>
+                            <label className="cv-label" htmlFor={`attestingBody-${index}`}>Attesting Body</label>
                             <select
+                              id={`attestingBody-${index}`}
                               value={watch(`education.${index}.attestingBody`) ?? ""}
                               onChange={(e) => {
                                 if (e.target.value === "__custom__") {
@@ -286,6 +410,7 @@ export const EducationStep = ({
                                 value={watch(`education.${index}.attestingBody`) ?? ""}
                                 onChange={(e) => setValue(`education.${index}.attestingBody`, e.target.value, { shouldDirty: true })}
                                 placeholder="Type attesting body name..."
+                                aria-label="Custom attesting body name"
                                 className="cv-input"
                                 style={{ marginTop: 8 }}
                                 autoFocus
@@ -311,7 +436,7 @@ export const EducationStep = ({
         </div>
       </section>
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext)} nextLabel="Continue to Skills" />
+      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext, onInvalid)} nextLabel="Continue to Skills" />
     </form>
   );
 };

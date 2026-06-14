@@ -74,7 +74,7 @@ export const TipJar = ({
           className="absolute inset-x-0 top-0 h-1"
           style={{
             background:
-              "linear-gradient(90deg, #2563eb 0%, #4f46e5 50%, #2563eb 100%)",
+              "linear-gradient(90deg, var(--ff-accent) 0%, var(--ff-accent-dark) 50%, var(--ff-accent) 100%)",
           }}
         />
       )}
@@ -88,22 +88,23 @@ export const TipJar = ({
           {isCompact ? "Did this help?" : "Support a free tool"}
         </h3>
         {!isCompact && (
-          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-[#2563eb]">
+          <span className="rounded-full bg-[var(--ff-accent-soft)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--ff-accent)]">
             Tip Jar
           </span>
         )}
       </div>
 
       <p className="mt-2 text-sm text-brand-muted">
-        MakeMyCV is free for everyone. Tips help cover hosting and AI costs.
+        MakeMyCV is free for everyone — including people who can&apos;t pay
+        right now. A small tip keeps it that way.
       </p>
 
-      {/* Primary CTA — Ko-fi. Big, full-width, indigo. The icon + label
+      {/* Primary CTA — Ko-fi. Big, full-width, brand green. The icon + label
           are horizontally centred with a comfortable gap. */}
       <button
         type="button"
         onClick={() => openTipUrl(KOFI_URL)}
-        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 px-6 py-4 text-base font-bold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+        className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--ff-accent)] px-6 py-4 text-base font-bold text-white transition-colors hover:bg-[var(--ff-accent-dark)] active:bg-[var(--ff-accent-dark)]"
       >
         <KofiIcon size={22} />
         <span>Tip via Ko-fi</span>

@@ -1,6 +1,7 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange, getFullName } from "./utils";
+import { getFullName } from "./utils";
+import { formatDateRange, normalizeHref } from "../utils/format";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -66,20 +67,38 @@ export const ExecSplitTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1B2A4A");
 
-  const contactParts: string[] = [
-    data.personal.email?.trim() || "",
-    data.personal.phone?.trim() || "",
-    data.personal.location?.trim() || "",
+  const contactItems = [
+    data.personal.email?.trim()
+      ? {
+          text: data.personal.email.trim(),
+          href: `mailto:${data.personal.email.trim()}`,
+        }
+      : null,
+    data.personal.phone?.trim()
+      ? {
+          text: data.personal.phone.trim(),
+          href: `tel:${data.personal.phone.trim()}`,
+        }
+      : null,
+    data.personal.location?.trim()
+      ? { text: data.personal.location.trim() }
+      : null,
     data.personal.linkedin?.trim()
-      ? shortenDisplayUrl(data.personal.linkedin)
-      : "",
+      ? {
+          text: shortenDisplayUrl(data.personal.linkedin),
+          href: normalizeHref(data.personal.linkedin),
+        }
+      : null,
     data.personal.website?.trim()
-      ? shortenDisplayUrl(data.personal.website)
-      : "",
+      ? {
+          text: shortenDisplayUrl(data.personal.website),
+          href: normalizeHref(data.personal.website),
+        }
+      : null,
     data.personal.dateOfBirth?.trim()
-      ? `DOB: ${data.personal.dateOfBirth.trim()}`
-      : "",
-  ].filter(Boolean);
+      ? { text: `DOB: ${data.personal.dateOfBirth.trim()}` }
+      : null,
+  ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
   const essentialChips = getEssentialChips(data.personal);
 
@@ -112,7 +131,7 @@ export const ExecSplitTemplate = ({
       <div
         style={{
           backgroundColor: theme.accent,
-          padding: "28px 48px 24px 48px",
+          padding: "28px 32px 24px 32px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
@@ -143,7 +162,7 @@ export const ExecSplitTemplate = ({
               {headline}
             </div>
           )}
-          {contactParts.length > 0 && (
+          {contactItems.length > 0 && (
             <div
               style={{
                 fontSize: "10px",
@@ -152,7 +171,24 @@ export const ExecSplitTemplate = ({
                 lineHeight: 1.6,
               }}
             >
-              {contactParts.join("  \u00B7  ")}
+              {contactItems.map((item, i) => (
+                <span key={`${item.text}-${i}`}>
+                  {i > 0 ? "  \u00B7  " : ""}
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      style={{
+                        color: "#CBD5E1",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {item.text}
+                    </a>
+                  ) : (
+                    item.text
+                  )}
+                </span>
+              ))}
             </div>
           )}
           {essentialChips.length > 0 && (
@@ -220,7 +256,7 @@ export const ExecSplitTemplate = ({
       <div
         style={{
           display: "flex",
-          padding: "20px 48px 40px 48px",
+          padding: "20px 32px 40px 32px",
           gap: "28px",
         }}
       >
@@ -270,7 +306,7 @@ export const ExecSplitTemplate = ({
                           whiteSpace: "nowrap" as const,
                         }}
                       >
-                        {formatRange(
+                        {formatDateRange(
                           role.startDate,
                           role.endDate,
                           role.isCurrent,
@@ -368,7 +404,7 @@ export const ExecSplitTemplate = ({
                           whiteSpace: "nowrap" as const,
                         }}
                       >
-                        {formatRange(edu.startDate, edu.endDate)}
+                        {formatDateRange(edu.startDate, edu.endDate)}
                       </span>
                     </div>
                     <div
@@ -449,7 +485,19 @@ export const ExecSplitTemplate = ({
                             marginTop: "1px",
                           }}
                         >
-                          ({project.link!.trim()})
+                          (
+                          <a
+                            href={normalizeHref(project.link)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              color: "#6B7280",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            {project.link!.trim()}
+                          </a>
+                          )
                         </div>
                       )}
                       {bullets.length > 0 && (
@@ -553,9 +601,9 @@ export const ExecSplitTemplate = ({
                       lineHeight: 1.5,
                     }}
                   >
-                    {lang.name}
+                    <span style={{ fontWeight: 600 }}>{lang.name}</span>
                     {lang.level
-                      ? ` (${formatLanguageLevel(lang.level)})`
+                      ? ` — ${formatLanguageLevel(lang.level)}`
                       : ""}
                   </div>
                 ))}

@@ -254,7 +254,7 @@ Array minimum: 0 (same step-validation pattern as languages).
 
 | Rule | Where enforced |
 | --- | --- |
-| `isCurrent: true` ⇒ `endDate` is ignored (rendered as "Present") | [`formatDateRange`](../lib/utils/format.ts), [`formatRange`](../lib/templates/utils.ts), DOCX export |
+| `isCurrent: true` ⇒ `endDate` is ignored (rendered as "Present") | [`formatDateRange`](../lib/utils/format.ts) — all 6 live templates, all 6 PDF layouts, DOCX export |
 | `isCurrent` and `endDate` are **not mutually exclusive in the schema** — Zod allows both. UI typically clears endDate via the checkbox but does not force it. | [cvSchemas.ts:25](../lib/schemas/cvSchemas.ts) |
 | Photo renders only when `personal.photo && personal.showPhoto` | All 6 templates (classic, modern, executive, ats-clean, exec-split, corp-sidebar) and `CVDocument` |
 | `attestingBody` text shown only when `attested === true` | All templates that render education |

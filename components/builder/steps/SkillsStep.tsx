@@ -7,10 +7,13 @@ import { skillsSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { createId } from "../../../lib/utils/id";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
+import { softSkillSuggestions } from "../../../lib/data/softSkills";
 import { Icon } from "../Icon";
+import { AiDisclosure } from "../AiDisclosure";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
 
 type SkillsForm = { skills: CvSkill[] };
@@ -30,6 +33,7 @@ export const SkillsStep = ({
   onBack: () => void;
 }) => {
   const skills = useCvStore((state) => state.data.skills);
+  const recentRole = useCvStore((state) => state.data.experience[0]?.role ?? "");
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(skills));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +68,6 @@ export const SkillsStep = ({
     clearResults: aiClear,
   } = useAIImprove();
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const aiTriggerChecked = useRef(false);
 
   const fireAISuggest = () => {
     const store = useCvStore.getState().data;
@@ -81,21 +84,6 @@ export const SkillsStep = ({
       existingSkills: fields.map((f) => f.name),
     });
   };
-
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "skills") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        fireAISuggest();
-      }
-    } catch {
-      /* SSR guard */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleApplySkills = (selected: string[]) => {
     const existingNames = new Set(fields.map((f) => f.name.toLowerCase()));
@@ -174,6 +162,20 @@ export const SkillsStep = ({
     setDuplicateWarning(false);
   };
 
+  // Add a skill by name (used by the UAE soft-skill chips). Mirrors
+  // handleAddSkill but takes the name directly and silently no-ops on dupes.
+  const addSkillByName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (fields.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) return;
+    const current = fields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      level: toSkillLevel(f.level ?? "intermediate"),
+    }));
+    replace([...current, { id: createId(), name: trimmed, level: toSkillLevel("intermediate") }]);
+  };
+
   const removeSkill = (index: number) => {
     const updated = fields
       .filter((_, i) => i !== index)
@@ -183,6 +185,21 @@ export const SkillsStep = ({
         level: toSkillLevel(f.level ?? "intermediate"),
       }));
     replace(updated);
+  };
+
+  // Touch/keyboard-friendly reorder — HTML5 drag never fires on mobile
+  // touch (audit UX-13), so each chip also gets explicit move buttons.
+  const moveSkill = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= fields.length) return;
+    const items = fields.map((f) => ({
+      id: f.id,
+      name: f.name,
+      level: toSkillLevel(f.level ?? "intermediate"),
+    }));
+    const [moved] = items.splice(index, 1);
+    items.splice(target, 0, moved);
+    replace(items);
   };
 
   const handleDrop = (dropIndex: number) => {
@@ -210,6 +227,7 @@ export const SkillsStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="skills" />
       <section className="cv-step-card">
         {/* Input row */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -218,6 +236,8 @@ export const SkillsStep = ({
             className="cv-input"
             style={{ flex: 1 }}
             placeholder="e.g. Project Management, SAP, AutoCAD"
+            aria-label="Add a skill"
+            spellCheck={false}
             value={inputValue}
             onChange={(e) => {
               setInputValue(sanitizeSkillLive(e.target.value));
@@ -255,11 +275,68 @@ export const SkillsStep = ({
           type="button"
           onClick={fireAISuggest}
           className="cv-btn-accent-outline"
-          style={{ width: "100%", padding: "11px", marginTop: 12, marginBottom: 14 }}
+          style={{ width: "100%", padding: "11px", marginTop: 12 }}
         >
           <Icon name="sparkle" size={13} />
           Suggest skills for my profile
         </button>
+        <div style={{ marginBottom: 14 }}>
+          <AiDisclosure align="left" />
+        </div>
+
+        {/* UAE soft-skill chips — instant, no AI. Culture-aware skills that
+            UAE recruiters screen for (cross-cultural, multilingual, etc.),
+            layered with role-specific picks. Tap to add. */}
+        {(() => {
+          const picks = softSkillSuggestions(
+            recentRole,
+            fields.map((f) => f.name),
+            10,
+          );
+          if (picks.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--ff-muted)",
+                  marginBottom: 8,
+                }}
+              >
+                Popular in the UAE · tap to add
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {picks.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => addSkillByName(name)}
+                    className="ff-hit-target"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      background: "var(--ff-card)",
+                      border: "1px dashed var(--ff-line-strong)",
+                      color: "var(--ff-ink-2)",
+                      fontSize: 13,
+                      fontFamily: "var(--font-body)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Icon name="plus" size={11} />
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Skills pills — draggable */}
         {fields.length === 0 ? (
@@ -295,6 +372,26 @@ export const SkillsStep = ({
                   {"\u283F"}
                 </span>
                 {field.name}
+                <button
+                  type="button"
+                  onClick={() => moveSkill(i, -1)}
+                  disabled={i === 0}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${field.name} earlier`}
+                  style={{ opacity: i === 0 ? 0.35 : 1 }}
+                >
+                  {"\u2039"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSkill(i, 1)}
+                  disabled={i === fields.length - 1}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${field.name} later`}
+                  style={{ opacity: i === fields.length - 1 ? 0.35 : 1 }}
+                >
+                  {"\u203A"}
+                </button>
                 <button
                   type="button"
                   onClick={() => removeSkill(i)}

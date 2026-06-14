@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { experienceSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
+import { AutoGrowTextarea } from "../../forms/AutoGrowTextarea";
+import { useBlurFeedback } from "../../forms/useBlurFeedback";
+import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
+import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
+import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
@@ -27,12 +34,15 @@ type ExperienceForm = { experience: CvExperience[] };
 export const ExperienceStep = ({
   onNext,
   onBack,
+  onSkip,
 }: {
   onNext: () => void;
   onBack: () => void;
+  onSkip?: () => void;
 }) => {
   const experience = useCvStore((state) => state.data.experience);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -52,10 +62,26 @@ export const ExperienceStep = ({
     defaultValues: { experience },
   });
 
-  const { fields, append, remove, update, move } = useFieldArray({
+  const { fields, append, remove, update, move, insert } = useFieldArray({
     control,
     name: "experience",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the entry BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveRole = (index: number) => {
+    const removed = getValues(`experience.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Role removed", {
+      actionLabel: "Undo",
+      onAction: () => {
+        insert(index, removed);
+        setOpenIndex(index);
+      },
+    });
+  };
 
   const adjustOpenIndexForMove = (from: number, to: number) => {
     setOpenIndex((prev) => {
@@ -88,29 +114,13 @@ export const ExperienceStep = ({
     clearResults: aiClear,
   } = useAIImprove();
   const [aiActiveIndex, setAiActiveIndex] = useState<number | null>(null);
+  // Which role's static UAE idea panel is expanded (zero-AI suggestions).
+  const [ideasOpenIndex, setIdeasOpenIndex] = useState<number | null>(null);
   // Suggestions queue per role. Accepting merges into bullets[]; rejecting
   // drops the suggestion from the queue.
   const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
-  const aiTriggerChecked = useRef(false);
-
-  // Auto-trigger if the user came in from the score panel.
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "bullets") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        if (fields.length > 0) {
-          handleGenerateBullets(0);
-        }
-      }
-    } catch {
-      /* SSR guard */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // Blur-time validity feedback for required entry fields (guided feedback).
+  const { fieldState, blurField, changeField } = useBlurFeedback();
   // When the hook returns results, route them into the active role's queue.
   useEffect(() => {
     if (aiActiveIndex === null) return;
@@ -154,6 +164,21 @@ export const ExperienceStep = ({
       ...prev,
       [index]: (prev[index] ?? []).filter((s) => s !== suggestion),
     }));
+  };
+
+  // Insert a static UAE idea bullet. If the last bullet is empty, fill it in
+  // place (so the user isn't left with a dangling blank); otherwise append.
+  const insertIdeaBullet = (index: number, text: string) => {
+    const entry = getValues(`experience.${index}`);
+    if (!entry) return;
+    const current = entry.bullets ?? [];
+    const filled = current.filter(Boolean);
+    if (filled.length >= MAX_BULLETS) return;
+    const lastIsEmpty = current.length > 0 && !current[current.length - 1]?.trim();
+    const next = lastIsEmpty
+      ? [...current.slice(0, -1), text]
+      : [...current, text];
+    update(index, { ...entry, bullets: next });
   };
 
   useEffect(() => {
@@ -230,21 +255,34 @@ export const ExperienceStep = ({
     setOpenIndex(fields.length);
   };
 
-  const improveAllWithAI = () => {
+  // Generates suggestions for the FIRST role only — the label must say so.
+  // Looping every role would burn the user's whole daily AI quota (10/24h).
+  const suggestBulletsWithAI = () => {
     if (fields.length === 0) return;
     handleGenerateBullets(0);
   };
 
+  // Failed submit with errors inside a collapsed card is invisible — open
+  // the first entry that has a validation error so the user can see it.
+  const openFirstErroredEntry = (formErrors: FieldErrors<ExperienceForm>) => {
+    const firstErrored = Object.keys(formErrors.experience ?? {})
+      .map(Number)
+      .filter(Number.isInteger)
+      .sort((a, b) => a - b)[0];
+    if (typeof firstErrored === "number") setOpenIndex(firstErrored);
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onNext)}
+      onSubmit={handleSubmit(onNext, openFirstErroredEntry)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
-      {/* Improve all button */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <StepHeader stepId="experience" />
+      {/* AI bullet suggestions — first (most recent) role */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <button
           type="button"
-          onClick={improveAllWithAI}
+          onClick={suggestBulletsWithAI}
           disabled={aiLoading || fields.length === 0}
           style={{
             fontFamily: "var(--font-body)",
@@ -263,8 +301,9 @@ export const ExperienceStep = ({
           }}
         >
           <Icon name="sparkle" size={13} />
-          {aiLoading ? "Generating…" : "Improve all with AI"}
+          {aiLoading ? "Generating…" : "Suggest bullets with AI"}
         </button>
+        <AiDisclosure />
       </div>
 
       {/* Roles list */}
@@ -349,20 +388,20 @@ export const ExperienceStep = ({
                         disabled={!canMoveUp}
                         label="Move up"
                       >
-                        <Icon name="chevron-left" size={12} />
+                        <Icon name="chevron-up" size={12} />
                       </CardIconBtn>
                       <CardIconBtn
                         onClick={() => reorder(index, index + 1)}
                         disabled={!canMoveDown}
                         label="Move down"
                       >
-                        <Icon name="chevron-right" size={12} />
+                        <Icon name="chevron-down" size={12} />
                       </CardIconBtn>
                     </div>
                     {fields.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => remove(index)}
+                        onClick={() => handleRemoveRole(index)}
                         className="cv-btn-danger"
                       >
                         <Icon name="trash" size={12} />
@@ -384,49 +423,79 @@ export const ExperienceStep = ({
                     <Field
                       label="Job title"
                       error={errors.experience?.[index]?.role?.message}
+                      feedback={{
+                        state: fieldState(`role-${index}`),
+                        message:
+                          "Job title is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
                         placeholder="e.g. Operations Manager"
+                        autoComplete="organization-title"
                         {...register(`experience.${index}.role`)}
                         onChange={(e) => {
                           e.target.value = sanitizeJobTitleLive(e.target.value);
                           register(`experience.${index}.role`).onChange(e);
+                          changeField(`role-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                         onBlur={(e) => {
                           e.target.value = sanitizeJobTitle(e.target.value);
                           register(`experience.${index}.role`).onChange(e);
                           register(`experience.${index}.role`).onBlur(e);
+                          blurField(`role-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                       />
                     </Field>
                     <Field
                       label="Company"
                       error={errors.experience?.[index]?.company?.message}
+                      feedback={{
+                        state: fieldState(`company-${index}`),
+                        message:
+                          "Company is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
                         placeholder="e.g. Emaar Properties"
+                        autoComplete="organization"
+                        spellCheck={false}
                         {...register(`experience.${index}.company`)}
                         onChange={(e) => {
                           e.target.value = sanitizeCompanyNameLive(e.target.value);
                           register(`experience.${index}.company`).onChange(e);
+                          changeField(`company-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                         onBlur={(e) => {
                           e.target.value = sanitizeCompanyName(e.target.value);
                           register(`experience.${index}.company`).onChange(e);
                           register(`experience.${index}.company`).onBlur(e);
+                          blurField(`company-${index}`, fieldValidators.entryText(e.target.value));
                         }}
                       />
                     </Field>
                     <Field
                       label="Start"
                       error={errors.experience?.[index]?.startDate?.message}
+                      feedback={{
+                        state: fieldState(`startDate-${index}`),
+                        message:
+                          "Start date is still empty — you can come back anytime",
+                      }}
                     >
                       <input
                         className="cv-input"
                         placeholder="e.g. Jan 2024"
                         {...register(`experience.${index}.startDate`)}
+                        onChange={(e) => {
+                          register(`experience.${index}.startDate`).onChange(e);
+                          changeField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                        }}
+                        onBlur={(e) => {
+                          register(`experience.${index}.startDate`).onBlur(e);
+                          blurField(`startDate-${index}`, fieldValidators.entryText(e.target.value));
+                        }}
                       />
                     </Field>
                     <Field label="End">
@@ -441,6 +510,7 @@ export const ExperienceStep = ({
                       <input
                         className="cv-input"
                         placeholder="e.g. Dubai"
+                        autoComplete="address-level2"
                         {...register(`experience.${index}.location`)}
                         onChange={(e) => {
                           e.target.value = sanitizeLocationLive(e.target.value);
@@ -517,11 +587,11 @@ export const ExperienceStep = ({
                         key={bulletIndex}
                         showMarker
                       >
-                        <textarea
-                          rows={2}
-                          placeholder="Describe an achievement, not a duty."
+                        <AutoGrowTextarea
+                          placeholder="What did you achieve? Start with a verb, add a number."
+                          aria-label={`Achievement ${bulletIndex + 1}`}
                           className="cv-input cv-textarea"
-                          style={{ minHeight: 56 }}
+                          minHeight={56}
                           {...register(
                             `experience.${index}.bullets.${bulletIndex}`,
                           )}
@@ -567,16 +637,74 @@ export const ExperienceStep = ({
                       <SuggestionLoading />
                     )}
 
+                    {/* Inline AI error — same affordances as the modal flow
+                        (audit UX-15): rate-limited shows the support link,
+                        other errors get a retry. */}
                     {aiError && aiActiveIndex === index && (
-                      <p
+                      <div
                         style={{
-                          fontSize: 12,
-                          color: "var(--ff-red)",
-                          padding: "8px 0",
+                          marginTop: 6,
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          background: "#FBEFED",
+                          border: "1px solid #F2D2CE",
                         }}
                       >
-                        {aiError.message}
-                      </p>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "var(--ff-red)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {aiError.message}
+                        </p>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: "flex",
+                            gap: 14,
+                            alignItems: "center",
+                          }}
+                        >
+                          {aiError.code === "RATE_LIMITED" ? (
+                            aiError.supportUrl && (
+                              <a
+                                href={aiError.supportUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: "var(--ff-accent-dark)",
+                                  textDecoration: "underline",
+                                  textUnderlineOffset: 2,
+                                }}
+                              >
+                                Support MakeMyCV
+                              </a>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateBullets(index)}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "var(--ff-ink)",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                textUnderlineOffset: 2,
+                              }}
+                            >
+                              Try again
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -587,8 +715,9 @@ export const ExperienceStep = ({
                       onClick={() => addBullet(index)}
                       className="cv-btn-ghost"
                       disabled={filledBullets >= MAX_BULLETS}
+                      style={{ width: "auto", padding: "10px 14px" }}
                     >
-                      <Icon name="plus" size={13} />
+                      <Icon name="plus" size={14} />
                       Add bullet
                     </button>
                     <button
@@ -604,6 +733,20 @@ export const ExperienceStep = ({
                         : "Generate more"}
                     </button>
                   </div>
+
+                  {/* UAE Idea Suggestions — instant, no AI quota used.
+                      Click a ready-made, UAE-flavored bullet to insert it,
+                      then fill in the blank (AED/%/headcount). */}
+                  <IdeaPanel
+                    open={ideasOpenIndex === index}
+                    onToggle={() =>
+                      setIdeasOpenIndex(ideasOpenIndex === index ? null : index)
+                    }
+                    role={role}
+                    disabled={filledBullets >= MAX_BULLETS}
+                    onInsert={(text) => insertIdeaBullet(index, text)}
+                    existingBullets={bullets.filter(Boolean)}
+                  />
 
                   {focusedBullet?.itemIndex === index && (
                     <button
@@ -653,10 +796,26 @@ export const ExperienceStep = ({
         </p>
       )}
 
+      {/* Fresh-grad escape (audit UX-2): this used to be the only content
+          step with no skip — a graduate with no formal experience hit a
+          hard validation wall with zero guidance. */}
+      <p
+        style={{
+          fontSize: 12.5,
+          lineHeight: 1.55,
+          color: "var(--ff-muted)",
+        }}
+      >
+        No formal work experience yet? Internships, volunteer work, and
+        university projects all count — add them as roles. Or skip for now
+        and come back later.
+      </p>
       <NavigationButtons
         onBack={onBack}
-        onNext={handleSubmit(onNext)}
+        onNext={handleSubmit(onNext, openFirstErroredEntry)}
         nextLabel="Continue to Education"
+        showSkip={Boolean(onSkip)}
+        onSkip={onSkip}
       />
 
       <style>{`
@@ -853,6 +1012,7 @@ const CardIconBtn = ({
     disabled={disabled}
     aria-label={label}
     title={label}
+    className="ff-hit-target"
     style={{
       width: 28,
       height: 28,
@@ -953,7 +1113,7 @@ const SuggestionBullet = ({
           textTransform: "uppercase",
         }}
       >
-        AI suggestion · +4 pts
+        AI suggestion
       </div>
       <div
         style={{
@@ -972,6 +1132,7 @@ const SuggestionBullet = ({
         onClick={onAccept}
         aria-label="Accept suggestion"
         title="Accept"
+        className="ff-hit-target"
         style={{
           width: 28,
           height: 28,
@@ -992,6 +1153,7 @@ const SuggestionBullet = ({
         onClick={onReject}
         aria-label="Reject suggestion"
         title="Reject"
+        className="ff-hit-target"
         style={{
           width: 28,
           height: 28,
@@ -1011,6 +1173,146 @@ const SuggestionBullet = ({
     </div>
   </div>
 );
+
+/* ─── UAE Idea Suggestions panel (static, zero-AI) ───────────
+   Replicates the cvtoolspro "Idea Suggestion" affordance with a
+   UAE-flavored phrase library. Collapsed by default to avoid clutter;
+   when open, lists role-matched bullets with a one-tap insert. */
+const IdeaPanel = ({
+  open,
+  onToggle,
+  role,
+  disabled,
+  onInsert,
+  existingBullets,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  role: string;
+  disabled: boolean;
+  onInsert: (text: string) => void;
+  existingBullets: string[];
+}) => {
+  const match = suggestionsForRole(role, existingBullets);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "var(--font-body)",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--ff-ink)",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+        }}
+        aria-expanded={open}
+      >
+        <Icon name="lightbulb" size={14} />
+        {open ? "Hide idea bullets" : "Need ideas? See ready-made bullets"}
+        <span
+          style={{
+            transition: "transform 150ms",
+            transform: open ? "rotate(180deg)" : "none",
+            display: "inline-flex",
+            color: "var(--ff-muted)",
+          }}
+        >
+          <Icon name="chevron-down" size={12} />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 14,
+            background: "var(--ff-sunken)",
+            border: "1px solid var(--ff-line)",
+            borderRadius: 12,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--ff-muted)",
+              marginBottom: 10,
+            }}
+          >
+            {match.label} · tap to add, then fill the blank
+          </div>
+
+          {match.bullets.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--ff-muted)" }}>
+              You&apos;ve used all the ready-made ideas for this role — try
+              &quot;Generate more&quot; for fresh AI bullets.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {match.bullets.map((idea) => (
+                <button
+                  key={idea}
+                  type="button"
+                  onClick={() => onInsert(idea)}
+                  disabled={disabled}
+                  className="ff-hit-target"
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    background: "var(--ff-card)",
+                    border: "1px solid var(--ff-line)",
+                    borderRadius: 10,
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    opacity: disabled ? 0.5 : 1,
+                    width: "100%",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 6,
+                      background: "var(--ff-accent-soft)",
+                      color: "var(--ff-accent-dark)",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    <Icon name="plus" size={11} />
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: 13.5,
+                      color: "var(--ff-ink-2)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {idea}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SuggestionLoading = () => (
   <div

@@ -30,6 +30,9 @@ export default function ExampleReportPreview() {
         <div className="flex items-center gap-2">
           <Logo variant="mark" height={22} href={null} />
           <span className="text-xs font-semibold text-slate-900">makemycv.ae · ATS Checker</span>
+          <span className="rounded-full border border-severity-review/40 bg-severity-review/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-severity-review">
+            Example report
+          </span>
         </div>
         <div className="rounded-md border border-line bg-paper px-2 py-1 text-[10px] font-medium text-slate-500">
           Share
@@ -39,7 +42,7 @@ export default function ExampleReportPreview() {
       {/* Body */}
       <div className="px-6 py-6">
         <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-          Aisha K. · Marketing Manager
+          Example: Marketing Manager CV
         </div>
 
         <div className="mt-4 flex items-center gap-5">

@@ -1,24 +1,33 @@
 "use client";
 
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates } from "../../../lib/templates";
-import { computeScore } from "../../../lib/scoreEngine";
+import {
+  computeScore,
+  computeDerivedStats,
+  GRADE_LABELS,
+} from "../../../lib/scoreEngine";
 import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
-import { DownloadTipModal, shouldShowDownloadTip } from "../../DownloadTipModal";
+import { ShareScoreCard } from "../../ShareScoreCard";
+import { useSharedScoreReport, useGuardedDownload } from "../BuilderShell";
+import type { ExportKind } from "../BuilderShell";
+import type { CvData } from "../../../lib/types/cv";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -89,20 +98,24 @@ export const ReviewStep = ({
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
 
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
-  const [downloadTipOpen, setDownloadTipOpen] = useState(false);
 
-  const score = useMemo(
+  // Reuse BuilderShell's report instead of running the engine a second
+  // time per commit (audit PERF-3). The local fallback only exists for
+  // any future mount outside the shell.
+  const sharedReport = useSharedScoreReport();
+  const fallbackReport = useMemo(
     () =>
-      computeScore(data, {
-        mode: "builder",
-        parseSignals: parseSignals ?? undefined,
-      }),
-    [data, parseSignals],
+      sharedReport
+        ? null
+        : computeScore(data, {
+            mode: "builder",
+            parseSignals: parseSignals ?? undefined,
+          }),
+    [sharedReport, data, parseSignals],
   );
+  const score = sharedReport ?? fallbackReport!;
 
   const animatedScore = useAnimatedNumber(score.total);
   const firstName =
@@ -110,30 +123,51 @@ export const ReviewStep = ({
     data.personal.lastName?.trim() ||
     "friend";
 
-  const handleExportDocx = () => exportToDocx(data);
-  // The PDF download runs immediately. On success, the post-download
-  // tip jar is scheduled ~1500ms later (suppressed if recently tipped
-  // or dismissed this session). Errors stay in the existing inline
-  // error UI — they don't open the modal.
-  const handleDownloadPdf = async () => {
-    setIsDownloading(true);
-    setDownloadError(null);
+  // Exports delegate to BuilderShell's DownloadContext — ONE export gate,
+  // ONE downloading state, ONE error bar, ONE tip-jar trigger for the whole
+  // builder (this step used to duplicate all four, which drifted from the
+  // shell's behaviour). The un-gated fallback only exists for any future
+  // mount outside the shell.
+  const guarded = useGuardedDownload();
+  const [fallbackDownloading, setFallbackDownloading] = useState(false);
+  const fallbackExport = async (kind: ExportKind) => {
+    setFallbackDownloading(true);
     try {
-      await downloadCV(data, "pro", data.settings.templateId ?? "classic");
-      if (shouldShowDownloadTip()) {
-        window.setTimeout(() => setDownloadTipOpen(true), 1500);
-      }
-    } catch {
-      setDownloadError("pdf-failed");
+      if (kind === "docx") await exportToDocx(data);
+      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
     } finally {
-      setIsDownloading(false);
+      setFallbackDownloading(false);
     }
   };
+  const isDownloading = guarded?.isDownloading ?? fallbackDownloading;
+  const requestExport = (kind: ExportKind) => {
+    if (guarded) void guarded.requestDownload(kind);
+    else void fallbackExport(kind);
+  };
 
+  const handleExportDocx = () => requestExport("docx");
+  const handleDownloadPdf = () => requestExport("pdf");
+
+  // The CV lives only in this browser's localStorage — sharing the builder
+  // URL would hand the recipient an EMPTY builder (audit UX-5). We share
+  // the product link instead, native share sheet first (WhatsApp-first UAE
+  // audience), clipboard as fallback.
   const handleShareLink = async () => {
     if (typeof navigator === "undefined") return;
+    const shareUrl = "https://makemycv.ae";
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "MakeMyCV — free UAE CV builder",
+          url: shareUrl,
+        });
+      } catch {
+        /* share sheet dismissed */
+      }
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     } catch {
@@ -149,32 +183,12 @@ export const ReviewStep = ({
     (step) => step.id !== "review" && !getStepCompletion(step, data),
   );
 
-  /* ── Stats line items for the score card ── */
-  const totalBullets = data.experience.reduce(
-    (sum, e) => sum + (e.bullets ?? []).filter(Boolean).length,
-    0,
-  );
-  const measurableBullets = data.experience.reduce(
-    (sum, e) =>
-      sum + (e.bullets ?? []).filter((b) => /\d/.test(b ?? "")).length,
-    0,
-  );
-  const uaeFilled = [
-    data.personal.visaStatus,
-    data.personal.availability,
-    data.personal.drivingLicense,
-  ].filter((v) => v && v.trim()).length;
-  const expectedPages =
-    data.experience.length <= 2 && totalBullets <= 8 ? 1 : 2;
-
-  const scoreCategoryLabel =
-    score.total >= 85
-      ? "Outstanding CV"
-      : score.total >= 65
-        ? "Strong CV"
-        : score.total >= 40
-          ? "Almost there"
-          : "Getting started";
+  /* ── Stats + label come from the engine — never recomputed locally.
+        The old local copies used different rules (untrimmed bullets, a
+        second threshold table), which is how "0 of 9 measurable bullets"
+        could sit beside "Strong CV" (audit §4 symptom b). ── */
+  const stats = useMemo(() => computeDerivedStats(data), [data]);
+  const scoreCategoryLabel = GRADE_LABELS[score.grade];
 
   return (
     <div
@@ -191,21 +205,17 @@ export const ReviewStep = ({
         >
           <div>
             <h1
-              className="cv-step-heading"
-              style={{
-                fontSize: 42,
-                fontWeight: 600,
-                letterSpacing: "-0.03em",
-              }}
+              className="cv-step-heading cv-step-heading-hero"
+              tabIndex={-1}
+              style={{ outline: "none" }}
             >
-              Looking good,
+              {score.total >= 40 ? "Looking good," : "Let's build this out,"}
               <br />
               <span className="accent">{firstName}.</span>
             </h1>
             <p className="cv-step-subtitle" style={{ maxWidth: 380 }}>
-              You&apos;re scoring above {Math.min(Math.round(score.total * 0.95), 97)}%
-              of CVs in the UAE market. Take a final look, pick a template, and
-              download.
+              Your CV scores {score.total}/100 on our UAE hiring rubric. Take a
+              final look, pick a template, and download.
             </p>
           </div>
 
@@ -292,8 +302,8 @@ export const ReviewStep = ({
                     marginTop: 4,
                   }}
                 >
-                  Top {Math.max(5, 100 - Math.round(score.total * 0.95))}% in
-                  UAE · {data.personal.headline?.trim() || "your field"}
+                  {data.personal.headline?.trim() || "Your CV"} · UAE hiring
+                  rubric
                 </div>
                 <div
                   style={{
@@ -334,26 +344,26 @@ export const ReviewStep = ({
               <StatRow
                 label="Measurable bullets"
                 value={
-                  totalBullets > 0
-                    ? `${measurableBullets} of ${totalBullets}`
+                  stats.totalBullets > 0
+                    ? `${stats.measurableBullets} of ${stats.totalBullets}`
                     : "—"
                 }
               />
               <StatRow
                 label="UAE essentials filled"
                 value={
-                  uaeFilled === 3
+                  stats.uaeFilledCount === 3
                     ? "All ✓"
-                    : `${uaeFilled} of 3`
+                    : `${stats.uaeFilledCount} of 3`
                 }
               />
               <StatRow
                 label="Sections complete"
-                value={`${builderSteps.filter((s) => getStepCompletion(s, data)).length - (getStepCompletion(builderSteps[builderSteps.length - 1], data) ? 1 : 0)} of ${builderSteps.length - 1}`}
+                value={`${builderSteps.filter((s) => s.id !== "review" && getStepCompletion(s, data)).length} of ${builderSteps.length - 1}`}
               />
               <StatRow
                 label="Expected length"
-                value={`${expectedPages} page${expectedPages > 1 ? "s" : ""}`}
+                value={`${stats.expectedPages} page${stats.expectedPages > 1 ? "s" : ""}`}
               />
             </div>
           </div>
@@ -391,26 +401,6 @@ export const ReviewStep = ({
                 </>
               )}
             </button>
-            {downloadError === "pdf-failed" && (
-              <div
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  background: "#FBEFED",
-                  border: "1px solid #F2D2CE",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 12.5,
-                    color: "var(--ff-red)",
-                    fontWeight: 500,
-                  }}
-                >
-                  PDF download failed. Try again or export as Word below.
-                </p>
-              </div>
-            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
@@ -426,7 +416,7 @@ export const ReviewStep = ({
                 className="cv-btn-secondary"
                 style={{ flex: 1, padding: "12px" }}
               >
-                {shareCopied ? "Link copied ✓" : "Copy share link"}
+                {shareCopied ? "Link copied ✓" : "Share MakeMyCV"}
               </button>
             </div>
             <p
@@ -439,6 +429,20 @@ export const ReviewStep = ({
             >
               PDF is best for applications. DOCX is editable.
             </p>
+            {/* Free CV-vs-job diagnosis — a natural next step once the CV is
+                built. Routes to the standalone JD Match page; the CV stays in
+                this browser and only the pasted job text is sent. */}
+            <Link
+              href="/jd-match"
+              className="cv-btn-secondary"
+              style={{ width: "100%", padding: "12px", textDecoration: "none" }}
+            >
+              <Icon name="lightbulb" size={14} />
+              Tailor to a job
+            </Link>
+            <div style={{ textAlign: "center" }}>
+              <ShareScoreCard total={score.total} />
+            </div>
           </div>
 
         </div>
@@ -468,7 +472,8 @@ export const ReviewStep = ({
                 marginTop: 3,
               }}
             >
-              All six are ATS-tested and used by UAE recruiters.
+              All six export as real text, not images. Classic and ATS Clean
+              are the safest picks for online applications.
             </div>
           </div>
 
@@ -485,9 +490,7 @@ export const ReviewStep = ({
                   onClick={() => handleTemplateChange(tmpl.id)}
                   onPreview={() => setPreviewTemplateId(tmpl.id)}
                 >
-                  <TemplateThumb>
-                    <tmpl.Render data={data} plan="pro" />
-                  </TemplateThumb>
+                  <TemplateGalleryPreview Render={tmpl.Render} data={data} />
                 </TemplateCard>
               );
             })}
@@ -519,11 +522,8 @@ export const ReviewStep = ({
         </button>
       </div>
 
-      <DownloadTipModal
-        open={downloadTipOpen}
-        onClose={() => setDownloadTipOpen(false)}
-        userName={data.personal.firstName?.trim() || undefined}
-      />
+      {/* Export gate + tip jar render once at shell level (DownloadContext);
+          the local duplicates were removed when exports were unified. */}
 
       <TemplatePreviewModal
         templateId={previewTemplateId}
@@ -552,26 +552,54 @@ export const ReviewStep = ({
         .ff-review-templates { grid-area: templates; }
         .ff-review-customize { grid-area: customize; }
 
-        /* 2 columns at 1200px+: hero | templates, with customize beneath
-           templates (still in the right rail). */
+        /* Sticky design intent: the score hero and customize panel stay
+           pinned (position: sticky against <main>, the single scroll
+           container — top: 0, no topbar offset needed) while the template
+           gallery scrolls past. On short viewports the pinned columns scroll
+           internally via max-height + overflow-y. align-self: start is
+           mandatory — grid items stretch by default and sticky silently
+           no-ops on a stretched item. */
+
+        /* 2 columns at 1200px+: hero | templates, with customize joining the
+           left rail under hero. Sticky left rail, gallery scrolls. */
         @media (min-width: 1200px) {
           .ff-review-grid {
             grid-template-columns: 1fr 1.4fr;
             grid-template-areas:
               "hero templates"
-              "hero customize";
+              "customize templates";
             gap: 28px 32px;
           }
+          .ff-review-hero,
+          .ff-review-customize {
+            align-self: start;
+            position: sticky;
+            top: 0;
+            max-height: calc(100dvh - var(--topbar-h) - var(--progressbar-h) - 56px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+          }
+          .ff-review-hero { padding-bottom: 8px; }
         }
 
         /* 3 columns at 1500px+: hero | templates | customize. Fills the empty
-           right rail on wide displays. */
+           right rail on wide displays. Same sticky rails as the 2-col layout. */
         @media (min-width: 1500px) {
           .ff-review-grid {
             grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
             grid-template-areas: "hero templates customize";
             gap: 32px;
           }
+          .ff-review-hero,
+          .ff-review-customize {
+            align-self: start;
+            position: sticky;
+            top: 0;
+            max-height: calc(100dvh - var(--topbar-h) - var(--progressbar-h) - 56px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+          }
+          .ff-review-hero { padding-bottom: 8px; }
         }
 
         .ff-templates-grid {
@@ -589,6 +617,29 @@ export const ReviewStep = ({
     </div>
   );
 };
+
+/* ─── Memoized gallery thumbnail (audit PERF-4) ──────────────
+   Six full A4 template trees are mounted at once in the gallery; without
+   memo, every unrelated ReviewStep state change (share feedback, modal
+   opens) re-rendered all six. memo skips them unless the CV data or the
+   template itself changes. content-visibility lets the browser skip
+   painting thumbnails that are scrolled off-screen (mobile stacks them
+   in one column). */
+const TemplateGalleryPreview = memo(function TemplateGalleryPreview({
+  Render,
+  data,
+}: {
+  Render: (props: { data: CvData; plan?: "free" | "pro" }) => React.ReactElement;
+  data: CvData;
+}) {
+  return (
+    <div style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
+      <TemplateThumb>
+        <Render data={data} plan="pro" />
+      </TemplateThumb>
+    </div>
+  );
+});
 
 /* ─── Score donut ───────────────────────────────────────── */
 const ScoreDonut = ({ total }: { total: number }) => {

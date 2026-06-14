@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BuilderShell } from "../../components/builder/BuilderShell";
 import ImportFromReportBanner from "../../components/builder/ImportFromReportBanner";
@@ -14,7 +14,6 @@ import { LanguagesStep } from "../../components/builder/steps/LanguagesStep";
 import { CertificationsStep } from "../../components/builder/steps/CertificationsStep";
 import { ProjectsStep } from "../../components/builder/steps/ProjectsStep";
 import { ReviewStep } from "../../components/builder/steps/ReviewStep";
-import { ScorePanel } from "../../components/ScorePanel";
 import { builderSteps } from "../../lib/utils/steps";
 
 const stepIds = builderSteps.map((step) => step.id);
@@ -23,10 +22,7 @@ export const BuilderClient = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = searchParams.get("step") || "personal";
-  const stepId =
-    stepIds.includes(current as never) || current === "score"
-      ? current
-      : "personal";
+  const stepId = stepIds.includes(current as never) ? current : "personal";
 
   const stepIndex = useMemo(
     () => builderSteps.findIndex((step) => step.id === stepId),
@@ -39,19 +35,6 @@ export const BuilderClient = () => {
 
   const nextStep = builderSteps[stepIndex + 1]?.id;
   const prevStep = builderSteps[stepIndex - 1]?.id;
-
-  // ScorePanel now hands us an already-resolved builder step id (via its
-  // internal CATEGORY_TO_STEP table). We just forward it to the router.
-  const handleSectionClick = useCallback(
-    (stepTarget: string) => {
-      const targetStep = stepIds.includes(stepTarget as never)
-        ? stepTarget
-        : "personal";
-      goToStep(targetStep);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
 
   return (
     <>
@@ -78,6 +61,7 @@ export const BuilderClient = () => {
         <ExperienceStep
           onNext={() => goToStep(nextStep || "education")}
           onBack={() => goToStep(prevStep || "summary")}
+          onSkip={() => goToStep(nextStep || "education")}
         />
       )}
       {stepId === "education" && (
@@ -116,7 +100,6 @@ export const BuilderClient = () => {
       {stepId === "review" && (
         <ReviewStep onBack={() => goToStep(prevStep || "projects")} onJump={goToStep} />
       )}
-      {stepId === "score" && <ScorePanel onSectionClick={handleSectionClick} />}
       </BuilderShell>
     </>
   );

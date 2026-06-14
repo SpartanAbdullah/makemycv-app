@@ -8,6 +8,8 @@
 
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
+import { Ratelimit } from "@upstash/ratelimit";
+import { kv } from "@vercel/kv";
 import { parseCvText } from "@/lib/resumeChecker/parse";
 import { computeScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
@@ -19,8 +21,64 @@ export const maxDuration = 60;
 const MAX_TEXT_LENGTH = 100_000;
 const MIN_TEXT_LENGTH = 200;
 
+// Per-IP rate limits (2026-06 audit): this route proxies a paid Claude call
+// per request and was the only AI endpoint with NO throttle — an open abuse
+// vector on the server's Anthropic key. Mirrors /api/ai-improve's pattern:
+// burst window (anti-hammer) + daily window (slow drip). Limits are looser
+// than ai-improve's because one check = one report a human reads.
+const dailyLimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(15, "24 h"),
+  analytics: true,
+  prefix: "mmcv_parse_daily",
+});
+
+const burstLimit = new Ratelimit({
+  redis: kv,
+  limiter: Ratelimit.slidingWindow(3, "60 s"),
+  analytics: true,
+  prefix: "mmcv_parse_burst",
+});
+
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  return "anon";
+}
+
+function rateLimitedResponse(resetAtMs: number, requestId: string) {
+  const retryAfter = Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000));
+  return NextResponse.json(
+    {
+      error:
+        "You've checked several CVs recently — the checker is rate-limited to keep it free for everyone. Please try again in a little while.",
+      requestId,
+      retryAfter,
+    },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
+}
+
 export async function POST(request: Request) {
   const requestId = nanoid(10);
+
+  // Rate limit first — before any parsing work. Fails OPEN if KV is
+  // unreachable (local dev without env vars) so the free tool never breaks
+  // on infrastructure hiccups.
+  try {
+    const ip = getClientIp(request);
+    const burst = await burstLimit.limit(ip);
+    if (!burst.success) return rateLimitedResponse(burst.reset, requestId);
+    const daily = await dailyLimit.limit(ip);
+    if (!daily.success) return rateLimitedResponse(daily.reset, requestId);
+  } catch (err) {
+    console.warn("[parse] rate limiter unavailable, failing open:", err);
+  }
 
   let body: unknown;
   try {

@@ -4,6 +4,11 @@
 
 export type ParsedContact = {
   name?: string;
+  /** Professional headline / tagline. Set either when the source already
+   *  carries one (the report->builder path round-trips a full CvData) or when
+   *  the text parser lifts the title line that sits under the name in the
+   *  header block (e.g. "Odoo Administrator"). */
+  headline?: string;
   email?: string;
   phone?: string;
   location?: string;
@@ -28,12 +33,33 @@ export type ParsedEducation = {
   startDate?: string;
   endDate?: string;
   notes?: string;
+  /** Degree attestation captured from an "Attested - MOFA" line folded into
+   *  this entry (UAE CVs list it under the degree, not as a separate block). */
+  attested?: boolean;
+  /** Canonical attesting-body label, matched to the builder's dropdown
+   *  options when recognisable (e.g. "MOFA - UAE Ministry of Foreign Affairs"). */
+  attestingBody?: string;
 };
 
 export type ParsedCertification = {
   name?: string;
   issuer?: string;
   date?: string;
+};
+
+export type ParsedProject = {
+  name?: string;
+  link?: string;
+  bullets?: string[];
+};
+
+/** UAE recruiter-signal fields harvested from labeled lines
+ *  ("Visa Status: ...", "Nationality: ...", "Notice Period: ..."). */
+export type ParsedUaeFields = {
+  nationality?: string;
+  visaStatus?: string;
+  availability?: string;
+  drivingLicense?: string;
 };
 
 export type ParsedDocument = {
@@ -44,9 +70,39 @@ export type ParsedDocument = {
   skills?: string[];
   languages?: string[];
   certifications?: ParsedCertification[];
+  /** Detected Projects section - was silently discarded before the 2026-06
+   *  wave-3 parser work. */
+  projects?: ParsedProject[];
+  uae?: ParsedUaeFields;
+  /** Header-block lines the parser detected but could not map to any field
+   *  (taglines, headlines, decorative text). Surfaced in MappingReview as a
+   *  copyable "we couldn't place this" bucket - never silently dropped. */
+  unplaced?: string[];
 };
 
-/** Swappable parser adapter interface — implement to add new import sources. */
+/** Why a parse failed - lets the UI route each failure mode differently
+ *  instead of collapsing everything into an empty review screen
+ *  (audit UX-18). */
+export type ImportFailureKind =
+  /** File opened but yielded (almost) no text - typical of scanned/image
+   *  PDFs that would need OCR. */
+  | "empty-text"
+  /** The file could not be opened/decoded at all. */
+  | "corrupt-file";
+
+export class ImportParseError extends Error {
+  constructor(
+    public kind: ImportFailureKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ImportParseError";
+  }
+}
+
+/** Swappable parser adapter interface - implement to add new import sources.
+ *  parse() THROWS ImportParseError on failure (it used to swallow errors and
+ *  resolve `{}`, which made every failure look like an empty success). */
 export interface ImportAdapter {
   /** Human-readable source label */
   name: string;

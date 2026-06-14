@@ -1,6 +1,7 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { formatRange, getFullName } from "./utils";
+import { getFullName } from "./utils";
+import { formatDateRange, normalizeHref } from "../utils/format";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -66,21 +67,52 @@ export const ATSCleanTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#111827");
 
-  // Contact line — plain text only, no emoji, separated by middle dot
-  const contactParts: string[] = [
-    data.personal.email?.trim() || "",
-    data.personal.phone?.trim() || "",
-    data.personal.location?.trim() || "",
-    data.personal.linkedin?.trim()
-      ? shortenDisplayUrl(data.personal.linkedin)
-      : "",
-    data.personal.website?.trim()
-      ? shortenDisplayUrl(data.personal.website)
-      : "",
-    data.personal.dateOfBirth?.trim()
-      ? `DOB: ${data.personal.dateOfBirth.trim()}`
-      : "",
-  ].filter(Boolean);
+  // Contact line — no emoji, separated by middle dot. Links are clickable but
+  // visually plain (inherit colour, no underline) so the ATS-safe look holds.
+  const plainLink = {
+    color: "inherit",
+    textDecoration: "none",
+  } as const;
+  const email = data.personal.email?.trim() || "";
+  const phone = data.personal.phone?.trim() || "";
+  const locationText = data.personal.location?.trim() || "";
+  const linkedin = data.personal.linkedin?.trim() || "";
+  const website = data.personal.website?.trim() || "";
+  const dateOfBirth = data.personal.dateOfBirth?.trim() || "";
+  const contactParts = [
+    email ? (
+      <a href={`mailto:${email}`} style={plainLink}>
+        {email}
+      </a>
+    ) : null,
+    phone ? (
+      <a href={`tel:${phone}`} style={plainLink}>
+        {phone}
+      </a>
+    ) : null,
+    locationText || null,
+    linkedin ? (
+      <a
+        href={normalizeHref(linkedin)}
+        target="_blank"
+        rel="noreferrer"
+        style={plainLink}
+      >
+        {shortenDisplayUrl(linkedin)}
+      </a>
+    ) : null,
+    website ? (
+      <a
+        href={normalizeHref(website)}
+        target="_blank"
+        rel="noreferrer"
+        style={plainLink}
+      >
+        {shortenDisplayUrl(website)}
+      </a>
+    ) : null,
+    dateOfBirth ? `DOB: ${dateOfBirth}` : null,
+  ].filter((part) => part !== null);
 
   const essentialChips = getEssentialChips(data.personal);
 
@@ -118,7 +150,7 @@ export const ATSCleanTemplate = ({
         width: "794px",
         minHeight: "1123px",
         backgroundColor: "#ffffff",
-        padding: "48px 52px",
+        padding: "36px 32px",
         fontFamily: theme.fontFamily,
         fontSize: "11.5px",
         color: "#1a1a1a",
@@ -171,7 +203,12 @@ export const ATSCleanTemplate = ({
                   lineHeight: 1.55,
                 }}
               >
-                {contactParts.join(" · ")}
+                {contactParts.map((part, i) => (
+                  <span key={i}>
+                    {i > 0 ? " · " : ""}
+                    {part}
+                  </span>
+                ))}
               </div>
             )}
             {essentialChips.length > 0 && (
@@ -286,7 +323,7 @@ export const ATSCleanTemplate = ({
                       whiteSpace: "nowrap" as const,
                     }}
                   >
-                    {formatRange(role.startDate, role.endDate, role.isCurrent)}
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                   </span>
                 </div>
 
@@ -379,7 +416,7 @@ export const ATSCleanTemplate = ({
                       whiteSpace: "nowrap" as const,
                     }}
                   >
-                    {formatRange(edu.startDate, edu.endDate)}
+                    {formatDateRange(edu.startDate, edu.endDate)}
                   </span>
                 </div>
 
@@ -474,13 +511,13 @@ export const ATSCleanTemplate = ({
               margin: 0,
             }}
           >
-            {data.languages
-              .map((lang) =>
-                lang.level
-                  ? `${lang.name} (${formatLanguageLevel(lang.level)})`
-                  : lang.name,
-              )
-              .join(", ")}
+            {data.languages.map((lang, i) => (
+              <span key={lang.id}>
+                {i > 0 ? ", " : ""}
+                <span style={{ fontWeight: 600 }}>{lang.name}</span>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </span>
+            ))}
           </p>
         </section>
       )}
@@ -534,17 +571,22 @@ export const ATSCleanTemplate = ({
                     {project.name?.trim() || "Project"}
                   </div>
 
-                  {/* URL as plain text — no <a> tag for ATS safety */}
+                  {/* Clickable but visually plain — link annotations don't affect ATS text extraction; loud styling would. */}
                   {showLink && (
-                    <div
+                    <a
+                      href={normalizeHref(project.link)}
+                      target="_blank"
+                      rel="noreferrer"
                       style={{
+                        display: "block",
                         fontSize: "10px",
                         color: "#6B7280",
+                        textDecoration: "none",
                         marginTop: "1px",
                       }}
                     >
                       ({project.link!.trim()})
-                    </div>
+                    </a>
                   )}
 
                   {bullets.length > 0 && (

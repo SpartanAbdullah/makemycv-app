@@ -4,9 +4,12 @@
 // CV templates would require further mapping work.
 
 import type { CvData } from "../types/cv";
+import { formatLanguageLevel } from "../language";
+import { formatDateRange, normalizeHref } from "./format";
 
 export async function exportToDocx(data: CvData): Promise<void> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = await import("docx");
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, ExternalHyperlink } =
+    await import("docx");
 
   const { personal, experience, education, skills, languages, certifications, projects } = data;
   const fullName = [personal.firstName, personal.lastName].filter(Boolean).join(" ") || "Your Name";
@@ -52,15 +55,34 @@ export async function exportToDocx(data: CvData): Promise<void> {
       })
     );
   }
-  const contactParts = [
-    personal.email,
-    personal.phone,
-    personal.location,
-    personal.linkedin,
-    personal.website,
-  ].filter(Boolean);
-  if (contactParts.length) {
-    children.push(makeText(contactParts.join("  |  "), false, 20));
+  // Contact line — email/phone/linkedin/website become real hyperlinks; the
+  // "Hyperlink" character style is registered by docx's default styles.
+  const makeLink = (text: string, link: string) =>
+    new ExternalHyperlink({
+      children: [new TextRun({ text, style: "Hyperlink", size: 20 })],
+      link,
+    });
+  const contactChildren: (
+    | InstanceType<typeof TextRun>
+    | InstanceType<typeof ExternalHyperlink>
+  )[] = [];
+  const addContact = (
+    part: InstanceType<typeof TextRun> | InstanceType<typeof ExternalHyperlink>
+  ) => {
+    if (contactChildren.length) {
+      contactChildren.push(new TextRun({ text: "  |  ", size: 20 }));
+    }
+    contactChildren.push(part);
+  };
+  if (personal.email) addContact(makeLink(personal.email, `mailto:${personal.email}`));
+  if (personal.phone) addContact(makeLink(personal.phone, `tel:${personal.phone}`));
+  if (personal.location) addContact(new TextRun({ text: personal.location, size: 20 }));
+  const linkedinHref = normalizeHref(personal.linkedin);
+  if (personal.linkedin && linkedinHref) addContact(makeLink(personal.linkedin, linkedinHref));
+  const websiteHref = normalizeHref(personal.website);
+  if (personal.website && websiteHref) addContact(makeLink(personal.website, websiteHref));
+  if (contactChildren.length) {
+    children.push(new Paragraph({ children: contactChildren, spacing: { after: 40 } }));
   }
 
   // Summary
@@ -86,9 +108,7 @@ export async function exportToDocx(data: CvData): Promise<void> {
           spacing: { before: 120, after: 40 },
         })
       );
-      const dateRange = [exp.startDate, exp.isCurrent ? "Present" : exp.endDate]
-        .filter(Boolean)
-        .join(" – ");
+      const dateRange = formatDateRange(exp.startDate, exp.endDate, exp.isCurrent);
       if (dateRange) children.push(makeText(dateRange, false, 20));
       for (const bullet of exp.bullets.filter(Boolean)) {
         children.push(makeBullet(bullet));
@@ -113,7 +133,7 @@ export async function exportToDocx(data: CvData): Promise<void> {
           spacing: { before: 120, after: 40 },
         })
       );
-      const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(" – ");
+      const dateRange = formatDateRange(edu.startDate, edu.endDate);
       if (dateRange) children.push(makeText(dateRange, false, 20));
       if (edu.notes) children.push(makeText(edu.notes));
     }
@@ -128,7 +148,19 @@ export async function exportToDocx(data: CvData): Promise<void> {
   // Languages
   if (languages.length) {
     children.push(makeSection("Languages"));
-    children.push(makeText(languages.map((l) => l.name).join(", ")));
+    for (const lang of languages) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: lang.name, bold: true, size: 22 }),
+            ...(lang.level
+              ? [new TextRun({ text: ` — ${formatLanguageLevel(lang.level)}`, size: 22 })]
+              : []),
+          ],
+          spacing: { after: 40 },
+        })
+      );
+    }
   }
 
   // Certifications
@@ -145,7 +177,15 @@ export async function exportToDocx(data: CvData): Promise<void> {
     children.push(makeSection("Projects"));
     for (const proj of projects) {
       children.push(makeText(proj.name, true));
-      if (proj.link) children.push(makeText(proj.link, false, 20));
+      const projHref = normalizeHref(proj.link);
+      if (proj.link && projHref) {
+        children.push(
+          new Paragraph({
+            children: [makeLink(proj.link, projHref)],
+            spacing: { after: 40 },
+          })
+        );
+      }
       for (const bullet of proj.bullets.filter(Boolean)) {
         children.push(makeBullet(bullet));
       }

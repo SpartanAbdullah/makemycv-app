@@ -16,9 +16,13 @@ function buildFilename(data: CvData): string {
   return "CV_MakeMyCV.pdf";
 }
 
+// Default plan is "pro": there is no paid tier any more (paywall removed
+// 2026-05-31), so no PDF should ever carry the "Free Plan" watermark. The
+// orphaned /export route that still passed "free" was deleted in wave 1;
+// this default flip closes the last path to a watermarked download (UI-7).
 export async function downloadCV(
   data: CvData,
-  plan: PlanTier = "free",
+  plan: PlanTier = "pro",
   templateId: string = "classic",
 ): Promise<void> {
   try {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
 
@@ -14,11 +15,11 @@ const ACCENT_SWATCHES: { label: string; hex: string }[] = [
   { label: "Bronze", hex: "#92400E" },
 ];
 
-const FONT_SCALES: { label: string; value: number }[] = [
-  { label: "Compact", value: 0.92 },
-  { label: "Normal", value: 1 },
-  { label: "Spacious", value: 1.08 },
-];
+// "Font scale" control removed 2026-06: no render path (live template or
+// PDF layout) ever read theme.fontScale, so the control silently did
+// nothing — worse than not having it. settings.fontScale stays in the
+// schema for saved-data compat; re-add the control only once both render
+// paths actually consume it.
 
 const FONT_FAMILIES: { label: string; value: CvFontFamily; sample: string }[] = [
   { label: "Sans", value: "sans", sample: "Inter" },
@@ -116,6 +117,24 @@ export const CustomizePanel = () => {
 
   const accentColor = settings.accentColor ?? "#1e5b54";
 
+  // Typeable hex field — local draft so the user can type freely; committed
+  // on blur/Enter. Invalid input quietly reverts to the current accent.
+  const [hexDraft, setHexDraft] = useState(accentColor);
+  useEffect(() => {
+    setHexDraft(accentColor);
+  }, [accentColor]);
+
+  const commitHexDraft = () => {
+    const match = hexDraft.trim().match(/^#?([0-9a-fA-F]{6})$/);
+    if (match) {
+      const normalized = `#${match[1].toLowerCase()}`;
+      setHexDraft(normalized);
+      setSetting("accentColor", normalized);
+    } else {
+      setHexDraft(accentColor);
+    }
+  };
+
   return (
     <div
       style={{
@@ -147,7 +166,8 @@ export const CustomizePanel = () => {
             lineHeight: 1.5,
           }}
         >
-          Apply across all templates. Live preview updates as you tweak.
+          Live preview updates as you tweak. Some options apply only to
+          certain templates.
         </div>
       </div>
 
@@ -163,8 +183,8 @@ export const CustomizePanel = () => {
                 aria-label={sw.label}
                 onClick={() => setSetting("accentColor", sw.hex)}
                 style={{
-                  width: 24,
-                  height: 24,
+                  width: 32,
+                  height: 32,
                   borderRadius: "50%",
                   background: sw.hex,
                   border: active
@@ -187,14 +207,17 @@ export const CustomizePanel = () => {
               marginLeft: 4,
             }}
           >
-            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>Hex</span>
+            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>
+              Choose your own colour
+            </span>
             <input
               type="color"
               value={accentColor}
+              aria-label="Choose your own colour"
               onChange={(e) => setSetting("accentColor", e.target.value)}
               style={{
-                width: 28,
-                height: 24,
+                width: 36,
+                height: 32,
                 border: "1px solid var(--ff-line)",
                 borderRadius: 6,
                 background: "transparent",
@@ -202,16 +225,30 @@ export const CustomizePanel = () => {
                 padding: 0,
               }}
             />
+            <input
+              type="text"
+              value={hexDraft}
+              onChange={(e) => setHexDraft(e.target.value)}
+              onBlur={commitHexDraft}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitHexDraft();
+                }
+              }}
+              aria-label="Accent colour hex code"
+              spellCheck={false}
+              maxLength={7}
+              className="cv-input"
+              style={{
+                width: 84,
+                padding: "6px 8px",
+                fontSize: 12,
+                fontFamily: "var(--font-mono)",
+              }}
+            />
           </label>
         </div>
-      </Group>
-
-      <Group label="Font scale">
-        <Segmented
-          options={FONT_SCALES}
-          value={settings.fontScale ?? 1}
-          onChange={(v) => setSetting("fontScale", v)}
-        />
       </Group>
 
       <Group label="Font family">

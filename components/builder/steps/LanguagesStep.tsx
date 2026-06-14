@@ -5,8 +5,10 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { languagesSchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
 import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
 import { UAEDot } from "../UAEDot";
@@ -132,7 +134,7 @@ const LevelDropdown = ({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-left flex justify-between items-center hover:border-indigo-300 focus:ring-2 focus:ring-indigo-300 focus:outline-none bg-white transition"
+        className="w-full px-4 py-2.5 border border-[var(--ff-line)] rounded-xl text-sm text-left flex justify-between items-center hover:border-[var(--ff-accent)] focus:ring-2 focus:ring-[var(--ff-accent-ring)] focus:outline-none bg-white transition"
       >
         <span className={displayLabel ? "text-gray-800" : "text-gray-400"}>
           {displayLabel || "Select proficiency level"}
@@ -149,7 +151,7 @@ const LevelDropdown = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden">
+        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-[var(--ff-line)] bg-white shadow-lg overflow-hidden">
           {LANGUAGE_LEVELS.map((level) => {
             const isSelected = level.value === value;
             return (
@@ -162,14 +164,14 @@ const LevelDropdown = ({
                 }}
                 className={`w-full px-4 py-3 text-left cursor-pointer transition flex items-center justify-between ${
                   isSelected
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "hover:bg-indigo-50"
+                    ? "bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)]"
+                    : "hover:bg-[var(--ff-accent-soft)]"
                 }`}
               >
                 <div>
                   <p
                     className={`text-sm ${
-                      isSelected ? "font-semibold text-indigo-700" : "font-medium text-gray-800"
+                      isSelected ? "font-semibold text-[var(--ff-accent-dark)]" : "font-medium text-gray-800"
                     }`}
                   >
                     {level.label}
@@ -177,7 +179,7 @@ const LevelDropdown = ({
                   <p className="text-xs text-gray-400">{level.description}</p>
                 </div>
                 {isSelected && (
-                  <span className="text-indigo-600 text-sm font-bold ml-2 shrink-0">
+                  <span className="text-[var(--ff-accent)] text-sm font-bold ml-2 shrink-0">
                     {"\u2713"}
                   </span>
                 )}
@@ -203,6 +205,7 @@ export const LanguagesStep = ({
 }) => {
   const languages = useCvStore((state) => state.data.languages);
   const updateSection = useCvStore((state) => state.updateSection);
+  const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(languages));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -211,18 +214,32 @@ export const LanguagesStep = ({
     handleSubmit,
     control,
     watch,
+    getValues,
     reset,
     setValue,
-    formState: { isDirty },
+    formState: { isDirty, errors },
   } = useForm<LanguagesForm>({
     resolver: zodResolver(languagesSchema),
     defaultValues: { languages },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, insert } = useFieldArray({
     control,
     name: "languages",
   });
+
+  // Deletion with undo (replaces a confirm dialog): capture the row BEFORE
+  // remove, then offer to re-insert it at its original position. The
+  // debounced watch subscription persists both the removal and the restore.
+  const handleRemoveLanguage = (index: number) => {
+    const removed = getValues(`languages.${index}`);
+    remove(index);
+    if (!removed) return;
+    pushToast("Language removed", {
+      actionLabel: "Undo",
+      onAction: () => insert(index, removed),
+    });
+  };
 
   useEffect(() => {
     if (!isDirty) reset({ languages });
@@ -261,6 +278,7 @@ export const LanguagesStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="languages" />
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Suggested languages — common in the UAE labour market */}
@@ -292,7 +310,10 @@ export const LanguagesStep = ({
 
           {fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
-              <Field label="Language">
+              <Field
+                label="Language"
+                error={errors.languages?.[index]?.name?.message}
+              >
                 <input
                   className="cv-input"
                   placeholder="e.g. Arabic"
@@ -318,7 +339,7 @@ export const LanguagesStep = ({
               </Field>
               <button
                 type="button"
-                onClick={() => remove(index)}
+                onClick={() => handleRemoveLanguage(index)}
                 className="cv-btn-danger"
                 style={{ alignSelf: "center", marginTop: 26 }}
               >
@@ -330,6 +351,14 @@ export const LanguagesStep = ({
         </div>
       </section>
 
+      {/* Form-level fallback (audit UX-3): Continue used to fail with no
+          message at all when a row was invalid. */}
+      {errors.languages && (
+        <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500 }}>
+          Fix the highlighted language entries above, or remove the empty row,
+          to continue.
+        </p>
+      )}
       <NavigationButtons
         onBack={onBack}
         onNext={handleSubmit(onNext)}

@@ -7,12 +7,14 @@ import { summarySchema } from "../../../lib/schemas/cvSchemas";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
+import { StepHeader } from "../StepHeader";
 import { FieldError } from "../../FieldError";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { Icon } from "../Icon";
 import { TodaysTipCard } from "../TodaysTipCard";
+import { AiDisclosure } from "../AiDisclosure";
 
 type SummaryForm = { summary: string };
 
@@ -49,8 +51,6 @@ export const SummaryStep = ({
   /* AI summary writer */
   const { improve, results: aiResults, isLoading: aiLoading, error: aiError, clearResults: aiClear } = useAIImprove();
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const aiTriggerChecked = useRef(false);
-
   const fireAISummary = () => {
     const store = useCvStore.getState().data;
     setAiModalOpen(true);
@@ -66,19 +66,6 @@ export const SummaryStep = ({
       existingSummary: store.personal.summary,
     });
   };
-
-  useEffect(() => {
-    if (aiTriggerChecked.current) return;
-    aiTriggerChecked.current = true;
-    try {
-      const trigger = sessionStorage.getItem("makemycv_ai_trigger");
-      if (trigger === "summary") {
-        sessionStorage.removeItem("makemycv_ai_trigger");
-        fireAISummary();
-      }
-    } catch { /* SSR guard */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleApplySummary = (selected: string[]) => {
     if (selected[0]) {
@@ -127,6 +114,7 @@ export const SummaryStep = ({
       onSubmit={handleSubmit(onNext)}
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
+      <StepHeader stepId="summary" />
 
       {/* Full-width textarea on top, tip card stacked below. The previous
           side-by-side layout squeezed the textarea into ~58% of the form
@@ -139,7 +127,7 @@ export const SummaryStep = ({
               rows={10}
               className="cv-input cv-textarea"
               style={{ minHeight: 260, lineHeight: 1.6, fontSize: 14.5 }}
-              placeholder={"e.g. Results-driven Operations Manager with 8+ years of experience in logistics, procurement, and team leadership across the UAE. Skilled in ERP systems, vendor negotiations, and cost optimisation. Seeking a senior role in Dubai's construction or trading sector."}
+              placeholder={"e.g. Operations Manager with 8 years of experience in logistics and procurement in the UAE. I lead teams of 10+, manage vendors, and cut costs. Looking for a senior role in Dubai."}
               {...register("summary")}
               onBlur={(e) => {
                 register("summary").onBlur(e);
@@ -169,16 +157,17 @@ export const SummaryStep = ({
             );
           })()}
           <FieldError message={summaryWarning} type="warning" />
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex flex-col items-end">
             <button
               type="button"
               onClick={fireAISummary}
               className="cv-btn-secondary"
-              style={{ fontSize: 12, padding: "5px 12px" }}
+              style={{ fontSize: 12, padding: "11px 16px" }}
             >
               <Icon name="sparkle" size={13} />
               Write my summary with AI
             </button>
+            <AiDisclosure />
           </div>
         </section>
         <TodaysTipCard stepId="summary" />

@@ -25,6 +25,8 @@ import type {
   ParsedExperience,
   ParsedEducation,
   ParsedCertification,
+  ParsedProject,
+  ParsedUaeFields,
 } from "./adapter";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
@@ -42,8 +44,12 @@ const BARE_DOMAIN_RE =
 
 const MONTH_NAMES =
   "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+// Word boundaries around month names are load-bearing: without them "Mar"
+// matched inside "Marketing", so "Marketing Director" parsed as "keting
+// Director" and the phantom date stole the entry's startDate slot
+// (baseline bug exposed by __fixtures__/two-column-interleaved.txt).
 const DATE_TOKEN_RE = new RegExp(
-  `(?:${MONTH_NAMES})[\\s.,]*\\d{4}|(?:${MONTH_NAMES})|\\b(?:19|20)\\d{2}\\b`,
+  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}|\\b(?:${MONTH_NAMES})\\b|\\b(?:19|20)\\d{2}\\b`,
   "gi",
 );
 const PRESENT_RE = /\b(?:present|current|now|ongoing|till\s+date|todate)\b/i;
@@ -214,13 +220,22 @@ function isDateOnlyLine(line: string): boolean {
   return residue.length <= 3;
 }
 
+// Pipe / middot / bullet are pure separators — they never appear inside a real
+// word, so we split on them even when glued to adjacent text. PDF text
+// extraction frequently drops the space before a pipe ("Role| Company"), which
+// previously left role+company fused in one field (and seeded a broken
+// headline). Dash and the word "at" still require surrounding whitespace so
+// hyphenated words ("Co-founder") and "at" inside words stay intact.
+const GLUED_SEP = /[|·•]/;
+const SPACED_SEP = /\s+(?:—|–|-{1,2}|at)\s+/i;
+// Combined splitter: pipe/middot/bullet with optional surrounding space, OR a
+// space-delimited dash / "at".
+const HEADER_SPLIT_RE = /\s*[|·•]\s*|\s+(?:—|–|-{1,2}|at)\s+/i;
+
 function splitHeaderParts(text: string): string[] {
-  // Strong separators: " | ", " · ", " — ", " – ", " - ", " at ", " • ".
-  // We require whitespace on both sides so "Co-founder" stays intact.
-  const STRONG_SEP = /\s+(?:\||·|—|–|-{1,2}|at|•)\s+/i;
   let parts: string[];
-  if (STRONG_SEP.test(text)) {
-    parts = text.split(STRONG_SEP);
+  if (GLUED_SEP.test(text) || SPACED_SEP.test(text)) {
+    parts = text.split(HEADER_SPLIT_RE);
     // DOCX-style "Role  Company" inside a part: also break on 2+ spaces.
     parts = parts.flatMap((p) => p.split(/[ \t]{2,}/));
   } else if (/[ \t]{2,}/.test(text)) {
@@ -449,6 +464,46 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   return entries;
 }
 
+// ── Attestation detection ────────────────────────────────────────────────────
+//
+// UAE CVs list degree attestation under the relevant education entry ("Attested
+// — MOFA"), and the builder models it as `attested` + `attestingBody` on the
+// education record (not a separate block). We fold any attestation line into the
+// preceding entry rather than letting it spawn a phantom degree.
+//
+// The labels below MUST stay byte-identical to ATTESTING_BODIES in
+// components/builder/steps/EducationStep.tsx (en dash "–", curly quote "’") so
+// an imported value selects an existing dropdown option instead of free text.
+const ATTESTING_BODY_OPTIONS: Array<{ re: RegExp; label: string }> = [
+  { re: /\bmofaic\b/i, label: "MOFAIC – Ministry of Foreign Affairs & Int’l Cooperation" },
+  { re: /\bmofa\b|ministry of foreign affairs/i, label: "MOFA – UAE Ministry of Foreign Affairs" },
+  { re: /\bhec\b|higher education commission/i, label: "HEC – Higher Education Commission (Pakistan)" },
+  { re: /\bwes\b|world education services/i, label: "WES – World Education Services (Canada)" },
+  { re: /\bnaric\b|uk enic/i, label: "NARIC – UK ENIC National Recognition" },
+  { re: /\bnoosr\b/i, label: "NOOSR – Australia" },
+  { re: /\bdataflow\b|\bdha\b|\bhaad\b/i, label: "DATAFLOW – Healthcare / DHA / HAAD Verification" },
+  { re: /embassy attestation/i, label: "Embassy Attestation – Home Country" },
+  { re: /\bnotar/i, label: "Notary / Legal Attestation" },
+];
+
+function isAttestationLine(line: string): boolean {
+  return (
+    /\battest(?:ed|ation|s)?\b/i.test(line) ||
+    /\bmofaic?\b/i.test(line) ||
+    /ministry of foreign affairs/i.test(line) ||
+    /\bequivalen(?:cy|ce)\b/i.test(line) ||
+    /\b(?:dataflow|naric|noosr)\b/i.test(line) ||
+    /embassy attestation/i.test(line)
+  );
+}
+
+function matchAttestingBody(line: string): string {
+  for (const { re, label } of ATTESTING_BODY_OPTIONS) {
+    if (re.test(line)) return label;
+  }
+  return "";
+}
+
 // ── Education block parser ───────────────────────────────────────────────────
 
 function parseEducationBlock(lines: string[]): ParsedEducation[] {
@@ -478,6 +533,22 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
+
+    // Attestation lines fold into the current (or most recent) education entry's
+    // attested + attestingBody fields instead of spawning a fake degree entry.
+    // We only fold when there is an entry to attach to — otherwise we let the
+    // line fall through to normal parsing so nothing is silently dropped.
+    if (isAttestationLine(line)) {
+      const target = current ?? entries[entries.length - 1];
+      if (target) {
+        target.attested = true;
+        if (!target.attestingBody) {
+          const body = matchAttestingBody(line);
+          if (body) target.attestingBody = body;
+        }
+        continue;
+      }
+    }
 
     if (isBulletLine(line)) {
       // Bullet inside education = notes / coursework. Append to current notes.
@@ -630,6 +701,262 @@ function stripLanguageLevel(name: string): string {
     .trim();
 }
 
+// ── Mis-bucket rescue (two-column header merges) ─────────────────────────────
+//
+// pdf.js linearises two-column layouts so side-by-side section headers can land
+// on ONE text line — e.g. "Languages Certifications" — which detectSection
+// (anchored to a whole-line heading) misses. The section boundary is lost and
+// the interleaved languages + certifications fall into the Skills bucket
+// (founder bug report 2026-06: languages & certs imported as skills). Reading
+// order can't be un-interleaved reliably, so we re-route by CONTENT: a Skills
+// entry that is clearly a language or a certification is moved to the right
+// field, and pure header / date / domain artifacts are dropped. Conservative
+// by design — anything ambiguous stays a skill for the user to fix on the
+// review screen, and a correctly-parsed CV is left untouched.
+
+const KNOWN_LANGUAGES = new Set<string>([
+  "english", "arabic", "urdu", "hindi", "punjabi", "pashto", "persian", "farsi",
+  "dari", "malayalam", "tamil", "telugu", "kannada", "bengali", "bangla",
+  "marathi", "gujarati", "sinhala", "nepali", "tagalog", "filipino", "cebuano",
+  "french", "spanish", "german", "italian", "portuguese", "dutch", "russian",
+  "ukrainian", "polish", "romanian", "greek", "turkish", "mandarin", "chinese",
+  "cantonese", "japanese", "korean", "vietnamese", "thai", "indonesian", "malay",
+  "swahili", "amharic", "tigrinya", "somali", "hausa", "yoruba", "igbo",
+  "afrikaans", "hebrew", "kurdish", "azerbaijani", "uzbek", "kazakh", "sindhi",
+]);
+
+// Only true SECTION-NAME words — deliberately NOT generic skill-ish words like
+// "professional", "development", "training", "expertise", so a real skill made
+// of those (e.g. "Professional Development") is never dropped. A column-merged
+// header is always a pair of section names ("Languages Certifications").
+const HEADING_WORD_RE =
+  /^(?:skills?|languages?|certif(?:ications?|icates?|s)?|certs?|licen[cs]es?|accreditations?|education|experience|projects?|summary|profile|objective|references?|interests?|hobbies|awards?|achievements?|publications?|portfolio|memberships?|volunteering)$/i;
+
+/** A line made up ONLY of section-name words — i.e. a column-merged header pair
+ *  like "Languages Certifications" that leaked into a content bucket. Requires
+ *  ≥2 such words so a single legitimately-named entry isn't dropped. */
+function isHeadingOnlyLine(s: string): boolean {
+  const cleaned = normalizeHeader(s);
+  if (!cleaned || cleaned.length > 50) return false;
+  const tokens = cleaned.split(/\s+/);
+  return tokens.length >= 2 && tokens.length <= 4 && tokens.every((t) => HEADING_WORD_RE.test(t));
+}
+
+/** A single token that is just a cert issuer's website (e.g. "mckinsey.org").
+ *  The TLD allowlist is deliberately narrow — only issuer-style TLDs — so it
+ *  never eats tech-skill tokens like "ASP.NET", "Socket.io", "Node.js". */
+function isBareDomain(s: string): boolean {
+  return /^[\w-]{2,}\.(?:com|org|edu|gov)(?:\.[a-z]{2})?$/i.test(s.trim());
+}
+
+/** If the entry begins with a known language name (before any level/qualifier
+ *  delimiter), return that name in its original casing; else null. Requires the
+ *  HEAD to equal a known language, so multi-word skills like "English Teaching"
+ *  are left alone. */
+function knownLanguageName(s: string): string | null {
+  const head = s.split(/[([:/\-–—]/)[0].trim();
+  return head && KNOWN_LANGUAGES.has(head.toLowerCase()) ? head : null;
+}
+
+/** A proficiency qualifier — only reclassify a language-named Skills entry when
+ *  it carries one (e.g. "English (C1)", "Arabic – Native"), so a bare "Arabic"
+ *  or "Mandarin" listed as a skill is never moved. Two-column language blocks
+ *  almost always show a level, so the real bug case still matches. */
+function hasLevelQualifier(s: string): boolean {
+  return (
+    /[([]/.test(s) ||
+    /\b(?:native|fluent|professional|conversational|elementary|intermediate|advanced|basic|beginner|bilingual|proficient|working)\b/i.test(s) ||
+    /\bmother\s*tongue\b/i.test(s) ||
+    /\b[abc][12]\b/i.test(s)
+  );
+}
+
+/** Conservative certification signal: an explicit credential KEYWORD as a whole
+ *  word. Deliberately NOT "license" (would catch "License Plate Recognition")
+ *  and NOT a trailing "program" (would catch "Affiliate Program" / "Loyalty
+ *  Program") — those broke real skills. A borderline "X Program" stays a skill
+ *  for the user to move on the review screen. */
+function looksLikeCertEntry(s: string): boolean {
+  return /\b(?:certif(?:icate|ication|ied)|diplomas?|accreditation|credential|nanodegree)\b/i.test(
+    s,
+  );
+}
+
+/** Normalised key for cert de-dupe: lowercased, trailing "certificate/
+ *  certification" stripped, so "PMP Certification" (rescued) doesn't duplicate
+ *  a "PMP" already parsed from a real Certifications section. */
+function certKey(name: string): string {
+  return name.toLowerCase().replace(/\s*certif(?:icate|ication)s?\s*$/i, "").trim();
+}
+
+/** Re-route languages/certifications that fell into Skills and drop header /
+ *  date / domain artifacts. Mutates `result`. See block comment above.
+ *
+ *  GATED: runs ONLY when a column-merged section header ("Languages
+ *  Certifications") actually leaked into Skills — the signature of the
+ *  two-column boundary loss this targets. A cleanly-parsed CV has no such line,
+ *  so its Skills are left exactly as the user wrote them (a skill literally
+ *  named "Arabic" or "Affiliate Program" is never touched). */
+function rescueMisbucketedSkills(result: ParsedDocument): void {
+  const skills = result.skills ?? [];
+  if (!skills.some(isHeadingOnlyLine)) return;
+
+  const languages = result.languages ?? [];
+  const certifications = result.certifications ?? [];
+  const langSeen = new Set(languages.map((l) => l.toLowerCase()));
+  const certSeen = new Set(certifications.map((c) => certKey(c.name ?? "")));
+  const kept: string[] = [];
+  const keptSeen = new Set<string>();
+
+  for (const raw of skills) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (isHeadingOnlyLine(s) || isDateOnlyLine(s) || isBareDomain(s)) continue;
+
+    const lang = knownLanguageName(s);
+    if (lang && hasLevelQualifier(s)) {
+      const key = lang.toLowerCase();
+      if (!langSeen.has(key)) {
+        languages.push(lang);
+        langSeen.add(key);
+      }
+      continue;
+    }
+
+    if (looksLikeCertEntry(s)) {
+      const cert = parseCertificationsBlock([s])[0];
+      const key = cert?.name ? certKey(cert.name) : "";
+      if (cert && key && !certSeen.has(key)) {
+        certifications.push(cert);
+        certSeen.add(key);
+      }
+      continue;
+    }
+
+    const key = s.toLowerCase();
+    if (!keptSeen.has(key)) {
+      kept.push(s);
+      keptSeen.add(key);
+    }
+  }
+
+  result.skills = kept;
+  result.languages = languages;
+  result.certifications = certifications;
+}
+
+// ── UAE labeled-field harvesting ─────────────────────────────────────────────
+//
+// GCC CVs routinely carry labeled personal-detail lines ("Visa Status:
+// Employment visa", "Nationality: Indian", "Notice Period: 30 days").
+// These were ignored before the 2026-06 wave-3 work; now they map straight
+// into the builder's UAE Essentials fields.
+
+const UAE_LABEL_PATTERNS: Array<{
+  key: keyof ParsedUaeFields;
+  re: RegExp;
+}> = [
+  { key: "nationality", re: /^nationality\s*[:\-–]\s*(.+)$/i },
+  { key: "visaStatus", re: /^(?:visa\s*status|visa|residency\s*status)\s*[:\-–]\s*(.+)$/i },
+  {
+    key: "availability",
+    re: /^(?:notice\s*period|availability|available\s*(?:from|to\s*join)?)\s*[:\-–]\s*(.+)$/i,
+  },
+  { key: "drivingLicense", re: /^driving\s*licen[sc]e\s*[:\-–]\s*(.+)$/i },
+];
+
+function harvestUaeFields(lines: string[]): {
+  uae: ParsedUaeFields;
+  consumedLines: Set<number>;
+} {
+  const uae: ParsedUaeFields = {};
+  const consumed = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    for (const { key, re } of UAE_LABEL_PATTERNS) {
+      const m = line.match(re);
+      if (m && !uae[key]) {
+        uae[key] = m[1].trim();
+        consumed.add(i);
+        break;
+      }
+    }
+  }
+  return { uae, consumedLines: consumed };
+}
+
+// ── Phone normalization ──────────────────────────────────────────────────────
+
+/**
+ * Normalize UAE phone formats toward "+971 5X XXX XXXX". "00971…" and bare
+ * "971…"/"05X…" forms are common in Word CVs; ATS systems and recruiters
+ * expect the +971 form. Non-UAE numbers pass through untouched.
+ */
+function normalizePhone(raw: string): string {
+  const original = raw.trim();
+  const digits = original.replace(/\D/g, "");
+  let local: string | null = null;
+  if (digits.startsWith("00971")) local = digits.slice(5);
+  else if (digits.startsWith("971") && digits.length >= 11 && digits.length <= 12)
+    local = digits.slice(3);
+  else if (digits.startsWith("05") && digits.length === 10) local = digits.slice(1);
+  else if (original.startsWith("+971")) local = digits.slice(3);
+  if (local === null) return original;
+  const grouped =
+    local.length === 9
+      ? `${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`
+      : local;
+  return `+971 ${grouped}`.trim();
+}
+
+// ── Projects block parser ────────────────────────────────────────────────────
+
+function parseProjectsBlock(lines: string[]): ParsedProject[] {
+  const out: ParsedProject[] = [];
+  let current: ParsedProject | null = null;
+  const push = () => {
+    if (current && ((current.name ?? "").trim() || current.bullets?.length)) {
+      out.push(current);
+    }
+    current = null;
+  };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (isBulletLine(line)) {
+      if (!current) current = { bullets: [] };
+      current.bullets = current.bullets ?? [];
+      current.bullets.push(stripBulletPrefix(line));
+      continue;
+    }
+    // New project header. "Name — detail" puts the detail into the first
+    // bullet so nothing the user wrote is dropped.
+    push();
+    // Detect a link anywhere in the header: an explicit URL first, else a bare
+    // domain ("usehisaab.com") — our exports strip http/www, so project links
+    // arrive as bare domains and used to get stranded inside the name.
+    const urlMatch = line.match(GENERIC_URL_RE) ?? line.match(BARE_DOMAIN_RE);
+    const link = urlMatch
+      ? urlMatch[0].replace(/[.,;:)]+$/, "")
+      : undefined;
+    // Split on glued/spaced separators (pipe/middot/bullet glue-safe), then
+    // drop the link token so it doesn't double up as the name or a bullet.
+    const parts = line
+      .split(/\s*[|·•]\s*|\s+(?:—|–)\s+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const nonLink = parts.filter((p) => !link || p !== link);
+    current = {
+      name: nonLink[0] ?? parts[0] ?? "",
+      link,
+      bullets: nonLink.slice(1).filter(Boolean),
+    };
+  }
+  push();
+  return out;
+}
+
 // ── Contact harvesting ───────────────────────────────────────────────────────
 
 const CONTACT_SCAN_DEPTH = 30;
@@ -684,7 +1011,7 @@ function harvestContact(lines: string[]): {
       // 8 ≤ digit-count ≤ 15.
       const digits = phoneMatch[0].replace(/\D/g, "");
       if (digits.length >= 8 && digits.length <= 15) {
-        contact.phone = phoneMatch[0].trim();
+        contact.phone = normalizePhone(phoneMatch[0]);
         matchedSomething = true;
       }
     }
@@ -695,8 +1022,13 @@ function harvestContact(lines: string[]): {
       const segments = line.split(/\s+\|\s+|\s+·\s+|\s+•\s+/);
       for (const seg of segments) {
         // Strip any leading emoji/icon prefix used in our PDF templates
-        // (📍, ✉️, 📞, etc.) so the saved value is plain text.
-        const s = seg.replace(/^[^A-Za-zÀ-ɏ0-9]+/, "").trim();
+        // (📍, ✉️, 📞, etc.) so the saved value is plain text, and drop a
+        // leading "Location:" / "Address:" / "City:" label — Word CVs label
+        // their contact lines, and the label used to leak into the value.
+        const s = seg
+          .replace(/^[^A-Za-zÀ-ɏ0-9]+/, "")
+          .replace(/^(?:location|address|city)\s*[:\-–]\s*/i, "")
+          .trim();
         if (!s) continue;
         if (s.match(EMAIL_RE)) continue;
         if (s.match(BARE_DOMAIN_RE)) continue;
@@ -738,6 +1070,37 @@ function harvestContact(lines: string[]): {
     break;
   }
 
+  // Headline / tagline: the title line that sits with the name in the header
+  // block (e.g. "Senior Operations Manager", "Odoo Administrator"). The parser
+  // used to drop this into the unplaced bucket; we now lift it into the contact
+  // so it seeds the builder's headline directly. We look just below the name,
+  // skip any already-consumed contact lines, and accept a line that reads like a
+  // job title or carries a title separator ("Accountant | CMA Candidate").
+  if (nameLine >= 0 && !contact.headline) {
+    for (let i = nameLine + 1; i < depth; i++) {
+      if (consumed.has(i)) continue;
+      const line = lines[i]?.trim();
+      if (!line) continue;
+      if (detectSection(line)) break;
+      if (line.length > 90) continue;
+      // Skip contact-value lines — those aren't the headline.
+      if (
+        line.match(EMAIL_RE) ||
+        line.match(GENERIC_URL_RE) ||
+        line.match(BARE_DOMAIN_RE) ||
+        line.match(PHONE_RE)
+      ) {
+        continue;
+      }
+      const titleish = looksLikeRole(line) || /\s[|·•—–]\s/.test(line);
+      if (titleish) {
+        contact.headline = line;
+        consumed.add(i);
+        break;
+      }
+    }
+  }
+
   return { contact, nameLine, consumedLines: consumed };
 }
 
@@ -757,10 +1120,19 @@ export function parseTextToDocument(text: string): ParsedDocument {
     skills: [],
     languages: [],
     certifications: [],
+    projects: [],
+    uae: {},
   };
 
   const { contact, consumedLines } = harvestContact(lines);
   result.contact = contact;
+
+  // UAE labeled fields can appear anywhere (header block or a "Personal
+  // Details" section) — sweep the whole document and consume the lines so
+  // they don't pollute the section buffers.
+  const { uae, consumedLines: uaeConsumed } = harvestUaeFields(lines);
+  result.uae = uae;
+  for (const i of uaeConsumed) consumedLines.add(i);
 
   // Section routing — start AFTER the first section header (so headline /
   // tagline lines in the header block don't accidentally land in "summary").
@@ -776,7 +1148,7 @@ export function parseTextToDocument(text: string): ParsedDocument {
   };
 
   // Find the first section header — everything before it is the contact /
-  // headline block. We've already harvested it; ignore the rest.
+  // headline block.
   let firstSectionIdx = lines.length;
   for (let i = 0; i < lines.length; i++) {
     if (detectSection(lines[i])) {
@@ -784,6 +1156,18 @@ export function parseTextToDocument(text: string): ParsedDocument {
       break;
     }
   }
+
+  // Header-block lines we couldn't harvest (headlines, taglines, column
+  // labels) used to be silently dropped. Collect them so the review screen
+  // can show a copyable "we couldn't place this" bucket (audit Wave 3).
+  const unplaced: string[] = [];
+  for (let i = 0; i < firstSectionIdx; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (consumedLines.has(i)) continue;
+    unplaced.push(line);
+  }
+  result.unplaced = unplaced;
 
   for (let i = firstSectionIdx; i < lines.length; i++) {
     const line = lines[i];
@@ -803,6 +1187,9 @@ export function parseTextToDocument(text: string): ParsedDocument {
   result.experience = parseExperienceBlock(buffers.experience);
   result.education = parseEducationBlock(buffers.education);
   result.certifications = parseCertificationsBlock(buffers.certifications);
+  // A detected Projects section used to be buffered and then silently
+  // dropped — nothing the parser detects gets discarded any more.
+  result.projects = parseProjectsBlock(buffers.projects);
 
   result.skills = flattenList(buffers.skills);
 
@@ -811,6 +1198,11 @@ export function parseTextToDocument(text: string): ParsedDocument {
   result.languages = flattenList(buffers.languages)
     .map(stripLanguageLevel)
     .filter(Boolean);
+
+  // Two-column PDFs merge section headers onto one line, so languages and
+  // certifications can land in Skills — re-route them by content (see
+  // rescueMisbucketedSkills). No-op on cleanly-parsed CVs.
+  rescueMisbucketedSkills(result);
 
   return result;
 }
