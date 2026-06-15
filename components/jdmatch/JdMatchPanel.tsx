@@ -17,7 +17,7 @@ import {
   type JdCategory,
   type JdCategoryResult,
 } from "../../lib/jdMatch/types";
-import type { CvExperience } from "../../lib/types/cv";
+import type { CvData, CvExperience } from "../../lib/types/cv";
 import { buildHeatmap } from "../../lib/jdMatch/heatmap";
 import { buildTailoredCv } from "../../lib/jdMatch/tailorCv";
 import { downloadCV } from "../../hooks/useDownloadCV";
@@ -27,6 +27,23 @@ import { JdHeatmap } from "./JdHeatmap";
 import { JdCoach } from "./JdCoach";
 import { JdTailor } from "./JdTailor";
 import { ProcessSteps } from "../ui/ProcessSteps";
+
+/**
+ * True when the CV has no real content yet — a visitor who landed on /jd-match
+ * before building or importing. There's nothing to match a job against, so we
+ * guide them to the builder instead of letting them "match" an empty CV.
+ */
+const isCvEmpty = (cv: CvData): boolean => {
+  const p = cv.personal;
+  if (p.firstName?.trim() || p.lastName?.trim() || p.headline?.trim() || p.summary?.trim()) return false;
+  if (cv.skills.length > 0) return false;
+  if ((cv.certifications?.length ?? 0) > 0) return false;
+  if ((cv.projects?.length ?? 0) > 0) return false;
+  if (cv.experience.some((e) => e.role?.trim() || e.company?.trim() || (e.bullets ?? []).some((b) => b.trim())))
+    return false;
+  if (cv.education.some((e) => e.school?.trim() || e.degree?.trim() || e.field?.trim())) return false;
+  return true;
+};
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -58,6 +75,7 @@ const canWeave = (c: JdCategory) => WEAVE_CATEGORIES.includes(c);
 export const JdMatchPanel = () => {
   const router = useRouter();
   const cv = useCvStore((s) => s.data);
+  const cvEmpty = useMemo(() => isCvEmpty(cv), [cv]);
   const hydrated = useCvStore((s) => s.hydrated);
   const isPro = useCvStore((s) => s.isPro);
   const setData = useCvStore((s) => s.setData);
@@ -378,7 +396,7 @@ export const JdMatchPanel = () => {
             Back to the builder
           </button>
         </div>
-        {fixable && (savedCount !== null ? (
+        {fixable && !cvEmpty && (savedCount !== null ? (
           <span
             style={{
               display: "inline-flex",
@@ -404,6 +422,10 @@ export const JdMatchPanel = () => {
         ))}
       </header>
 
+      {hydrated && cvEmpty ? (
+        <JdEmptyGuide onBuild={() => router.push("/builder")} />
+      ) : (
+      <>
       {!isDesktop && <MobileViewToggle value={mobileView} onChange={setMobileView} />}
 
       <div
@@ -905,6 +927,8 @@ export const JdMatchPanel = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {backPrompt && (
         <BackConfirmDialog
@@ -924,6 +948,88 @@ export const JdMatchPanel = () => {
     </div>
   );
 };
+
+/* ─── Empty-CV guide — landed on JD Match before building or importing ───── */
+const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
+  <div
+    style={{
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      overflowY: "auto",
+    }}
+  >
+    <div
+      style={{
+        maxWidth: 460,
+        width: "100%",
+        textAlign: "center",
+        background: "var(--ff-card)",
+        border: "1px solid var(--ff-line)",
+        borderRadius: 16,
+        padding: "32px 28px",
+        boxShadow: "0 10px 34px rgba(40,36,28,0.06)",
+      }}
+    >
+      <span
+        style={{
+          display: "grid",
+          placeItems: "center",
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          background: "var(--ff-accent-soft)",
+          margin: "0 auto 14px",
+        }}
+      >
+        <Icon name="lightbulb" size={20} color="var(--ff-accent-dark)" />
+      </span>
+      <h2
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 19,
+          fontWeight: 700,
+          color: "var(--ff-ink)",
+          margin: "0 0 8px",
+        }}
+      >
+        First, you&apos;ll need a CV to match
+      </h2>
+      <p style={{ fontSize: 14, color: "var(--ff-muted)", lineHeight: 1.6, margin: "0 0 20px" }}>
+        JD Match compares your CV against a job description — and there&apos;s
+        nothing to compare yet. Build your CV in a few minutes, or import an
+        existing one, then come back and paste the job.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={onBuild}
+          className="cv-btn-primary"
+          style={{ padding: "12px 22px", width: "100%", maxWidth: 280 }}
+        >
+          <Icon name="plus" size={14} />
+          Build my CV
+        </button>
+        <button
+          type="button"
+          onClick={onBuild}
+          className="cv-btn-secondary"
+          style={{ padding: "11px 20px", width: "100%", maxWidth: 280 }}
+        >
+          <Icon name="upload" size={14} />
+          Import an existing CV (PDF / DOCX)
+        </button>
+      </div>
+      <p style={{ fontSize: 11.5, color: "var(--ff-faint)", lineHeight: 1.5, margin: "16px 0 0" }}>
+        Your CV stays in your browser. Importing reads your file locally — it&apos;s
+        never uploaded.
+      </p>
+    </div>
+  </div>
+);
 
 /* ─── Header change controls: eye-toggle + Accept all + Discard all ──────── */
 const ghostPill: React.CSSProperties = {
