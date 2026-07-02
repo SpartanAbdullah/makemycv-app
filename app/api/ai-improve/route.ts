@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { kv } from "@vercel/kv";
+import type { RoleFamily } from "../../../lib/data/roleFamily";
 
 type AIType = "bullets" | "skills" | "summary";
 
@@ -13,6 +14,46 @@ type RequestBody = {
   experienceRoles?: { title: string; company: string; bullets: string[] }[];
   existingSkills?: string[];
   existingSummary?: string;
+  // Job domain (Phase 1 personalization) — prepends a specialist clause to the
+  // system prompt so wording is domain-native, not generic "UAE job market".
+  domain?: RoleFamily;
+};
+
+// Per-domain specialist clause. Each names the family's "proof unit" so the
+// model quantifies the way that field's recruiters expect.
+const DOMAIN_CLAUSE: Partial<Record<RoleFamily, string>> = {
+  sales:
+    "The candidate works in Sales & Business Development — every bullet should quantify revenue, quota, pipeline or client growth in AED or %.",
+  marketing:
+    "The candidate works in Marketing & Digital — quantify reach, engagement, CAC/ROAS and campaign-attributed revenue.",
+  finance:
+    "The candidate works in Finance — quantify AED amounts, budgets, variances and compliance (FTA/VAT, IFRS).",
+  accounting:
+    "The candidate works in Accounting & Audit — emphasise accuracy, reconciliations, close cycles and IFRS/VAT compliance.",
+  operations:
+    "The candidate works in Operations & Management — quantify team size, budget owned, cost savings and efficiency %.",
+  logistics:
+    "The candidate works in Logistics & Supply Chain — quantify shipments, cost/lead-time reductions and supplier savings.",
+  hr:
+    "The candidate works in Human Resources — quantify headcount, time-to-hire, turnover and MOHRE/WPS compliance.",
+  admin:
+    "The candidate works in Administration/PRO — emphasise scope (execs supported, entities), named systems (Tasheel, MS365) and zero-error accuracy.",
+  engineering:
+    "The candidate works in Engineering & Construction — quantify project value, on-time/on-budget delivery, HSE (NEBOSH) and code compliance.",
+  it:
+    "The candidate works in IT & Software — quantify users, uptime, performance gains and name concrete technologies.",
+  hospitality:
+    "The candidate works in Hospitality & F&B — quantify covers/occupancy and guest-satisfaction, and name systems (Opera PMS, HACCP).",
+  retail:
+    "The candidate works in Retail — quantify sales-target attainment, basket size, footfall and shrinkage.",
+  realestate:
+    "The candidate works in Real Estate — quantify deal value in AED, occupancy and leads, and note RERA where relevant.",
+  healthcare:
+    "The candidate works in Healthcare — emphasise patient volumes, clinical standards and DHA/DOH/MOH licensure.",
+  education:
+    "The candidate works in Education & Training — quantify learners, attainment gains and curriculum (KHDA/ADEK).",
+  customerservice:
+    "The candidate works in Customer Service — quantify CSAT, handling time, first-contact resolution and languages.",
 };
 
 const SUPPORT_URL = "https://www.makemycv.ae/support";
@@ -63,7 +104,16 @@ function rateLimitedResponse(retryAfterSeconds: number) {
   );
 }
 
+// Prepends the domain specialist clause (when a domain is set) to the base
+// system prompt, so the model writes domain-native wording.
 function buildPrompt(body: RequestBody): { system: string; user: string } {
+  const base = buildBasePrompt(body);
+  const clause = body.domain ? DOMAIN_CLAUSE[body.domain] : undefined;
+  if (!clause) return base;
+  return { system: `${clause}\n\n${base.system}`, user: base.user };
+}
+
+function buildBasePrompt(body: RequestBody): { system: string; user: string } {
   switch (body.type) {
     case "bullets": {
       const existing = (body.existingBullets ?? []).filter(Boolean).join("\n");

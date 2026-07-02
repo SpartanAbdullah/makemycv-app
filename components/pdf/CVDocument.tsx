@@ -17,6 +17,7 @@ import { formatDateRange, normalizeHref } from "../../lib/utils/format";
 import { meaningfulProjects } from "../../lib/utils/projects";
 import { meaningfulExperience } from "../../lib/utils/experience";
 import { meaningfulEducation } from "../../lib/utils/education";
+import { isSkillsFirst } from "../../lib/data/sectionOrder";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -513,6 +514,18 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
+      {/* ── Skills (hoisted above experience for skills-first domains) ── */}
+      {hasSkills && isSkillsFirst(data.settings.domain) && (
+        <View style={s.section}>
+          <View style={s.sectionHeadingWrap}>
+            <Text style={s.sectionHeading}>Skills</Text>
+          </View>
+          <Text style={s.body}>
+            {data.skills.map((sk) => sk.name).join(", ")}
+          </Text>
+        </View>
+      )}
+
       {/* ── Experience ── */}
       {hasExperience && (
         <View style={s.section}>
@@ -559,8 +572,8 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
-      {/* ── Skills ── */}
-      {hasSkills && (
+      {/* ── Skills (rendered above if skills-first) ── */}
+      {hasSkills && !isSkillsFirst(data.settings.domain) && (
         <View style={s.section}>
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Skills</Text>
@@ -1017,21 +1030,24 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
 
   // atsSectionHeading already has marginTop: 16 baked in.
   // Override first section to marginTop: 0 via inline style.
+  const skillsFirst = isSkillsFirst(data.settings.domain);
   const firstSection = hasSummary
     ? "summary"
-    : hasExperience
-      ? "experience"
-      : hasEducation
-        ? "education"
-        : hasSkills
-          ? "skills"
-          : hasLanguages
-            ? "languages"
-            : hasCertifications
-              ? "certifications"
-              : hasProjects
-                ? "projects"
-                : null;
+    : skillsFirst && hasSkills
+      ? "skills"
+      : hasExperience
+        ? "experience"
+        : hasEducation
+          ? "education"
+          : hasSkills
+            ? "skills"
+            : hasLanguages
+              ? "languages"
+              : hasCertifications
+                ? "certifications"
+                : hasProjects
+                  ? "projects"
+                  : null;
 
   const headingStyle = (id: string) =>
     firstSection === id
@@ -1116,6 +1132,16 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
+      {/* ── Skills (hoisted above experience for skills-first domains) ── */}
+      {hasSkills && skillsFirst && (
+        <View>
+          <Text style={headingStyle("skills")}>Skills</Text>
+          <Text style={{ ...s.body, color: "#374151" }}>
+            {data.skills.map((sk) => sk.name).join(" · ")}
+          </Text>
+        </View>
+      )}
+
       {/* ── Experience ── */}
       {hasExperience && (
         <View>
@@ -1185,8 +1211,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
-      {/* ── Skills ── */}
-      {hasSkills && (
+      {/* ── Skills (rendered above if skills-first) ── */}
+      {hasSkills && !skillsFirst && (
         <View>
           <Text style={headingStyle("skills")}>Skills</Text>
           <Text style={{ ...s.body, color: "#374151" }}>

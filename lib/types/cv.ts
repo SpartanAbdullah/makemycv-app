@@ -89,6 +89,32 @@ export type PhotoShape = "round" | "square" | "hidden";
 
 export type CvFontFamily = "sans" | "display" | "serif";
 
+/**
+ * Job-domain taxonomy that drives per-domain content personalization
+ * (wording, idea bullets, soft skills, AI prompt). Runtime helpers — the
+ * keyword table, labels, and inference — live in lib/data/roleFamily.ts;
+ * this is just the canonical type so lib/types stays the source of truth.
+ * "generic" is the always-available fallback.
+ */
+export type RoleFamily =
+  | "sales"
+  | "marketing"
+  | "finance"
+  | "accounting"
+  | "operations"
+  | "logistics"
+  | "hr"
+  | "admin"
+  | "engineering"
+  | "it"
+  | "hospitality"
+  | "retail"
+  | "realestate"
+  | "healthcare"
+  | "education"
+  | "customerservice"
+  | "generic";
+
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
@@ -96,6 +122,13 @@ export type CvSettings = {
   fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
+  // Personalization (Phase 1): the job domain we tailor content for.
+  // `domain` is inferred from the headline and confirmable via the chip;
+  // `domainSource` records whether the value was inferred or user-chosen so
+  // auto-inference never clobbers a manual pick. Both optional → old CVs load
+  // fine with no migration; domain is inferred lazily on first headline blur.
+  domain?: RoleFamily;
+  domainSource?: "inferred" | "user";
 };
 
 export type CvData = {

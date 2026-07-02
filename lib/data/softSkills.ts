@@ -14,7 +14,7 @@
  * UNIVERSAL skills suit any UAE role; FAMILY skills are layered in when the
  * job title matches, reusing the same RoleFamily keys as ideaSuggestions.
  */
-import { matchesRoleKeyword, type RoleFamily } from "./ideaSuggestions";
+import { inferRoleFamily, type RoleFamily } from "./roleFamily";
 
 // Soft skills relevant to virtually every UAE role, regardless of function.
 export const UNIVERSAL_SOFT_SKILLS: string[] = [
@@ -48,53 +48,33 @@ const FAMILY_SOFT_SKILLS: Partial<Record<RoleFamily, string[]>> = {
   customerservice: ["Active Listening", "Patience", "Multilingual Communication", "De-escalation"],
 };
 
-// Keywords follow the same trailing-space whole-word convention as
-// ideaSuggestions (see matchesRoleKeyword): short/ambiguous abbreviations carry
-// a trailing space ("ops ", "hr ", "pro ") so they only match a standalone word
-// — e.g. "pro " must not leak into "process", nor "hr " into "through". Longer,
-// unambiguous keywords stay plain substrings.
-const FAMILY_KEYWORDS: Array<{ family: RoleFamily; keywords: string[] }> = [
-  { family: "sales", keywords: ["sales", "business development", "account", "relationship manager"] },
-  { family: "marketing", keywords: ["marketing", "digital", "brand", "social media", "content", "seo"] },
-  { family: "finance", keywords: ["finance", "financial", "fp&a", "treasury", "investment"] },
-  { family: "accounting", keywords: ["account", "audit", "bookkeep", "ledger", "vat", "tax"] },
-  { family: "operations", keywords: ["operations", "operation", "general manager", "coo", "ops "] },
-  { family: "logistics", keywords: ["logistics", "supply chain", "procurement", "warehouse", "fleet"] },
-  { family: "hr", keywords: ["hr ", "human resources", "recruit", "talent", "people"] },
-  { family: "admin", keywords: ["admin", "secretary", "assistant", "pro ", "public relations", "office", "coordinator", "reception"] },
-  { family: "engineering", keywords: ["engineer", "construction", "civil", "mechanical", "electrical", "mep", "site"] },
-  { family: "it", keywords: ["developer", "software", "data", "system", "network", "devops", "programmer"] },
-  { family: "hospitality", keywords: ["hospitality", "hotel", "f&b", "chef", "restaurant", "guest", "concierge"] },
-  { family: "retail", keywords: ["retail", "store", "merchandis", "cashier", "boutique"] },
-  { family: "realestate", keywords: ["real estate", "property", "leasing", "broker", "rera"] },
-  { family: "healthcare", keywords: ["nurse", "doctor", "medical", "health", "clinic", "patient", "pharmac"] },
-  { family: "education", keywords: ["teacher", "tutor", "lecturer", "trainer", "education", "instructor"] },
-  { family: "customerservice", keywords: ["customer service", "call center", "call centre", "support", "help desk"] },
-];
-
 /**
  * Returns UAE soft-skill suggestions: universal skills first, then any that
- * match the user's most recent role title. Excludes skills already added.
+ * match the role family. The family is the caller-supplied `domain`
+ * (user-confirmed) when given, otherwise inferred from the role title via the
+ * shared matcher (lib/data/roleFamily.ts), so idea bullets and soft skills can
+ * never disagree on which family a title belongs to. Excludes skills already
+ * added.
  *
  * @param roleTitle most recent job title (drives family layer); optional
  * @param exclude   skill names already present (case-insensitive)
  * @param limit     max suggestions to return (default 10)
+ * @param domain    optional confirmed domain that overrides title inference
  */
 export function softSkillSuggestions(
   roleTitle: string | undefined,
   exclude: string[] = [],
   limit = 10,
+  domain?: RoleFamily,
 ): string[] {
   const excludeSet = new Set(exclude.map((s) => s.toLowerCase().trim()));
-  const title = (roleTitle ?? "").toLowerCase().trim();
 
-  let familySkills: string[] = [];
-  if (title) {
-    const match = FAMILY_KEYWORDS.find((f) =>
-      f.keywords.some((kw) => matchesRoleKeyword(title, kw)),
-    );
-    if (match) familySkills = FAMILY_SOFT_SKILLS[match.family] ?? [];
-  }
+  const family =
+    domain && domain !== "generic"
+      ? domain
+      : inferRoleFamily(roleTitle).family;
+  const familySkills =
+    family !== "generic" ? (FAMILY_SOFT_SKILLS[family] ?? []) : [];
 
   // Family skills first (more specific), then universal — de-duplicated.
   const ordered = [...familySkills, ...UNIVERSAL_SOFT_SKILLS];

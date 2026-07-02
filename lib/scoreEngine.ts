@@ -14,6 +14,7 @@
 //   the CV was imported with its parseSignals (see the import endpoint).
 
 import type { CvData } from "./types/cv";
+import { findWeakPhrases } from "./data/genericPhrases";
 import type {
   ParseSignals,
   ScoreCategory,
@@ -533,6 +534,38 @@ function evaluateContent(
           actionable: pass ? "" : "Run the CV through a spell checker. Pay attention to proper nouns and company names.",
         },
         true,
+      ),
+    );
+  }
+
+  // C14 No weak / generic filler phrases (2) — N/A when there is no text.
+  // The universal cross-domain failure mode: "responsible for", "team player",
+  // "proven track record" describe a job, not an achievement, and carry no ATS
+  // signal (lib/data/genericPhrases.ts).
+  {
+    const weakText = [summary, ...allBullets].join(" ");
+    const found = findWeakPhrases(weakText);
+    const pass = found.length === 0;
+    out.push(
+      sig(
+        "C14",
+        "content",
+        2,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass
+            ? "No generic filler phrases"
+            : `${found.length} weak phrase${found.length === 1 ? "" : "s"} to rewrite`,
+          description: pass
+            ? "Your wording frames achievements, not job duties."
+            : `Phrases like "${found.slice(0, 3).join('", "')}" describe a job, not an achievement, and carry no ATS signal.`,
+          actionable: pass
+            ? ""
+            : "Swap each for a strong verb + result (e.g. 'Responsible for sales' → 'Grew sales 30% …').",
+        },
+        false,
+        weakText.trim().length > 0,
       ),
     );
   }

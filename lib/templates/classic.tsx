@@ -3,6 +3,7 @@ import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { meaningfulEducation } from "../utils/education";
+import { isSkillsFirst } from "../data/sectionOrder";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
@@ -30,6 +31,18 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const bodyClass = "text-[11.5px] leading-[1.45] text-slate-700";
   const bulletListClass =
     "list-disc pl-4 space-y-1 text-[11.5px] leading-[1.45] text-slate-700 marker:text-slate-400";
+
+  // Skills-first domains (e.g. IT) lead with the skills block, above experience.
+  // The section is extracted so it renders exactly once, in the right place.
+  const skillsFirst = isSkillsFirst(data.settings.domain);
+  const skillsSection = hasSkills ? (
+    <section className={sectionClass}>
+      <div className={headingWrapClass}>
+        <h2 className={headingClass}>Skills</h2>
+      </div>
+      <p className={`mt-2 ${bodyClass}`}>{data.skills.map((skill) => skill.name).join(", ")}</p>
+    </section>
+  ) : null;
 
   const shouldShowProjectLink = (value?: string) => {
     const normalized = value?.trim();
@@ -218,6 +231,8 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           </section>
         )}
 
+        {skillsFirst ? skillsSection : null}
+
         {hasExperience && (
           <section className={sectionClass}>
             <div className={headingWrapClass}>
@@ -289,14 +304,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           </section>
         )}
 
-        {hasSkills && (
-          <section className={sectionClass}>
-            <div className={headingWrapClass}>
-              <h2 className={headingClass}>Skills</h2>
-            </div>
-            <p className={`mt-2 ${bodyClass}`}>{data.skills.map((skill) => skill.name).join(", ")}</p>
-          </section>
-        )}
+        {skillsFirst ? null : skillsSection}
 
         {(hasLanguages || hasCertifications) && (
           <section className={`${sectionClass} grid gap-6 md:grid-cols-2`}>

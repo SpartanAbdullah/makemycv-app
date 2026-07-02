@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useJdMatch } from "../../hooks/useJdMatch";
+import { inferRoleFamily } from "../../lib/data/roleFamily";
+import { canTailorByDomain } from "../../lib/utils/entitlements";
 import { useBulletRewrite } from "../../hooks/useBulletRewrite";
 import { matchRequirementsToCv } from "../../lib/jdMatch/match";
 import { applyPendingChanges, type PendingChange } from "../../lib/jdMatch/applyFix";
@@ -234,6 +236,26 @@ export const JdMatchPanel = () => {
     setTailorError(null);
     setAnalyzedText(jobText.trim());
     run(jobText.trim());
+
+    // Conservative domain handoff (Phase 3): if the user hasn't set/confirmed a
+    // domain yet, infer it from the JD and pre-select — only on a high-confidence
+    // match (a mixed JD ties → low confidence → we skip). Never overrides a
+    // manual pick; the builder's DomainChip lets them change it either way.
+    if (canTailorByDomain()) {
+      const settings = useCvStore.getState().data.settings;
+      if (settings.domainSource !== "user" && !settings.domain) {
+        const { family, confidence } = inferRoleFamily(jobText);
+        if (confidence === "high") {
+          useCvStore
+            .getState()
+            .updateSection("settings", {
+              ...settings,
+              domain: family,
+              domainSource: "inferred",
+            });
+        }
+      }
+    }
   };
 
   const handleAdd = (category: JdCategory, term: string) => {

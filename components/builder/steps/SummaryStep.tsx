@@ -15,6 +15,8 @@ import { AIResultsModal } from "../../AIResultsModal";
 import { Icon } from "../Icon";
 import { TodaysTipCard } from "../TodaysTipCard";
 import { AiDisclosure } from "../AiDisclosure";
+import { summaryStartersFor } from "../../../lib/data/summaryStarters";
+import { ROLE_FAMILY_LABELS } from "../../../lib/data/roleFamily";
 
 type SummaryForm = { summary: string };
 
@@ -28,6 +30,7 @@ export const SummaryStep = ({
   onSkip: () => void;
 }) => {
   const summary = useCvStore((state) => state.data.personal.summary);
+  const domain = useCvStore((state) => state.data.settings.domain);
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(
     JSON.stringify({ ...useCvStore.getState().data.personal, summary })
@@ -57,6 +60,7 @@ export const SummaryStep = ({
     aiClear();
     improve({
       type: "summary",
+      domain: store.settings.domain,
       headline: store.personal.headline,
       experienceRoles: store.experience.map((r) => ({
         title: r.role,
@@ -73,6 +77,12 @@ export const SummaryStep = ({
     }
     setAiModalOpen(false);
     aiClear();
+  };
+
+  // Instant, offline starter — only offered when the box is empty (no clobber).
+  const applyStarter = (text: string) => {
+    setValue("summary", text, { shouldDirty: true });
+    setSummaryWarning(validateSummaryLength(text));
   };
 
   useEffect(() => {
@@ -157,6 +167,57 @@ export const SummaryStep = ({
             );
           })()}
           <FieldError message={summaryWarning} type="warning" />
+
+          {/* Instant starter summaries — domain-tailored, no AI, no quota.
+              Shown only while the box is empty so we never overwrite work. */}
+          {!(watch("summary") ?? "").trim() && (() => {
+            const starters = summaryStartersFor(domain);
+            if (starters.length === 0) return null;
+            return (
+              <div style={{ marginTop: 14 }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--ff-muted)",
+                    marginBottom: 8,
+                  }}
+                >
+                  {domain
+                    ? `Starter summaries for ${ROLE_FAMILY_LABELS[domain]}`
+                    : "Starter summaries"}{" "}
+                  · tap to use
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {starters.map((text, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => applyStarter(text)}
+                      className="ff-hit-target"
+                      style={{
+                        textAlign: "left",
+                        padding: "12px 14px",
+                        borderRadius: 12,
+                        background: "var(--ff-card)",
+                        border: "1px dashed var(--ff-line-strong)",
+                        color: "var(--ff-ink-2)",
+                        fontSize: 13,
+                        lineHeight: 1.5,
+                        fontFamily: "var(--font-body)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="mt-4 flex flex-col items-end">
             <button
               type="button"

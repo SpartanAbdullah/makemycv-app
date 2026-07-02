@@ -5,6 +5,7 @@ import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { meaningfulEducation } from "../utils/education";
+import { isSkillsFirst } from "../data/sectionOrder";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -133,22 +134,63 @@ export const ATSCleanTemplate = ({
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
 
-  // Determine which section is rendered first (for marginTop: 0)
+  // Skills-first domains (e.g. IT) lead with the skills block, above experience.
+  const skillsFirst = isSkillsFirst(data.settings.domain);
+
+  // Determine which section is rendered first (for marginTop: 0). When
+  // skills-first and there's no summary, skills becomes the first section.
   const firstSection = hasSummary
     ? "summary"
-    : hasExperience
-      ? "experience"
-      : hasEducation
-        ? "education"
-        : hasSkills
-          ? "skills"
-          : hasLanguages
-            ? "languages"
-            : hasCertifications
-              ? "certifications"
-              : hasProjects
-                ? "projects"
-                : null;
+    : skillsFirst && hasSkills
+      ? "skills"
+      : hasExperience
+        ? "experience"
+        : hasEducation
+          ? "education"
+          : hasSkills
+            ? "skills"
+            : hasLanguages
+              ? "languages"
+              : hasCertifications
+                ? "certifications"
+                : hasProjects
+                  ? "projects"
+                  : null;
+
+  // Extracted so the skills block renders exactly once, in the right place.
+  const skillsSection = hasSkills ? (
+    <section>
+      <SectionHeading isFirst={firstSection === "skills"}>
+        Skills
+      </SectionHeading>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap" as const,
+          gap: "6px",
+        }}
+      >
+        {data.skills.map((skill) => (
+          <span
+            key={skill.id}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              fontSize: "10.5px",
+              color: "#111827",
+              border: "1px solid #D1D5DB",
+              borderRadius: "4px",
+              padding: "2px 8px",
+              backgroundColor: "#F9FAFB",
+              lineHeight: 1.5,
+            }}
+          >
+            {skill.name}
+          </span>
+        ))}
+      </div>
+    </section>
+  ) : null;
 
   return (
     <div
@@ -287,6 +329,8 @@ export const ATSCleanTemplate = ({
           </p>
         </section>
       )}
+
+      {skillsFirst ? skillsSection : null}
 
       {/* ── Experience ── */}
       {hasExperience && (
@@ -468,40 +512,8 @@ export const ATSCleanTemplate = ({
         </section>
       )}
 
-      {/* ── Skills ── */}
-      {hasSkills && (
-        <section>
-          <SectionHeading isFirst={firstSection === "skills"}>
-            Skills
-          </SectionHeading>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap" as const,
-              gap: "6px",
-            }}
-          >
-            {data.skills.map((skill) => (
-              <span
-                key={skill.id}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: "10.5px",
-                  color: "#111827",
-                  border: "1px solid #D1D5DB",
-                  borderRadius: "4px",
-                  padding: "2px 8px",
-                  backgroundColor: "#F9FAFB",
-                  lineHeight: 1.5,
-                }}
-              >
-                {skill.name}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* ── Skills (rendered above if skills-first) ── */}
+      {skillsFirst ? null : skillsSection}
 
       {/* ── Languages ── */}
       {hasLanguages && (

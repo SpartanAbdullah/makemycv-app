@@ -12,6 +12,9 @@ import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
 import { softSkillSuggestions } from "../../../lib/data/softSkills";
+import { domainHardSkills } from "../../../lib/data/domainSkills";
+import { ROLE_FAMILY_LABELS } from "../../../lib/data/roleFamily";
+import { canTailorByDomain } from "../../../lib/utils/entitlements";
 import { Icon } from "../Icon";
 import { AiDisclosure } from "../AiDisclosure";
 import type { CvSkill, SkillLevel } from "../../../lib/types/cv";
@@ -34,6 +37,7 @@ export const SkillsStep = ({
 }) => {
   const skills = useCvStore((state) => state.data.skills);
   const recentRole = useCvStore((state) => state.data.experience[0]?.role ?? "");
+  const domain = useCvStore((state) => state.data.settings.domain);
   const updateSection = useCvStore((state) => state.updateSection);
   const lastSerializedRef = useRef<string>(JSON.stringify(skills));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,6 +79,7 @@ export const SkillsStep = ({
     aiClear();
     improve({
       type: "skills",
+      domain: store.settings.domain,
       headline: store.personal.headline,
       experienceRoles: store.experience.map((r) => ({
         title: r.role,
@@ -284,6 +289,57 @@ export const SkillsStep = ({
           <AiDisclosure align="left" />
         </div>
 
+        {/* Domain hard-skill / cert chips — the ATS keywords for the user's
+            confirmed field (Salesforce, IFRS, DHA licence, NEBOSH…). Shows only
+            when a domain is set. Tap to add. */}
+        {canTailorByDomain() && domain && (() => {
+          const picks = domainHardSkills(domain, fields.map((f) => f.name), 10);
+          if (picks.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--ff-muted)",
+                  marginBottom: 8,
+                }}
+              >
+                Recommended for {ROLE_FAMILY_LABELS[domain]} · tap to add
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {picks.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => addSkillByName(name)}
+                    className="ff-hit-target"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      background: "var(--ff-accent-soft)",
+                      border: "1px solid var(--ff-accent)",
+                      color: "var(--ff-accent)",
+                      fontSize: 13,
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Icon name="plus" size={11} />
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* UAE soft-skill chips — instant, no AI. Culture-aware skills that
             UAE recruiters screen for (cross-cultural, multilingual, etc.),
             layered with role-specific picks. Tap to add. */}
@@ -292,6 +348,7 @@ export const SkillsStep = ({
             recentRole,
             fields.map((f) => f.name),
             10,
+            domain,
           );
           if (picks.length === 0) return null;
           return (

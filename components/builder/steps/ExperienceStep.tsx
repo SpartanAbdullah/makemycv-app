@@ -17,6 +17,8 @@ import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
+import { inferRoleFamily } from "../../../lib/data/roleFamily";
+import { canTailorByDomain } from "../../../lib/utils/entitlements";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
@@ -141,6 +143,9 @@ export const ExperienceStep = ({
     aiClear();
     improve({
       type: "bullets",
+      // Per-entry: a past role's bullets should reflect THAT role's domain,
+      // not the person's global target domain.
+      domain: canTailorByDomain() ? inferRoleFamily(entry.role).family : undefined,
       jobTitle: entry.role,
       company: entry.company,
       existingBullets: entry.bullets?.filter(Boolean),
