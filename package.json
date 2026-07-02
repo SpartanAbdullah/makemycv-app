@@ -13,7 +13,10 @@
     "test:rolematch": "tsc lib/data/ideaSuggestions.ts lib/data/softSkills.ts lib/data/roleMatch.test.ts --rootDir lib --outDir .rolematch-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .rolematch-test-build/data/roleMatch.test.js",
     "test:applyfix": "tsc lib/jdMatch/applyFix.ts lib/jdMatch/applyFix.test.ts --rootDir lib --outDir .applyfix-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .applyfix-test-build/jdMatch/applyFix.test.js",
     "test:heatmap": "tsc lib/jdMatch/heatmap.ts lib/jdMatch/heatmap.test.ts --rootDir lib --outDir .heatmap-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .heatmap-test-build/jdMatch/heatmap.test.js",
-    "test:tailor": "tsc lib/jdMatch/tailorCv.ts lib/jdMatch/tailorCv.test.ts --rootDir lib --outDir .tailor-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .tailor-test-build/jdMatch/tailorCv.test.js"
+    "test:tailor": "tsc lib/jdMatch/tailorCv.ts lib/jdMatch/tailorCv.test.ts --rootDir lib --outDir .tailor-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .tailor-test-build/jdMatch/tailorCv.test.js",
+    "test:projects": "tsc lib/utils/projects.ts lib/utils/projects.test.ts --rootDir lib --outDir .projects-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .projects-test-build/utils/projects.test.js",
+    "test:experience": "tsc lib/utils/experience.ts lib/utils/experience.test.ts --rootDir lib --outDir .experience-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .experience-test-build/utils/experience.test.js",
+    "test:education": "tsc lib/utils/education.ts lib/utils/education.test.ts --rootDir lib --outDir .education-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .education-test-build/utils/education.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

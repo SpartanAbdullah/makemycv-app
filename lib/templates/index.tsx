@@ -7,11 +7,22 @@ import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
 import { ModernTemplate } from "./modern";
 
+/**
+ * Badge tones drive both meaning and color in the template picker:
+ *  - "recommended": filled accent, highest emphasis — the safe default we
+ *    steer the indecisive majority toward (only ONE template should carry it).
+ *  - "ats": green, reassures the #1 user fear ("will a bot reject my CV?").
+ *    Only honest for genuinely single-column, parseable layouts.
+ *  - "neutral": quiet grey for design-led (two-column) templates.
+ */
+export type TemplateBadgeTone = "recommended" | "ats" | "neutral";
+export type TemplateBadge = { label: string; tone: TemplateBadgeTone };
+
 export type TemplateDefinition = {
   id: string;
   name: string;
   description: string;
-  badge?: string;
+  badges?: TemplateBadge[];
   Thumbnail: () => React.ReactElement;
   Render: ({ data, plan }: { data: CvData; plan?: PlanTier }) => React.ReactElement;
 };
@@ -153,24 +164,29 @@ const CorpSidebarThumb = () => (
 
 export const templates: TemplateDefinition[] = [
   /* Badges are an honest ATS-safety signal (audit UI-10): single-column
-     text-first layouts get "ATS-safe"; sidebar/two-column structures get
-     "Design-led" because older ATS parsers can interleave their columns —
-     fine for direct email, riskier for online application portals. */
+     text-first layouts get the green "ATS-Friendly" badge; sidebar/two-column
+     structures get a quiet "Design-led" badge because older ATS parsers can
+     interleave their columns — fine for direct email, riskier for online
+     application portals. Exactly ONE template ("Classic", the default) also
+     carries "Recommended" to anchor the indecisive majority. */
   {
     id: "classic",
     name: "Classic",
     description: "Clean single-column layout for traditional roles.",
-    badge: "ATS-safe",
+    badges: [
+      { label: "Recommended", tone: "recommended" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
     Thumbnail: ClassicThumb,
     Render: ClassicTemplate,
   },
   {
     id: "modern",
     name: "Modern",
-    // Has a 2fr/1fr two-column body (modern.tsx:154) — NOT ATS-safe-badged,
+    // Has a 2fr/1fr two-column body (modern.tsx:154) — NOT ATS-Friendly-badged,
     // whatever earlier notes claimed. Verified against the template source.
     description: "Two-column layout with a refined accent section.",
-    badge: "Design-led",
+    badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ModernThumb,
     Render: ModernTemplate,
   },
@@ -179,7 +195,7 @@ export const templates: TemplateDefinition[] = [
     name: "Executive",
     description:
       "Navy sidebar, two-column. Best for direct email to a recruiter.",
-    badge: "Design-led",
+    badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ExecutiveThumb,
     Render: ExecutiveTemplate,
   },
@@ -187,7 +203,7 @@ export const templates: TemplateDefinition[] = [
     id: "ats-clean",
     name: "ATS Clean",
     description: "Single-column layout engineered for maximum ATS pass rate.",
-    badge: "ATS-safe",
+    badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
   },
@@ -195,7 +211,7 @@ export const templates: TemplateDefinition[] = [
     id: "exec-split",
     name: "Executive Split",
     description: "Dark header with two-column body for senior professionals.",
-    badge: "Design-led",
+    badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ExecSplitThumb,
     Render: ExecSplitTemplate,
   },
@@ -204,7 +220,7 @@ export const templates: TemplateDefinition[] = [
     name: "Corporate",
     description:
       "Right dark sidebar. Best for direct email to a recruiter.",
-    badge: "Design-led",
+    badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: CorpSidebarThumb,
     Render: CorpSidebarTemplate,
   },

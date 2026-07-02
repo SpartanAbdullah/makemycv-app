@@ -26,7 +26,8 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")",
       "Bash(git rm *)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(sed -n '/Clicking ..Clear.. with pending/,/dimension/p' \"C:\\\\Users\\\\MUHAMM~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-MuhammadAbdullah-Desktop-Makemycv-makemycv-app\\\\eb6ab0db-be5b-4d57-9061-b97e5df30b59\\\\tasks\\\\wbetxpaez.output\" | head -40)"
     ]
   }
 }

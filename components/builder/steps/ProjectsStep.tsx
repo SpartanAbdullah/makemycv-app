@@ -224,12 +224,14 @@ export const ProjectsStep = ({
                   {isOpen && (
                     <div style={{ borderTop: "1px solid var(--border-soft)", padding: 20 }}>
                       <div className="flex items-center justify-end" style={{ gap: 6 }}>
-                        {fields.length > 1 && (
-                          <button type="button" onClick={() => handleRemoveEntry(index)} className="cv-btn-danger">
-                            <Icon name="trash" size={12} />
-                            Remove
-                          </button>
-                        )}
+                        {/* Always removable — Projects is optional, so the last
+                            card must delete down to an empty section (not stay
+                            as an un-deletable blank shell that renders a ghost
+                            "Projects" heading on the CV). */}
+                        <button type="button" onClick={() => handleRemoveEntry(index)} className="cv-btn-danger">
+                          <Icon name="trash" size={12} />
+                          Remove
+                        </button>
                       </div>
 
                       <div className="mt-2 grid gap-4 md:grid-cols-2">

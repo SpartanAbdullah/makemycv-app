@@ -2,6 +2,9 @@ import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
+import { meaningfulProjects } from "../utils/projects";
+import { meaningfulExperience } from "../utils/experience";
+import { meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -132,9 +135,12 @@ export const ExecutiveTemplate = ({
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -418,7 +424,7 @@ export const ExecutiveTemplate = ({
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
-              {data.experience.map((role) => (
+              {experience.map((role) => (
                 <div
                   key={role.id}
                   style={{
@@ -506,7 +512,7 @@ export const ExecutiveTemplate = ({
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
-              {data.education.map((edu) => (
+              {education.map((edu) => (
                 <div
                   key={edu.id}
                   style={{
@@ -601,7 +607,7 @@ export const ExecutiveTemplate = ({
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
-              {data.projects.map((project) => {
+              {projects.map((project) => {
                 const bullets = (project.bullets ?? []).filter(Boolean);
                 const showLink = shouldShowProjectLink(project.link);
                 return (

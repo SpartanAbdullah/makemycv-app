@@ -1,5 +1,8 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatDateRange, normalizeHref } from "../utils/format";
+import { meaningfulProjects } from "../utils/projects";
+import { meaningfulExperience } from "../utils/experience";
+import { meaningfulEducation } from "../utils/education";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
@@ -11,12 +14,15 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const theme = resolveTheme(data.settings, "#1e5b54");
   const photoVisible = theme.photoVisible;
   const hasSummary = Boolean(data.personal.summary);
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasLanguages = data.languages.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   const sectionClass = "cv-section mt-6";
   const headingWrapClass = "avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]";
@@ -218,7 +224,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               <h2 className={headingClass}>Experience</h2>
             </div>
             <div className="mt-2 space-y-3">
-              {data.experience.map((role) => (
+              {experience.map((role) => (
                 <div key={role.id} className="avoid-break space-y-1 [break-inside:avoid]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-[12px] leading-[1.35]">
@@ -252,7 +258,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               <h2 className={headingClass}>Education</h2>
             </div>
             <div className="mt-2 space-y-3">
-              {data.education.map((edu) => (
+              {education.map((edu) => (
                 <div key={edu.id} className="avoid-break [break-inside:avoid]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-[12px] font-semibold text-slate-800">
@@ -333,7 +339,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
         {hasProjects && (
           <section className={sectionClass}>
-            {data.projects.map((project, index) => {
+            {projects.map((project, index) => {
               const bullets = (project.bullets ?? []).map((bullet) => bullet.trim()).filter(Boolean);
               const [firstBullet, ...remainingBullets] = bullets;
               const showLink = shouldShowProjectLink(project.link);

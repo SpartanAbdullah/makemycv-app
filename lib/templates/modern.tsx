@@ -1,6 +1,9 @@
 import type { CvData } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
+import { meaningfulProjects } from "../utils/projects";
+import { meaningfulExperience } from "../utils/experience";
+import { meaningfulEducation } from "../utils/education";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
@@ -13,6 +16,9 @@ export const ModernTemplate = ({
 }) => {
   const name = getFullName(data) || "Your Name";
   const theme = resolveTheme(data.settings, "#1e5b54");
+  const projects = meaningfulProjects(data.projects);
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
   const shouldShowProjectLink = (value?: string) => {
     const normalized = value?.trim();
     if (!normalized) return false;
@@ -168,13 +174,13 @@ export const ModernTemplate = ({
             </section>
           )}
 
-          {data.experience.length > 0 && (
+          {experience.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Experience
               </h2>
               <div className="mt-3 space-y-4">
-                {data.experience.map((role) => (
+                {experience.map((role) => (
                   <div
                     key={role.id}
                     className="rounded-xl border border-slate-200 p-3"
@@ -246,9 +252,9 @@ export const ModernTemplate = ({
             </section>
           )}
 
-          {data.projects.length > 0 && (
+          {projects.length > 0 && (
             <section>
-              {data.projects.map((project, index) => {
+              {projects.map((project, index) => {
                 const bullets = (project.bullets ?? []).filter(Boolean);
                 const [firstBullet, ...remainingBullets] = bullets;
                 const showLink = shouldShowProjectLink(project.link);
@@ -320,13 +326,13 @@ export const ModernTemplate = ({
         </div>
 
         <aside className="space-y-6" style={{ width: "200px", flexShrink: 0 }}>
-          {data.education.length > 0 && (
+          {education.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Education
               </h2>
               <div className="mt-3 space-y-3">
-                {data.education.map((edu) => (
+                {education.map((edu) => (
                   <div key={edu.id}>
                     <div className="text-sm font-semibold">
                       {edu.school || "School"}

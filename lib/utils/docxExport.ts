@@ -6,12 +6,20 @@
 import type { CvData } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "./format";
+import { meaningfulProjects } from "./projects";
+import { meaningfulExperience } from "./experience";
+import { meaningfulEducation } from "./education";
 
 export async function exportToDocx(data: CvData): Promise<void> {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, ExternalHyperlink } =
     await import("docx");
 
-  const { personal, experience, education, skills, languages, certifications, projects } = data;
+  const { personal, skills, languages, certifications } = data;
+  // Drop blank shells so the DOCX never emits a ghost section heading
+  // (see lib/utils/{projects,experience,education}.ts).
+  const projects = meaningfulProjects(data.projects);
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
   const fullName = [personal.firstName, personal.lastName].filter(Boolean).join(" ") || "Your Name";
 
   const makeSection = (title: string) =>

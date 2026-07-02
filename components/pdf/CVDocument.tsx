@@ -14,6 +14,9 @@ import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
 import { formatDateRange, normalizeHref } from "../../lib/utils/format";
+import { meaningfulProjects } from "../../lib/utils/projects";
+import { meaningfulExperience } from "../../lib/utils/experience";
+import { meaningfulEducation } from "../../lib/utils/education";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -383,12 +386,15 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
@@ -513,7 +519,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
-          {data.experience.map((role) => (
+          {experience.map((role) => (
             <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -547,7 +553,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {data.education.map((edu) => (
+          {education.map((edu) => (
             <EducationEntry key={edu.id} edu={edu} />
           ))}
         </View>
@@ -615,7 +621,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Projects</Text>
           </View>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -656,9 +662,12 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1E2A4A");
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -871,7 +880,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {data.experience.map((role) => (
+            {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -905,7 +914,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {data.education.map((edu) => (
+            {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} />
             ))}
           </View>
@@ -917,7 +926,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Projects</Text>
             </View>
-            {data.projects.map((project) => {
+            {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -992,12 +1001,15 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
     .join(" · ");
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#111827");
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -1108,7 +1120,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasExperience && (
         <View>
           <Text style={headingStyle("experience")}>Experience</Text>
-          {data.experience.map((role) => (
+          {experience.map((role) => (
             <View key={role.id} style={{ marginBottom: 9 }} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text
@@ -1159,7 +1171,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasEducation && (
         <View>
           <Text style={headingStyle("education")}>Education</Text>
-          {data.education.map((edu) => (
+          {education.map((edu) => (
             <EducationEntry
               key={edu.id}
               edu={edu}
@@ -1226,7 +1238,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasProjects && (
         <View>
           <Text style={headingStyle("projects")}>Projects</Text>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={{ marginBottom: 8 }} wrap={false}>
@@ -1281,12 +1293,15 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1e5b54");
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -1421,7 +1436,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
-          {data.experience.map((role) => (
+          {experience.map((role) => (
             <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -1455,7 +1470,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {data.education.map((edu) => (
+          {education.map((edu) => (
             <EducationEntry key={edu.id} edu={edu} />
           ))}
         </View>
@@ -1523,7 +1538,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Projects</Text>
           </View>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -1565,12 +1580,15 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   const contactParts: Array<{ text: string; href?: string }> = [];
   if (data.personal.email?.trim())
@@ -1765,7 +1783,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Experience</Text>
               </View>
-              {data.experience.map((role) => (
+              {experience.map((role) => (
                 <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                   <View style={s.entryRow}>
                     <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -1798,7 +1816,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Education</Text>
               </View>
-              {data.education.map((edu) => (
+              {education.map((edu) => (
                 <EducationEntry key={edu.id} edu={edu} />
               ))}
             </View>
@@ -1809,7 +1827,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Projects</Text>
               </View>
-              {data.projects.map((project) => {
+              {projects.map((project) => {
                 const showLink = shouldShowProjectLink(project.link);
                 return (
                   <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -1927,12 +1945,15 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   const sidebarContacts: Array<{
     label: string;
@@ -2035,7 +2056,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {data.experience.map((role) => (
+            {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -2068,7 +2089,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {data.education.map((edu) => (
+            {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} />
             ))}
           </View>
@@ -2079,7 +2100,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Projects</Text>
             </View>
-            {data.projects.map((project) => {
+            {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
