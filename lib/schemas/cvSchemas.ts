@@ -125,6 +125,7 @@ export const settingsSchema = z.object({
   domain: z.enum(ROLE_FAMILIES).optional(),
   domainSource: z.enum(["inferred", "user"]).optional(),
   fontScale: z.number().optional(),
+  pageMargins: z.number().optional(),
   sectionOrder: z.array(z.string()).optional(),
 });
 

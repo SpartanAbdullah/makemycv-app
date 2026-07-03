@@ -14,6 +14,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim();
   const theme = resolveTheme(data.settings, "#1e5b54");
+  const m = theme.marginScale;
   const photoVisible = theme.photoVisible;
   const hasSummary = Boolean(data.personal.summary);
   const experience = meaningfulExperience(data.experience);
@@ -136,8 +137,8 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white px-8 py-9 text-[11.5px] leading-[1.45] text-slate-700"
-      style={{ fontFamily: theme.fontFamily }}
+      className="cv-print relative overflow-hidden bg-white text-[11.5px] leading-[1.45] text-slate-700"
+      style={{ fontFamily: theme.fontFamily, padding: `${36 * m}px ${32 * m}px` }}
     >
       {plan === "free" && (
         <div

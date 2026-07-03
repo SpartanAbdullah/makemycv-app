@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
+import { onColor } from "../../lib/utils/color";
+import { Icon } from "./Icon";
 
 // Curated, professional accent palette. Ordered blues → greens → warm → neutral.
 // Every colour renders readably because the templates derive contrast-safe text
@@ -21,11 +23,10 @@ const ACCENT_SWATCHES: { label: string; hex: string }[] = [
   { label: "Sand", hex: "#C9A96A" },
 ];
 
-// "Font scale" control removed 2026-06: no render path (live template or
-// PDF layout) ever read theme.fontScale, so the control silently did
-// nothing — worse than not having it. settings.fontScale stays in the
-// schema for saved-data compat; re-add the control only once both render
-// paths actually consume it.
+// Font-size / line-height / section-spacing sliders are the next pass — they
+// need every template (preview + PDF) to consume the scale before the control
+// can go live, so they are intentionally NOT shown here yet (no dead sliders).
+// Page Margins is wired (theme.marginScale → content padding).
 
 const FONT_FAMILIES: { label: string; value: CvFontFamily; sample: string }[] = [
   { label: "Sans", value: "sans", sample: "Inter" },
@@ -38,6 +39,10 @@ const PHOTO_SHAPES: { label: string; value: PhotoShape }[] = [
   { label: "Square", value: "square" },
   { label: "Hidden", value: "hidden" },
 ];
+
+const SLIDER_GREEN = "#22C55E";
+const SLIDER_TRACK = "#2B3648";
+const SLIDER_TICK = "#94A3B8";
 
 const Group = ({
   label,
@@ -54,7 +59,7 @@ const Group = ({
         letterSpacing: "0.12em",
         color: "var(--ff-muted)",
         textTransform: "uppercase",
-        marginBottom: 8,
+        marginBottom: 10,
       }}
     >
       {label}
@@ -62,6 +67,181 @@ const Group = ({
     {children}
   </div>
 );
+
+const Divider = () => (
+  <div style={{ borderTop: "1px solid var(--ff-line)" }} />
+);
+
+// − / + end buttons for the stepped slider.
+const StepButton = ({
+  glyph,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  glyph: string;
+  onClick: () => void;
+  disabled: boolean;
+  ariaLabel: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={ariaLabel}
+    style={{
+      width: 26,
+      height: 26,
+      flexShrink: 0,
+      borderRadius: 8,
+      border: "1px solid var(--ff-line)",
+      background: "var(--ff-paper)",
+      color: "var(--ff-ink-2)",
+      fontSize: 16,
+      lineHeight: 1,
+      display: "grid",
+      placeItems: "center",
+      cursor: disabled ? "default" : "pointer",
+      opacity: disabled ? 0.4 : 1,
+      padding: 0,
+    }}
+  >
+    {glyph}
+  </button>
+);
+
+/**
+ * Discrete slider (min..max integer steps) styled like the reference: a dark
+ * track with tick notches, a green capsule thumb, and −/＋ ends. Values are
+ * discrete so there's no drag state — click a position, use the ends, or
+ * arrow-key. Rendered at module level so react-compiler is happy.
+ */
+const StepSlider = ({
+  value,
+  min,
+  max,
+  onChange,
+  leftLabel,
+  rightLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  leftLabel: string;
+  rightLabel: string;
+}) => {
+  const steps = max - min;
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const pct = ((clamp(value) - min) / steps) * 100;
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    color: "var(--ff-muted)",
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <StepButton
+          glyph="−"
+          ariaLabel="Decrease"
+          disabled={value <= min}
+          onClick={() => onChange(clamp(value - 1))}
+        />
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={clamp(value)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const rel = Math.min(
+              1,
+              Math.max(0, (e.clientX - rect.left) / rect.width),
+            );
+            onChange(clamp(Math.round(rel * steps) + min));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+              e.preventDefault();
+              onChange(clamp(value - 1));
+            } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+              e.preventDefault();
+              onChange(clamp(value + 1));
+            }
+          }}
+          style={{
+            position: "relative",
+            flex: 1,
+            height: 26,
+            cursor: "pointer",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: "50%",
+              height: 4,
+              marginTop: -2,
+              borderRadius: 2,
+              background: SLIDER_TRACK,
+            }}
+          />
+          {Array.from({ length: steps + 1 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: `${(i / steps) * 100}%`,
+                top: "50%",
+                width: 2,
+                height: 10,
+                marginTop: -5,
+                marginLeft: -1,
+                borderRadius: 1,
+                background: SLIDER_TICK,
+              }}
+            />
+          ))}
+          <div
+            style={{
+              position: "absolute",
+              left: `${pct}%`,
+              top: "50%",
+              width: 12,
+              height: 22,
+              marginTop: -11,
+              marginLeft: -6,
+              borderRadius: 6,
+              background: SLIDER_GREEN,
+              border: "2px solid #fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+            }}
+          />
+        </div>
+        <StepButton
+          glyph="+"
+          ariaLabel="Increase"
+          disabled={value >= max}
+          onClick={() => onChange(clamp(value + 1))}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 6,
+        }}
+      >
+        <span style={labelStyle}>{leftLabel}</span>
+        <span style={labelStyle}>{rightLabel}</span>
+      </div>
+    </div>
+  );
+};
 
 const Segmented = <T extends string | number>({
   options,
@@ -122,6 +302,14 @@ export const CustomizePanel = () => {
   };
 
   const accentColor = settings.accentColor ?? "#1e5b54";
+  const isCustomColor = !ACCENT_SWATCHES.some(
+    (sw) => sw.hex.toLowerCase() === accentColor.toLowerCase(),
+  );
+  const pageMargins = settings.pageMargins ?? 2;
+
+  // Custom-colour drawer, revealed by the "Use custom colour" link. Opens by
+  // default when the saved accent isn't one of the presets so it stays visible.
+  const [showCustom, setShowCustom] = useState(isCustomColor);
 
   // Typeable hex field — local draft so the user can type freely; committed
   // on blur/Enter. Invalid input quietly reverts to the current accent.
@@ -163,69 +351,114 @@ export const CustomizePanel = () => {
             marginBottom: 2,
           }}
         >
-          Customize
+          Design &amp; Font
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--ff-muted)",
-            lineHeight: 1.5,
-          }}
-        >
-          Live preview updates as you tweak. Some options apply only to
-          certain templates.
+        <div style={{ fontSize: 12, color: "var(--ff-muted)", lineHeight: 1.5 }}>
+          Live preview updates as you tweak.
         </div>
       </div>
 
-      <Group label="Accent colour">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+      <Group label={`Page margins: ${pageMargins}`}>
+        <StepSlider
+          value={pageMargins}
+          min={1}
+          max={5}
+          onChange={(v) => setSetting("pageMargins", v)}
+          leftLabel="narrow"
+          rightLabel="wide"
+        />
+      </Group>
+
+      <Divider />
+
+      <Group label="Colours">
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            alignItems: "center",
+          }}
+        >
           {ACCENT_SWATCHES.map((sw) => {
-            const active = accentColor.toLowerCase() === sw.hex.toLowerCase();
+            const active =
+              accentColor.toLowerCase() === sw.hex.toLowerCase();
             return (
               <button
                 key={sw.hex}
                 type="button"
                 title={sw.label}
                 aria-label={sw.label}
+                aria-pressed={active}
                 onClick={() => setSetting("accentColor", sw.hex)}
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 40,
+                  height: 40,
                   borderRadius: "50%",
-                  background: sw.hex,
-                  border: active
-                    ? "2px solid var(--ff-ink)"
-                    : "1.5px solid var(--ff-line)",
-                  outline: active ? "2px solid white" : "none",
-                  outlineOffset: -4,
+                  padding: 3,
+                  background: "#1F2937",
+                  border: "none",
                   cursor: "pointer",
-                  padding: 0,
                   flexShrink: 0,
+                  display: "grid",
+                  placeItems: "center",
                 }}
-              />
+              >
+                <span
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    background: sw.hex,
+                    display: "grid",
+                    placeItems: "center",
+                    color: onColor(sw.hex),
+                  }}
+                >
+                  {active && <Icon name="check" size={16} />}
+                </span>
+              </button>
             );
           })}
-          <label
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowCustom((v) => !v)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            marginTop: 14,
+            color: "var(--ff-accent)",
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          {showCustom ? "Hide custom colour" : "Use custom colour"}
+        </button>
+
+        {showCustom && (
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: 6,
-              marginLeft: 4,
+              gap: 8,
+              marginTop: 10,
             }}
           >
-            <span style={{ fontSize: 11, color: "var(--ff-muted)" }}>
-              Choose your own colour
-            </span>
             <input
               type="color"
               value={accentColor}
               aria-label="Choose your own colour"
               onChange={(e) => setSetting("accentColor", e.target.value)}
               style={{
-                width: 36,
-                height: 32,
+                width: 40,
+                height: 34,
                 border: "1px solid var(--ff-line)",
-                borderRadius: 6,
+                borderRadius: 8,
                 background: "transparent",
                 cursor: "pointer",
                 padding: 0,
@@ -247,22 +480,67 @@ export const CustomizePanel = () => {
               maxLength={7}
               className="cv-input"
               style={{
-                width: 84,
-                padding: "6px 8px",
+                width: 96,
+                padding: "7px 8px",
                 fontSize: 12,
                 fontFamily: "var(--font-mono)",
               }}
             />
-          </label>
-        </div>
+          </div>
+        )}
       </Group>
 
-      <Group label="Font family">
-        <Segmented
-          options={FONT_FAMILIES}
-          value={settings.fontFamily ?? "sans"}
-          onChange={(v) => setSetting("fontFamily", v)}
-        />
+      <Divider />
+
+      <Group label="Font style">
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            maxWidth: 240,
+          }}
+        >
+          <select
+            value={settings.fontFamily ?? "sans"}
+            onChange={(e) =>
+              setSetting("fontFamily", e.target.value as CvFontFamily)
+            }
+            aria-label="Font style"
+            style={{
+              appearance: "none",
+              WebkitAppearance: "none",
+              width: "100%",
+              border: "1px solid var(--ff-line)",
+              borderRadius: 10,
+              background: "var(--ff-paper)",
+              padding: "9px 34px 9px 12px",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--ff-ink)",
+              cursor: "pointer",
+            }}
+          >
+            {FONT_FAMILIES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.sample}
+              </option>
+            ))}
+          </select>
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              right: 12,
+              pointerEvents: "none",
+              color: "var(--ff-muted)",
+              display: "inline-flex",
+            }}
+          >
+            <Icon name="chevron-down" size={14} />
+          </span>
+        </div>
       </Group>
 
       <Group label="Photo">

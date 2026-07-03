@@ -22,6 +22,10 @@ export type CvTheme = {
   accentSoft: string;
   fontFamily: string;
   fontScale: number;
+  /** Multiplier for content padding, from the Page Margins control (1–5 level;
+   *  level 2 = 1.0 = the current design). Multiply a template's content padding
+   *  by this so "narrow ↔ wide" actually changes the whitespace. */
+  marginScale: number;
   photoVisible: boolean;
 };
 
@@ -42,6 +46,10 @@ export function resolveTheme(
   // Muted-on-band: blend the readable ink ~35% toward the band colour — a
   // softened secondary that stays legible on both dark and light accents.
   const onAccentMuted = mix(onAccent, accent, 0.35);
+  // Page Margins: a 1–5 level → padding multiplier. Level 2 (default) maps to
+  // 1.0 so existing CVs are unchanged; 1 = narrower, 5 = wider.
+  const marginLevel = Math.min(5, Math.max(1, settings.pageMargins ?? 2));
+  const marginScale = 0.85 + (marginLevel - 1) * 0.15;
   return {
     accent,
     accentText: ensureReadableOn(accent, "#ffffff", 4.5),
@@ -50,6 +58,7 @@ export function resolveTheme(
     accentSoft: softTint(accent, 0.9),
     fontFamily: FONT_FAMILY_MAP[settings.fontFamily ?? "sans"],
     fontScale: settings.fontScale ?? 1,
+    marginScale,
     photoVisible: settings.photoShape !== "hidden",
   };
 }

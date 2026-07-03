@@ -166,7 +166,7 @@ const ProfessionalBase = ({
         width: "794px",
         minHeight: "1123px",
         backgroundColor: "#ffffff",
-        padding: "40px 44px",
+        padding: `${40 * theme.marginScale}px ${44 * theme.marginScale}px`,
         fontFamily: theme.fontFamily,
         fontSize: "11.5px",
         color: "#1a1a1a",

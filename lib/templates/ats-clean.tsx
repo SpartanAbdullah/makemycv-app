@@ -219,7 +219,7 @@ export const ATSCleanTemplate = ({
         width: "794px",
         minHeight: "1123px",
         backgroundColor: "#ffffff",
-        padding: "36px 32px",
+        padding: `${36 * theme.marginScale}px ${32 * theme.marginScale}px`,
         fontFamily: theme.fontFamily,
         fontSize: "11.5px",
         color: "#1a1a1a",

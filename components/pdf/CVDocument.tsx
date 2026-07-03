@@ -3153,6 +3153,28 @@ export const CVDocument = ({
   plan = "free",
   templateId = "classic",
 }: Props) => {
+  // Page Margins (theme.marginScale) scales the shared page padding — but ONLY
+  // for single-column templates, whose content sits directly under s.page. The
+  // two-column/sidebar layouts bleed to the page edge with hardcoded negative
+  // margins tied to s.page's 24/27, so scaling their page padding would break
+  // the bleed; their main-column margins land in the next pass.
+  const marginScale = resolveTheme(data.settings).marginScale;
+  const SINGLE_COLUMN = new Set([
+    "classic",
+    "ats-clean",
+    "professional",
+    "professional-photo",
+  ]);
+  const pageStyle = SINGLE_COLUMN.has(templateId)
+    ? {
+        ...s.page,
+        paddingTop: 27 * marginScale,
+        paddingBottom: 27 * marginScale,
+        paddingLeft: 24 * marginScale,
+        paddingRight: 24 * marginScale,
+      }
+    : s.page;
+
   const renderLayout = () => {
     switch (templateId) {
       case "executive":
@@ -3180,7 +3202,7 @@ export const CVDocument = ({
 
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={pageStyle}>
         {plan === "free" && (
           <View style={s.watermarkContainer} fixed>
             <Text style={s.watermarkText}>Created with MakeMyCV.ae — Free Plan</Text>

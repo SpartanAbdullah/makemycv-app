@@ -125,6 +125,9 @@ export type CvSettings = {
   fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
+  // Design & Font controls. pageMargins is a 1–5 level (2 = current default)
+  // that scales content padding; more sliders (spacing/font/line) land later.
+  pageMargins?: number;
   // Personalization (Phase 1): the job domain we tailor content for.
   // `domain` is inferred from the headline and confirmable via the chip;
   // `domainSource` records whether the value was inferred or user-chosen so
