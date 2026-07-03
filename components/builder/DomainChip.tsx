@@ -7,18 +7,19 @@ import {
   SELECTABLE_ROLE_FAMILIES,
 } from "../../lib/data/roleFamily";
 import type { RoleFamily } from "../../lib/types/cv";
+import { Icon } from "./Icon";
 
 /**
- * The one-tap domain confirm chip that sits under the Headline field.
+ * Premium one-tap domain confirm chip under the Headline field.
  *
  * PersonalStep infers the domain from the headline on blur (high-confidence
- * only) and writes settings.domain with domainSource "inferred". This chip:
- *  - shows "Tailoring for: <label>" when a domain is set (0 taps if correct),
- *  - shows a "Pick your field" prompt when inference was low-confidence/empty,
- *  - lets the user override in one tap, which locks domainSource to "user" so
- *    future headline edits never clobber the manual pick.
+ * only) and writes settings.domain with domainSource "inferred". This chip
+ * confirms/overrides it in one tap; a manual pick locks domainSource to "user"
+ * so future headline edits never clobber it.
  *
- * Uses a native <select> on purpose: accessible, reliable, zero popover state.
+ * The control is a native <select> with `appearance: none` + a custom chevron —
+ * it looks bespoke (sparkle glyph, sentence-case label, accent value) but keeps
+ * native accessibility and zero popover/click-outside state.
  */
 export const DomainChip = () => {
   const settings = useCvStore((s) => s.data.settings);
@@ -29,8 +30,7 @@ export const DomainChip = () => {
 
   const domain = settings.domain;
   const hasHeadline = Boolean(headline?.trim());
-  // Don't show the chip before the user has named a role and before we have
-  // anything to tailor.
+  // Nothing to tailor before the user names a role.
   if (!domain && !hasHeadline) return null;
 
   const active = Boolean(domain);
@@ -44,70 +44,87 @@ export const DomainChip = () => {
     });
   };
 
+  const accent = active ? "var(--ff-accent)" : "var(--ff-muted)";
+
   return (
     <div
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 8,
-        marginTop: 8,
-        padding: "5px 10px 5px 11px",
+        gap: 7,
+        marginTop: 10,
+        padding: "6px 12px",
         borderRadius: 999,
         border: `1px solid ${active ? "var(--ff-accent)" : "var(--ff-line)"}`,
         background: active ? "var(--ff-accent-soft)" : "var(--ff-paper)",
         maxWidth: "100%",
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: 999,
-          flexShrink: 0,
-          background: active ? "var(--ff-accent)" : "var(--ff-muted)",
-        }}
-      />
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "var(--ff-muted)",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {active ? "Tailoring for" : "Tailor this CV"}
+      <span style={{ display: "inline-flex", color: accent, flexShrink: 0 }}>
+        <Icon name="sparkle" size={13} />
       </span>
-      <select
-        value={domain ?? ""}
-        onChange={(e) => handlePick(e.target.value)}
-        aria-label="Choose the job domain to tailor this CV for"
+      {active && (
+        <span
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 12.5,
+            color: "var(--ff-muted)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Tailored for
+        </span>
+      )}
+      <span
         style={{
-          appearance: "auto",
-          border: "none",
-          background: "transparent",
-          fontFamily: "var(--font-body)",
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--ff-ink)",
-          cursor: "pointer",
-          maxWidth: "100%",
-          padding: 0,
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          minWidth: 0,
         }}
       >
-        {!active && (
-          <option value="" disabled>
-            Pick your field…
-          </option>
-        )}
-        {SELECTABLE_ROLE_FAMILIES.map((f) => (
-          <option key={f} value={f}>
-            {ROLE_FAMILY_LABELS[f]}
-          </option>
-        ))}
-      </select>
+        <select
+          value={domain ?? ""}
+          onChange={(e) => handlePick(e.target.value)}
+          aria-label="Choose the job domain to tailor this CV for"
+          style={{
+            appearance: "none",
+            WebkitAppearance: "none",
+            border: "none",
+            background: "transparent",
+            fontFamily: "var(--font-body)",
+            fontSize: 13,
+            fontWeight: 600,
+            color: active ? "var(--ff-accent)" : "var(--ff-ink-2)",
+            cursor: "pointer",
+            paddingRight: 18,
+            maxWidth: "100%",
+          }}
+        >
+          {!active && (
+            <option value="" disabled>
+              Tailor this CV to your field…
+            </option>
+          )}
+          {SELECTABLE_ROLE_FAMILIES.map((f) => (
+            <option key={f} value={f}>
+              {ROLE_FAMILY_LABELS[f]}
+            </option>
+          ))}
+        </select>
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            right: 0,
+            display: "inline-flex",
+            pointerEvents: "none",
+            color: accent,
+          }}
+        >
+          <Icon name="chevron-down" size={13} />
+        </span>
+      </span>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { meaningfulEducation } from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
+import { splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
@@ -35,13 +36,32 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   // Skills-first domains (e.g. IT) lead with the skills block, above experience.
   // The section is extracted so it renders exactly once, in the right place.
   const skillsFirst = isSkillsFirst(data.settings.domain);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
   const skillsSection = hasSkills ? (
-    <section className={sectionClass}>
-      <div className={headingWrapClass}>
-        <h2 className={headingClass}>Skills</h2>
-      </div>
-      <p className={`mt-2 ${bodyClass}`}>{data.skills.map((skill) => skill.name).join(", ")}</p>
-    </section>
+    <>
+      {generalSkills.length > 0 && (
+        <section className={sectionClass}>
+          <div className={headingWrapClass}>
+            <h2 className={headingClass}>Skills</h2>
+          </div>
+          <p className={`mt-2 ${bodyClass}`}>
+            {generalSkills.map((skill) => skill.name).join(", ")}
+          </p>
+        </section>
+      )}
+      {technicalSkills.length > 0 && (
+        <section className={sectionClass}>
+          <div className={headingWrapClass}>
+            <h2 className={headingClass}>Technical Skills</h2>
+          </div>
+          <p className={`mt-2 ${bodyClass}`}>
+            {technicalSkills.map((skill) => skill.name).join(", ")}
+          </p>
+        </section>
+      )}
+    </>
   ) : null;
 
   const shouldShowProjectLink = (value?: string) => {

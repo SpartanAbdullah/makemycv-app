@@ -21,7 +21,8 @@
     "test:domainskills": "tsc lib/data/domainSkills.ts lib/data/domainSkills.test.ts --rootDir lib --outDir .domainskills-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .domainskills-test-build/data/domainSkills.test.js",
     "test:genericphrases": "tsc lib/data/genericPhrases.ts lib/data/genericPhrases.test.ts --rootDir lib --outDir .genericphrases-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .genericphrases-test-build/data/genericPhrases.test.js",
     "test:summarystarters": "tsc lib/data/summaryStarters.ts lib/data/summaryStarters.test.ts lib/data/genericPhrases.ts --rootDir lib --outDir .summarystarters-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .summarystarters-test-build/data/summaryStarters.test.js",
-    "test:sectionorder": "tsc lib/data/sectionOrder.ts lib/data/sectionOrder.test.ts --rootDir lib --outDir .sectionorder-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .sectionorder-test-build/data/sectionOrder.test.js"
+    "test:sectionorder": "tsc lib/data/sectionOrder.ts lib/data/sectionOrder.test.ts --rootDir lib --outDir .sectionorder-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .sectionorder-test-build/data/sectionOrder.test.js",
+    "test:skills": "tsc lib/utils/skills.ts lib/utils/skills.test.ts --rootDir lib --outDir .skills-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .skills-test-build/utils/skills.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

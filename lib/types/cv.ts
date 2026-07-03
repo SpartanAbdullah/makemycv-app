@@ -63,6 +63,9 @@ export type CvSkill = {
   id: string;
   name: string;
   level?: SkillLevel;
+  // Optional grouping: "technical" skills render under a separate "Technical
+  // Skills" heading on the ATS templates. Absent = general skill.
+  category?: "technical" | "general";
 };
 
 export type CvLanguage = {

@@ -45,6 +45,10 @@ export const SkillsStep = ({
   const [inputValue, setInputValue] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  // Which group the next-added skill lands in (General vs Technical Skills).
+  const [addCategory, setAddCategory] = useState<"general" | "technical">(
+    "general",
+  );
 
   const {
     handleSubmit,
@@ -103,6 +107,7 @@ export const SkillsStep = ({
       id: f.id,
       name: f.name,
       level: toSkillLevel(f.level ?? "intermediate"),
+      ...(f.category ? { category: f.category } : {}),
     }));
     replace([...current, ...newSkills]);
     setAiModalOpen(false);
@@ -154,12 +159,14 @@ export const SkillsStep = ({
       id: createId(),
       name: trimmed,
       level: toSkillLevel("intermediate"),
+      ...(addCategory === "technical" ? { category: "technical" as const } : {}),
     };
     replace([
       ...fields.map((f) => ({
         id: f.id,
         name: f.name,
         level: toSkillLevel(f.level ?? "intermediate"),
+        ...(f.category ? { category: f.category } : {}),
       })),
       newSkill,
     ]);
@@ -169,7 +176,10 @@ export const SkillsStep = ({
 
   // Add a skill by name (used by the UAE soft-skill chips). Mirrors
   // handleAddSkill but takes the name directly and silently no-ops on dupes.
-  const addSkillByName = (name: string) => {
+  const addSkillByName = (
+    name: string,
+    category?: "technical" | "general",
+  ) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     if (fields.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) return;
@@ -177,8 +187,17 @@ export const SkillsStep = ({
       id: f.id,
       name: f.name,
       level: toSkillLevel(f.level ?? "intermediate"),
+      ...(f.category ? { category: f.category } : {}),
     }));
-    replace([...current, { id: createId(), name: trimmed, level: toSkillLevel("intermediate") }]);
+    replace([
+      ...current,
+      {
+        id: createId(),
+        name: trimmed,
+        level: toSkillLevel("intermediate"),
+        ...(category ? { category } : {}),
+      },
+    ]);
   };
 
   const removeSkill = (index: number) => {
@@ -188,6 +207,7 @@ export const SkillsStep = ({
         id: f.id,
         name: f.name,
         level: toSkillLevel(f.level ?? "intermediate"),
+        ...(f.category ? { category: f.category } : {}),
       }));
     replace(updated);
   };
@@ -201,6 +221,7 @@ export const SkillsStep = ({
       id: f.id,
       name: f.name,
       level: toSkillLevel(f.level ?? "intermediate"),
+      ...(f.category ? { category: f.category } : {}),
     }));
     const [moved] = items.splice(index, 1);
     items.splice(target, 0, moved);
@@ -213,6 +234,7 @@ export const SkillsStep = ({
       id: f.id,
       name: f.name,
       level: toSkillLevel(f.level ?? "intermediate"),
+      ...(f.category ? { category: f.category } : {}),
     }));
     const [moved] = items.splice(draggedIndex, 1);
     items.splice(dropIndex, 0, moved);
@@ -268,6 +290,51 @@ export const SkillsStep = ({
           </button>
         </div>
 
+        {/* Add-as group toggle — lets the user build a separate Technical
+            Skills section (renders under its own heading on ATS templates). */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 10,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--ff-muted)" }}>Add as</span>
+          <div
+            style={{
+              display: "inline-flex",
+              border: "1px solid var(--ff-line)",
+              borderRadius: 999,
+              overflow: "hidden",
+            }}
+          >
+            {(["general", "technical"] as const).map((cat) => {
+              const on = addCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setAddCategory(cat)}
+                  aria-pressed={on}
+                  style={{
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: "var(--font-body)",
+                    border: "none",
+                    cursor: "pointer",
+                    background: on ? "var(--ff-accent)" : "transparent",
+                    color: on ? "#fff" : "var(--ff-muted)",
+                  }}
+                >
+                  {cat === "general" ? "General" : "Technical"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Duplicate warning */}
         {duplicateWarning && (
           <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-warn)", fontWeight: 500 }}>
@@ -314,7 +381,7 @@ export const SkillsStep = ({
                   <button
                     key={name}
                     type="button"
-                    onClick={() => addSkillByName(name)}
+                    onClick={() => addSkillByName(name, "technical")}
                     className="ff-hit-target"
                     style={{
                       display: "inline-flex",
@@ -429,6 +496,23 @@ export const SkillsStep = ({
                   {"\u283F"}
                 </span>
                 {field.name}
+                {field.category === "technical" && (
+                  <span
+                    style={{
+                      fontSize: 8.5,
+                      fontWeight: 700,
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase",
+                      color: "var(--ff-accent)",
+                      border: "1px solid var(--ff-accent)",
+                      borderRadius: 4,
+                      padding: "0 4px",
+                      marginLeft: 2,
+                    }}
+                  >
+                    Tech
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => moveSkill(i, -1)}

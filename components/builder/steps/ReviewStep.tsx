@@ -15,7 +15,7 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { templates, type TemplateBadge } from "../../../lib/templates";
-import { TemplateBadges } from "../../templates/TemplateBadges";
+import { TemplateRibbon } from "../../templates/TemplateBadges";
 import {
   computeScore,
   computeDerivedStats,
@@ -752,6 +752,7 @@ const TemplateCard = ({
     aria-pressed={selected}
     style={{
       position: "relative",
+      overflow: "hidden",
       padding: 8,
       borderRadius: 14,
       background: selected ? "var(--ff-accent-soft)" : "var(--ff-card)",
@@ -793,9 +794,7 @@ const TemplateCard = ({
         <Icon name="search" size={13} />
       </button>
     )}
-    <div style={{ position: "absolute", top: 12, left: 12, zIndex: 2 }}>
-      <TemplateBadges badges={badges} direction="column" />
-    </div>
+    <TemplateRibbon badges={badges} />
     {children}
     <div
       style={{

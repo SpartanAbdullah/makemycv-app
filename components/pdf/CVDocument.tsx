@@ -18,6 +18,7 @@ import { meaningfulProjects } from "../../lib/utils/projects";
 import { meaningfulExperience } from "../../lib/utils/experience";
 import { meaningfulEducation } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
+import { splitSkills } from "../../lib/utils/skills";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -382,6 +383,34 @@ const EducationEntry = ({
    ═══════════════════════════════════════════════════════════ */
 
 const ClassicPDFLayout = ({ data }: { data: CvData }) => {
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const skillsBlock =
+    generalSkills.length > 0 || technicalSkills.length > 0 ? (
+      <>
+        {generalSkills.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeadingWrap}>
+              <Text style={s.sectionHeading}>Skills</Text>
+            </View>
+            <Text style={s.body}>
+              {generalSkills.map((sk) => sk.name).join(", ")}
+            </Text>
+          </View>
+        )}
+        {technicalSkills.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeadingWrap}>
+              <Text style={s.sectionHeading}>Technical Skills</Text>
+            </View>
+            <Text style={s.body}>
+              {technicalSkills.map((sk) => sk.name).join(", ")}
+            </Text>
+          </View>
+        )}
+      </>
+    ) : null;
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
     "Your Name";
@@ -515,16 +544,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
       )}
 
       {/* ── Skills (hoisted above experience for skills-first domains) ── */}
-      {hasSkills && isSkillsFirst(data.settings.domain) && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Skills</Text>
-          </View>
-          <Text style={s.body}>
-            {data.skills.map((sk) => sk.name).join(", ")}
-          </Text>
-        </View>
-      )}
+      {isSkillsFirst(data.settings.domain) ? skillsBlock : null}
 
       {/* ── Experience ── */}
       {hasExperience && (
@@ -573,16 +593,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
       )}
 
       {/* ── Skills (rendered above if skills-first) ── */}
-      {hasSkills && !isSkillsFirst(data.settings.domain) && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Skills</Text>
-          </View>
-          <Text style={s.body}>
-            {data.skills.map((sk) => sk.name).join(", ")}
-          </Text>
-        </View>
-      )}
+      {isSkillsFirst(data.settings.domain) ? null : skillsBlock}
 
       {/* ── Languages & Certifications ── */}
       {(hasLanguages || hasCertifications) && (
@@ -1054,6 +1065,39 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       ? { ...s.atsSectionHeading, marginTop: 0 }
       : s.atsSectionHeading;
 
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const skillsBlock =
+    generalSkills.length > 0 || technicalSkills.length > 0 ? (
+      <>
+        {generalSkills.length > 0 && (
+          <View>
+            <Text style={headingStyle("skills")}>Skills</Text>
+            <Text style={{ ...s.body, color: "#374151" }}>
+              {generalSkills.map((sk) => sk.name).join(" · ")}
+            </Text>
+          </View>
+        )}
+        {technicalSkills.length > 0 && (
+          <View>
+            <Text
+              style={
+                generalSkills.length === 0
+                  ? headingStyle("skills")
+                  : s.atsSectionHeading
+              }
+            >
+              Technical Skills
+            </Text>
+            <Text style={{ ...s.body, color: "#374151" }}>
+              {technicalSkills.map((sk) => sk.name).join(" · ")}
+            </Text>
+          </View>
+        )}
+      </>
+    ) : null;
+
   return (
     <View>
       {/* ── Header ── */}
@@ -1133,14 +1177,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       )}
 
       {/* ── Skills (hoisted above experience for skills-first domains) ── */}
-      {hasSkills && skillsFirst && (
-        <View>
-          <Text style={headingStyle("skills")}>Skills</Text>
-          <Text style={{ ...s.body, color: "#374151" }}>
-            {data.skills.map((sk) => sk.name).join(" · ")}
-          </Text>
-        </View>
-      )}
+      {skillsFirst ? skillsBlock : null}
 
       {/* ── Experience ── */}
       {hasExperience && (
@@ -1212,14 +1249,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       )}
 
       {/* ── Skills (rendered above if skills-first) ── */}
-      {hasSkills && !skillsFirst && (
-        <View>
-          <Text style={headingStyle("skills")}>Skills</Text>
-          <Text style={{ ...s.body, color: "#374151" }}>
-            {data.skills.map((sk) => sk.name).join(" · ")}
-          </Text>
-        </View>
-      )}
+      {skillsFirst ? null : skillsBlock}
 
       {/* ── Languages ── */}
       {hasLanguages && (

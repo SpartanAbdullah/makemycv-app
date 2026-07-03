@@ -6,6 +6,7 @@ import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { meaningfulEducation } from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
+import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -158,38 +159,58 @@ export const ATSCleanTemplate = ({
                   : null;
 
   // Extracted so the skills block renders exactly once, in the right place.
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const renderSkillChips = (list: typeof data.skills) => (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap" as const,
+        gap: "6px",
+      }}
+    >
+      {list.map((skill) => (
+        <span
+          key={skill.id}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            fontSize: "10.5px",
+            color: "#111827",
+            border: "1px solid #D1D5DB",
+            borderRadius: "4px",
+            padding: "2px 8px",
+            backgroundColor: "#F9FAFB",
+            lineHeight: 1.5,
+          }}
+        >
+          {skill.name}
+        </span>
+      ))}
+    </div>
+  );
   const skillsSection = hasSkills ? (
-    <section>
-      <SectionHeading isFirst={firstSection === "skills"}>
-        Skills
-      </SectionHeading>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap" as const,
-          gap: "6px",
-        }}
-      >
-        {data.skills.map((skill) => (
-          <span
-            key={skill.id}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              fontSize: "10.5px",
-              color: "#111827",
-              border: "1px solid #D1D5DB",
-              borderRadius: "4px",
-              padding: "2px 8px",
-              backgroundColor: "#F9FAFB",
-              lineHeight: 1.5,
-            }}
+    <>
+      {generalSkills.length > 0 && (
+        <section>
+          <SectionHeading isFirst={firstSection === "skills"}>
+            Skills
+          </SectionHeading>
+          {renderSkillChips(generalSkills)}
+        </section>
+      )}
+      {technicalSkills.length > 0 && (
+        <section>
+          <SectionHeading
+            isFirst={firstSection === "skills" && generalSkills.length === 0}
           >
-            {skill.name}
-          </span>
-        ))}
-      </div>
-    </section>
+            Technical Skills
+          </SectionHeading>
+          {renderSkillChips(technicalSkills)}
+        </section>
+      )}
+    </>
   ) : null;
 
   return (

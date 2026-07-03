@@ -67,6 +67,7 @@ export const skillsSchema = z.object({
         id: z.string(),
         name: z.string().min(1, "Skill is required"),
         level: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+        category: z.enum(["technical", "general"]).optional(),
       })
     )
     .min(1, "Add at least one skill"),

@@ -66,3 +66,59 @@ export const TemplateBadges = ({
     </div>
   );
 };
+
+// ── Corner ribbon (grid cards) ────────────────────────────────────────────
+// cvtoolspro-style diagonal ribbon across the card's top-right corner. Shows a
+// SINGLE badge (highest priority) so the card reads cleanly like the reference.
+// The parent card must be `position: relative; overflow: hidden`.
+const RIBBON_TONE: Record<TemplateBadge["tone"], { bg: string; fg: string }> = {
+  recommended: { bg: "var(--ff-accent)", fg: "#ffffff" },
+  ats: { bg: "#0E7C4A", fg: "#ffffff" },
+  neutral: { bg: "#64748B", fg: "#ffffff" },
+};
+
+const TONE_PRIORITY: TemplateBadge["tone"][] = ["recommended", "ats", "neutral"];
+
+export const TemplateRibbon = ({ badges }: { badges?: TemplateBadge[] }) => {
+  if (!badges || badges.length === 0) return null;
+  const top =
+    TONE_PRIORITY.map((t) => badges.find((b) => b.tone === t)).find(Boolean) ??
+    badges[0];
+  const { bg, fg } = RIBBON_TONE[top.tone];
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        width: 104,
+        height: 104,
+        overflow: "hidden",
+        pointerEvents: "none",
+        zIndex: 3,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 18,
+          right: -34,
+          width: 140,
+          transform: "rotate(45deg)",
+          textAlign: "center",
+          background: bg,
+          color: fg,
+          fontFamily: "var(--font-body)",
+          fontSize: 9.5,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          padding: "4px 0",
+          boxShadow: "0 1px 4px rgba(15,23,42,0.28)",
+        }}
+      >
+        {top.label}
+      </span>
+    </div>
+  );
+};
