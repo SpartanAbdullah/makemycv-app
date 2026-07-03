@@ -10,14 +10,13 @@ import { resolveTheme } from "./theme";
 
 /**
  * "Onyx" — charcoal left sidebar with a prominent circular photo, inspired by
- * the founder's cvtoolspro "Most Selected" reference. Distinct from Executive
- * (navy, summary-in-main): here the sidebar carries the photo, "About Me"
- * (summary), contact, languages and personal details, while the main column
- * runs Experience → Education → Skills → Certifications → Projects. Skills are
- * listed as text (no progress bars — a deliberate ATS/honesty call).
+ * the founder's cvtoolspro "Most Selected" reference. The sidebar background IS
+ * the accent (default charcoal), so picking a custom colour recolours the band;
+ * all sidebar text uses the contrast-safe onAccent/onAccentMuted derivatives so
+ * a light pick stays readable, and main-column headings use accentText (auto-
+ * darkened) so they never vanish on white. Skills are text (no bars — an
+ * ATS/honesty call).
  */
-
-const SIDEBAR_BG = "#262626";
 
 const shortenDisplayUrl = (value: string): string => {
   const cleaned = value
@@ -40,13 +39,19 @@ const shouldShowProjectLink = (value?: string): boolean => {
   return normalized.toLowerCase() !== "no link was pasted";
 };
 
-const SideLabel = ({ children }: { children: React.ReactNode }) => (
+const SideLabel = ({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) => (
   <div
     style={{
       fontSize: "9px",
       fontWeight: 700,
       letterSpacing: "0.14em",
-      color: "#9CA3AF",
+      color,
       marginBottom: "7px",
       textTransform: "uppercase" as const,
     }}
@@ -95,8 +100,8 @@ export const OnyxTemplate = ({
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
-  const theme = resolveTheme(data.settings, "#334155");
-  const accent = theme.accent;
+  const theme = resolveTheme(data.settings, "#262626");
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
 
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -130,6 +135,10 @@ export const OnyxTemplate = ({
       : null,
   ].filter(Boolean) as Array<{ text: string; href?: string }>;
 
+  // Border tint that reads on both dark and light bands.
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
+
   return (
     <div
       style={{
@@ -142,15 +151,15 @@ export const OnyxTemplate = ({
         fontSize: "11px",
       }}
     >
-      {/* ── Charcoal sidebar ── */}
+      {/* ── Accent band sidebar ── */}
       <div
         style={{
           width: "220px",
           flexShrink: 0,
-          backgroundColor: SIDEBAR_BG,
+          backgroundColor: accent,
           padding: "30px 22px",
           boxSizing: "border-box" as const,
-          color: "#D1D5DB",
+          color: onAccentMuted,
         }}
       >
         {showPhoto && data.personal.photo && (
@@ -161,7 +170,7 @@ export const OnyxTemplate = ({
                 height: 108,
                 borderRadius: data.settings.photoShape === "square" ? 10 : "50%",
                 overflow: "hidden",
-                border: "3px solid rgba(255,255,255,0.16)",
+                border: `3px solid ${bandBorder}`,
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -179,7 +188,7 @@ export const OnyxTemplate = ({
             fontSize: "21px",
             fontWeight: 700,
             lineHeight: 1.15,
-            color: "#ffffff",
+            color: onAccent,
             textAlign: "center",
             letterSpacing: "0.02em",
           }}
@@ -190,12 +199,12 @@ export const OnyxTemplate = ({
           <div
             style={{
               fontSize: "11px",
-              color: accent === "#334155" ? "#9CA3AF" : "#CBD5E1",
+              color: onAccentMuted,
               marginTop: "5px",
               textAlign: "center",
               lineHeight: 1.4,
               paddingBottom: "14px",
-              borderBottom: "1px solid rgba(255,255,255,0.14)",
+              borderBottom: `1px solid ${bandBorder}`,
               marginBottom: "14px",
             }}
           >
@@ -205,8 +214,8 @@ export const OnyxTemplate = ({
 
         {hasSummary && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel>About Me</SideLabel>
-            <p style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.6, margin: 0 }}>
+            <SideLabel color={onAccentMuted}>About Me</SideLabel>
+            <p style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.6, margin: 0 }}>
               {data.personal.summary!.trim()}
             </p>
           </div>
@@ -214,7 +223,7 @@ export const OnyxTemplate = ({
 
         {contactItems.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel>Contact</SideLabel>
+            <SideLabel color={onAccentMuted}>Contact</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) =>
                 item.href ? (
@@ -223,7 +232,7 @@ export const OnyxTemplate = ({
                     href={item.href}
                     style={{
                       fontSize: "10px",
-                      color: "#CBD5E1",
+                      color: onAccentMuted,
                       lineHeight: 1.5,
                       wordBreak: "break-all" as const,
                       textDecoration: "none",
@@ -232,7 +241,7 @@ export const OnyxTemplate = ({
                     {item.text}
                   </a>
                 ) : (
-                  <span key={i} style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.5 }}>
+                  <span key={i} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
                     {item.text}
                   </span>
                 ),
@@ -243,11 +252,11 @@ export const OnyxTemplate = ({
 
         {hasLanguages && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel>Languages</SideLabel>
+            <SideLabel color={onAccentMuted}>Languages</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
               {data.languages.map((lang) => (
-                <div key={lang.id} style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 600, color: "#ffffff" }}>{lang.name}</span>
+                <div key={lang.id} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600, color: onAccent }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                 </div>
               ))}
@@ -257,11 +266,11 @@ export const OnyxTemplate = ({
 
         {essentialChips.length > 0 && (
           <div>
-            <SideLabel>Details</SideLabel>
+            <SideLabel color={onAccentMuted}>Details</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {essentialChips.map((chip) => (
-                <div key={chip.label} style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.45 }}>
-                  <span style={{ color: "#9CA3AF", fontWeight: 700 }}>{chip.label}:</span> {chip.value}
+                <div key={chip.label} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.45 }}>
+                  <span style={{ color: onAccent, fontWeight: 700 }}>{chip.label}:</span> {chip.value}
                 </div>
               ))}
             </div>
@@ -273,7 +282,7 @@ export const OnyxTemplate = ({
       <div style={{ flex: 1, minWidth: 0, padding: "30px 30px", boxSizing: "border-box" as const }}>
         {hasExperience && (
           <section>
-            <MainHeading accent={accent} isFirst>
+            <MainHeading accent={accentText} isFirst>
               Experience
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -288,7 +297,7 @@ export const OnyxTemplate = ({
                     </span>
                   </div>
                   {(role.company || role.location) && (
-                    <div style={{ fontSize: "11px", color: accent, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {role.company?.trim() || ""}
                       {role.company?.trim() && role.location?.trim() ? " · " : ""}
                       <span style={{ color: "#6B7280", fontWeight: 400 }}>{role.location?.trim() || ""}</span>
@@ -311,7 +320,7 @@ export const OnyxTemplate = ({
 
         {hasEducation && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasExperience}>
+            <MainHeading accent={accentText} isFirst={!hasExperience}>
               Education
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -327,7 +336,7 @@ export const OnyxTemplate = ({
                     </span>
                   </div>
                   {edu.school?.trim() && (
-                    <div style={{ fontSize: "11px", color: accent, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {edu.school.trim()}
                     </div>
                   )}
@@ -347,7 +356,7 @@ export const OnyxTemplate = ({
 
         {hasSkills && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasExperience && !hasEducation}>
+            <MainHeading accent={accentText} isFirst={!hasExperience && !hasEducation}>
               Skills
             </MainHeading>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -372,7 +381,7 @@ export const OnyxTemplate = ({
 
         {hasCertifications && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasExperience && !hasEducation && !hasSkills}>
+            <MainHeading accent={accentText} isFirst={!hasExperience && !hasEducation && !hasSkills}>
               Certifications
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -392,7 +401,7 @@ export const OnyxTemplate = ({
         {hasProjects && (
           <section>
             <MainHeading
-              accent={accent}
+              accent={accentText}
               isFirst={!hasExperience && !hasEducation && !hasSkills && !hasCertifications}
             >
               Projects
@@ -405,7 +414,7 @@ export const OnyxTemplate = ({
                     <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#111827" }}>
                       {project.name?.trim() || "Project"}
                       {shouldShowProjectLink(project.link) && (
-                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accent }}>
+                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accentText }}>
                           {shortenDisplayUrl(project.link!.trim())}
                         </span>
                       )}

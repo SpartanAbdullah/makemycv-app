@@ -2633,8 +2633,10 @@ const OnyxHeading = ({
 );
 
 const OnyxPDFLayout = ({ data }: { data: CvData }) => {
-  const theme = resolveTheme(data.settings, "#334155");
-  const accent = theme.accent;
+  const theme = resolveTheme(data.settings, "#262626");
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
@@ -2670,13 +2672,13 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const sideLabel = {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
-    color: "#9CA3AF",
+    color: onAccentMuted,
     letterSpacing: 0.8,
     marginBottom: 5,
     marginTop: 14,
     textTransform: "uppercase" as const,
   };
-  const sideText = { fontSize: 7.8, color: "#CBD5E1", lineHeight: 1.5, marginBottom: 2 };
+  const sideText = { fontSize: 7.8, color: onAccentMuted, lineHeight: 1.5, marginBottom: 2 };
 
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
@@ -2684,7 +2686,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
       <View
         style={{
           width: 172,
-          backgroundColor: "#262626",
+          backgroundColor: accent,
           marginTop: -27,
           marginBottom: -27,
           marginLeft: -24,
@@ -2705,25 +2707,25 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
                 borderRadius: data.settings.photoShape === "square" ? 8 : 42,
                 objectFit: "cover",
                 borderWidth: 2,
-                borderColor: "rgba(255,255,255,0.16)",
+                borderColor: bandBorder,
               }}
             />
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#FFFFFF", textAlign: "center", lineHeight: 1.2 }}>
+        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 }}>
           {firstName} {lastName}
         </Text>
         {headline ? (
           <Text
             style={{
               fontSize: 8,
-              color: "#9CA3AF",
+              color: onAccentMuted,
               textAlign: "center",
               marginTop: 3,
               paddingBottom: 12,
               borderBottomWidth: 0.5,
-              borderBottomColor: "rgba(255,255,255,0.14)",
+              borderBottomColor: bandBorder,
             }}
           >
             {headline}
@@ -2733,7 +2735,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasSummary && (
           <View>
             <Text style={sideLabel}>ABOUT ME</Text>
-            <Text style={{ fontSize: 7.8, color: "#CBD5E1", lineHeight: 1.55 }}>
+            <Text style={{ fontSize: 7.8, color: onAccentMuted, lineHeight: 1.55 }}>
               {data.personal.summary?.trim()}
             </Text>
           </View>
@@ -2765,7 +2767,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={sideText}>
-                <Text style={{ fontFamily: "Helvetica-Bold", color: "#FFFFFF" }}>{lang.name}</Text>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: onAccent }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
             ))}
@@ -2777,7 +2779,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>DETAILS</Text>
             {essentialChips.map((chip) => (
               <Text key={chip.label} style={sideText}>
-                <Text style={{ color: "#9CA3AF", fontFamily: "Helvetica-Bold" }}>{chip.label}: </Text>
+                <Text style={{ color: onAccentMuted, fontFamily: "Helvetica-Bold" }}>{chip.label}: </Text>
                 {chip.value}
               </Text>
             ))}
@@ -2789,14 +2791,14 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
       <View style={{ flex: 1, paddingLeft: 18 }}>
         {hasExperience && (
           <View>
-            <OnyxHeading accent={accent}>Experience</OnyxHeading>
+            <OnyxHeading accent={accentText}>Experience</OnyxHeading>
             {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
                     {role.role?.trim() || "Role"}
                     {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accent }}>{` | ${role.company.trim()}`}</Text>
+                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
                     ) : null}
                   </Text>
                   <Text style={s.entryDate}>
@@ -2812,7 +2814,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading accent={accent}>Education</OnyxHeading>
+            <OnyxHeading accent={accentText}>Education</OnyxHeading>
             {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} />
             ))}
@@ -2821,7 +2823,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading accent={accent}>Skills</OnyxHeading>
+            <OnyxHeading accent={accentText}>Skills</OnyxHeading>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
               {data.skills.map((skill) => (
                 <Text
@@ -2846,7 +2848,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading accent={accent}>Certifications</OnyxHeading>
+            <OnyxHeading accent={accentText}>Certifications</OnyxHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -2860,7 +2862,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading accent={accent}>Projects</OnyxHeading>
+            <OnyxHeading accent={accentText}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
@@ -2879,8 +2881,10 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
    ═══════════════════════════════════════════════════════════ */
 
 const SandstonePDFLayout = ({ data }: { data: CvData }) => {
-  const theme = resolveTheme(data.settings, "#8A6D3B");
-  const accent = theme.accent;
+  const theme = resolveTheme(data.settings, "#ECE3D2");
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)";
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
@@ -2919,8 +2923,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   if (data.personal.website?.trim())
     contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
 
-  const SIDE_TEXT = "#44403C";
-  const SIDE_MUTED = "#78716C";
+  const SIDE_TEXT = onAccent;
+  const SIDE_MUTED = onAccentMuted;
   const sideLabel = {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
@@ -2937,7 +2941,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
       <View
         style={{
           width: 180,
-          backgroundColor: "#ECE3D2",
+          backgroundColor: accent,
           marginTop: -27,
           marginBottom: -27,
           marginLeft: -24,
@@ -2958,26 +2962,26 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
                 borderRadius: data.settings.photoShape === "square" ? 8 : 44,
                 objectFit: "cover",
                 borderWidth: 2,
-                borderColor: "rgba(0,0,0,0.08)",
+                borderColor: bandBorder,
               }}
             />
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#292524", textAlign: "center", lineHeight: 1.2 }}>
+        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 }}>
           {firstName} {lastName}
         </Text>
         {headline ? (
           <Text
             style={{
               fontSize: 8,
-              color: accent,
+              color: onAccentMuted,
               fontFamily: "Helvetica-Bold",
               textAlign: "center",
               marginTop: 3,
               paddingBottom: 12,
               borderBottomWidth: 0.5,
-              borderBottomColor: "rgba(0,0,0,0.10)",
+              borderBottomColor: bandBorder,
             }}
           >
             {headline}
@@ -3036,21 +3040,21 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
       <View style={{ flex: 1, paddingLeft: 18 }}>
         {hasSummary && (
           <View>
-            <OnyxHeading accent={accent}>About Me</OnyxHeading>
+            <OnyxHeading accent={accentText}>About Me</OnyxHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
           <View>
-            <OnyxHeading accent={accent}>Work Experience</OnyxHeading>
+            <OnyxHeading accent={accentText}>Work Experience</OnyxHeading>
             {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
                     {role.role?.trim() || "Role"}
                     {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accent }}>{` | ${role.company.trim()}`}</Text>
+                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
                     ) : null}
                   </Text>
                   <Text style={s.entryDate}>
@@ -3066,7 +3070,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading accent={accent}>Education</OnyxHeading>
+            <OnyxHeading accent={accentText}>Education</OnyxHeading>
             {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} />
             ))}
@@ -3075,7 +3079,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading accent={accent}>Skills</OnyxHeading>
+            <OnyxHeading accent={accentText}>Skills</OnyxHeading>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
               {data.skills.map((skill) => (
                 <Text
@@ -3100,7 +3104,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading accent={accent}>Certifications</OnyxHeading>
+            <OnyxHeading accent={accentText}>Certifications</OnyxHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -3114,7 +3118,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading accent={accent}>Projects</OnyxHeading>
+            <OnyxHeading accent={accentText}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>

@@ -11,16 +11,13 @@ import { resolveTheme } from "./theme";
 /**
  * "Sandstone" — warm beige left sidebar with a profile photo, inspired by the
  * founder's cvtoolspro "Rotterdam" reference. The sidebar leads with a PERSONAL
- * DETAILS block (nationality / visa / DOB / availability) — exactly the fields
- * UAE recruiters screen first — plus contact and languages. The main column
- * opens with "About Me" (summary) then Experience → Education → Skills →
- * Certifications → Projects. Distinct from Onyx (dark, summary-in-sidebar).
+ * DETAILS block (nationality / visa / DOB / availability) — the fields UAE
+ * recruiters screen first — plus contact and languages. The sidebar background
+ * IS the accent (default beige), so a custom colour recolours the band; all
+ * sidebar text uses contrast-safe onAccent/onAccentMuted and main-column
+ * headings use accentText, so any accent stays readable. Distinct from Onyx
+ * (dark, summary-in-sidebar): here "About Me" opens the main column.
  */
-
-const SIDEBAR_BG = "#ECE3D2";
-const SIDE_TEXT = "#44403C";
-const SIDE_MUTED = "#78716C";
-const NAME_COLOR = "#292524";
 
 const shortenDisplayUrl = (value: string): string => {
   const cleaned = value
@@ -43,13 +40,19 @@ const shouldShowProjectLink = (value?: string): boolean => {
   return normalized.toLowerCase() !== "no link was pasted";
 };
 
-const SideLabel = ({ children }: { children: React.ReactNode }) => (
+const SideLabel = ({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) => (
   <div
     style={{
       fontSize: "9px",
       fontWeight: 700,
       letterSpacing: "0.14em",
-      color: SIDE_MUTED,
+      color,
       marginBottom: "7px",
       textTransform: "uppercase" as const,
     }}
@@ -80,7 +83,7 @@ const MainHeading = ({
         fontSize: "11px",
         fontWeight: 700,
         letterSpacing: "0.1em",
-        color: NAME_COLOR,
+        color: "#292524",
         textTransform: "uppercase" as const,
       }}
     >
@@ -98,8 +101,8 @@ export const SandstoneTemplate = ({
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
-  const theme = resolveTheme(data.settings, "#8A6D3B");
-  const accent = theme.accent;
+  const theme = resolveTheme(data.settings, "#ECE3D2");
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
 
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -117,9 +120,9 @@ export const SandstoneTemplate = ({
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
 
-  // Personal-details block — the UAE recruiter-screen fields. Reuses the
-  // essential chips (visa / availability / driving licence / nationality) and
-  // layers DOB when present.
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)";
+
   const personalDetails = [
     ...essentialChips.map((c) => ({ label: c.label, value: c.value })),
     data.personal.dateOfBirth?.trim()
@@ -155,15 +158,15 @@ export const SandstoneTemplate = ({
         fontSize: "11px",
       }}
     >
-      {/* ── Warm sidebar ── */}
+      {/* ── Accent band sidebar ── */}
       <div
         style={{
           width: "230px",
           flexShrink: 0,
-          backgroundColor: SIDEBAR_BG,
+          backgroundColor: accent,
           padding: "30px 22px",
           boxSizing: "border-box" as const,
-          color: SIDE_TEXT,
+          color: onAccentMuted,
         }}
       >
         {showPhoto && data.personal.photo && (
@@ -174,7 +177,7 @@ export const SandstoneTemplate = ({
                 height: 110,
                 borderRadius: data.settings.photoShape === "square" ? 10 : "50%",
                 overflow: "hidden",
-                border: "3px solid rgba(0,0,0,0.08)",
+                border: `3px solid ${bandBorder}`,
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -187,20 +190,20 @@ export const SandstoneTemplate = ({
           </div>
         )}
 
-        <div style={{ fontSize: "20px", fontWeight: 700, color: NAME_COLOR, textAlign: "center", lineHeight: 1.2 }}>
+        <div style={{ fontSize: "20px", fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 }}>
           {firstName} {lastName}
         </div>
         {headline && (
           <div
             style={{
               fontSize: "11px",
-              color: accent,
+              color: onAccentMuted,
               fontWeight: 600,
               marginTop: "4px",
               textAlign: "center",
               lineHeight: 1.4,
               paddingBottom: "14px",
-              borderBottom: "1px solid rgba(0,0,0,0.10)",
+              borderBottom: `1px solid ${bandBorder}`,
               marginBottom: "14px",
             }}
           >
@@ -210,14 +213,14 @@ export const SandstoneTemplate = ({
 
         {personalDetails.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel>Personal Details</SideLabel>
+            <SideLabel color={onAccentMuted}>Personal Details</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {personalDetails.map((d) => (
                 <div key={d.label} style={{ fontSize: "10px", lineHeight: 1.4 }}>
-                  <div style={{ color: SIDE_MUTED, fontWeight: 700, fontSize: "8.5px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  <div style={{ color: onAccentMuted, fontWeight: 700, fontSize: "8.5px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                     {d.label}
                   </div>
-                  <div style={{ color: SIDE_TEXT }}>{d.value}</div>
+                  <div style={{ color: onAccent }}>{d.value}</div>
                 </div>
               ))}
             </div>
@@ -226,19 +229,19 @@ export const SandstoneTemplate = ({
 
         {contactItems.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel>Contact</SideLabel>
+            <SideLabel color={onAccentMuted}>Contact</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) =>
                 item.href ? (
                   <a
                     key={i}
                     href={item.href}
-                    style={{ fontSize: "10px", color: SIDE_TEXT, lineHeight: 1.5, wordBreak: "break-all" as const, textDecoration: "none" }}
+                    style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5, wordBreak: "break-all" as const, textDecoration: "none" }}
                   >
                     {item.text}
                   </a>
                 ) : (
-                  <span key={i} style={{ fontSize: "10px", color: SIDE_TEXT, lineHeight: 1.5 }}>
+                  <span key={i} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
                     {item.text}
                   </span>
                 ),
@@ -249,11 +252,11 @@ export const SandstoneTemplate = ({
 
         {hasLanguages && (
           <div>
-            <SideLabel>Languages</SideLabel>
+            <SideLabel color={onAccentMuted}>Languages</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
               {data.languages.map((lang) => (
-                <div key={lang.id} style={{ fontSize: "10px", color: SIDE_TEXT, lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 700, color: NAME_COLOR }}>{lang.name}</span>
+                <div key={lang.id} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 700, color: onAccent }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                 </div>
               ))}
@@ -266,7 +269,7 @@ export const SandstoneTemplate = ({
       <div style={{ flex: 1, minWidth: 0, padding: "30px 30px", boxSizing: "border-box" as const }}>
         {hasSummary && (
           <section>
-            <MainHeading accent={accent} isFirst>
+            <MainHeading accent={accentText} isFirst>
               About Me
             </MainHeading>
             <p style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.6, margin: 0 }}>
@@ -277,14 +280,14 @@ export const SandstoneTemplate = ({
 
         {hasExperience && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasSummary}>
+            <MainHeading accent={accentText} isFirst={!hasSummary}>
               Work Experience
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {experience.map((role) => (
                 <div key={role.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: NAME_COLOR }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#292524" }}>
                       {role.role?.trim() || "Role"}
                     </span>
                     <span style={{ fontSize: "10px", color: "#78716C", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
@@ -292,7 +295,7 @@ export const SandstoneTemplate = ({
                     </span>
                   </div>
                   {(role.company || role.location) && (
-                    <div style={{ fontSize: "11px", color: accent, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {role.company?.trim() || ""}
                       {role.company?.trim() && role.location?.trim() ? " · " : ""}
                       <span style={{ color: "#78716C", fontWeight: 400 }}>{role.location?.trim() || ""}</span>
@@ -315,14 +318,14 @@ export const SandstoneTemplate = ({
 
         {hasEducation && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasSummary && !hasExperience}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience}>
               Education
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {education.map((edu) => (
                 <div key={edu.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: NAME_COLOR }}>
+                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#292524" }}>
                       {edu.degree?.trim() || "Degree"}
                       {edu.field?.trim() ? ` — ${edu.field.trim()}` : ""}
                     </span>
@@ -331,7 +334,7 @@ export const SandstoneTemplate = ({
                     </span>
                   </div>
                   {edu.school?.trim() && (
-                    <div style={{ fontSize: "11px", color: accent, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {edu.school.trim()}
                     </div>
                   )}
@@ -351,7 +354,7 @@ export const SandstoneTemplate = ({
 
         {hasSkills && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasSummary && !hasExperience && !hasEducation}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation}>
               Skills
             </MainHeading>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -376,13 +379,13 @@ export const SandstoneTemplate = ({
 
         {hasCertifications && (
           <section>
-            <MainHeading accent={accent} isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills}>
               Certifications
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {data.certifications.map((cert) => (
                 <div key={cert.id} style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.45 }}>
-                  <span style={{ fontWeight: 600, color: NAME_COLOR }}>{cert.name.trim()}</span>
+                  <span style={{ fontWeight: 600, color: "#292524" }}>{cert.name.trim()}</span>
                   <span style={{ color: "#78716C" }}>
                     {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
                     {cert.date ? ` | ${cert.date.trim()}` : ""}
@@ -396,7 +399,7 @@ export const SandstoneTemplate = ({
         {hasProjects && (
           <section>
             <MainHeading
-              accent={accent}
+              accent={accentText}
               isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills && !hasCertifications}
             >
               Projects
@@ -406,10 +409,10 @@ export const SandstoneTemplate = ({
                 const bullets = (project.bullets ?? []).filter(Boolean);
                 return (
                   <div key={project.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
-                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: NAME_COLOR }}>
+                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#292524" }}>
                       {project.name?.trim() || "Project"}
                       {shouldShowProjectLink(project.link) && (
-                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accent }}>
+                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accentText }}>
                           {shortenDisplayUrl(project.link!.trim())}
                         </span>
                       )}

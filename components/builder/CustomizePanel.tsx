@@ -4,15 +4,21 @@ import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
 
+// Curated, professional accent palette. Ordered blues → greens → warm → neutral.
+// Every colour renders readably because the templates derive contrast-safe text
+// from the accent (lib/utils/color.ts) — so even the lighter "Sand" is safe.
 const ACCENT_SWATCHES: { label: string; hex: string }[] = [
-  { label: "Emerald", hex: "#0E7C4A" },
-  { label: "Navy", hex: "#1E2A4A" },
-  { label: "Teal", hex: "#1e5b54" },
-  { label: "Burgundy", hex: "#7A1F2B" },
-  { label: "Slate", hex: "#1F2937" },
-  { label: "Royal", hex: "#1E3A8A" },
+  { label: "Midnight", hex: "#1E2A4A" },
+  { label: "Royal", hex: "#1E40AF" },
+  { label: "Slate", hex: "#334155" },
+  { label: "Teal", hex: "#0F766E" },
+  { label: "Emerald", hex: "#047857" },
   { label: "Forest", hex: "#14532D" },
+  { label: "Burgundy", hex: "#7A1F2B" },
+  { label: "Plum", hex: "#6B21A8" },
   { label: "Bronze", hex: "#92400E" },
+  { label: "Graphite", hex: "#33373D" },
+  { label: "Sand", hex: "#C9A96A" },
 ];
 
 // "Font scale" control removed 2026-06: no render path (live template or
