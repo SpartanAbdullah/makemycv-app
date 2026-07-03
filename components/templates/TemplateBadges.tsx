@@ -25,6 +25,11 @@ const BADGE_TONE_STYLE: Record<
     color: "var(--ff-muted)",
     border: "1px solid var(--ff-line)",
   },
+  new: {
+    background: "#E7EEFB",
+    color: "#1D4ED8",
+    border: "1px solid rgba(29,78,216,0.30)",
+  },
 };
 
 export const TemplateBadges = ({
@@ -75,9 +80,15 @@ const RIBBON_TONE: Record<TemplateBadge["tone"], { bg: string; fg: string }> = {
   recommended: { bg: "var(--ff-accent)", fg: "#ffffff" },
   ats: { bg: "#0E7C4A", fg: "#ffffff" },
   neutral: { bg: "#64748B", fg: "#ffffff" },
+  new: { bg: "#2563EB", fg: "#ffffff" },
 };
 
-const TONE_PRIORITY: TemplateBadge["tone"][] = ["recommended", "ats", "neutral"];
+const TONE_PRIORITY: TemplateBadge["tone"][] = [
+  "recommended",
+  "new",
+  "ats",
+  "neutral",
+];
 
 export const TemplateRibbon = ({ badges }: { badges?: TemplateBadge[] }) => {
   if (!badges || badges.length === 0) return null;

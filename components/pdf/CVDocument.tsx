@@ -2362,6 +2362,773 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   PROFESSIONAL PDF LAYOUT (centered single-column; with/without photo)
+   ═══════════════════════════════════════════════════════════ */
+
+const ProPdfHeading = ({
+  children,
+  accent,
+}: {
+  children: string;
+  accent: string;
+}) => (
+  <View
+    style={{
+      marginTop: 14,
+      marginBottom: 8,
+      paddingBottom: 3,
+      borderBottomWidth: 1.5,
+      borderBottomColor: accent,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 9,
+        fontFamily: "Helvetica-Bold",
+        color: "#111827",
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </Text>
+  </View>
+);
+
+const ProfessionalPDFLayout = ({
+  data,
+  withPhoto,
+}: {
+  data: CvData;
+  withPhoto: boolean;
+}) => {
+  const theme = resolveTheme(data.settings, "#1f2937");
+  const accent = theme.accent;
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasProjects = projects.length > 0;
+  const skillsFirst = isSkillsFirst(data.settings.domain);
+  const photo =
+    withPhoto && theme.photoVisible && data.personal.photo
+      ? data.personal.photo
+      : null;
+  const essentialChips = getEssentialChips(data.personal);
+
+  const contactBits = [
+    data.personal.email?.trim(),
+    data.personal.phone?.trim(),
+    data.personal.location?.trim(),
+    data.personal.linkedin?.trim()
+      ? shortenDisplayUrl(data.personal.linkedin.trim())
+      : "",
+    data.personal.website?.trim()
+      ? shortenDisplayUrl(data.personal.website.trim())
+      : "",
+  ].filter(Boolean);
+
+  const skillsSection = hasSkills ? (
+    <>
+      {generalSkills.length > 0 && (
+        <View>
+          <ProPdfHeading accent={accent}>Skills</ProPdfHeading>
+          <Text style={{ ...s.body, textAlign: "center" }}>
+            {generalSkills.map((sk) => sk.name).join("   •   ")}
+          </Text>
+        </View>
+      )}
+      {technicalSkills.length > 0 && (
+        <View>
+          <ProPdfHeading accent={accent}>Technical Skills</ProPdfHeading>
+          <Text style={{ ...s.body, textAlign: "center" }}>
+            {technicalSkills.map((sk) => sk.name).join("   •   ")}
+          </Text>
+        </View>
+      )}
+    </>
+  ) : null;
+
+  return (
+    <View>
+      {/* Centered header */}
+      <View style={{ alignItems: "center", paddingBottom: 4 }}>
+        {photo ? (
+          <Image
+            src={photo}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              objectFit: "cover",
+              borderWidth: 1.5,
+              borderColor: accent,
+              marginBottom: 6,
+            }}
+          />
+        ) : null}
+        <Text
+          style={{
+            fontSize: 20,
+            fontFamily: "Helvetica-Bold",
+            color: "#111827",
+            letterSpacing: 1,
+            textAlign: "center",
+          }}
+        >
+          {name.toUpperCase()}
+        </Text>
+        {headline ? (
+          <Text style={{ fontSize: 10, color: accent, marginTop: 3, textAlign: "center" }}>
+            {headline}
+          </Text>
+        ) : null}
+        {contactBits.length > 0 ? (
+          <Text style={{ fontSize: 8, color: SLATE_500, marginTop: 4, textAlign: "center" }}>
+            {contactBits.join("   •   ")}
+          </Text>
+        ) : null}
+        {essentialChips.length > 0 ? (
+          <Text style={{ fontSize: 7.5, color: SLATE_600, marginTop: 3, textAlign: "center" }}>
+            {essentialChips.map((c) => `${c.label}: ${c.value}`).join("   ·   ")}
+          </Text>
+        ) : null}
+      </View>
+
+      {hasSummary && (
+        <View>
+          <ProPdfHeading accent={accent}>Summary</ProPdfHeading>
+          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+        </View>
+      )}
+
+      {skillsFirst ? skillsSection : null}
+
+      {hasExperience && (
+        <View>
+          <ProPdfHeading accent={accent}>Experience</ProPdfHeading>
+          {experience.map((role) => (
+            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+              <View style={s.entryRow}>
+                <Text style={{ ...s.entryTitle, flex: 1 }}>
+                  {role.role?.trim() || "Role"}
+                  {role.company ? (
+                    <Text style={s.entryCompany}>{` | ${role.company.trim()}`}</Text>
+                  ) : null}
+                </Text>
+                <Text style={s.entryDate}>
+                  {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                </Text>
+              </View>
+              {role.location?.trim() ? (
+                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
+              ) : null}
+              <BulletList bullets={role.bullets} />
+            </View>
+          ))}
+        </View>
+      )}
+
+      {hasEducation && (
+        <View>
+          <ProPdfHeading accent={accent}>Education</ProPdfHeading>
+          {education.map((edu) => (
+            <EducationEntry key={edu.id} edu={edu} />
+          ))}
+        </View>
+      )}
+
+      {skillsFirst ? null : skillsSection}
+
+      {(hasLanguages || hasCertifications) && (
+        <View style={s.twoCol}>
+          {hasLanguages && (
+            <View style={s.twoColItem}>
+              <ProPdfHeading accent={accent}>Languages</ProPdfHeading>
+              <Text style={{ ...s.body, textAlign: "center" }}>
+                {data.languages
+                  .map(
+                    (lang) =>
+                      `${lang.name}${lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}`,
+                  )
+                  .join("   •   ")}
+              </Text>
+            </View>
+          )}
+          {hasCertifications && (
+            <View style={s.twoColItem}>
+              <ProPdfHeading accent={accent}>Certifications</ProPdfHeading>
+              {data.certifications.map((cert) => (
+                <Text key={cert.id} style={{ ...s.body, textAlign: "center" }}>
+                  {cert.name.trim()}
+                  {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                    ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                    : ""}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {hasProjects && (
+        <View>
+          <ProPdfHeading accent={accent}>Projects</ProPdfHeading>
+          {projects.map((project) => (
+            <View key={project.id} style={s.entryBlock} wrap={false}>
+              <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+              <BulletList bullets={project.bullets ?? []} />
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ONYX PDF LAYOUT (charcoal left sidebar + photo)
+   ═══════════════════════════════════════════════════════════ */
+
+const OnyxHeading = ({
+  children,
+  accent,
+}: {
+  children: string;
+  accent: string;
+}) => (
+  <View
+    style={{
+      marginTop: 14,
+      marginBottom: 7,
+      paddingBottom: 3,
+      borderBottomWidth: 1.5,
+      borderBottomColor: accent,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 9.5,
+        fontFamily: "Helvetica-Bold",
+        color: "#1F2937",
+        letterSpacing: 0.6,
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </Text>
+  </View>
+);
+
+const OnyxPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#334155");
+  const accent = theme.accent;
+  const firstName = data.personal.firstName?.trim() || "First";
+  const lastName = data.personal.lastName?.trim() || "Last";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const essentialChips = getEssentialChips(data.personal);
+
+  const contactItems: Array<{ text: string; href?: string; fontSize?: number }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
+    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 24 ? 6.4 : undefined });
+  }
+  if (data.personal.phone?.trim())
+    contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
+  if (data.personal.location?.trim())
+    contactItems.push({ text: data.personal.location.trim() });
+  if (data.personal.linkedin?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
+  if (data.personal.website?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+
+  const sideLabel = {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: "#9CA3AF",
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    marginTop: 14,
+    textTransform: "uppercase" as const,
+  };
+  const sideText = { fontSize: 7.8, color: "#CBD5E1", lineHeight: 1.5, marginBottom: 2 };
+
+  return (
+    <View style={{ flexDirection: "row", flex: 1 }}>
+      {/* ── Charcoal sidebar (edge-bleed) ── */}
+      <View
+        style={{
+          width: 172,
+          backgroundColor: "#262626",
+          marginTop: -27,
+          marginBottom: -27,
+          marginLeft: -24,
+          paddingTop: 26,
+          paddingBottom: 26,
+          paddingLeft: 16,
+          paddingRight: 16,
+          flexShrink: 0,
+        }}
+      >
+        {showPhoto && data.personal.photo ? (
+          <View style={{ alignItems: "center", marginBottom: 12 }}>
+            <Image
+              src={data.personal.photo}
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: data.settings.photoShape === "square" ? 8 : 42,
+                objectFit: "cover",
+                borderWidth: 2,
+                borderColor: "rgba(255,255,255,0.16)",
+              }}
+            />
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#FFFFFF", textAlign: "center", lineHeight: 1.2 }}>
+          {firstName} {lastName}
+        </Text>
+        {headline ? (
+          <Text
+            style={{
+              fontSize: 8,
+              color: "#9CA3AF",
+              textAlign: "center",
+              marginTop: 3,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: "rgba(255,255,255,0.14)",
+            }}
+          >
+            {headline}
+          </Text>
+        ) : null}
+
+        {hasSummary && (
+          <View>
+            <Text style={sideLabel}>ABOUT ME</Text>
+            <Text style={{ fontSize: 7.8, color: "#CBD5E1", lineHeight: 1.55 }}>
+              {data.personal.summary?.trim()}
+            </Text>
+          </View>
+        )}
+
+        {contactItems.length > 0 && (
+          <View>
+            <Text style={sideLabel}>CONTACT</Text>
+            {contactItems.map((item, i) =>
+              item.href ? (
+                <Link
+                  key={i}
+                  src={item.href}
+                  style={{ ...sideText, textDecoration: "none", ...(item.fontSize ? { fontSize: item.fontSize } : {}) }}
+                >
+                  {item.text}
+                </Link>
+              ) : (
+                <Text key={i} style={sideText}>
+                  {item.text}
+                </Text>
+              ),
+            )}
+          </View>
+        )}
+
+        {hasLanguages && (
+          <View>
+            <Text style={sideLabel}>LANGUAGES</Text>
+            {data.languages.map((lang) => (
+              <Text key={lang.id} style={sideText}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: "#FFFFFF" }}>{lang.name}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {essentialChips.length > 0 && (
+          <View>
+            <Text style={sideLabel}>DETAILS</Text>
+            {essentialChips.map((chip) => (
+              <Text key={chip.label} style={sideText}>
+                <Text style={{ color: "#9CA3AF", fontFamily: "Helvetica-Bold" }}>{chip.label}: </Text>
+                {chip.value}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Main column ── */}
+      <View style={{ flex: 1, paddingLeft: 18 }}>
+        {hasExperience && (
+          <View>
+            <OnyxHeading accent={accent}>Experience</OnyxHeading>
+            {experience.map((role) => (
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+                <View style={s.entryRow}>
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
+                      <Text style={{ ...s.entryCompany, color: accent }}>{` | ${role.company.trim()}`}</Text>
+                    ) : null}
+                  </Text>
+                  <Text style={s.entryDate}>
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  </Text>
+                </View>
+                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
+                <BulletList bullets={role.bullets} />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {hasEducation && (
+          <View>
+            <OnyxHeading accent={accent}>Education</OnyxHeading>
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} />
+            ))}
+          </View>
+        )}
+
+        {hasSkills && (
+          <View>
+            <OnyxHeading accent={accent}>Skills</OnyxHeading>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+              {data.skills.map((skill) => (
+                <Text
+                  key={skill.id}
+                  style={{
+                    fontSize: 8,
+                    color: "#374151",
+                    backgroundColor: "#F3F4F6",
+                    borderWidth: 0.5,
+                    borderColor: "#E5E7EB",
+                    borderRadius: 3,
+                    paddingVertical: 1.5,
+                    paddingHorizontal: 5,
+                  }}
+                >
+                  {skill.name}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasCertifications && (
+          <View>
+            <OnyxHeading accent={accent}>Certifications</OnyxHeading>
+            {data.certifications.map((cert) => (
+              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                  : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {hasProjects && (
+          <View>
+            <OnyxHeading accent={accent}>Projects</OnyxHeading>
+            {projects.map((project) => (
+              <View key={project.id} style={s.entryBlock} wrap={false}>
+                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <BulletList bullets={project.bullets ?? []} />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SANDSTONE PDF LAYOUT (warm beige left sidebar + photo + personal details)
+   ═══════════════════════════════════════════════════════════ */
+
+const SandstonePDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#8A6D3B");
+  const accent = theme.accent;
+  const firstName = data.personal.firstName?.trim() || "First";
+  const lastName = data.personal.lastName?.trim() || "Last";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const essentialChips = getEssentialChips(data.personal);
+  const personalDetails = [
+    ...essentialChips.map((c) => ({ label: c.label, value: c.value })),
+    data.personal.dateOfBirth?.trim()
+      ? { label: "Date of birth", value: data.personal.dateOfBirth.trim() }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const contactItems: Array<{ text: string; href?: string; fontSize?: number }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
+    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 26 ? 6.4 : undefined });
+  }
+  if (data.personal.phone?.trim())
+    contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
+  if (data.personal.location?.trim())
+    contactItems.push({ text: data.personal.location.trim() });
+  if (data.personal.linkedin?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
+  if (data.personal.website?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+
+  const SIDE_TEXT = "#44403C";
+  const SIDE_MUTED = "#78716C";
+  const sideLabel = {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: SIDE_MUTED,
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    marginTop: 14,
+    textTransform: "uppercase" as const,
+  };
+
+  return (
+    <View style={{ flexDirection: "row", flex: 1 }}>
+      {/* ── Warm sidebar (edge-bleed) ── */}
+      <View
+        style={{
+          width: 180,
+          backgroundColor: "#ECE3D2",
+          marginTop: -27,
+          marginBottom: -27,
+          marginLeft: -24,
+          paddingTop: 26,
+          paddingBottom: 26,
+          paddingLeft: 16,
+          paddingRight: 16,
+          flexShrink: 0,
+        }}
+      >
+        {showPhoto && data.personal.photo ? (
+          <View style={{ alignItems: "center", marginBottom: 12 }}>
+            <Image
+              src={data.personal.photo}
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: data.settings.photoShape === "square" ? 8 : 44,
+                objectFit: "cover",
+                borderWidth: 2,
+                borderColor: "rgba(0,0,0,0.08)",
+              }}
+            />
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#292524", textAlign: "center", lineHeight: 1.2 }}>
+          {firstName} {lastName}
+        </Text>
+        {headline ? (
+          <Text
+            style={{
+              fontSize: 8,
+              color: accent,
+              fontFamily: "Helvetica-Bold",
+              textAlign: "center",
+              marginTop: 3,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: "rgba(0,0,0,0.10)",
+            }}
+          >
+            {headline}
+          </Text>
+        ) : null}
+
+        {personalDetails.length > 0 && (
+          <View>
+            <Text style={sideLabel}>PERSONAL DETAILS</Text>
+            {personalDetails.map((d) => (
+              <View key={d.label} style={{ marginBottom: 4 }}>
+                <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold", color: SIDE_MUTED, letterSpacing: 0.4 }}>
+                  {d.label.toUpperCase()}
+                </Text>
+                <Text style={{ fontSize: 7.8, color: SIDE_TEXT, lineHeight: 1.4 }}>{d.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {contactItems.length > 0 && (
+          <View>
+            <Text style={sideLabel}>CONTACT</Text>
+            {contactItems.map((item, i) =>
+              item.href ? (
+                <Link
+                  key={i}
+                  src={item.href}
+                  style={{ fontSize: item.fontSize ?? 7.8, color: SIDE_TEXT, lineHeight: 1.5, marginBottom: 2, textDecoration: "none" }}
+                >
+                  {item.text}
+                </Link>
+              ) : (
+                <Text key={i} style={{ fontSize: 7.8, color: SIDE_TEXT, lineHeight: 1.5, marginBottom: 2 }}>
+                  {item.text}
+                </Text>
+              ),
+            )}
+          </View>
+        )}
+
+        {hasLanguages && (
+          <View>
+            <Text style={sideLabel}>LANGUAGES</Text>
+            {data.languages.map((lang) => (
+              <Text key={lang.id} style={{ fontSize: 7.8, color: SIDE_TEXT, lineHeight: 1.5, marginBottom: 1 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: "#292524" }}>{lang.name}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Main column ── */}
+      <View style={{ flex: 1, paddingLeft: 18 }}>
+        {hasSummary && (
+          <View>
+            <OnyxHeading accent={accent}>About Me</OnyxHeading>
+            <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+          </View>
+        )}
+
+        {hasExperience && (
+          <View>
+            <OnyxHeading accent={accent}>Work Experience</OnyxHeading>
+            {experience.map((role) => (
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+                <View style={s.entryRow}>
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
+                      <Text style={{ ...s.entryCompany, color: accent }}>{` | ${role.company.trim()}`}</Text>
+                    ) : null}
+                  </Text>
+                  <Text style={s.entryDate}>
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  </Text>
+                </View>
+                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
+                <BulletList bullets={role.bullets} />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {hasEducation && (
+          <View>
+            <OnyxHeading accent={accent}>Education</OnyxHeading>
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} />
+            ))}
+          </View>
+        )}
+
+        {hasSkills && (
+          <View>
+            <OnyxHeading accent={accent}>Skills</OnyxHeading>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+              {data.skills.map((skill) => (
+                <Text
+                  key={skill.id}
+                  style={{
+                    fontSize: 8,
+                    color: "#44403C",
+                    backgroundColor: "#F5F0E6",
+                    borderWidth: 0.5,
+                    borderColor: "#E2D8C4",
+                    borderRadius: 3,
+                    paddingVertical: 1.5,
+                    paddingHorizontal: 5,
+                  }}
+                >
+                  {skill.name}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasCertifications && (
+          <View>
+            <OnyxHeading accent={accent}>Certifications</OnyxHeading>
+            {data.certifications.map((cert) => (
+              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                  : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {hasProjects && (
+          <View>
+            <OnyxHeading accent={accent}>Projects</OnyxHeading>
+            {projects.map((project) => (
+              <View key={project.id} style={s.entryBlock} wrap={false}>
+                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <BulletList bullets={project.bullets ?? []} />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -2388,6 +3155,14 @@ export const CVDocument = ({
         return <ExecSplitPDFLayout data={data} />;
       case "corp-sidebar":
         return <CorpSidebarPDFLayout data={data} />;
+      case "professional":
+        return <ProfessionalPDFLayout data={data} withPhoto={false} />;
+      case "professional-photo":
+        return <ProfessionalPDFLayout data={data} withPhoto={true} />;
+      case "onyx":
+        return <OnyxPDFLayout data={data} />;
+      case "sandstone":
+        return <SandstonePDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }

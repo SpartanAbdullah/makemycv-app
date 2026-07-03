@@ -6,6 +6,9 @@ import { CorpSidebarTemplate } from "./corp-sidebar";
 import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
 import { ModernTemplate } from "./modern";
+import { OnyxTemplate } from "./onyx";
+import { ProfessionalPhotoTemplate, ProfessionalTemplate } from "./professional";
+import { SandstoneTemplate } from "./sandstone";
 
 /**
  * Badge tones drive both meaning and color in the template picker:
@@ -14,8 +17,9 @@ import { ModernTemplate } from "./modern";
  *  - "ats": green, reassures the #1 user fear ("will a bot reject my CV?").
  *    Only honest for genuinely single-column, parseable layouts.
  *  - "neutral": quiet grey for design-led (two-column) templates.
+ *  - "new": blue "New" ribbon for freshly-added templates (cvtoolspro-style).
  */
-export type TemplateBadgeTone = "recommended" | "ats" | "neutral";
+export type TemplateBadgeTone = "recommended" | "ats" | "neutral" | "new";
 export type TemplateBadge = { label: string; tone: TemplateBadgeTone };
 
 export type TemplateDefinition = {
@@ -162,6 +166,80 @@ const CorpSidebarThumb = () => (
   </div>
 );
 
+const OnyxThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 overflow-hidden flex">
+    <div className="w-14 flex-shrink-0 bg-[#262626] p-1.5 flex flex-col items-center gap-1.5">
+      <div className="h-6 w-6 rounded-full bg-white/25" />
+      <div className="h-1 w-10 rounded bg-white/30" />
+      <div className="mt-1 h-1 w-full rounded bg-white/15" />
+      <div className="h-1 w-4/5 rounded bg-white/15" />
+      <div className="h-1 w-full rounded bg-white/15" />
+    </div>
+    <div className="flex-1 space-y-1.5 bg-white p-2">
+      <div className="h-1.5 w-14 rounded bg-slate-700" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="h-1 w-5/6 rounded bg-slate-200" />
+      <div className="mt-1 h-1.5 w-12 rounded bg-slate-700" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+    </div>
+  </div>
+);
+
+const SandstoneThumb = () => (
+  <div className="flex h-32 overflow-hidden rounded-xl border border-slate-200">
+    <div className="flex w-16 flex-shrink-0 flex-col items-center gap-1.5 bg-[#ECE3D2] p-1.5">
+      <div className="h-6 w-6 rounded-full bg-black/15" />
+      <div className="h-1 w-10 rounded bg-stone-500/60" />
+      <div className="mt-1 h-1 w-full rounded bg-stone-400/50" />
+      <div className="h-1 w-4/5 rounded bg-stone-400/50" />
+      <div className="h-1 w-full rounded bg-stone-400/50" />
+    </div>
+    <div className="flex-1 space-y-1.5 bg-white p-2">
+      <div className="h-1.5 w-14 rounded bg-stone-700" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="h-1 w-5/6 rounded bg-slate-200" />
+      <div className="mt-1 h-1.5 w-12 rounded bg-stone-700" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+    </div>
+  </div>
+);
+
+const ProfessionalThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex flex-col items-center gap-1">
+      <div className="h-3 w-24 rounded bg-slate-800" />
+      <div className="h-1.5 w-32 rounded bg-slate-300" />
+      <div className="h-1 w-20 rounded bg-slate-200" />
+    </div>
+    <div className="mt-3 h-px w-full bg-slate-300" />
+    <div className="mt-2 space-y-1">
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="mx-auto h-1 w-5/6 rounded bg-slate-200" />
+    </div>
+    <div className="mt-2 h-px w-full bg-slate-300" />
+    <div className="mt-2 space-y-1">
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="h-1 w-4/6 rounded bg-slate-200" />
+    </div>
+  </div>
+);
+
+const ProfessionalPhotoThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex flex-col items-center gap-1">
+      <div className="h-8 w-8 rounded-full bg-slate-300" />
+      <div className="h-2.5 w-24 rounded bg-slate-800" />
+      <div className="h-1.5 w-28 rounded bg-slate-300" />
+    </div>
+    <div className="mt-2 h-px w-full bg-slate-300" />
+    <div className="mt-2 space-y-1">
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="mx-auto h-1 w-5/6 rounded bg-slate-200" />
+      <div className="h-1 w-4/6 rounded bg-slate-200" />
+    </div>
+  </div>
+);
+
 export const templates: TemplateDefinition[] = [
   /* Badges are an honest ATS-safety signal (audit UI-10): single-column
      text-first layouts get the green "ATS-Friendly" badge; sidebar/two-column
@@ -223,6 +301,42 @@ export const templates: TemplateDefinition[] = [
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: CorpSidebarThumb,
     Render: CorpSidebarTemplate,
+  },
+  {
+    id: "onyx",
+    name: "Onyx",
+    description:
+      "Charcoal sidebar with a bold profile photo — modern and confident.",
+    badges: [{ label: "New", tone: "new" }],
+    Thumbnail: OnyxThumb,
+    Render: OnyxTemplate,
+  },
+  {
+    id: "sandstone",
+    name: "Sandstone",
+    description:
+      "Warm sidebar with a UAE personal-details panel and profile photo.",
+    badges: [{ label: "New", tone: "new" }],
+    Thumbnail: SandstoneThumb,
+    Render: SandstoneTemplate,
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    description:
+      "Centered single-column with a clean headline strip. ATS-friendly.",
+    badges: [{ label: "ATS-Friendly", tone: "ats" }],
+    Thumbnail: ProfessionalThumb,
+    Render: ProfessionalTemplate,
+  },
+  {
+    id: "professional-photo",
+    name: "Professional Photo",
+    description:
+      "The Professional layout with a profile photo — polished and recruiter-ready.",
+    badges: [{ label: "New", tone: "new" }],
+    Thumbnail: ProfessionalPhotoThumb,
+    Render: ProfessionalPhotoTemplate,
   },
 ];
 
