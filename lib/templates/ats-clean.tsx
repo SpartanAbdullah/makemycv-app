@@ -325,7 +325,7 @@ export const ATSCleanTemplate = ({
 
         <div
           style={{
-            borderBottom: `2px solid ${theme.accent}`,
+            borderBottom: `2px solid ${theme.accentText}`,
             marginTop: "8px",
             marginBottom: "16px",
           }}

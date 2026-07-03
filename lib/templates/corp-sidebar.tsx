@@ -79,6 +79,7 @@ export const CorpSidebarTemplate = ({
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#0F172A");
+  const { onAccent, onAccentMuted } = theme;
 
   const contactItems: Array<{ label: string; value: string; href?: string }> =
     [];
@@ -182,7 +183,7 @@ export const CorpSidebarTemplate = ({
           )}
           <div
             style={{
-              borderBottom: `2px solid ${theme.accent}`,
+              borderBottom: `2px solid ${theme.accentText}`,
               marginTop: "10px",
             }}
           />
@@ -555,7 +556,7 @@ export const CorpSidebarTemplate = ({
                       href={item.href}
                       style={{
                         fontSize: "10px",
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.5,
                         wordBreak: "break-all" as const,
                         textDecoration: "underline",
@@ -567,7 +568,7 @@ export const CorpSidebarTemplate = ({
                     <div
                       style={{
                         fontSize: "10px",
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.5,
                         wordBreak: "break-all" as const,
                       }}
@@ -609,7 +610,7 @@ export const CorpSidebarTemplate = ({
                   <div
                     style={{
                       fontSize: "10px",
-                      color: "#CBD5E1",
+                      color: onAccentMuted,
                       lineHeight: 1.5,
                     }}
                   >
@@ -637,7 +638,7 @@ export const CorpSidebarTemplate = ({
                   key={skill.id}
                   style={{
                     fontSize: "9px",
-                    color: "#E2E8F0",
+                    color: onAccentMuted,
                     backgroundColor: "rgba(255,255,255,0.08)",
                     borderRadius: "3px",
                     padding: "2px 6px",
@@ -667,7 +668,7 @@ export const CorpSidebarTemplate = ({
                   key={lang.id}
                   style={{
                     fontSize: "10px",
-                    color: "#CBD5E1",
+                    color: onAccentMuted,
                     lineHeight: 1.6,
                   }}
                 >
@@ -698,7 +699,7 @@ export const CorpSidebarTemplate = ({
                     style={{
                       fontSize: "10px",
                       fontWeight: 700,
-                      color: "#ffffff",
+                      color: onAccent,
                       lineHeight: 1.4,
                     }}
                   >
@@ -708,7 +709,7 @@ export const CorpSidebarTemplate = ({
                     <div
                       style={{
                         fontSize: "9px",
-                        color: "#94A3B8",
+                        color: onAccentMuted,
                         lineHeight: 1.4,
                       }}
                     >

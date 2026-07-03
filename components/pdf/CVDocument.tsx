@@ -693,6 +693,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1E2A4A");
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -762,25 +763,25 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
           <>
             {data.personal.firstName?.trim() ? (
-              <Text style={s.execName}>{data.personal.firstName.trim()}</Text>
+              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.firstName.trim()}</Text>
             ) : null}
             {data.personal.lastName?.trim() ? (
-              <Text style={s.execName}>{data.personal.lastName.trim()}</Text>
+              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.lastName.trim()}</Text>
             ) : null}
           </>
         ) : (
-          <Text style={s.execName}>Your Name</Text>
+          <Text style={{ ...s.execName, color: onAccent }}>Your Name</Text>
         )}
 
         {/* Headline */}
         {data.personal.headline?.trim() ? (
-          <Text style={s.execHeadline}>{data.personal.headline.trim()}</Text>
+          <Text style={{ ...s.execHeadline, color: onAccentMuted }}>{data.personal.headline.trim()}</Text>
         ) : null}
 
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>CONTACT</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
             {sidebarContacts.map((item, i) =>
               item.href ? (
                 <Link
@@ -788,6 +789,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   src={item.href}
                   style={{
                     ...s.execContactItem,
+                    color: onAccentMuted,
                     textDecoration: "underline",
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
@@ -799,6 +801,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   key={i}
                   style={{
                     ...s.execContactItem,
+                    color: onAccentMuted,
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
                 >
@@ -812,9 +815,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>PERSONAL</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
             {essentialChips.map((chip) => (
-              <Text key={chip.label} style={s.execContactItem}>
+              <Text key={chip.label} style={{ ...s.execContactItem, color: onAccentMuted }}>
                 {chip.label}: {chip.value}
               </Text>
             ))}
@@ -824,10 +827,10 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={s.execSideLabel}>SKILLS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
             {data.skills.map((skill) => (
-              <Text key={skill.id} style={s.execSkillItem}>
-                <Text style={{ color: "#94A3B8" }}>{"·  "}</Text>
+              <Text key={skill.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
+                <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
                 {skill.name}
               </Text>
             ))}
@@ -837,9 +840,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={s.execSideLabel}>LANGUAGES</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
-              <Text key={lang.id} style={s.execSkillItem}>
+              <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
                   {lang.name}
                 </Text>
@@ -854,14 +857,14 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={s.execSideLabel}>CERTIFICATIONS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
                   style={{
                     fontSize: 7.5,
                     fontFamily: "Helvetica-Bold",
-                    color: "#FFFFFF",
+                    color: onAccent,
                     lineHeight: 1.4,
                   }}
                 >
@@ -871,7 +874,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       fontSize: 7,
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       lineHeight: 1.4,
                     }}
                   >
@@ -963,7 +966,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                           src={normalizeHref(project.link)}
                           style={{
                             ...s.entryCompany,
-                            color: theme.accent,
+                            color: theme.accentText,
                             textDecoration: "none",
                           }}
                         >
@@ -1164,7 +1167,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           />
         )}
       </View>
-      <View style={{ ...s.atsDivider, borderBottomColor: theme.accent }} />
+      <View style={{ ...s.atsDivider, borderBottomColor: theme.accentText }} />
 
       {/* ── Summary ── */}
       {hasSummary && (
@@ -1394,7 +1397,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
 
   const modernSectionHeadingWrap: Style = {
     borderLeftWidth: 3,
-    borderLeftColor: theme.accent,
+    borderLeftColor: theme.accentText,
     paddingLeft: 8,
     marginBottom: 6,
   };
@@ -1405,7 +1408,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
           <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, color: theme.accent, lineHeight: 1 }}>
+            <Text style={{ ...s.name, color: theme.accentText, lineHeight: 1 }}>
               {name}
             </Text>
           </View>
@@ -1450,7 +1453,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   key={chip.label}
                   style={{ flexDirection: "row", alignItems: "center" }}
                 >
-                  <Text style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
+                  <Text style={{ fontSize: 9, color: theme.accentText, fontWeight: 600 }}>
                     {chip.label}:
                   </Text>
                   <Text style={{ fontSize: 9, color: "#374151", marginLeft: 2 }}>
@@ -1674,6 +1677,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#1B2A4A");
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1701,7 +1705,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
             style={{
               fontSize: 20,
               fontFamily: "Helvetica-Bold",
-              color: "#FFFFFF",
+              color: onAccent,
               lineHeight: 1.15,
             }}
           >
@@ -1711,7 +1715,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
             <Text
               style={{
                 fontSize: 9,
-                color: "#94A3B8",
+                color: onAccentMuted,
                 marginTop: 3,
                 lineHeight: 1.4,
               }}
@@ -1738,7 +1742,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                       src={item.href}
                       style={{
                         fontSize: 7.5,
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.6,
                         textDecoration: "underline",
                       }}
@@ -1749,7 +1753,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                     <Text
                       style={{
                         fontSize: 7.5,
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.6,
                       }}
                     >
@@ -1760,7 +1764,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                     <Text
                       style={{
                         fontSize: 7.5,
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.6,
                         marginHorizontal: 4,
                       }}
@@ -1798,14 +1802,14 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       fontSize: 7,
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       fontFamily: "Helvetica-Bold",
                       marginRight: 3,
                     }}
                   >
                     {chip.label}
                   </Text>
-                  <Text style={{ fontSize: 7, color: "#E2E8F0" }}>
+                  <Text style={{ fontSize: 7, color: onAccentMuted }}>
                     {chip.value}
                   </Text>
                 </View>
@@ -2058,6 +2062,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#0F172A");
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -2227,14 +2232,14 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>CONTACT</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
             {sidebarContacts.map((item, i) => (
               <View key={i} style={{ marginBottom: 3 }}>
                 <Text
                   style={{
                     fontSize: 6,
                     fontFamily: "Helvetica-Bold",
-                    color: "rgba(255,255,255,0.35)",
+                    color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
                 >
@@ -2269,14 +2274,14 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>PERSONAL</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
             {essentialChips.map((chip) => (
               <View key={chip.label} style={{ marginBottom: 3 }}>
                 <Text
                   style={{
                     fontSize: 6,
                     fontFamily: "Helvetica-Bold",
-                    color: "rgba(255,255,255,0.35)",
+                    color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
                 >
@@ -2293,11 +2298,11 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={s.execSideLabel}>SKILLS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
             <Text
               style={{
                 fontSize: 7.5,
-                color: "#E2E8F0",
+                color: onAccentMuted,
                 lineHeight: 1.6,
               }}
             >
@@ -2309,9 +2314,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={s.execSideLabel}>LANGUAGES</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
-              <Text key={lang.id} style={s.execSkillItem}>
+              <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
                   {lang.name}
                 </Text>
@@ -2326,14 +2331,14 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={s.execSideLabel}>CERTIFICATIONS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
                   style={{
                     fontSize: 7.5,
                     fontFamily: "Helvetica-Bold",
-                    color: "#FFFFFF",
+                    color: onAccent,
                     lineHeight: 1.4,
                   }}
                 >
@@ -2343,7 +2348,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       fontSize: 7,
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       lineHeight: 1.4,
                     }}
                   >
@@ -2404,7 +2409,8 @@ const ProfessionalPDFLayout = ({
   withPhoto: boolean;
 }) => {
   const theme = resolveTheme(data.settings, "#1f2937");
-  const accent = theme.accent;
+  // On a white page, accent is used only as text/border → use the readable form.
+  const accent = theme.accentText;
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
   const headline = data.personal.headline?.trim() || "";

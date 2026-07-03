@@ -69,7 +69,8 @@ const ProfessionalBase = ({
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1f2937");
-  const accent = theme.accent;
+  // Accent appears only as text/border on a white page → use the readable form.
+  const accent = theme.accentText;
 
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);

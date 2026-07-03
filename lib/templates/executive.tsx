@@ -33,13 +33,19 @@ const shouldShowProjectLink = (value?: string): boolean => {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const SidebarLabel = ({ children }: { children: React.ReactNode }) => (
+const SidebarLabel = ({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) => (
   <div
     style={{
       fontSize: "9px",
       fontWeight: 700,
       letterSpacing: "0.1em",
-      color: "#64748B",
+      color,
       marginBottom: "8px",
       textTransform: "uppercase" as const,
     }}
@@ -91,6 +97,7 @@ export const ExecutiveTemplate = ({
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1E2A4A");
+  const { onAccent, onAccentMuted } = theme;
 
   const contactItems = [
     data.personal.email?.trim()
@@ -210,7 +217,7 @@ export const ExecutiveTemplate = ({
               fontSize: "22px",
               fontWeight: 700,
               lineHeight: 1.15,
-              color: "#ffffff",
+              color: onAccent,
             }}
           >
             {firstName}
@@ -222,7 +229,7 @@ export const ExecutiveTemplate = ({
               style={{
                 fontSize: "12px",
                 fontWeight: 400,
-                color: "#94A3B8",
+                color: onAccentMuted,
                 marginTop: "6px",
                 lineHeight: 1.4,
               }}
@@ -235,7 +242,7 @@ export const ExecutiveTemplate = ({
         {/* Contact */}
         {contactItems.length > 0 && (
           <div>
-            <SidebarLabel>Contact</SidebarLabel>
+            <SidebarLabel color={onAccentMuted}>Contact</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) => (
                 <div
@@ -252,7 +259,7 @@ export const ExecutiveTemplate = ({
                       href={item.href}
                       style={{
                         fontSize: "10px",
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.6,
                         wordBreak: "break-all" as const,
                         textDecoration: "underline",
@@ -264,7 +271,7 @@ export const ExecutiveTemplate = ({
                     <span
                       style={{
                         fontSize: "10px",
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         lineHeight: 1.6,
                       }}
                     >
@@ -280,20 +287,20 @@ export const ExecutiveTemplate = ({
         {/* Personal */}
         {essentialChips.length > 0 && (
           <div style={{ marginTop: "20px" }}>
-            <SidebarLabel>Personal</SidebarLabel>
+            <SidebarLabel color={onAccentMuted}>Personal</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {essentialChips.map((chip) => (
                 <div
                   key={chip.label}
                   style={{
                     fontSize: "10px",
-                    color: "#CBD5E1",
+                    color: onAccentMuted,
                     lineHeight: 1.5,
                   }}
                 >
                   <span
                     style={{
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       fontWeight: 700,
                       letterSpacing: "0.04em",
                     }}
@@ -310,7 +317,7 @@ export const ExecutiveTemplate = ({
         {/* Skills */}
         {hasSkills && (
           <div style={{ marginTop: "20px" }}>
-            <SidebarLabel>Skills</SidebarLabel>
+            <SidebarLabel color={onAccentMuted}>Skills</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               {data.skills.map((skill) => (
                 <div
@@ -319,7 +326,7 @@ export const ExecutiveTemplate = ({
                 >
                   <span
                     style={{
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       fontSize: "12px",
                       lineHeight: 1,
                       flexShrink: 0,
@@ -328,7 +335,7 @@ export const ExecutiveTemplate = ({
                     ·
                   </span>
                   <span
-                    style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.7 }}
+                    style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.7 }}
                   >
                     {skill.name}
                   </span>
@@ -341,12 +348,12 @@ export const ExecutiveTemplate = ({
         {/* Languages */}
         {hasLanguages && (
           <div style={{ marginTop: "20px" }}>
-            <SidebarLabel>Languages</SidebarLabel>
+            <SidebarLabel color={onAccentMuted}>Languages</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               {data.languages.map((lang) => (
                 <div
                   key={lang.id}
-                  style={{ fontSize: "10px", color: "#CBD5E1", lineHeight: 1.7 }}
+                  style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.7 }}
                 >
                   <span style={{ fontWeight: 600 }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
@@ -359,7 +366,7 @@ export const ExecutiveTemplate = ({
         {/* Certifications */}
         {hasCertifications && (
           <div style={{ marginTop: "20px" }}>
-            <SidebarLabel>Certifications</SidebarLabel>
+            <SidebarLabel color={onAccentMuted}>Certifications</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {data.certifications.map((cert) => (
                 <div key={cert.id}>
@@ -367,7 +374,7 @@ export const ExecutiveTemplate = ({
                     style={{
                       fontSize: "10px",
                       fontWeight: 700,
-                      color: "#ffffff",
+                      color: onAccent,
                       lineHeight: 1.4,
                     }}
                   >
@@ -376,7 +383,7 @@ export const ExecutiveTemplate = ({
                   <div
                     style={{
                       fontSize: "9px",
-                      color: "#94A3B8",
+                      color: onAccentMuted,
                       lineHeight: 1.4,
                     }}
                   >
@@ -403,7 +410,7 @@ export const ExecutiveTemplate = ({
         {/* Summary */}
         {hasSummary && (
           <section>
-            <RightHeading isFirst accent={theme.accent}>Summary</RightHeading>
+            <RightHeading isFirst accent={theme.accentText}>Summary</RightHeading>
             <p
               style={{
                 fontSize: "11px",
@@ -420,7 +427,7 @@ export const ExecutiveTemplate = ({
         {/* Experience */}
         {hasExperience && (
           <section>
-            <RightHeading isFirst={!hasSummary} accent={theme.accent}>Experience</RightHeading>
+            <RightHeading isFirst={!hasSummary} accent={theme.accentText}>Experience</RightHeading>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -506,7 +513,7 @@ export const ExecutiveTemplate = ({
         {/* Education */}
         {hasEducation && (
           <section>
-            <RightHeading isFirst={!hasSummary && !hasExperience} accent={theme.accent}>
+            <RightHeading isFirst={!hasSummary && !hasExperience} accent={theme.accentText}>
               Education
             </RightHeading>
             <div
@@ -564,8 +571,8 @@ export const ExecutiveTemplate = ({
                       <span
                         style={{
                           fontSize: "8px",
-                          color: theme.accent,
-                          border: `1px solid ${theme.accent}`,
+                          color: theme.accentText,
+                          border: `1px solid ${theme.accentText}`,
                           borderRadius: "3px",
                           padding: "1px 4px",
                           lineHeight: 1.4,
@@ -600,7 +607,7 @@ export const ExecutiveTemplate = ({
           <section>
             <RightHeading
               isFirst={!hasSummary && !hasExperience && !hasEducation}
-              accent={theme.accent}
+              accent={theme.accentText}
             >
               Projects
             </RightHeading>
@@ -632,7 +639,7 @@ export const ExecutiveTemplate = ({
                         href={normalizeHref(project.link)}
                         style={{
                           fontSize: "10px",
-                          color: theme.accent,
+                          color: theme.accentText,
                           textDecoration: "none",
                           wordBreak: "break-all" as const,
                         }}

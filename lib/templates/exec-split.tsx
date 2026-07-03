@@ -69,6 +69,7 @@ export const ExecSplitTemplate = ({
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1B2A4A");
+  const { onAccent, onAccentMuted } = theme;
 
   const contactItems = [
     data.personal.email?.trim()
@@ -148,7 +149,7 @@ export const ExecSplitTemplate = ({
             style={{
               fontSize: "28px",
               fontWeight: 700,
-              color: "#ffffff",
+              color: onAccent,
               letterSpacing: "-0.3px",
               lineHeight: 1.15,
             }}
@@ -160,7 +161,7 @@ export const ExecSplitTemplate = ({
               style={{
                 fontSize: "13px",
                 fontWeight: 400,
-                color: "#94A3B8",
+                color: onAccentMuted,
                 marginTop: "4px",
                 lineHeight: 1.4,
               }}
@@ -172,7 +173,7 @@ export const ExecSplitTemplate = ({
             <div
               style={{
                 fontSize: "10px",
-                color: "#CBD5E1",
+                color: onAccentMuted,
                 marginTop: "10px",
                 lineHeight: 1.6,
               }}
@@ -184,7 +185,7 @@ export const ExecSplitTemplate = ({
                     <a
                       href={item.href}
                       style={{
-                        color: "#CBD5E1",
+                        color: onAccentMuted,
                         textDecoration: "underline",
                       }}
                     >
@@ -211,7 +212,7 @@ export const ExecSplitTemplate = ({
                   key={chip.label}
                   style={{
                     fontSize: "9px",
-                    color: "#E2E8F0",
+                    color: onAccentMuted,
                     background: "rgba(255,255,255,0.10)",
                     border: "1px solid rgba(255,255,255,0.18)",
                     borderRadius: "999px",
@@ -220,7 +221,7 @@ export const ExecSplitTemplate = ({
                     letterSpacing: "0.02em",
                   }}
                 >
-                  <span style={{ color: "#94A3B8", marginRight: 4, fontWeight: 700 }}>
+                  <span style={{ color: onAccentMuted, marginRight: 4, fontWeight: 700 }}>
                     {chip.label}
                   </span>
                   {chip.value}
@@ -271,7 +272,7 @@ export const ExecSplitTemplate = ({
           {/* Experience */}
           {hasExperience && (
             <section>
-              <SectionHeading accent={theme.accent}>Experience</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Experience</SectionHeading>
               <div
                 style={{
                   display: "flex",
@@ -368,7 +369,7 @@ export const ExecSplitTemplate = ({
           {/* Education */}
           {hasEducation && (
             <section>
-              <SectionHeading accent={theme.accent}>Education</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Education</SectionHeading>
               <div
                 style={{
                   display: "flex",
@@ -455,7 +456,7 @@ export const ExecSplitTemplate = ({
           {/* Projects */}
           {hasProjects && (
             <section>
-              <SectionHeading accent={theme.accent}>Projects</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Projects</SectionHeading>
               <div
                 style={{
                   display: "flex",
@@ -541,7 +542,7 @@ export const ExecSplitTemplate = ({
           {/* Summary */}
           {hasSummary && (
             <section>
-              <SectionHeading accent={theme.accent}>Summary</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Summary</SectionHeading>
               <p
                 style={{
                   fontSize: "10.5px",
@@ -558,7 +559,7 @@ export const ExecSplitTemplate = ({
           {/* Skills */}
           {hasSkills && (
             <section>
-              <SectionHeading accent={theme.accent}>Skills</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Skills</SectionHeading>
               <div
                 style={{
                   display: "flex",
@@ -572,7 +573,7 @@ export const ExecSplitTemplate = ({
                     style={{
                       display: "inline-flex",
                       fontSize: "9.5px",
-                      color: theme.accent,
+                      color: theme.accentText,
                       border: "1px solid #CBD5E1",
                       borderRadius: "3px",
                       padding: "1px 6px",
@@ -590,7 +591,7 @@ export const ExecSplitTemplate = ({
           {/* Languages */}
           {hasLanguages && (
             <section>
-              <SectionHeading accent={theme.accent}>Languages</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Languages</SectionHeading>
               <div
                 style={{
                   display: "flex",
@@ -620,7 +621,7 @@ export const ExecSplitTemplate = ({
           {/* Certifications */}
           {hasCertifications && (
             <section>
-              <SectionHeading accent={theme.accent}>Certifications</SectionHeading>
+              <SectionHeading accent={theme.accentText}>Certifications</SectionHeading>
               <div
                 style={{
                   display: "flex",
