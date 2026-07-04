@@ -306,6 +306,9 @@ export const CustomizePanel = () => {
     (sw) => sw.hex.toLowerCase() === accentColor.toLowerCase(),
   );
   const pageMargins = settings.pageMargins ?? 3;
+  const fontSize = settings.fontSize ?? 3;
+  const lineHeight = settings.lineHeight ?? 3;
+  const sectionSpacing = settings.sectionSpacing ?? 3;
 
   // Custom-colour drawer, revealed by the "Use custom colour" link. Opens by
   // default when the saved accent isn't one of the presets so it stays visible.
@@ -366,6 +369,39 @@ export const CustomizePanel = () => {
           onChange={(v) => setSetting("pageMargins", v)}
           leftLabel="narrow"
           rightLabel="wide"
+        />
+      </Group>
+
+      <Group label={`Font size: ${fontSize}`}>
+        <StepSlider
+          value={fontSize}
+          min={1}
+          max={5}
+          onChange={(v) => setSetting("fontSize", v)}
+          leftLabel="smaller"
+          rightLabel="larger"
+        />
+      </Group>
+
+      <Group label={`Line height: ${lineHeight}`}>
+        <StepSlider
+          value={lineHeight}
+          min={1}
+          max={5}
+          onChange={(v) => setSetting("lineHeight", v)}
+          leftLabel="tight"
+          rightLabel="loose"
+        />
+      </Group>
+
+      <Group label={`Section spacing: ${sectionSpacing}`}>
+        <StepSlider
+          value={sectionSpacing}
+          min={1}
+          max={5}
+          onChange={(v) => setSetting("sectionSpacing", v)}
+          leftLabel="compact"
+          rightLabel="airy"
         />
       </Group>
 

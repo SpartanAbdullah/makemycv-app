@@ -1,3 +1,4 @@
+import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
@@ -38,14 +39,23 @@ const shouldShowProjectLink = (value?: string): boolean => {
 const SectionHeading = ({
   children,
   isFirst = false,
+  spaceScale = 1,
+  fontScale = 1,
 }: {
   children: string;
   isFirst?: boolean;
+  spaceScale?: number;
+  fontScale?: number;
 }) => (
-  <div style={{ marginTop: isFirst ? 0 : "20px", marginBottom: "8px" }}>
+  <div
+    style={{
+      marginTop: isFirst ? 0 : `${20 * spaceScale}px`,
+      marginBottom: "8px",
+    }}
+  >
     <h2
       style={{
-        fontSize: "11px",
+        fontSize: `${11 * fontScale}px`,
         fontWeight: 700,
         letterSpacing: "0.1em",
         color: "#111827",
@@ -176,13 +186,13 @@ export const ATSCleanTemplate = ({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            fontSize: "10.5px",
+            fontSize: `${10.5 * theme.fontScale}px`,
             color: "#111827",
             border: "1px solid #D1D5DB",
             borderRadius: "4px",
             padding: "2px 8px",
             backgroundColor: "#F9FAFB",
-            lineHeight: 1.5,
+            lineHeight: 1.5 * theme.lineScale,
           }}
         >
           {skill.name}
@@ -194,7 +204,11 @@ export const ATSCleanTemplate = ({
     <>
       {generalSkills.length > 0 && (
         <section>
-          <SectionHeading isFirst={firstSection === "skills"}>
+          <SectionHeading
+            isFirst={firstSection === "skills"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Skills
           </SectionHeading>
           {renderSkillChips(generalSkills)}
@@ -204,6 +218,8 @@ export const ATSCleanTemplate = ({
         <section>
           <SectionHeading
             isFirst={firstSection === "skills" && generalSkills.length === 0}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
           >
             Technical Skills
           </SectionHeading>
@@ -221,11 +237,17 @@ export const ATSCleanTemplate = ({
         backgroundColor: "#ffffff",
         padding: `${36 * theme.marginScale}px ${32 * theme.marginScale}px`,
         fontFamily: theme.fontFamily,
-        fontSize: "11.5px",
+        fontSize: `${11.5 * theme.fontScale}px`,
         color: "#1a1a1a",
-        lineHeight: 1.55,
+        lineHeight: 1.55 * theme.lineScale,
         boxSizing: "border-box" as const,
-      }}
+        // Density multipliers exposed as CSS vars for any calc()-based utility
+        // classes. This template is pure inline styles today, so nothing reads
+        // them yet, but they keep the root consistent with the panel contract.
+        "--fs": theme.fontScale,
+        "--lh": theme.lineScale,
+        "--sp": theme.spaceScale,
+      } as React.CSSProperties}
     >
       {/* ── Header ── */}
       <div>
@@ -239,12 +261,12 @@ export const ATSCleanTemplate = ({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontSize: "26px",
+                fontSize: `${26 * theme.fontScale}px`,
                 fontWeight: 700,
                 color: "#111827",
                 letterSpacing: "-0.3px",
                 marginBottom: "2px",
-                lineHeight: 1.2,
+                lineHeight: 1.2 * theme.lineScale,
               }}
             >
               {name}
@@ -253,7 +275,7 @@ export const ATSCleanTemplate = ({
             {headline && (
               <div
                 style={{
-                  fontSize: "13px",
+                  fontSize: `${13 * theme.fontScale}px`,
                   fontWeight: 500,
                   color: "#374151",
                   marginBottom: "8px",
@@ -266,10 +288,10 @@ export const ATSCleanTemplate = ({
             {contactParts.length > 0 && (
               <div
                 style={{
-                  fontSize: "10.5px",
+                  fontSize: `${10.5 * theme.fontScale}px`,
                   color: "#6B7280",
                   marginBottom: "4px",
-                  lineHeight: 1.55,
+                  lineHeight: 1.55 * theme.lineScale,
                 }}
               >
                 {contactParts.map((part, i) => (
@@ -283,9 +305,9 @@ export const ATSCleanTemplate = ({
             {essentialChips.length > 0 && (
               <div
                 style={{
-                  fontSize: "10px",
+                  fontSize: `${10 * theme.fontScale}px`,
                   color: "#374151",
-                  lineHeight: 1.55,
+                  lineHeight: 1.55 * theme.lineScale,
                   marginTop: "2px",
                 }}
               >
@@ -335,14 +357,18 @@ export const ATSCleanTemplate = ({
       {/* ── Summary ── */}
       {hasSummary && (
         <section>
-          <SectionHeading isFirst={firstSection === "summary"}>
+          <SectionHeading
+            isFirst={firstSection === "summary"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Summary
           </SectionHeading>
           <p
             style={{
-              fontSize: "11.5px",
+              fontSize: `${11.5 * theme.fontScale}px`,
               color: "#374151",
-              lineHeight: 1.6,
+              lineHeight: 1.6 * theme.lineScale,
               margin: 0,
             }}
           >
@@ -356,7 +382,11 @@ export const ATSCleanTemplate = ({
       {/* ── Experience ── */}
       {hasExperience && (
         <section>
-          <SectionHeading isFirst={firstSection === "experience"}>
+          <SectionHeading
+            isFirst={firstSection === "experience"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Experience
           </SectionHeading>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -379,7 +409,7 @@ export const ATSCleanTemplate = ({
                   <span
                     style={{
                       fontWeight: 700,
-                      fontSize: "11.5px",
+                      fontSize: `${11.5 * theme.fontScale}px`,
                       color: "#111827",
                     }}
                   >
@@ -387,7 +417,7 @@ export const ATSCleanTemplate = ({
                   </span>
                   <span
                     style={{
-                      fontSize: "10.5px",
+                      fontSize: `${10.5 * theme.fontScale}px`,
                       color: "#6B7280",
                       flexShrink: 0,
                       paddingLeft: "8px",
@@ -402,7 +432,7 @@ export const ATSCleanTemplate = ({
                 {(role.company || role.location) && (
                   <div
                     style={{
-                      fontSize: "11px",
+                      fontSize: `${11 * theme.fontScale}px`,
                       color: "#374151",
                       marginTop: "1px",
                       marginBottom: "4px",
@@ -429,9 +459,9 @@ export const ATSCleanTemplate = ({
                         <li
                           key={i}
                           style={{
-                            fontSize: "11px",
+                            fontSize: `${11 * theme.fontScale}px`,
                             color: "#374151",
-                            lineHeight: 1.55,
+                            lineHeight: 1.55 * theme.lineScale,
                           }}
                         >
                           {bullet}
@@ -448,7 +478,11 @@ export const ATSCleanTemplate = ({
       {/* ── Education ── */}
       {hasEducation && (
         <section>
-          <SectionHeading isFirst={firstSection === "education"}>
+          <SectionHeading
+            isFirst={firstSection === "education"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Education
           </SectionHeading>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -471,7 +505,7 @@ export const ATSCleanTemplate = ({
                   <span
                     style={{
                       fontWeight: 700,
-                      fontSize: "11.5px",
+                      fontSize: `${11.5 * theme.fontScale}px`,
                       color: "#111827",
                     }}
                   >
@@ -480,7 +514,7 @@ export const ATSCleanTemplate = ({
                   </span>
                   <span
                     style={{
-                      fontSize: "10.5px",
+                      fontSize: `${10.5 * theme.fontScale}px`,
                       color: "#6B7280",
                       flexShrink: 0,
                       paddingLeft: "8px",
@@ -494,7 +528,7 @@ export const ATSCleanTemplate = ({
                 {/* Institution */}
                 <div
                   style={{
-                    fontSize: "11px",
+                    fontSize: `${11 * theme.fontScale}px`,
                     color: "#374151",
                     marginTop: "1px",
                   }}
@@ -503,7 +537,7 @@ export const ATSCleanTemplate = ({
                   {edu.attested && (
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: "#15803d",
                         marginLeft: "8px",
                       }}
@@ -519,7 +553,7 @@ export const ATSCleanTemplate = ({
                 {edu.notes?.trim() && (
                   <div
                     style={{
-                      fontSize: "10.5px",
+                      fontSize: `${10.5 * theme.fontScale}px`,
                       color: "#6B7280",
                       marginTop: "1px",
                     }}
@@ -539,14 +573,18 @@ export const ATSCleanTemplate = ({
       {/* ── Languages ── */}
       {hasLanguages && (
         <section>
-          <SectionHeading isFirst={firstSection === "languages"}>
+          <SectionHeading
+            isFirst={firstSection === "languages"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Languages
           </SectionHeading>
           <p
             style={{
-              fontSize: "11px",
+              fontSize: `${11 * theme.fontScale}px`,
               color: "#374151",
-              lineHeight: 1.55,
+              lineHeight: 1.55 * theme.lineScale,
               margin: 0,
             }}
           >
@@ -564,14 +602,22 @@ export const ATSCleanTemplate = ({
       {/* ── Certifications ── */}
       {hasCertifications && (
         <section>
-          <SectionHeading isFirst={firstSection === "certifications"}>
+          <SectionHeading
+            isFirst={firstSection === "certifications"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Certifications
           </SectionHeading>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             {data.certifications.map((cert) => (
               <div
                 key={cert.id}
-                style={{ fontSize: "11px", color: "#374151", lineHeight: 1.55 }}
+                style={{
+                  fontSize: `${11 * theme.fontScale}px`,
+                  color: "#374151",
+                  lineHeight: 1.55 * theme.lineScale,
+                }}
               >
                 <span style={{ fontWeight: 600 }}>{cert.name}</span>
                 {cert.issuer ? ` · ${cert.issuer}` : ""}
@@ -585,7 +631,11 @@ export const ATSCleanTemplate = ({
       {/* ── Projects ── */}
       {hasProjects && (
         <section>
-          <SectionHeading isFirst={firstSection === "projects"}>
+          <SectionHeading
+            isFirst={firstSection === "projects"}
+            spaceScale={theme.spaceScale}
+            fontScale={theme.fontScale}
+          >
             Projects
           </SectionHeading>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -603,7 +653,7 @@ export const ATSCleanTemplate = ({
                   <div
                     style={{
                       fontWeight: 700,
-                      fontSize: "11.5px",
+                      fontSize: `${11.5 * theme.fontScale}px`,
                       color: "#111827",
                     }}
                   >
@@ -618,7 +668,7 @@ export const ATSCleanTemplate = ({
                       rel="noreferrer"
                       style={{
                         display: "block",
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: "#6B7280",
                         textDecoration: "none",
                         marginTop: "1px",
@@ -640,9 +690,9 @@ export const ATSCleanTemplate = ({
                         <li
                           key={i}
                           style={{
-                            fontSize: "11px",
+                            fontSize: `${11 * theme.fontScale}px`,
                             color: "#374151",
-                            lineHeight: 1.55,
+                            lineHeight: 1.55 * theme.lineScale,
                           }}
                         >
                           {bullet}

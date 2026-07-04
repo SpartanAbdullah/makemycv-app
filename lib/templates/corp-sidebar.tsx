@@ -33,27 +33,44 @@ const shouldShowProjectLink = (value?: string): boolean => {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-const SidebarHeading = ({ children }: { children: string }) => (
+const SidebarHeading = ({
+  children,
+  theme,
+}: {
+  children: string;
+  theme: ReturnType<typeof resolveTheme>;
+}) => (
   <div
     style={{
-      fontSize: "9px",
+      fontSize: `${9 * theme.fontScale}px`,
       fontWeight: 700,
       letterSpacing: "0.1em",
       color: "rgba(255,255,255,0.5)",
       textTransform: "uppercase" as const,
       marginBottom: "6px",
-      marginTop: "18px",
+      marginTop: `${18 * theme.spaceScale}px`,
     }}
   >
     {children}
   </div>
 );
 
-const MainHeading = ({ children }: { children: string }) => (
-  <div style={{ marginTop: "18px", marginBottom: "6px" }}>
+const MainHeading = ({
+  children,
+  theme,
+}: {
+  children: string;
+  theme: ReturnType<typeof resolveTheme>;
+}) => (
+  <div
+    style={{
+      marginTop: `${18 * theme.spaceScale}px`,
+      marginBottom: "6px",
+    }}
+  >
     <h2
       style={{
-        fontSize: "10px",
+        fontSize: `${10 * theme.fontScale}px`,
         fontWeight: 700,
         letterSpacing: "0.08em",
         color: "#1E293B",
@@ -145,7 +162,7 @@ export const CorpSidebarTemplate = ({
         minHeight: "1123px",
         backgroundColor: "#ffffff",
         fontFamily: theme.fontFamily,
-        fontSize: "11px",
+        fontSize: `${11 * theme.fontScale}px`,
       }}
     >
       {/* ── Main Content (Left) ── */}
@@ -161,11 +178,11 @@ export const CorpSidebarTemplate = ({
         <div style={{ marginBottom: "16px" }}>
           <div
             style={{
-              fontSize: "26px",
+              fontSize: `${26 * theme.fontScale}px`,
               fontWeight: 700,
               color: "#0F172A",
               letterSpacing: "-0.3px",
-              lineHeight: 1.15,
+              lineHeight: 1.15 * theme.lineScale,
             }}
           >
             {name}
@@ -173,7 +190,7 @@ export const CorpSidebarTemplate = ({
           {headline && (
             <div
               style={{
-                fontSize: "12px",
+                fontSize: `${12 * theme.fontScale}px`,
                 fontWeight: 500,
                 color: "#64748B",
                 marginTop: "4px",
@@ -193,12 +210,12 @@ export const CorpSidebarTemplate = ({
         {/* Summary */}
         {hasSummary && (
           <section>
-            <MainHeading>Summary</MainHeading>
+            <MainHeading theme={theme}>Summary</MainHeading>
             <p
               style={{
-                fontSize: "11px",
+                fontSize: `${11 * theme.fontScale}px`,
                 color: "#374151",
-                lineHeight: 1.6,
+                lineHeight: 1.6 * theme.lineScale,
                 margin: 0,
               }}
             >
@@ -210,7 +227,7 @@ export const CorpSidebarTemplate = ({
         {/* Experience */}
         {hasExperience && (
           <section>
-            <MainHeading>Experience</MainHeading>
+            <MainHeading theme={theme}>Experience</MainHeading>
             <div
               style={{
                 display: "flex",
@@ -236,7 +253,7 @@ export const CorpSidebarTemplate = ({
                     <span
                       style={{
                         fontWeight: 700,
-                        fontSize: "11.5px",
+                        fontSize: `${11.5 * theme.fontScale}px`,
                         color: "#0F172A",
                       }}
                     >
@@ -244,7 +261,7 @@ export const CorpSidebarTemplate = ({
                     </span>
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: "#64748B",
                         flexShrink: 0,
                         paddingLeft: "8px",
@@ -261,7 +278,7 @@ export const CorpSidebarTemplate = ({
                   {(role.company || role.location) && (
                     <div
                       style={{
-                        fontSize: "10.5px",
+                        fontSize: `${10.5 * theme.fontScale}px`,
                         color: "#475569",
                         marginTop: "1px",
                         marginBottom: "3px",
@@ -288,9 +305,9 @@ export const CorpSidebarTemplate = ({
                           <li
                             key={i}
                             style={{
-                              fontSize: "10.5px",
+                              fontSize: `${10.5 * theme.fontScale}px`,
                               color: "#374151",
-                              lineHeight: 1.5,
+                              lineHeight: 1.5 * theme.lineScale,
                             }}
                           >
                             {bullet}
@@ -307,7 +324,7 @@ export const CorpSidebarTemplate = ({
         {/* Education */}
         {hasEducation && (
           <section>
-            <MainHeading>Education</MainHeading>
+            <MainHeading theme={theme}>Education</MainHeading>
             <div
               style={{
                 display: "flex",
@@ -333,7 +350,7 @@ export const CorpSidebarTemplate = ({
                     <span
                       style={{
                         fontWeight: 700,
-                        fontSize: "11px",
+                        fontSize: `${11 * theme.fontScale}px`,
                         color: "#0F172A",
                       }}
                     >
@@ -342,7 +359,7 @@ export const CorpSidebarTemplate = ({
                     </span>
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: "#64748B",
                         flexShrink: 0,
                         paddingLeft: "8px",
@@ -361,19 +378,22 @@ export const CorpSidebarTemplate = ({
                     }}
                   >
                     <span
-                      style={{ fontSize: "10.5px", color: "#475569" }}
+                      style={{
+                        fontSize: `${10.5 * theme.fontScale}px`,
+                        color: "#475569",
+                      }}
                     >
                       {edu.school?.trim() || ""}
                     </span>
                     {edu.attested && (
                       <span
                         style={{
-                          fontSize: "8px",
+                          fontSize: `${8 * theme.fontScale}px`,
                           color: "#15803d",
                           border: "1px solid #BBF7D0",
                           borderRadius: "3px",
                           padding: "1px 4px",
-                          lineHeight: 1.4,
+                          lineHeight: 1.4 * theme.lineScale,
                           flexShrink: 0,
                         }}
                       >
@@ -386,7 +406,7 @@ export const CorpSidebarTemplate = ({
                   {edu.notes?.trim() && (
                     <div
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: "#64748B",
                         marginTop: "1px",
                       }}
@@ -403,7 +423,7 @@ export const CorpSidebarTemplate = ({
         {/* Projects */}
         {hasProjects && (
           <section>
-            <MainHeading>Projects</MainHeading>
+            <MainHeading theme={theme}>Projects</MainHeading>
             <div
               style={{
                 display: "flex",
@@ -425,7 +445,7 @@ export const CorpSidebarTemplate = ({
                     <div
                       style={{
                         fontWeight: 700,
-                        fontSize: "11px",
+                        fontSize: `${11 * theme.fontScale}px`,
                         color: "#0F172A",
                       }}
                     >
@@ -434,7 +454,7 @@ export const CorpSidebarTemplate = ({
                     {showLink && (
                       <div
                         style={{
-                          fontSize: "9.5px",
+                          fontSize: `${9.5 * theme.fontScale}px`,
                           color: "#64748B",
                           marginTop: "1px",
                         }}
@@ -464,9 +484,9 @@ export const CorpSidebarTemplate = ({
                           <li
                             key={i}
                             style={{
-                              fontSize: "10.5px",
+                              fontSize: `${10.5 * theme.fontScale}px`,
                               color: "#374151",
-                              lineHeight: 1.5,
+                              lineHeight: 1.5 * theme.lineScale,
                             }}
                           >
                             {bullet}
@@ -530,7 +550,7 @@ export const CorpSidebarTemplate = ({
         {/* Contact */}
         {contactItems.length > 0 && (
           <div>
-            <SidebarHeading>Contact</SidebarHeading>
+            <SidebarHeading theme={theme}>Contact</SidebarHeading>
             <div
               style={{
                 display: "flex",
@@ -542,12 +562,12 @@ export const CorpSidebarTemplate = ({
                 <div key={i}>
                   <div
                     style={{
-                      fontSize: "8px",
+                      fontSize: `${8 * theme.fontScale}px`,
                       fontWeight: 600,
                       color: "rgba(255,255,255,0.4)",
                       textTransform: "uppercase" as const,
                       letterSpacing: "0.05em",
-                      lineHeight: 1.4,
+                      lineHeight: 1.4 * theme.lineScale,
                     }}
                   >
                     {item.label}
@@ -556,9 +576,9 @@ export const CorpSidebarTemplate = ({
                     <a
                       href={item.href}
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: onAccentMuted,
-                        lineHeight: 1.5,
+                        lineHeight: 1.5 * theme.lineScale,
                         wordBreak: "break-all" as const,
                         textDecoration: "underline",
                       }}
@@ -568,9 +588,9 @@ export const CorpSidebarTemplate = ({
                   ) : (
                     <div
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * theme.fontScale}px`,
                         color: onAccentMuted,
-                        lineHeight: 1.5,
+                        lineHeight: 1.5 * theme.lineScale,
                         wordBreak: "break-all" as const,
                       }}
                     >
@@ -586,7 +606,7 @@ export const CorpSidebarTemplate = ({
         {/* Personal */}
         {essentialChips.length > 0 && (
           <div>
-            <SidebarHeading>Personal</SidebarHeading>
+            <SidebarHeading theme={theme}>Personal</SidebarHeading>
             <div
               style={{
                 display: "flex",
@@ -598,21 +618,21 @@ export const CorpSidebarTemplate = ({
                 <div key={chip.label}>
                   <div
                     style={{
-                      fontSize: "8px",
+                      fontSize: `${8 * theme.fontScale}px`,
                       fontWeight: 600,
                       color: "rgba(255,255,255,0.4)",
                       textTransform: "uppercase" as const,
                       letterSpacing: "0.05em",
-                      lineHeight: 1.4,
+                      lineHeight: 1.4 * theme.lineScale,
                     }}
                   >
                     {chip.label}
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: `${10 * theme.fontScale}px`,
                       color: onAccentMuted,
-                      lineHeight: 1.5,
+                      lineHeight: 1.5 * theme.lineScale,
                     }}
                   >
                     {chip.value}
@@ -626,7 +646,7 @@ export const CorpSidebarTemplate = ({
         {/* Skills */}
         {hasSkills && (
           <div>
-            <SidebarHeading>Skills</SidebarHeading>
+            <SidebarHeading theme={theme}>Skills</SidebarHeading>
             <div
               style={{
                 display: "flex",
@@ -638,12 +658,12 @@ export const CorpSidebarTemplate = ({
                 <span
                   key={skill.id}
                   style={{
-                    fontSize: "9px",
+                    fontSize: `${9 * theme.fontScale}px`,
                     color: onAccentMuted,
                     backgroundColor: "rgba(255,255,255,0.08)",
                     borderRadius: "3px",
                     padding: "2px 6px",
-                    lineHeight: 1.5,
+                    lineHeight: 1.5 * theme.lineScale,
                   }}
                 >
                   {skill.name}
@@ -656,7 +676,7 @@ export const CorpSidebarTemplate = ({
         {/* Languages */}
         {hasLanguages && (
           <div>
-            <SidebarHeading>Languages</SidebarHeading>
+            <SidebarHeading theme={theme}>Languages</SidebarHeading>
             <div
               style={{
                 display: "flex",
@@ -668,9 +688,9 @@ export const CorpSidebarTemplate = ({
                 <div
                   key={lang.id}
                   style={{
-                    fontSize: "10px",
+                    fontSize: `${10 * theme.fontScale}px`,
                     color: onAccentMuted,
-                    lineHeight: 1.6,
+                    lineHeight: 1.6 * theme.lineScale,
                   }}
                 >
                   <span style={{ fontWeight: 600 }}>{lang.name}</span>
@@ -686,7 +706,7 @@ export const CorpSidebarTemplate = ({
         {/* Certifications */}
         {hasCertifications && (
           <div>
-            <SidebarHeading>Certifications</SidebarHeading>
+            <SidebarHeading theme={theme}>Certifications</SidebarHeading>
             <div
               style={{
                 display: "flex",
@@ -698,10 +718,10 @@ export const CorpSidebarTemplate = ({
                 <div key={cert.id}>
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: `${10 * theme.fontScale}px`,
                       fontWeight: 700,
                       color: onAccent,
-                      lineHeight: 1.4,
+                      lineHeight: 1.4 * theme.lineScale,
                     }}
                   >
                     {cert.name}
@@ -709,9 +729,9 @@ export const CorpSidebarTemplate = ({
                   {(cert.issuer || cert.date) && (
                     <div
                       style={{
-                        fontSize: "9px",
+                        fontSize: `${9 * theme.fontScale}px`,
                         color: onAccentMuted,
-                        lineHeight: 1.4,
+                        lineHeight: 1.4 * theme.lineScale,
                       }}
                     >
                       {[cert.issuer?.trim(), cert.date?.trim()]

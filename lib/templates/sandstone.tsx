@@ -43,13 +43,15 @@ const shouldShowProjectLink = (value?: string): boolean => {
 const SideLabel = ({
   children,
   color,
+  fontScale = 1,
 }: {
   children: React.ReactNode;
   color: string;
+  fontScale?: number;
 }) => (
   <div
     style={{
-      fontSize: "9px",
+      fontSize: `${9 * fontScale}px`,
       fontWeight: 700,
       letterSpacing: "0.14em",
       color,
@@ -65,14 +67,18 @@ const MainHeading = ({
   children,
   accent,
   isFirst = false,
+  fontScale = 1,
+  spaceScale = 1,
 }: {
   children: React.ReactNode;
   accent: string;
   isFirst?: boolean;
+  fontScale?: number;
+  spaceScale?: number;
 }) => (
   <div
     style={{
-      marginTop: isFirst ? 0 : "18px",
+      marginTop: isFirst ? 0 : `${18 * spaceScale}px`,
       borderBottom: `1.5px solid ${accent}`,
       paddingBottom: "3px",
       marginBottom: "9px",
@@ -80,7 +86,7 @@ const MainHeading = ({
   >
     <span
       style={{
-        fontSize: "11px",
+        fontSize: `${11 * fontScale}px`,
         fontWeight: 700,
         letterSpacing: "0.1em",
         color: "#292524",
@@ -104,6 +110,9 @@ export const SandstoneTemplate = ({
   const theme = resolveTheme(data.settings, "#ECE3D2");
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   const m = theme.marginScale;
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
 
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -156,7 +165,7 @@ export const SandstoneTemplate = ({
         minHeight: "1123px",
         backgroundColor: "#ffffff",
         fontFamily: theme.fontFamily,
-        fontSize: "11px",
+        fontSize: `${11 * fs}px`,
       }}
     >
       {/* ── Accent band sidebar ── */}
@@ -191,18 +200,18 @@ export const SandstoneTemplate = ({
           </div>
         )}
 
-        <div style={{ fontSize: "20px", fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 }}>
+        <div style={{ fontSize: `${20 * fs}px`, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * ls }}>
           {firstName} {lastName}
         </div>
         {headline && (
           <div
             style={{
-              fontSize: "11px",
+              fontSize: `${11 * fs}px`,
               color: onAccentMuted,
               fontWeight: 600,
               marginTop: "4px",
               textAlign: "center",
-              lineHeight: 1.4,
+              lineHeight: 1.4 * ls,
               paddingBottom: "14px",
               borderBottom: `1px solid ${bandBorder}`,
               marginBottom: "14px",
@@ -214,11 +223,11 @@ export const SandstoneTemplate = ({
 
         {personalDetails.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel color={onAccentMuted}>Personal Details</SideLabel>
+            <SideLabel color={onAccentMuted} fontScale={fs}>Personal Details</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {personalDetails.map((d) => (
-                <div key={d.label} style={{ fontSize: "10px", lineHeight: 1.4 }}>
-                  <div style={{ color: onAccentMuted, fontWeight: 700, fontSize: "8.5px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <div key={d.label} style={{ fontSize: `${10 * fs}px`, lineHeight: 1.4 * ls }}>
+                  <div style={{ color: onAccentMuted, fontWeight: 700, fontSize: `${8.5 * fs}px`, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                     {d.label}
                   </div>
                   <div style={{ color: onAccent }}>{d.value}</div>
@@ -230,19 +239,19 @@ export const SandstoneTemplate = ({
 
         {contactItems.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <SideLabel color={onAccentMuted}>Contact</SideLabel>
+            <SideLabel color={onAccentMuted} fontScale={fs}>Contact</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) =>
                 item.href ? (
                   <a
                     key={i}
                     href={item.href}
-                    style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5, wordBreak: "break-all" as const, textDecoration: "none" }}
+                    style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.5 * ls, wordBreak: "break-all" as const, textDecoration: "none" }}
                   >
                     {item.text}
                   </a>
                 ) : (
-                  <span key={i} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                  <span key={i} style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.5 * ls }}>
                     {item.text}
                   </span>
                 ),
@@ -253,10 +262,10 @@ export const SandstoneTemplate = ({
 
         {hasLanguages && (
           <div>
-            <SideLabel color={onAccentMuted}>Languages</SideLabel>
+            <SideLabel color={onAccentMuted} fontScale={fs}>Languages</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
               {data.languages.map((lang) => (
-                <div key={lang.id} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                <div key={lang.id} style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.5 * ls }}>
                   <span style={{ fontWeight: 700, color: onAccent }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                 </div>
@@ -270,10 +279,10 @@ export const SandstoneTemplate = ({
       <div style={{ flex: 1, minWidth: 0, padding: `${30 * m}px ${30 * m}px`, boxSizing: "border-box" as const }}>
         {hasSummary && (
           <section>
-            <MainHeading accent={accentText} isFirst>
+            <MainHeading accent={accentText} isFirst fontScale={fs} spaceScale={sp}>
               About Me
             </MainHeading>
-            <p style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.6, margin: 0 }}>
+            <p style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.6 * ls, margin: 0 }}>
               {data.personal.summary!.trim()}
             </p>
           </section>
@@ -281,22 +290,22 @@ export const SandstoneTemplate = ({
 
         {hasExperience && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasSummary}>
+            <MainHeading accent={accentText} isFirst={!hasSummary} fontScale={fs} spaceScale={sp}>
               Work Experience
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {experience.map((role) => (
                 <div key={role.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#292524" }}>
+                    <span style={{ fontSize: `${12 * fs}px`, fontWeight: 700, color: "#292524" }}>
                       {role.role?.trim() || "Role"}
                     </span>
-                    <span style={{ fontSize: "10px", color: "#78716C", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
+                    <span style={{ fontSize: `${10 * fs}px`, color: "#78716C", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
                       {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                     </span>
                   </div>
                   {(role.company || role.location) && (
-                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: `${11 * fs}px`, color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {role.company?.trim() || ""}
                       {role.company?.trim() && role.location?.trim() ? " · " : ""}
                       <span style={{ color: "#78716C", fontWeight: 400 }}>{role.location?.trim() || ""}</span>
@@ -305,7 +314,7 @@ export const SandstoneTemplate = ({
                   {role.bullets.filter(Boolean).length > 0 && (
                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                       {role.bullets.filter(Boolean).map((bullet, i) => (
-                        <li key={i} style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.55 }}>
+                        <li key={i} style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls }}>
                           {bullet}
                         </li>
                       ))}
@@ -319,33 +328,33 @@ export const SandstoneTemplate = ({
 
         {hasEducation && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience} fontScale={fs} spaceScale={sp}>
               Education
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {education.map((edu) => (
                 <div key={edu.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#292524" }}>
+                    <span style={{ fontSize: `${11.5 * fs}px`, fontWeight: 700, color: "#292524" }}>
                       {edu.degree?.trim() || "Degree"}
                       {edu.field?.trim() ? ` — ${edu.field.trim()}` : ""}
                     </span>
-                    <span style={{ fontSize: "10px", color: "#78716C", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
+                    <span style={{ fontSize: `${10 * fs}px`, color: "#78716C", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
                   {edu.school?.trim() && (
-                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: `${11 * fs}px`, color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {edu.school.trim()}
                     </div>
                   )}
                   {edu.attested && edu.attestingBody?.trim() && (
-                    <div style={{ fontSize: "9.5px", color: "#15803d", marginTop: "1px" }}>
+                    <div style={{ fontSize: `${9.5 * fs}px`, color: "#15803d", marginTop: "1px" }}>
                       {"✓"} Attested — {edu.attestingBody.trim()}
                     </div>
                   )}
                   {edu.notes?.trim() && (
-                    <div style={{ fontSize: "10px", color: "#78716C", marginTop: "1px" }}>{edu.notes.trim()}</div>
+                    <div style={{ fontSize: `${10 * fs}px`, color: "#78716C", marginTop: "1px" }}>{edu.notes.trim()}</div>
                   )}
                 </div>
               ))}
@@ -355,7 +364,7 @@ export const SandstoneTemplate = ({
 
         {hasSkills && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation} fontScale={fs} spaceScale={sp}>
               Skills
             </MainHeading>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -363,7 +372,7 @@ export const SandstoneTemplate = ({
                 <span
                   key={skill.id}
                   style={{
-                    fontSize: "10.5px",
+                    fontSize: `${10.5 * fs}px`,
                     color: "#44403C",
                     background: "#F5F0E6",
                     border: "1px solid #E2D8C4",
@@ -380,12 +389,12 @@ export const SandstoneTemplate = ({
 
         {hasCertifications && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills}>
+            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills} fontScale={fs} spaceScale={sp}>
               Certifications
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {data.certifications.map((cert) => (
-                <div key={cert.id} style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.45 }}>
+                <div key={cert.id} style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.45 * ls }}>
                   <span style={{ fontWeight: 600, color: "#292524" }}>{cert.name.trim()}</span>
                   <span style={{ color: "#78716C" }}>
                     {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -402,6 +411,8 @@ export const SandstoneTemplate = ({
             <MainHeading
               accent={accentText}
               isFirst={!hasSummary && !hasExperience && !hasEducation && !hasSkills && !hasCertifications}
+              fontScale={fs}
+              spaceScale={sp}
             >
               Projects
             </MainHeading>
@@ -410,10 +421,10 @@ export const SandstoneTemplate = ({
                 const bullets = (project.bullets ?? []).filter(Boolean);
                 return (
                   <div key={project.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
-                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#292524" }}>
+                    <div style={{ fontSize: `${11.5 * fs}px`, fontWeight: 700, color: "#292524" }}>
                       {project.name?.trim() || "Project"}
                       {shouldShowProjectLink(project.link) && (
-                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accentText }}>
+                        <span style={{ marginLeft: "6px", fontSize: `${10 * fs}px`, fontWeight: 400, color: accentText }}>
                           {shortenDisplayUrl(project.link!.trim())}
                         </span>
                       )}
@@ -421,7 +432,7 @@ export const SandstoneTemplate = ({
                     {bullets.length > 0 && (
                       <ul style={{ margin: "3px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                         {bullets.map((b, i) => (
-                          <li key={i} style={{ fontSize: "11px", color: "#44403C", lineHeight: 1.55 }}>
+                          <li key={i} style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls }}>
                             {b}
                           </li>
                         ))}

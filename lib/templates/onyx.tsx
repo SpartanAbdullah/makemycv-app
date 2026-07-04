@@ -42,13 +42,15 @@ const shouldShowProjectLink = (value?: string): boolean => {
 const SideLabel = ({
   children,
   color,
+  theme,
 }: {
   children: React.ReactNode;
   color: string;
+  theme: ReturnType<typeof resolveTheme>;
 }) => (
   <div
     style={{
-      fontSize: "9px",
+      fontSize: `${9 * theme.fontScale}px`,
       fontWeight: 700,
       letterSpacing: "0.14em",
       color,
@@ -63,15 +65,17 @@ const SideLabel = ({
 const MainHeading = ({
   children,
   accent,
+  theme,
   isFirst = false,
 }: {
   children: React.ReactNode;
   accent: string;
+  theme: ReturnType<typeof resolveTheme>;
   isFirst?: boolean;
 }) => (
   <div
     style={{
-      marginTop: isFirst ? 0 : "18px",
+      marginTop: isFirst ? 0 : `${18 * theme.spaceScale}px`,
       borderBottom: `1.5px solid ${accent}`,
       paddingBottom: "3px",
       marginBottom: "9px",
@@ -79,7 +83,7 @@ const MainHeading = ({
   >
     <span
       style={{
-        fontSize: "11px",
+        fontSize: `${11 * theme.fontScale}px`,
         fontWeight: 700,
         letterSpacing: "0.1em",
         color: "#1f2937",
@@ -149,7 +153,7 @@ export const OnyxTemplate = ({
         minHeight: "1123px",
         backgroundColor: "#ffffff",
         fontFamily: theme.fontFamily,
-        fontSize: "11px",
+        fontSize: `${11 * theme.fontScale}px`,
       }}
     >
       {/* ── Accent band sidebar ── */}
@@ -186,9 +190,9 @@ export const OnyxTemplate = ({
 
         <div
           style={{
-            fontSize: "21px",
+            fontSize: `${21 * theme.fontScale}px`,
             fontWeight: 700,
-            lineHeight: 1.15,
+            lineHeight: 1.15 * theme.lineScale,
             color: onAccent,
             textAlign: "center",
             letterSpacing: "0.02em",
@@ -199,11 +203,11 @@ export const OnyxTemplate = ({
         {headline && (
           <div
             style={{
-              fontSize: "11px",
+              fontSize: `${11 * theme.fontScale}px`,
               color: onAccentMuted,
               marginTop: "5px",
               textAlign: "center",
-              lineHeight: 1.4,
+              lineHeight: 1.4 * theme.lineScale,
               paddingBottom: "14px",
               borderBottom: `1px solid ${bandBorder}`,
               marginBottom: "14px",
@@ -214,17 +218,17 @@ export const OnyxTemplate = ({
         )}
 
         {hasSummary && (
-          <div style={{ marginBottom: "18px" }}>
-            <SideLabel color={onAccentMuted}>About Me</SideLabel>
-            <p style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.6, margin: 0 }}>
+          <div style={{ marginBottom: `${18 * theme.spaceScale}px` }}>
+            <SideLabel color={onAccentMuted} theme={theme}>About Me</SideLabel>
+            <p style={{ fontSize: `${10 * theme.fontScale}px`, color: onAccentMuted, lineHeight: 1.6 * theme.lineScale, margin: 0 }}>
               {data.personal.summary!.trim()}
             </p>
           </div>
         )}
 
         {contactItems.length > 0 && (
-          <div style={{ marginBottom: "18px" }}>
-            <SideLabel color={onAccentMuted}>Contact</SideLabel>
+          <div style={{ marginBottom: `${18 * theme.spaceScale}px` }}>
+            <SideLabel color={onAccentMuted} theme={theme}>Contact</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) =>
                 item.href ? (
@@ -232,9 +236,9 @@ export const OnyxTemplate = ({
                     key={i}
                     href={item.href}
                     style={{
-                      fontSize: "10px",
+                      fontSize: `${10 * theme.fontScale}px`,
                       color: onAccentMuted,
-                      lineHeight: 1.5,
+                      lineHeight: 1.5 * theme.lineScale,
                       wordBreak: "break-all" as const,
                       textDecoration: "none",
                     }}
@@ -242,7 +246,7 @@ export const OnyxTemplate = ({
                     {item.text}
                   </a>
                 ) : (
-                  <span key={i} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                  <span key={i} style={{ fontSize: `${10 * theme.fontScale}px`, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale }}>
                     {item.text}
                   </span>
                 ),
@@ -252,11 +256,11 @@ export const OnyxTemplate = ({
         )}
 
         {hasLanguages && (
-          <div style={{ marginBottom: "18px" }}>
-            <SideLabel color={onAccentMuted}>Languages</SideLabel>
+          <div style={{ marginBottom: `${18 * theme.spaceScale}px` }}>
+            <SideLabel color={onAccentMuted} theme={theme}>Languages</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
               {data.languages.map((lang) => (
-                <div key={lang.id} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.5 }}>
+                <div key={lang.id} style={{ fontSize: `${10 * theme.fontScale}px`, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale }}>
                   <span style={{ fontWeight: 600, color: onAccent }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                 </div>
@@ -267,10 +271,10 @@ export const OnyxTemplate = ({
 
         {essentialChips.length > 0 && (
           <div>
-            <SideLabel color={onAccentMuted}>Details</SideLabel>
+            <SideLabel color={onAccentMuted} theme={theme}>Details</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {essentialChips.map((chip) => (
-                <div key={chip.label} style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.45 }}>
+                <div key={chip.label} style={{ fontSize: `${10 * theme.fontScale}px`, color: onAccentMuted, lineHeight: 1.45 * theme.lineScale }}>
                   <span style={{ color: onAccent, fontWeight: 700 }}>{chip.label}:</span> {chip.value}
                 </div>
               ))}
@@ -283,22 +287,22 @@ export const OnyxTemplate = ({
       <div style={{ flex: 1, minWidth: 0, padding: `${30 * m}px ${30 * m}px`, boxSizing: "border-box" as const }}>
         {hasExperience && (
           <section>
-            <MainHeading accent={accentText} isFirst>
+            <MainHeading accent={accentText} theme={theme} isFirst>
               Experience
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {experience.map((role) => (
                 <div key={role.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#111827" }}>
+                    <span style={{ fontSize: `${12 * theme.fontScale}px`, fontWeight: 700, color: "#111827" }}>
                       {role.role?.trim() || "Role"}
                     </span>
-                    <span style={{ fontSize: "10px", color: "#6B7280", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
+                    <span style={{ fontSize: `${10 * theme.fontScale}px`, color: "#6B7280", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
                       {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                     </span>
                   </div>
                   {(role.company || role.location) && (
-                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: `${11 * theme.fontScale}px`, color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {role.company?.trim() || ""}
                       {role.company?.trim() && role.location?.trim() ? " · " : ""}
                       <span style={{ color: "#6B7280", fontWeight: 400 }}>{role.location?.trim() || ""}</span>
@@ -307,7 +311,7 @@ export const OnyxTemplate = ({
                   {role.bullets.filter(Boolean).length > 0 && (
                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                       {role.bullets.filter(Boolean).map((bullet, i) => (
-                        <li key={i} style={{ fontSize: "11px", color: "#374151", lineHeight: 1.55 }}>
+                        <li key={i} style={{ fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
                           {bullet}
                         </li>
                       ))}
@@ -321,33 +325,33 @@ export const OnyxTemplate = ({
 
         {hasEducation && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasExperience}>
+            <MainHeading accent={accentText} theme={theme} isFirst={!hasExperience}>
               Education
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {education.map((edu) => (
                 <div key={edu.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#111827" }}>
+                    <span style={{ fontSize: `${11.5 * theme.fontScale}px`, fontWeight: 700, color: "#111827" }}>
                       {edu.degree?.trim() || "Degree"}
                       {edu.field?.trim() ? ` — ${edu.field.trim()}` : ""}
                     </span>
-                    <span style={{ fontSize: "10px", color: "#6B7280", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
+                    <span style={{ fontSize: `${10 * theme.fontScale}px`, color: "#6B7280", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
                   {edu.school?.trim() && (
-                    <div style={{ fontSize: "11px", color: accentText, fontWeight: 600, marginTop: "1px" }}>
+                    <div style={{ fontSize: `${11 * theme.fontScale}px`, color: accentText, fontWeight: 600, marginTop: "1px" }}>
                       {edu.school.trim()}
                     </div>
                   )}
                   {edu.attested && edu.attestingBody?.trim() && (
-                    <div style={{ fontSize: "9.5px", color: "#15803d", marginTop: "1px" }}>
+                    <div style={{ fontSize: `${9.5 * theme.fontScale}px`, color: "#15803d", marginTop: "1px" }}>
                       {"✓"} Attested — {edu.attestingBody.trim()}
                     </div>
                   )}
                   {edu.notes?.trim() && (
-                    <div style={{ fontSize: "10px", color: "#6B7280", marginTop: "1px" }}>{edu.notes.trim()}</div>
+                    <div style={{ fontSize: `${10 * theme.fontScale}px`, color: "#6B7280", marginTop: "1px" }}>{edu.notes.trim()}</div>
                   )}
                 </div>
               ))}
@@ -357,7 +361,7 @@ export const OnyxTemplate = ({
 
         {hasSkills && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasExperience && !hasEducation}>
+            <MainHeading accent={accentText} theme={theme} isFirst={!hasExperience && !hasEducation}>
               Skills
             </MainHeading>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -365,7 +369,7 @@ export const OnyxTemplate = ({
                 <span
                   key={skill.id}
                   style={{
-                    fontSize: "10.5px",
+                    fontSize: `${10.5 * theme.fontScale}px`,
                     color: "#374151",
                     background: "#F3F4F6",
                     border: "1px solid #E5E7EB",
@@ -382,12 +386,12 @@ export const OnyxTemplate = ({
 
         {hasCertifications && (
           <section>
-            <MainHeading accent={accentText} isFirst={!hasExperience && !hasEducation && !hasSkills}>
+            <MainHeading accent={accentText} theme={theme} isFirst={!hasExperience && !hasEducation && !hasSkills}>
               Certifications
             </MainHeading>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {data.certifications.map((cert) => (
-                <div key={cert.id} style={{ fontSize: "11px", color: "#374151", lineHeight: 1.45 }}>
+                <div key={cert.id} style={{ fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.45 * theme.lineScale }}>
                   <span style={{ fontWeight: 600, color: "#111827" }}>{cert.name.trim()}</span>
                   <span style={{ color: "#6B7280" }}>
                     {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -403,6 +407,7 @@ export const OnyxTemplate = ({
           <section>
             <MainHeading
               accent={accentText}
+              theme={theme}
               isFirst={!hasExperience && !hasEducation && !hasSkills && !hasCertifications}
             >
               Projects
@@ -412,10 +417,10 @@ export const OnyxTemplate = ({
                 const bullets = (project.bullets ?? []).filter(Boolean);
                 return (
                   <div key={project.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
-                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#111827" }}>
+                    <div style={{ fontSize: `${11.5 * theme.fontScale}px`, fontWeight: 700, color: "#111827" }}>
                       {project.name?.trim() || "Project"}
                       {shouldShowProjectLink(project.link) && (
-                        <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 400, color: accentText }}>
+                        <span style={{ marginLeft: "6px", fontSize: `${10 * theme.fontScale}px`, fontWeight: 400, color: accentText }}>
                           {shortenDisplayUrl(project.link!.trim())}
                         </span>
                       )}
@@ -423,7 +428,7 @@ export const OnyxTemplate = ({
                     {bullets.length > 0 && (
                       <ul style={{ margin: "3px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                         {bullets.map((b, i) => (
-                          <li key={i} style={{ fontSize: "11px", color: "#374151", lineHeight: 1.55 }}>
+                          <li key={i} style={{ fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
                             {b}
                           </li>
                         ))}

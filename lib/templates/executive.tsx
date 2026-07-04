@@ -36,13 +36,15 @@ const shouldShowProjectLink = (value?: string): boolean => {
 const SidebarLabel = ({
   children,
   color,
+  fontScale = 1,
 }: {
   children: React.ReactNode;
   color: string;
+  fontScale?: number;
 }) => (
   <div
     style={{
-      fontSize: "9px",
+      fontSize: `${9 * fontScale}px`,
       fontWeight: 700,
       letterSpacing: "0.1em",
       color,
@@ -58,14 +60,18 @@ const RightHeading = ({
   children,
   isFirst = false,
   accent = "#1E2A4A",
+  fontScale = 1,
+  spaceScale = 1,
 }: {
   children: React.ReactNode;
   isFirst?: boolean;
   accent?: string;
+  fontScale?: number;
+  spaceScale?: number;
 }) => (
   <div
     style={{
-      marginTop: isFirst ? 0 : "20px",
+      marginTop: isFirst ? 0 : `${20 * spaceScale}px`,
       borderBottom: `1px solid ${accent}`,
       paddingBottom: "3px",
       marginBottom: "8px",
@@ -73,7 +79,7 @@ const RightHeading = ({
   >
     <span
       style={{
-        fontSize: "10px",
+        fontSize: `${10 * fontScale}px`,
         fontWeight: 700,
         letterSpacing: "0.08em",
         color: accent,
@@ -98,6 +104,9 @@ export const ExecutiveTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1E2A4A");
   const m = theme.marginScale;
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
   const { onAccent, onAccentMuted } = theme;
 
   const contactItems = [
@@ -163,7 +172,7 @@ export const ExecutiveTemplate = ({
         minHeight: "1123px",
         backgroundColor: "#ffffff",
         fontFamily: theme.fontFamily,
-        fontSize: "11px",
+        fontSize: `${11 * fs}px`,
       }}
     >
       {/* ── Left Sidebar ── */}
@@ -215,9 +224,9 @@ export const ExecutiveTemplate = ({
         >
           <div
             style={{
-              fontSize: "22px",
+              fontSize: `${22 * fs}px`,
               fontWeight: 700,
-              lineHeight: 1.15,
+              lineHeight: 1.15 * ls,
               color: onAccent,
             }}
           >
@@ -228,11 +237,11 @@ export const ExecutiveTemplate = ({
           {headline && (
             <div
               style={{
-                fontSize: "12px",
+                fontSize: `${12 * fs}px`,
                 fontWeight: 400,
                 color: onAccentMuted,
                 marginTop: "6px",
-                lineHeight: 1.4,
+                lineHeight: 1.4 * ls,
               }}
             >
               {headline}
@@ -243,7 +252,7 @@ export const ExecutiveTemplate = ({
         {/* Contact */}
         {contactItems.length > 0 && (
           <div>
-            <SidebarLabel color={onAccentMuted}>Contact</SidebarLabel>
+            <SidebarLabel color={onAccentMuted} fontScale={fs}>Contact</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) => (
                 <div
@@ -251,7 +260,7 @@ export const ExecutiveTemplate = ({
                   style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}
                 >
                   <span
-                    style={{ fontSize: "10px", flexShrink: 0, lineHeight: 1.6 }}
+                    style={{ fontSize: `${10 * fs}px`, flexShrink: 0, lineHeight: 1.6 * ls }}
                   >
                     {item.icon}
                   </span>
@@ -259,9 +268,9 @@ export const ExecutiveTemplate = ({
                     <a
                       href={item.href}
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * fs}px`,
                         color: onAccentMuted,
-                        lineHeight: 1.6,
+                        lineHeight: 1.6 * ls,
                         wordBreak: "break-all" as const,
                         textDecoration: "underline",
                       }}
@@ -271,9 +280,9 @@ export const ExecutiveTemplate = ({
                   ) : (
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * fs}px`,
                         color: onAccentMuted,
-                        lineHeight: 1.6,
+                        lineHeight: 1.6 * ls,
                       }}
                     >
                       {item.text}
@@ -287,16 +296,16 @@ export const ExecutiveTemplate = ({
 
         {/* Personal */}
         {essentialChips.length > 0 && (
-          <div style={{ marginTop: "20px" }}>
-            <SidebarLabel color={onAccentMuted}>Personal</SidebarLabel>
+          <div style={{ marginTop: `${20 * sp}px` }}>
+            <SidebarLabel color={onAccentMuted} fontScale={fs}>Personal</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {essentialChips.map((chip) => (
                 <div
                   key={chip.label}
                   style={{
-                    fontSize: "10px",
+                    fontSize: `${10 * fs}px`,
                     color: onAccentMuted,
-                    lineHeight: 1.5,
+                    lineHeight: 1.5 * ls,
                   }}
                 >
                   <span
@@ -317,8 +326,8 @@ export const ExecutiveTemplate = ({
 
         {/* Skills */}
         {hasSkills && (
-          <div style={{ marginTop: "20px" }}>
-            <SidebarLabel color={onAccentMuted}>Skills</SidebarLabel>
+          <div style={{ marginTop: `${20 * sp}px` }}>
+            <SidebarLabel color={onAccentMuted} fontScale={fs}>Skills</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               {data.skills.map((skill) => (
                 <div
@@ -328,15 +337,15 @@ export const ExecutiveTemplate = ({
                   <span
                     style={{
                       color: onAccentMuted,
-                      fontSize: "12px",
-                      lineHeight: 1,
+                      fontSize: `${12 * fs}px`,
+                      lineHeight: 1 * ls,
                       flexShrink: 0,
                     }}
                   >
                     ·
                   </span>
                   <span
-                    style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.7 }}
+                    style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.7 * ls }}
                   >
                     {skill.name}
                   </span>
@@ -348,13 +357,13 @@ export const ExecutiveTemplate = ({
 
         {/* Languages */}
         {hasLanguages && (
-          <div style={{ marginTop: "20px" }}>
-            <SidebarLabel color={onAccentMuted}>Languages</SidebarLabel>
+          <div style={{ marginTop: `${20 * sp}px` }}>
+            <SidebarLabel color={onAccentMuted} fontScale={fs}>Languages</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               {data.languages.map((lang) => (
                 <div
                   key={lang.id}
-                  style={{ fontSize: "10px", color: onAccentMuted, lineHeight: 1.7 }}
+                  style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.7 * ls }}
                 >
                   <span style={{ fontWeight: 600 }}>{lang.name}</span>
                   {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
@@ -366,26 +375,26 @@ export const ExecutiveTemplate = ({
 
         {/* Certifications */}
         {hasCertifications && (
-          <div style={{ marginTop: "20px" }}>
-            <SidebarLabel color={onAccentMuted}>Certifications</SidebarLabel>
+          <div style={{ marginTop: `${20 * sp}px` }}>
+            <SidebarLabel color={onAccentMuted} fontScale={fs}>Certifications</SidebarLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {data.certifications.map((cert) => (
                 <div key={cert.id}>
                   <div
                     style={{
-                      fontSize: "10px",
+                      fontSize: `${10 * fs}px`,
                       fontWeight: 700,
                       color: onAccent,
-                      lineHeight: 1.4,
+                      lineHeight: 1.4 * ls,
                     }}
                   >
                     {cert.name}
                   </div>
                   <div
                     style={{
-                      fontSize: "9px",
+                      fontSize: `${9 * fs}px`,
                       color: onAccentMuted,
-                      lineHeight: 1.4,
+                      lineHeight: 1.4 * ls,
                     }}
                   >
                     {cert.issuer}
@@ -411,12 +420,12 @@ export const ExecutiveTemplate = ({
         {/* Summary */}
         {hasSummary && (
           <section>
-            <RightHeading isFirst accent={theme.accentText}>Summary</RightHeading>
+            <RightHeading isFirst accent={theme.accentText} fontScale={fs} spaceScale={sp}>Summary</RightHeading>
             <p
               style={{
-                fontSize: "11px",
+                fontSize: `${11 * fs}px`,
                 color: "#374151",
-                lineHeight: 1.6,
+                lineHeight: 1.6 * ls,
                 margin: 0,
               }}
             >
@@ -428,7 +437,7 @@ export const ExecutiveTemplate = ({
         {/* Experience */}
         {hasExperience && (
           <section>
-            <RightHeading isFirst={!hasSummary} accent={theme.accentText}>Experience</RightHeading>
+            <RightHeading isFirst={!hasSummary} accent={theme.accentText} fontScale={fs} spaceScale={sp}>Experience</RightHeading>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -449,7 +458,7 @@ export const ExecutiveTemplate = ({
                   >
                     <span
                       style={{
-                        fontSize: "12px",
+                        fontSize: `${12 * fs}px`,
                         fontWeight: 700,
                         color: "#111827",
                       }}
@@ -458,7 +467,7 @@ export const ExecutiveTemplate = ({
                     </span>
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * fs}px`,
                         color: "#6B7280",
                         whiteSpace: "nowrap" as const,
                         marginLeft: "8px",
@@ -471,7 +480,7 @@ export const ExecutiveTemplate = ({
                   {(role.company || role.location) && (
                     <div
                       style={{
-                        fontSize: "11px",
+                        fontSize: `${11 * fs}px`,
                         color: "#374151",
                         marginTop: "1px",
                       }}
@@ -495,9 +504,9 @@ export const ExecutiveTemplate = ({
                           <li
                             key={i}
                             style={{
-                              fontSize: "11px",
+                              fontSize: `${11 * fs}px`,
                               color: "#374151",
-                              lineHeight: 1.55,
+                              lineHeight: 1.55 * ls,
                             }}
                           >
                             {bullet}
@@ -514,7 +523,7 @@ export const ExecutiveTemplate = ({
         {/* Education */}
         {hasEducation && (
           <section>
-            <RightHeading isFirst={!hasSummary && !hasExperience} accent={theme.accentText}>
+            <RightHeading isFirst={!hasSummary && !hasExperience} accent={theme.accentText} fontScale={fs} spaceScale={sp}>
               Education
             </RightHeading>
             <div
@@ -537,7 +546,7 @@ export const ExecutiveTemplate = ({
                   >
                     <span
                       style={{
-                        fontSize: "11px",
+                        fontSize: `${11 * fs}px`,
                         fontWeight: 700,
                         color: "#111827",
                       }}
@@ -547,7 +556,7 @@ export const ExecutiveTemplate = ({
                     </span>
                     <span
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * fs}px`,
                         color: "#6B7280",
                         whiteSpace: "nowrap" as const,
                         marginLeft: "8px",
@@ -565,18 +574,18 @@ export const ExecutiveTemplate = ({
                       marginTop: "1px",
                     }}
                   >
-                    <span style={{ fontSize: "11px", color: "#374151" }}>
+                    <span style={{ fontSize: `${11 * fs}px`, color: "#374151" }}>
                       {edu.school?.trim() || ""}
                     </span>
                     {edu.attested && (
                       <span
                         style={{
-                          fontSize: "8px",
+                          fontSize: `${8 * fs}px`,
                           color: theme.accentText,
                           border: `1px solid ${theme.accentText}`,
                           borderRadius: "3px",
                           padding: "1px 4px",
-                          lineHeight: 1.4,
+                          lineHeight: 1.4 * ls,
                           flexShrink: 0,
                         }}
                       >
@@ -589,7 +598,7 @@ export const ExecutiveTemplate = ({
                   {edu.notes?.trim() && (
                     <div
                       style={{
-                        fontSize: "10px",
+                        fontSize: `${10 * fs}px`,
                         color: "#6B7280",
                         marginTop: "1px",
                       }}
@@ -609,6 +618,8 @@ export const ExecutiveTemplate = ({
             <RightHeading
               isFirst={!hasSummary && !hasExperience && !hasEducation}
               accent={theme.accentText}
+              fontScale={fs}
+              spaceScale={sp}
             >
               Projects
             </RightHeading>
@@ -628,7 +639,7 @@ export const ExecutiveTemplate = ({
                   >
                     <div
                       style={{
-                        fontSize: "11px",
+                        fontSize: `${11 * fs}px`,
                         fontWeight: 700,
                         color: "#111827",
                       }}
@@ -639,7 +650,7 @@ export const ExecutiveTemplate = ({
                       <a
                         href={normalizeHref(project.link)}
                         style={{
-                          fontSize: "10px",
+                          fontSize: `${10 * fs}px`,
                           color: theme.accentText,
                           textDecoration: "none",
                           wordBreak: "break-all" as const,
@@ -660,9 +671,9 @@ export const ExecutiveTemplate = ({
                           <li
                             key={i}
                             style={{
-                              fontSize: "11px",
+                              fontSize: `${11 * fs}px`,
                               color: "#374151",
-                              lineHeight: 1.55,
+                              lineHeight: 1.55 * ls,
                             }}
                           >
                             {bullet}

@@ -126,7 +126,7 @@ const ProfessionalBase = ({
   ].filter(Boolean);
 
   const headingStyle = {
-    fontSize: "11px",
+    fontSize: `${11 * theme.fontScale}px`,
     fontWeight: 700,
     letterSpacing: "0.14em",
     color: "#111827",
@@ -135,24 +135,24 @@ const ProfessionalBase = ({
     borderBottom: `1.5px solid ${accent}`,
     paddingBottom: "4px",
     marginBottom: "10px",
-    marginTop: "18px",
+    marginTop: `${18 * theme.spaceScale}px`,
   };
 
   const bulletListClass =
-    "list-disc pl-4 space-y-1 text-[11px] leading-[1.5] text-slate-700 marker:text-slate-400";
+    "list-disc pl-4 space-y-1 text-[calc(11px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 marker:text-slate-400";
 
   const skillsSection = hasSkills ? (
     <>
       {generalSkills.length > 0 && (
         <ProSection headingStyle={headingStyle} title="Skills">
-          <p className="text-[11.5px] leading-[1.5] text-slate-700 text-center">
+          <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 text-center">
             {generalSkills.map((sk) => sk.name).join("  •  ")}
           </p>
         </ProSection>
       )}
       {technicalSkills.length > 0 && (
         <ProSection headingStyle={headingStyle} title="Technical Skills">
-          <p className="text-[11.5px] leading-[1.5] text-slate-700 text-center">
+          <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 text-center">
             {technicalSkills.map((sk) => sk.name).join("  •  ")}
           </p>
         </ProSection>
@@ -168,10 +168,13 @@ const ProfessionalBase = ({
         backgroundColor: "#ffffff",
         padding: `${40 * theme.marginScale}px ${44 * theme.marginScale}px`,
         fontFamily: theme.fontFamily,
-        fontSize: "11.5px",
+        fontSize: `${11.5 * theme.fontScale}px`,
         color: "#1a1a1a",
-        lineHeight: 1.5,
+        lineHeight: 1.5 * theme.lineScale,
         boxSizing: "border-box" as const,
+        ["--fs" as string]: theme.fontScale,
+        ["--lh" as string]: theme.lineScale,
+        ["--sp" as string]: theme.spaceScale,
       }}
     >
       {/* ── Centered header ── */}
@@ -194,12 +197,12 @@ const ProfessionalBase = ({
         )}
         <div
           style={{
-            fontSize: "28px",
+            fontSize: `${28 * theme.fontScale}px`,
             fontWeight: 700,
             color: "#111827",
             letterSpacing: "1px",
             textTransform: "uppercase",
-            lineHeight: 1.15,
+            lineHeight: 1.15 * theme.lineScale,
           }}
         >
           {name}
@@ -207,7 +210,7 @@ const ProfessionalBase = ({
         {headline && (
           <div
             style={{
-              fontSize: "12.5px",
+              fontSize: `${12.5 * theme.fontScale}px`,
               fontWeight: 500,
               color: accent,
               marginTop: "5px",
@@ -220,7 +223,7 @@ const ProfessionalBase = ({
         {contactParts.length > 0 && (
           <div
             style={{
-              fontSize: "10.5px",
+              fontSize: `${10.5 * theme.fontScale}px`,
               color: "#6B7280",
               marginTop: "7px",
               display: "flex",
@@ -251,7 +254,7 @@ const ProfessionalBase = ({
               <span
                 key={chip.label}
                 style={{
-                  fontSize: "9.5px",
+                  fontSize: `${9.5 * theme.fontScale}px`,
                   color: "#374151",
                   background: "#F3F4F6",
                   border: "1px solid #E5E7EB",
@@ -269,7 +272,7 @@ const ProfessionalBase = ({
 
       {hasSummary && (
         <ProSection headingStyle={headingStyle} title="Summary">
-          <p className="text-[11.5px] leading-[1.55] text-slate-700">
+          <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.55*var(--lh))] text-slate-700">
             {data.personal.summary?.trim()}
           </p>
         </ProSection>
@@ -283,18 +286,18 @@ const ProfessionalBase = ({
             {experience.map((role) => (
               <div key={role.id} className="avoid-break space-y-1 [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-[12px] leading-[1.35]">
+                  <div className="text-[calc(12px*var(--fs))] leading-[calc(1.35*var(--lh))]">
                     <span className="font-semibold text-slate-800">{role.role?.trim() || "Role"}</span>
                     <span className="font-normal text-slate-600">
                       {role.company ? ` | ${role.company.trim()}` : ""}
                     </span>
                   </div>
-                  <span className="whitespace-nowrap text-right text-[11px] text-slate-500">
+                  <span className="whitespace-nowrap text-right text-[calc(11px*var(--fs))] text-slate-500">
                     {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                   </span>
                 </div>
                 {role.location && (
-                  <div className="text-[11px] text-slate-500">{role.location.trim()}</div>
+                  <div className="text-[calc(11px*var(--fs))] text-slate-500">{role.location.trim()}</div>
                 )}
                 <ul className={bulletListClass}>
                   {role.bullets
@@ -316,19 +319,19 @@ const ProfessionalBase = ({
             {education.map((edu) => (
               <div key={edu.id} className="avoid-break [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-[12px] font-semibold text-slate-800">
+                  <div className="text-[calc(12px*var(--fs))] font-semibold text-slate-800">
                     {[edu.degree?.trim(), edu.field?.trim()].filter(Boolean).join(" · ") || "Degree"}
                     <span className="font-normal text-slate-600">
                       {edu.school ? ` | ${edu.school.trim()}` : ""}
                     </span>
                   </div>
-                  <span className="whitespace-nowrap text-[11px] text-slate-500">
+                  <span className="whitespace-nowrap text-[calc(11px*var(--fs))] text-slate-500">
                     {formatDateRange(edu.startDate, edu.endDate)}
                   </span>
                 </div>
-                {edu.notes && <div className="mt-0.5 text-[11px] text-slate-500">{edu.notes.trim()}</div>}
+                {edu.notes && <div className="mt-0.5 text-[calc(11px*var(--fs))] text-slate-500">{edu.notes.trim()}</div>}
                 {edu.attested && edu.attestingBody?.trim() && (
-                  <p className="mt-0.5 text-[11px] font-medium text-green-700">
+                  <p className="mt-0.5 text-[calc(11px*var(--fs))] font-medium text-green-700">
                     {"✓"} Attested — {edu.attestingBody.trim()}
                   </p>
                 )}
@@ -347,7 +350,7 @@ const ProfessionalBase = ({
           {hasLanguages && (
             <div>
               <h2 style={headingStyle}>Languages</h2>
-              <p className="text-[11.5px] leading-[1.5] text-slate-700 text-center">
+              <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 text-center">
                 {data.languages.map((lang, i) => (
                   <span key={lang.id}>
                     <span className="font-semibold">{lang.name}</span>
@@ -363,7 +366,7 @@ const ProfessionalBase = ({
               <h2 style={headingStyle}>Certifications</h2>
               <div className="space-y-1 text-center text-slate-700">
                 {data.certifications.map((cert) => (
-                  <div key={cert.id} className="text-[11px] leading-[1.45]">
+                  <div key={cert.id} className="text-[calc(11px*var(--fs))] leading-[calc(1.45*var(--lh))]">
                     <span className="font-semibold">{cert.name.trim()}</span>
                     <span className="text-slate-500">
                       {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -384,10 +387,10 @@ const ProfessionalBase = ({
               const bullets = (project.bullets ?? []).map((b) => b.trim()).filter(Boolean);
               return (
                 <div key={project.id} className="avoid-break [break-inside:avoid]">
-                  <div className="text-[12px] font-semibold text-slate-800">
+                  <div className="text-[calc(12px*var(--fs))] font-semibold text-slate-800">
                     {project.name?.trim() || "Project"}
                     {shouldShowProjectLink(project.link) && (
-                      <span className="ml-1 text-[10.5px] font-normal text-slate-500">
+                      <span className="ml-1 text-[calc(10.5px*var(--fs))] font-normal text-slate-500">
                         {shortenDisplayUrl(project.link!.trim())}
                       </span>
                     )}

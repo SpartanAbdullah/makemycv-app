@@ -78,22 +78,28 @@ export const ModernTemplate = ({
 
   return (
     <div
-      className="cv-print bg-white text-slate-900 text-[0.9rem] leading-relaxed"
-      style={{ fontFamily: theme.fontFamily, padding: `${36 * m}px ${32 * m}px` }}
+      className="cv-print bg-white text-slate-900 text-[calc(0.9rem*var(--fs))] leading-[calc(1.625*var(--lh))]"
+      style={{
+        fontFamily: theme.fontFamily,
+        padding: `${36 * m}px ${32 * m}px`,
+        ["--fs" as string]: theme.fontScale,
+        ["--lh" as string]: theme.lineScale,
+        ["--sp" as string]: theme.spaceScale,
+      }}
     >
       <header className="border-b border-slate-200 pb-4">
         <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
           <div style={{ flex: 1, minWidth: 0 }} className="flex flex-col gap-2">
-            <h1 className="font-display text-3xl font-semibold tracking-tight">
+            <h1 className="font-display text-[calc(1.875rem*var(--fs))] leading-[calc(2.25rem*var(--lh))] font-semibold tracking-tight">
               {name}
             </h1>
             {data.personal.headline?.trim() && (
-              <p className="text-sm text-slate-500">
+              <p className="text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-500">
                 {data.personal.headline}
               </p>
             )}
             {contactItems.length > 0 && (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-500">
                 {contactItems.map((item, index) =>
                   item.href ? (
                     <a
@@ -121,9 +127,9 @@ export const ModernTemplate = ({
                 {essentialChips.map((chip) => (
                   <span
                     key={chip.label}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] leading-snug text-slate-700"
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[calc(10px*var(--fs))] leading-[calc(1.375*var(--lh))] text-slate-700"
                   >
-                    <span className="font-semibold uppercase tracking-wider text-emerald-700 text-[9px]">
+                    <span className="font-semibold uppercase tracking-wider text-emerald-700 text-[calc(9px*var(--fs))]">
                       {chip.label}
                     </span>
                     <span>{chip.value}</span>
@@ -160,16 +166,16 @@ export const ModernTemplate = ({
       </header>
 
       <div
-        className="mt-6 grid gap-8"
+        className="mt-[calc(1.5rem*var(--sp))] grid gap-8"
         style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}
       >
-        <div className="space-y-6">
+        <div className="space-y-[calc(1.5rem*var(--sp))]">
           {data.personal.summary && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Profile
               </h2>
-              <p className="mt-2 text-sm text-slate-700">
+              <p className="mt-2 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                 {data.personal.summary}
               </p>
             </section>
@@ -177,7 +183,7 @@ export const ModernTemplate = ({
 
           {experience.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Experience
               </h2>
               <div className="mt-3 space-y-4">
@@ -186,9 +192,9 @@ export const ModernTemplate = ({
                     key={role.id}
                     className="rounded-xl border border-slate-200 p-3"
                   >
-                    <div className="flex items-center justify-between text-sm font-semibold">
+                    <div className="flex items-center justify-between text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] font-semibold">
                       <span>{role.role || "Role"}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-400">
                         {formatDateRange(
                           role.startDate,
                           role.endDate,
@@ -197,14 +203,14 @@ export const ModernTemplate = ({
                       </span>
                     </div>
                     {(role.company?.trim() || role.location) && (
-                      <div className="text-xs text-slate-500">
+                      <div className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-500">
                         {role.company?.trim() || ""}
                         {role.company?.trim() && role.location
                           ? ` - ${role.location}`
                           : role.location || ""}
                       </div>
                     )}
-                    <ul className="list-disc pl-5 text-sm text-slate-700 mt-2">
+                    <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700 mt-2">
                       {role.bullets.filter(Boolean).map((bullet, index) => (
                         <li key={index}>{bullet}</li>
                       ))}
@@ -217,10 +223,10 @@ export const ModernTemplate = ({
 
           {data.languages.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Languages
               </h2>
-              <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <ul className="mt-3 space-y-2 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                 {data.languages.map((lang) => (
                   <li key={lang.id}>
                     <span className="font-semibold">{lang.name}</span>
@@ -235,10 +241,10 @@ export const ModernTemplate = ({
 
           {data.certifications.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Certifications
               </h2>
-              <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <ul className="mt-3 space-y-2 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                 {data.certifications.map((cert) => (
                   <li key={cert.id}>
                     {cert.name}
@@ -261,7 +267,7 @@ export const ModernTemplate = ({
                 const showLink = shouldShowProjectLink(project.link);
                 const titleRow = (
                   <div
-                    className={`${index === 0 ? "mt-3 " : ""}text-sm font-semibold`}
+                    className={`${index === 0 ? "mt-3 " : ""}text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] font-semibold`}
                   >
                     {project.name || "Project"}
                     {showLink ? (
@@ -281,18 +287,18 @@ export const ModernTemplate = ({
                   return (
                     <div key={project.id}>
                       <div className="keep-with-next">
-                        <h2 className="avoid-orphan text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        <h2 className="avoid-orphan text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                           Projects
                         </h2>
                         {titleRow}
                         {firstBullet && (
-                          <ul className="list-disc pl-5 text-sm text-slate-700">
+                          <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                             <li>{firstBullet}</li>
                           </ul>
                         )}
                       </div>
                       {remainingBullets.length > 0 && (
-                        <ul className="list-disc pl-5 text-sm text-slate-700">
+                        <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                           {remainingBullets.map((bullet, bulletIndex) => (
                             <li key={bulletIndex}>{bullet}</li>
                           ))}
@@ -307,13 +313,13 @@ export const ModernTemplate = ({
                     <div className="keep-with-next">
                       {titleRow}
                       {firstBullet && (
-                        <ul className="list-disc pl-5 text-sm text-slate-700">
+                        <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                           <li>{firstBullet}</li>
                         </ul>
                       )}
                     </div>
                     {remainingBullets.length > 0 && (
-                      <ul className="list-disc pl-5 text-sm text-slate-700">
+                      <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                         {remainingBullets.map((bullet, bulletIndex) => (
                           <li key={bulletIndex}>{bullet}</li>
                         ))}
@@ -326,27 +332,27 @@ export const ModernTemplate = ({
           )}
         </div>
 
-        <aside className="space-y-6" style={{ width: "200px", flexShrink: 0 }}>
+        <aside className="space-y-[calc(1.5rem*var(--sp))]" style={{ width: "200px", flexShrink: 0 }}>
           {education.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Education
               </h2>
               <div className="mt-3 space-y-3">
                 {education.map((edu) => (
                   <div key={edu.id}>
-                    <div className="text-sm font-semibold">
+                    <div className="text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] font-semibold">
                       {edu.school || "School"}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-500">
                       {edu.degree || "Degree"}
                       {edu.field ? ` - ${edu.field}` : ""}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-400">
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </div>
                     {edu.attested && edu.attestingBody?.trim() && (
-                      <p className="mt-0.5 text-xs font-medium text-green-700">
+                      <p className="mt-0.5 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-medium text-green-700">
                         {"\u2713"} Attested — {edu.attestingBody.trim()}
                       </p>
                     )}
@@ -358,10 +364,10 @@ export const ModernTemplate = ({
 
           {data.skills.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Skills
               </h2>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <div className="mt-3 flex flex-wrap gap-2 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))]">
                 {data.skills.map((skill) => (
                   <span
                     key={skill.id}
