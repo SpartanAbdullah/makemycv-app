@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useUiStore } from "../../lib/store/uiStore";
 import { getDailyTipIndex, resolveTipForStep, type UaeTip } from "../../lib/data/tips";
+import { useCvStore } from "../../lib/store/cvStore";
 import { UAEDot } from "./UAEDot";
 import { Icon } from "./Icon";
 
@@ -15,6 +16,7 @@ type Props = {
 export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
   const currentTipIndex = useUiStore((s) => s.currentTipIndex);
   const setCurrentTipIndex = useUiStore((s) => s.setCurrentTipIndex);
+  const domain = useCvStore((s) => s.data.settings.domain);
 
   // First render of the session — pick the daily rotation index.
   useEffect(() => {
@@ -24,8 +26,8 @@ export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
   }, [currentTipIndex, setCurrentTipIndex]);
 
   const resolved = useMemo(
-    () => resolveTipForStep(stepId, Math.max(0, currentTipIndex)),
-    [stepId, currentTipIndex],
+    () => resolveTipForStep(stepId, Math.max(0, currentTipIndex), domain),
+    [stepId, currentTipIndex, domain],
   );
   const { tip, positionLabel } = resolved;
 

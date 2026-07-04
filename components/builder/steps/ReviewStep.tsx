@@ -14,7 +14,8 @@ import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
-import { templates } from "../../../lib/templates";
+import { templates, type TemplateBadge } from "../../../lib/templates";
+import { TemplateRibbon } from "../../templates/TemplateBadges";
 import {
   computeScore,
   computeDerivedStats,
@@ -485,7 +486,7 @@ export const ReviewStep = ({
                   key={tmpl.id}
                   name={tmpl.name}
                   description={tmpl.description}
-                  badge={tmpl.badge}
+                  badges={tmpl.badges}
                   selected={isSelected}
                   onClick={() => handleTemplateChange(tmpl.id)}
                   onPreview={() => setPreviewTemplateId(tmpl.id)}
@@ -724,7 +725,7 @@ const StatRow = ({ label, value }: { label: string; value: string }) => (
 const TemplateCard = ({
   name,
   description,
-  badge,
+  badges,
   selected,
   onClick,
   onPreview,
@@ -732,7 +733,7 @@ const TemplateCard = ({
 }: {
   name: string;
   description: string;
-  badge?: string;
+  badges?: TemplateBadge[];
   selected: boolean;
   onClick: () => void;
   onPreview?: () => void;
@@ -751,6 +752,7 @@ const TemplateCard = ({
     aria-pressed={selected}
     style={{
       position: "relative",
+      overflow: "hidden",
       padding: 8,
       borderRadius: 14,
       background: selected ? "var(--ff-accent-soft)" : "var(--ff-card)",
@@ -792,28 +794,7 @@ const TemplateCard = ({
         <Icon name="search" size={13} />
       </button>
     )}
-    {badge && (
-      <span
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 12,
-          zIndex: 2,
-          fontFamily: "var(--font-mono)",
-          fontSize: 9,
-          color: "var(--ff-ink)",
-          background: "var(--ff-paper)",
-          padding: "3px 8px",
-          borderRadius: 999,
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          border: "1px solid var(--ff-line)",
-          textTransform: "uppercase",
-        }}
-      >
-        {badge}
-      </span>
-    )}
+    <TemplateRibbon badges={badges} />
     {children}
     <div
       style={{

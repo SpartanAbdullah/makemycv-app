@@ -3,6 +3,7 @@
 import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
+import { TemplateBadges } from "../templates/TemplateBadges";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -117,6 +118,11 @@ export const TemplatePreviewModal = ({
           >
             Full-page preview · live data
           </div>
+          {template.badges && template.badges.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <TemplateBadges badges={template.badges} direction="row" />
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button

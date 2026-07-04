@@ -109,6 +109,11 @@ export const defaultCvData: CvData = {
     accentColor: "#1e5b54",
     fontScale: 1,
     fontFamily: "sans",
+    // Density controls — level 3 = neutral (×1.0). See CvSettings / resolveTheme.
+    pageMargins: 3,
+    fontSize: 3,
+    lineHeight: 3,
+    sectionSpacing: 3,
     sectionOrder: [
       "summary",
       "experience",

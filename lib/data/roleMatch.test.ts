@@ -48,6 +48,19 @@ describe("suggestionsForRole — trailing-space whole-word matching", () => {
   });
 });
 
+describe("suggestionsForRole — consolidated matcher (longest-wins) fixes", () => {
+  test('"Software Engineer" is IT, not Engineering (old first-match bug)', () => {
+    assert.equal(familyFor("Software Engineer"), "it");
+  });
+  test('"Civil Engineer" stays engineering', () => {
+    assert.equal(familyFor("Civil Engineer"), "engineering");
+  });
+  test("an explicit confirmed domain overrides title inference", () => {
+    // Ambiguous headline, but the user confirmed Sales → sales bullets.
+    assert.equal(suggestionsForRole("Manager", [], "sales").family, "sales");
+  });
+});
+
 describe("softSkillSuggestions — same convention, no admin leak", () => {
   test('"Process Excellence Manager" does not surface admin soft skills', () => {
     const skills = softSkillSuggestions("Process Excellence Manager");

@@ -14,50 +14,35 @@
  *    Tasheel, multicultural teams) — the moat a generic US library can't match.
  *  - ATS-safe plain text. No symbols beyond the placeholder underscores.
  *
- * Matching is keyword-based against the job title (see suggestionsForRole).
+ * Family selection is delegated to lib/data/roleFamily.ts (the single source
+ * of title→domain inference). Callers may pass an explicit `domain` (the
+ * user-confirmed settings.domain) to override title-based inference — so a
+ * headline of "Manager" confirmed as Sales still yields sales bullets.
  * GENERIC is the always-available fallback so every role gets ideas.
  */
+import { inferRoleFamily, type RoleFamily } from "./roleFamily";
 
-export type RoleFamily =
-  | "sales"
-  | "marketing"
-  | "finance"
-  | "accounting"
-  | "operations"
-  | "logistics"
-  | "hr"
-  | "admin"
-  | "engineering"
-  | "it"
-  | "hospitality"
-  | "retail"
-  | "realestate"
-  | "healthcare"
-  | "education"
-  | "customerservice"
-  | "generic";
+// Re-exported so existing importers keep working after the type + matcher
+// moved to roleFamily.ts / types/cv.ts.
+export type { RoleFamily };
+export { matchesRoleKeyword } from "./roleFamily";
 
-type RoleMatcher = {
+type RoleBullets = {
   family: RoleFamily;
   label: string;
-  // Lowercased keywords tested against the job title (see matchesRoleKeyword).
-  // A keyword that ends with a SPACE ("pro ", "bd ", "gm ", "ops ") is a
-  // whole-word marker — matched only as a standalone word. Keywords without a
-  // trailing space ("sales", "account", "engineer") are plain substrings.
-  keywords: string[];
   bullets: string[];
 };
 
 /**
  * Each entry's bullets leave a blank (the "__") for a real number. We never
  * pre-fill metrics — fabricated numbers are a fail in an interview, and the
- * product's whole pitch is honesty.
+ * product's whole pitch is honesty. Bullets are keyed by family; the matching
+ * keywords live in roleFamily.ts.
  */
-const ROLE_LIBRARY: RoleMatcher[] = [
+const ROLE_LIBRARY: RoleBullets[] = [
   {
     family: "sales",
     label: "Sales & Business Development",
-    keywords: ["sales", "business development", "account manager", "bd ", "key account", "relationship manager"],
     bullets: [
       "Grew the GCC sales pipeline from AED __ to AED __ over __ months across UAE and KSA accounts.",
       "Closed __ new B2B accounts in the UAE market, exceeding the annual target by __%.",
@@ -69,7 +54,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "marketing",
     label: "Marketing & Digital",
-    keywords: ["marketing", "digital", "brand", "social media", "content", "seo", "growth"],
     bullets: [
       "Ran paid and organic campaigns reaching __ users across the UAE, improving engagement by __%.",
       "Cut cost per acquisition by __% through restructured Google and Meta ad accounts.",
@@ -81,7 +65,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "finance",
     label: "Finance",
-    keywords: ["finance", "financial", "fp&a", "treasury", "investment", "credit"],
     bullets: [
       "Prepared monthly management accounts for __ entities, cutting the close cycle from __ to __ days.",
       "Managed working capital of AED __, improving cash conversion by __ days.",
@@ -93,7 +76,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "accounting",
     label: "Accounting & Audit",
-    keywords: ["account", "audit", "bookkeep", "ledger", "ifrs", "vat", "tax"],
     bullets: [
       "Maintained the general ledger for __ entities under IFRS, reconciling AED __ in monthly transactions.",
       "Filed quarterly FTA VAT returns for __ companies accurately and on time.",
@@ -105,7 +87,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "operations",
     label: "Operations & Management",
-    keywords: ["operations", "operation", "general manager", "gm ", "coo", "ops "],
     bullets: [
       "Led daily operations across __ UAE sites, meeting __% of on-time delivery KPIs.",
       "Implemented process improvements that reduced operating costs by AED __ annually.",
@@ -117,7 +98,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "logistics",
     label: "Logistics & Supply Chain",
-    keywords: ["logistics", "supply chain", "procurement", "warehouse", "fleet", "import", "export", "freight"],
     bullets: [
       "Managed inbound and outbound logistics through Jebel Ali Port and JAFZA, handling __ shipments monthly.",
       "Negotiated supplier contracts that reduced procurement spend by AED __ annually.",
@@ -129,7 +109,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "hr",
     label: "Human Resources",
-    keywords: ["hr ", "human resources", "recruit", "talent", "people", "hr manager", "hr officer"],
     bullets: [
       "Managed end-to-end recruitment for __ roles across __ nationalities, reducing time-to-hire by __ days.",
       "Administered MOHRE labour contracts, visa processing, and onboarding for __ employees.",
@@ -141,7 +120,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "admin",
     label: "Administration & PRO",
-    keywords: ["admin", "secretary", "executive assistant", "pro ", "public relations", "office manager", "coordinator", "receptionist"],
     bullets: [
       "Processed visa, Emirates ID, and labour-card renewals via Tasheel and GDRFA for __ employees.",
       "Coordinated diaries, travel, and meetings for __ senior executives across time zones.",
@@ -153,7 +131,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "engineering",
     label: "Engineering & Construction",
-    keywords: ["engineer", "engineering", "construction", "civil", "mechanical", "electrical", "mep", "project engineer", "site"],
     bullets: [
       "Delivered __ projects worth AED __ on time and within budget across UAE sites.",
       "Supervised __ contractors and site staff, maintaining zero lost-time incidents over __ months.",
@@ -165,7 +142,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "it",
     label: "IT & Software",
-    keywords: ["developer", "software", "it ", "engineer", "data", "system", "network", "devops", "qa ", "analyst", "programmer"],
     bullets: [
       "Built and shipped __ features used by __ users, improving __ by __%.",
       "Reduced system downtime to __% uptime across __ production services.",
@@ -177,7 +153,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "hospitality",
     label: "Hospitality & F&B",
-    keywords: ["hospitality", "hotel", "f&b", "food", "beverage", "chef", "restaurant", "guest", "concierge", "front office", "housekeeping"],
     bullets: [
       "Maintained a guest-satisfaction score of __% across __ daily covers / room nights.",
       "Led a multicultural team of __ across __ nationalities in a __-star property.",
@@ -189,7 +164,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "retail",
     label: "Retail & Customer-Facing",
-    keywords: ["retail", "store", "sales associate", "merchandis", "cashier", "boutique", "mall"],
     bullets: [
       "Achieved __% of monthly store sales targets across a AED __ retail outlet.",
       "Increased basket size by __% through upselling and cross-selling in a mall environment.",
@@ -201,7 +175,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "realestate",
     label: "Real Estate",
-    keywords: ["real estate", "property", "leasing", "broker", "realtor", "rera"],
     bullets: [
       "Closed property deals worth AED __ across Dubai and Abu Dhabi (RERA-certified).",
       "Managed a portfolio of __ leasing units, maintaining __% occupancy.",
@@ -213,7 +186,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "healthcare",
     label: "Healthcare",
-    keywords: ["nurse", "doctor", "medical", "health", "clinic", "patient", "pharmac", "dha", "haad", "moh"],
     bullets: [
       "Cared for __ patients per shift while maintaining DHA / MOH clinical standards.",
       "Maintained accurate patient records and compliance for a __-bed facility.",
@@ -225,7 +197,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "education",
     label: "Education & Training",
-    keywords: ["teacher", "tutor", "lecturer", "trainer", "education", "academic", "instructor", "kg ", "school"],
     bullets: [
       "Taught __ students across __ year groups, improving average attainment by __%.",
       "Delivered KHDA / ADEK-aligned curriculum to a multicultural classroom of __ nationalities.",
@@ -237,7 +208,6 @@ const ROLE_LIBRARY: RoleMatcher[] = [
   {
     family: "customerservice",
     label: "Customer Service & Call Centre",
-    keywords: ["customer service", "call center", "call centre", "support", "csr", "client service", "help desk"],
     bullets: [
       "Resolved __ customer queries per day, maintaining a CSAT score of __%.",
       "Handled inbound and outbound contact across __ languages for the UAE market.",
@@ -264,48 +234,29 @@ export type IdeaMatch = {
 };
 
 /**
- * Whole-word-aware keyword test honoring the trailing-space convention.
- *
- * A keyword that ends with a space (e.g. "pro ", "bd ", "gm ", "ops ", and in
- * other families "it ", "qa ", "hr ", "kg ") is a whole-word marker: it must
- * match a standalone word in the title, never a substring of a larger word —
- * so "pro " fires on the title "PRO" but NOT on "Process Excellence Manager".
- * Keywords without a trailing space ("sales", "account", "engineer") stay
- * plain substrings, as intended.
- *
- * The previous implementation did `title.includes(kw.trim())`, which stripped
- * the marker space and let "pro " leak into "process", "bd " into "brand", etc.
- *
- * @param title    already lowercased + trimmed job title
- * @param keyword  a keyword from a role family's list (may carry a trailing space)
- */
-export function matchesRoleKeyword(title: string, keyword: string): boolean {
-  if (keyword.endsWith(" ")) {
-    return ` ${title} `.includes(` ${keyword.trim()} `);
-  }
-  return title.includes(keyword);
-}
-
-/**
- * Returns role-matched idea bullets for a job title. Falls back to GENERIC
- * when the title is empty or unmatched, so the panel is never empty.
+ * Returns role-matched idea bullets. The family is the caller-supplied
+ * `domain` (user-confirmed) when given, otherwise inferred from the job title.
+ * Falls back to GENERIC when the title is empty/unmatched, so the panel is
+ * never empty.
  *
  * @param jobTitle  the role title the user typed (any case)
  * @param exclude   bullets already present, excluded from the result
+ * @param domain    optional confirmed domain that overrides title inference
  */
 export function suggestionsForRole(
   jobTitle: string | undefined,
   exclude: string[] = [],
+  domain?: RoleFamily,
 ): IdeaMatch {
-  const title = (jobTitle ?? "").toLowerCase().trim();
   const excludeSet = new Set(exclude.map((b) => b.trim()));
 
-  let match: RoleMatcher | undefined;
-  if (title) {
-    match = ROLE_LIBRARY.find((r) =>
-      r.keywords.some((kw) => matchesRoleKeyword(title, kw)),
-    );
-  }
+  const family =
+    domain && domain !== "generic" ? domain : inferRoleFamily(jobTitle).family;
+
+  const match =
+    family !== "generic"
+      ? ROLE_LIBRARY.find((r) => r.family === family)
+      : undefined;
 
   if (match) {
     return {

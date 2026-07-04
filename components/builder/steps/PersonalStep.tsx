@@ -10,6 +10,9 @@ import { TodaysTipCard } from "../TodaysTipCard";
 import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
 import { StepHeader } from "../StepHeader";
+import { DomainChip } from "../DomainChip";
+import { inferRoleFamily } from "../../../lib/data/roleFamily";
+import { canTailorByDomain } from "../../../lib/utils/entitlements";
 import { Field } from "../../forms/Field";
 import { useBlurFeedback } from "../../forms/useBlurFeedback";
 import { fieldValidators } from "../../../lib/validation/cvRequirements";
@@ -70,6 +73,24 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const handleToggleChange = (show: boolean) => {
     const current = useCvStore.getState().data.personal;
     updateSection("personal", { ...current, showPhoto: show } as CvPersonal);
+  };
+
+  // Infer the job domain from the headline (Phase 1 personalization). Runs on
+  // headline blur; respects a manual pick (domainSource "user") and only
+  // auto-applies a HIGH-confidence guess — a low-confidence result clears the
+  // domain so the DomainChip prompts the user rather than guessing wrong.
+  const maybeInferDomain = (headlineValue: string) => {
+    if (!canTailorByDomain()) return;
+    const current = useCvStore.getState().data.settings;
+    if (current.domainSource === "user") return;
+    const { family, confidence } = inferRoleFamily(headlineValue);
+    const nextDomain = confidence === "high" ? family : undefined;
+    if (current.domain === nextDomain) return;
+    updateSection("settings", {
+      ...current,
+      domain: nextDomain,
+      domainSource: "inferred",
+    });
   };
 
   const {
@@ -273,8 +294,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
               e.target.value = sanitizeJobTitle(e.target.value);
               register("headline").onChange(e);
               register("headline").onBlur(e);
+              maybeInferDomain(e.target.value);
             }}
           />
+          <DomainChip />
         </Field>
         {/* Emirate select (audit UX-9): emirate is a primary recruiter
             filter on Bayt/NaukriGulf, but location was a bare free-text

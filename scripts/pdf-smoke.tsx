@@ -33,6 +33,10 @@ const fixture: CvData = {
     visaStatus: "Employment visa",
     availability: "30 days notice",
     drivingLicense: "UAE Light Vehicle",
+    // 1x1 PNG so photo-bearing layouts exercise their <Image> path.
+    photo:
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    showPhoto: true,
   },
   experience: [
     {
@@ -139,6 +143,10 @@ const TEMPLATE_IDS = [
   "ats-clean",
   "exec-split",
   "corp-sidebar",
+  "professional",
+  "professional-photo",
+  "onyx",
+  "sandstone",
 ];
 
 async function main() {

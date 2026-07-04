@@ -1,5 +1,10 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatDateRange, normalizeHref } from "../utils/format";
+import { meaningfulProjects } from "../utils/projects";
+import { meaningfulExperience } from "../utils/experience";
+import { meaningfulEducation } from "../utils/education";
+import { isSkillsFirst } from "../data/sectionOrder";
+import { splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
@@ -9,21 +14,56 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim();
   const theme = resolveTheme(data.settings, "#1e5b54");
+  const m = theme.marginScale;
   const photoVisible = theme.photoVisible;
   const hasSummary = Boolean(data.personal.summary);
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasLanguages = data.languages.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
-  const sectionClass = "cv-section mt-6";
+  const sectionClass = "cv-section mt-[calc(1.5rem*var(--sp))]";
   const headingWrapClass = "avoid-orphan border-b border-slate-200 pb-1 [break-after:avoid]";
-  const headingClass = "text-[12.5px] font-semibold tracking-normal text-slate-800";
-  const bodyClass = "text-[11.5px] leading-[1.45] text-slate-700";
+  const headingClass = "text-[calc(12.5px*var(--fs))] font-semibold tracking-normal text-slate-800";
+  const bodyClass = "text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))] text-slate-700";
   const bulletListClass =
-    "list-disc pl-4 space-y-1 text-[11.5px] leading-[1.45] text-slate-700 marker:text-slate-400";
+    "list-disc pl-4 space-y-1 text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))] text-slate-700 marker:text-slate-400";
+
+  // Skills-first domains (e.g. IT) lead with the skills block, above experience.
+  // The section is extracted so it renders exactly once, in the right place.
+  const skillsFirst = isSkillsFirst(data.settings.domain);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const skillsSection = hasSkills ? (
+    <>
+      {generalSkills.length > 0 && (
+        <section className={sectionClass}>
+          <div className={headingWrapClass}>
+            <h2 className={headingClass}>Skills</h2>
+          </div>
+          <p className={`mt-2 ${bodyClass}`}>
+            {generalSkills.map((skill) => skill.name).join(", ")}
+          </p>
+        </section>
+      )}
+      {technicalSkills.length > 0 && (
+        <section className={sectionClass}>
+          <div className={headingWrapClass}>
+            <h2 className={headingClass}>Technical Skills</h2>
+          </div>
+          <p className={`mt-2 ${bodyClass}`}>
+            {technicalSkills.map((skill) => skill.name).join(", ")}
+          </p>
+        </section>
+      )}
+    </>
+  ) : null;
 
   const shouldShowProjectLink = (value?: string) => {
     const normalized = value?.trim();
@@ -97,8 +137,14 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white px-8 py-9 text-[11.5px] leading-[1.45] text-slate-700"
-      style={{ fontFamily: theme.fontFamily }}
+      className="cv-print relative overflow-hidden bg-white text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))] text-slate-700"
+      style={{
+        fontFamily: theme.fontFamily,
+        padding: `${36 * m}px ${32 * m}px`,
+        ["--fs" as string]: theme.fontScale,
+        ["--lh" as string]: theme.lineScale,
+        ["--sp" as string]: theme.spaceScale,
+      }}
     >
       {plan === "free" && (
         <div
@@ -117,23 +163,23 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
             {/* Left block: Name + Headline + Contact */}
             <div className="flex flex-col gap-1 flex-1 min-w-0 pr-24">
               <h1
-                className="text-[28px] font-bold leading-tight tracking-tight text-slate-900"
-                style={{ lineHeight: 1.1 }}
+                className="text-[calc(28px*var(--fs))] font-bold leading-[calc(1.25*var(--lh))] tracking-tight text-slate-900"
+                style={{ lineHeight: 1.1 * theme.lineScale }}
               >
                 {name}
               </h1>
               {headline ? (
-                <p className="text-[14px] font-medium text-slate-500 mt-0.5">
+                <p className="text-[calc(14px*var(--fs))] font-medium text-slate-500 mt-0.5">
                   {headline}
                 </p>
               ) : null}
 
               {contactItems.length > 0 && (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10.5px] leading-snug text-slate-500">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[calc(10.5px*var(--fs))] leading-[calc(1.375*var(--lh))] text-slate-500">
                   {contactItems.map((item, index) => (
                     <div key={`${item.text}-${index}`} className="inline-flex min-w-0 items-center gap-1">
                       <span
-                        style={{ fontSize: "10px", lineHeight: 1, flexShrink: 0 }}
+                        style={{ fontSize: `${10 * theme.fontScale}px`, lineHeight: 1 * theme.lineScale, flexShrink: 0 }}
                         aria-hidden="true"
                       >
                         {item.icon}
@@ -157,7 +203,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 </div>
               )}
               {essentialChips.length > 0 && (
-                <div className="mt-1.5 text-[10px] leading-snug text-slate-600">
+                <div className="mt-1.5 text-[calc(10px*var(--fs))] leading-[calc(1.375*var(--lh))] text-slate-600">
                   {essentialChips.map((chip, idx) => (
                     <span key={chip.label}>
                       <span className="font-semibold text-slate-800">{chip.label}:</span>{" "}
@@ -212,26 +258,28 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           </section>
         )}
 
+        {skillsFirst ? skillsSection : null}
+
         {hasExperience && (
           <section className={sectionClass}>
             <div className={headingWrapClass}>
               <h2 className={headingClass}>Experience</h2>
             </div>
             <div className="mt-2 space-y-3">
-              {data.experience.map((role) => (
+              {experience.map((role) => (
                 <div key={role.id} className="avoid-break space-y-1 [break-inside:avoid]">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[12px] leading-[1.35]">
+                    <div className="text-[calc(12px*var(--fs))] leading-[calc(1.35*var(--lh))]">
                       <span className="font-semibold text-slate-800">{role.role?.trim() || "Role"}</span>
                       <span className="font-normal text-slate-700">
                         {role.company ? ` | ${role.company.trim()}` : ""}
                       </span>
                     </div>
-                    <span className="whitespace-nowrap text-right text-[11px] font-normal text-slate-500">
+                    <span className="whitespace-nowrap text-right text-[calc(11px*var(--fs))] font-normal text-slate-500">
                       {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                     </span>
                   </div>
-                  {role.location && <div className="text-[11px] text-slate-500">{role.location.trim()}</div>}
+                  {role.location && <div className="text-[calc(11px*var(--fs))] text-slate-500">{role.location.trim()}</div>}
                   <ul className={bulletListClass}>
                     {role.bullets
                       .map((bullet) => bullet.trim())
@@ -252,28 +300,28 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
               <h2 className={headingClass}>Education</h2>
             </div>
             <div className="mt-2 space-y-3">
-              {data.education.map((edu) => (
+              {education.map((edu) => (
                 <div key={edu.id} className="avoid-break [break-inside:avoid]">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[12px] font-semibold text-slate-800">
+                    <div className="text-[calc(12px*var(--fs))] font-semibold text-slate-800">
                       {edu.degree?.trim() || "Degree"}
                       <span className="font-normal text-slate-700">
                         {edu.school ? ` | ${edu.school.trim()}` : ""}
                       </span>
                     </div>
-                    <span className="whitespace-nowrap text-[11px] font-normal text-slate-500">
+                    <span className="whitespace-nowrap text-[calc(11px*var(--fs))] font-normal text-slate-500">
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
                   {(edu.field || edu.notes) && (
-                    <div className="mt-1 text-[11px] text-slate-500">
+                    <div className="mt-1 text-[calc(11px*var(--fs))] text-slate-500">
                       {edu.field ? <span>{edu.field.trim()}</span> : null}
                       {edu.field && edu.notes ? <span> | </span> : null}
                       {edu.notes ? <span>{edu.notes.trim()}</span> : null}
                     </div>
                   )}
                   {edu.attested && edu.attestingBody?.trim() && (
-                    <p className="mt-0.5 text-xs font-medium text-green-700">
+                    <p className="mt-0.5 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-medium text-green-700">
                       {"\u2713"} Attested — {edu.attestingBody.trim()}
                     </p>
                   )}
@@ -283,14 +331,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
           </section>
         )}
 
-        {hasSkills && (
-          <section className={sectionClass}>
-            <div className={headingWrapClass}>
-              <h2 className={headingClass}>Skills</h2>
-            </div>
-            <p className={`mt-2 ${bodyClass}`}>{data.skills.map((skill) => skill.name).join(", ")}</p>
-          </section>
-        )}
+        {skillsFirst ? null : skillsSection}
 
         {(hasLanguages || hasCertifications) && (
           <section className={`${sectionClass} grid gap-6 md:grid-cols-2`}>
@@ -317,7 +358,7 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
                 </div>
                 <div className="mt-2 space-y-2 text-slate-700">
                   {data.certifications.map((cert) => (
-                    <div key={cert.id} className="text-[11.5px] leading-[1.45]">
+                    <div key={cert.id} className="text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))]">
                       <span className="font-semibold">{cert.name.trim()}</span>
                       <span className="text-slate-500">
                         {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
@@ -333,12 +374,12 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
 
         {hasProjects && (
           <section className={sectionClass}>
-            {data.projects.map((project, index) => {
+            {projects.map((project, index) => {
               const bullets = (project.bullets ?? []).map((bullet) => bullet.trim()).filter(Boolean);
               const [firstBullet, ...remainingBullets] = bullets;
               const showLink = shouldShowProjectLink(project.link);
               const titleRow = (
-                <div className={`${index === 0 ? "mt-2 " : ""}text-[12px] font-semibold text-slate-800`}>
+                <div className={`${index === 0 ? "mt-2 " : ""}text-[calc(12px*var(--fs))] font-semibold text-slate-800`}>
                   {project.name?.trim() || "Project"}
                   {showLink ? (
                     <span className="font-normal text-slate-500 break-words [overflow-wrap:anywhere]">

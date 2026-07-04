@@ -17,6 +17,8 @@ import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
+import { inferRoleFamily } from "../../../lib/data/roleFamily";
+import { canTailorByDomain } from "../../../lib/utils/entitlements";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import {
   sanitizeJobTitle,
@@ -141,6 +143,9 @@ export const ExperienceStep = ({
     aiClear();
     improve({
       type: "bullets",
+      // Per-entry: a past role's bullets should reflect THAT role's domain,
+      // not the person's global target domain.
+      domain: canTailorByDomain() ? inferRoleFamily(entry.role).family : undefined,
       jobTitle: entry.role,
       company: entry.company,
       existingBullets: entry.bullets?.filter(Boolean),
@@ -336,6 +341,11 @@ export const ExperienceStep = ({
           const bullets = watch(`experience.${index}.bullets`) || [""];
           const filledBullets = bullets.filter(Boolean).length;
           const roleSuggestions = suggestions[index] ?? [];
+          // Compulsory fields (schema-required): once filled, the card
+          // auto-folds when focus leaves it (see ExpandRoleCard onBlur).
+          const entryComplete = Boolean(
+            role.trim() && company.trim() && startDate.trim(),
+          );
 
           return (
             <ExpandRoleCard
@@ -370,6 +380,8 @@ export const ExperienceStep = ({
               title={role || `Role ${index + 1}`}
               subline={summarySubLine}
               isCurrent={isCurrent}
+              complete={entryComplete}
+              onAutoCollapse={() => setOpenIndex(null)}
             >
               {isOpen && (
                 <div style={{ padding: 22, borderTop: "1px solid var(--ff-line)" }}>
@@ -730,7 +742,7 @@ export const ExperienceStep = ({
                       <Icon name="sparkle" size={13} />
                       {aiLoading && aiActiveIndex === index
                         ? "Generating…"
-                        : "Generate more"}
+                        : "Generate more with AI"}
                     </button>
                   </div>
 
@@ -841,6 +853,8 @@ const ExpandRoleCard = ({
   title,
   subline,
   isCurrent,
+  complete,
+  onAutoCollapse,
   children,
 }: {
   isOpen: boolean;
@@ -855,6 +869,8 @@ const ExpandRoleCard = ({
   title: string;
   subline: string;
   isCurrent: boolean;
+  complete: boolean;
+  onAutoCollapse: () => void;
   children: React.ReactNode;
 }) => (
   <div
@@ -862,6 +878,13 @@ const ExpandRoleCard = ({
     onDragOver={onDragOver}
     onDragLeave={onDragLeave}
     onDrop={onDrop}
+    onBlur={(e) => {
+      // Auto-fold a completed entry when focus leaves the card (the user
+      // clicked/tabbed elsewhere). Guarded so it never collapses mid-edit.
+      if (!isOpen || !complete) return;
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      onAutoCollapse();
+    }}
     style={{
       borderRadius: 16,
       opacity: isDragging ? 0.5 : 1,

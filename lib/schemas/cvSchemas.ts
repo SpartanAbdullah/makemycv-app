@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROLE_FAMILIES } from "../data/roleFamily";
 
 export const personalSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -66,6 +67,7 @@ export const skillsSchema = z.object({
         id: z.string(),
         name: z.string().min(1, "Skill is required"),
         level: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+        category: z.enum(["technical", "general"]).optional(),
       })
     )
     .min(1, "Add at least one skill"),
@@ -120,7 +122,13 @@ export const projectsSchema = z.object({
 export const settingsSchema = z.object({
   templateId: z.string().min(1),
   accentColor: z.string().optional(),
+  domain: z.enum(ROLE_FAMILIES).optional(),
+  domainSource: z.enum(["inferred", "user"]).optional(),
   fontScale: z.number().optional(),
+  pageMargins: z.number().optional(),
+  fontSize: z.number().optional(),
+  lineHeight: z.number().optional(),
+  sectionSpacing: z.number().optional(),
   sectionOrder: z.array(z.string()).optional(),
 });
 

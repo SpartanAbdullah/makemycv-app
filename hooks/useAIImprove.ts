@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import type { RoleFamily } from "../lib/data/roleFamily";
 
 export type AIImproveType = "bullets" | "skills" | "summary";
 
@@ -13,6 +14,7 @@ export type AIImprovePayload = {
   experienceRoles?: { title: string; company: string; bullets: string[] }[];
   existingSkills?: string[];
   existingSummary?: string;
+  domain?: RoleFamily;
 };
 
 export type AIError = {

@@ -63,6 +63,9 @@ export type CvSkill = {
   id: string;
   name: string;
   level?: SkillLevel;
+  // Optional grouping: "technical" skills render under a separate "Technical
+  // Skills" heading on the ATS templates. Absent = general skill.
+  category?: "technical" | "general";
 };
 
 export type CvLanguage = {
@@ -89,6 +92,32 @@ export type PhotoShape = "round" | "square" | "hidden";
 
 export type CvFontFamily = "sans" | "display" | "serif";
 
+/**
+ * Job-domain taxonomy that drives per-domain content personalization
+ * (wording, idea bullets, soft skills, AI prompt). Runtime helpers — the
+ * keyword table, labels, and inference — live in lib/data/roleFamily.ts;
+ * this is just the canonical type so lib/types stays the source of truth.
+ * "generic" is the always-available fallback.
+ */
+export type RoleFamily =
+  | "sales"
+  | "marketing"
+  | "finance"
+  | "accounting"
+  | "operations"
+  | "logistics"
+  | "hr"
+  | "admin"
+  | "engineering"
+  | "it"
+  | "hospitality"
+  | "retail"
+  | "realestate"
+  | "healthcare"
+  | "education"
+  | "customerservice"
+  | "generic";
+
 export type CvSettings = {
   templateId: string;
   accentColor?: string;
@@ -96,6 +125,24 @@ export type CvSettings = {
   fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
+  // Design & Font density controls, each a 1–5 level (3 = neutral = current
+  // default). resolveTheme maps them to multipliers (lib/templates/theme.ts):
+  //   pageMargins → marginScale, fontSize → fontScale,
+  //   lineHeight  → lineScale,   sectionSpacing → spaceScale.
+  // All optional → old CVs load unchanged (undefined ⇒ level 3 ⇒ ×1.0).
+  // NOTE: the `fontScale` field above is a dead legacy multiplier kept only for
+  // saved-data compat; the live font-size control drives `fontSize` instead.
+  pageMargins?: number;
+  fontSize?: number;
+  lineHeight?: number;
+  sectionSpacing?: number;
+  // Personalization (Phase 1): the job domain we tailor content for.
+  // `domain` is inferred from the headline and confirmable via the chip;
+  // `domainSource` records whether the value was inferred or user-chosen so
+  // auto-inference never clobbers a manual pick. Both optional → old CVs load
+  // fine with no migration; domain is inferred lazily on first headline blur.
+  domain?: RoleFamily;
+  domainSource?: "inferred" | "user";
 };
 
 export type CvData = {

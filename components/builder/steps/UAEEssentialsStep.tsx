@@ -63,6 +63,17 @@ export const UAEEssentialsStep = ({
     website: (personal.website ?? "").trim() !== "",
   }));
 
+  // Extras are optional → folded by default. Open on mount only if the user
+  // already has content in there (e.g. an imported CV) so nothing hides silently.
+  const [extrasOpen, setExtrasOpen] = useState(() =>
+    Boolean(
+      (personal.linkedin ?? "").trim() ||
+        (personal.website ?? "").trim() ||
+        (personal.country ?? "").trim() ||
+        (personal.dateOfBirth ?? "").trim(),
+    ),
+  );
+
   const {
     register,
     handleSubmit,
@@ -230,12 +241,21 @@ export const UAEEssentialsStep = ({
           borderRadius: 14,
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={() => setExtrasOpen((o) => !o)}
+          aria-expanded={extrasOpen}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            marginBottom: 14,
+            width: "100%",
+            marginBottom: extrasOpen ? 14 : 0,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
           }}
         >
           <Icon name="plus" size={13} />
@@ -262,7 +282,20 @@ export const UAEEssentialsStep = ({
           >
             Optional
           </span>
-        </div>
+          <span
+            aria-hidden="true"
+            style={{
+              display: "inline-flex",
+              color: "var(--ff-muted)",
+              transform: extrasOpen ? "rotate(180deg)" : "none",
+              transition: "transform 150ms",
+            }}
+          >
+            <Icon name="chevron-down" size={14} />
+          </span>
+        </button>
+        {extrasOpen && (
+          <>
         <p
           style={{
             fontSize: 12.5,
@@ -367,6 +400,8 @@ export const UAEEssentialsStep = ({
             />
           </Field>
         </div>
+          </>
+        )}
       </section>
 
       <NavigationButtons

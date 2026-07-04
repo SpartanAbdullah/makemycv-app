@@ -171,7 +171,21 @@ export const EducationStep = ({
               const summaryLine = [degree, school, [startDate, endDate].filter(Boolean).join(" - ")].filter(Boolean).join(" | ");
 
               return (
-                <div key={field.id} className="cv-entry-card">
+                <div
+                  key={field.id}
+                  className="cv-entry-card"
+                  onBlur={(e) => {
+                    // Auto-fold a completed entry when focus leaves the card.
+                    if (!isOpen) return;
+                    const complete = Boolean(
+                      degree.trim() && school.trim() && startDate.trim(),
+                    );
+                    if (!complete) return;
+                    if (e.currentTarget.contains(e.relatedTarget as Node | null))
+                      return;
+                    setOpenIndex(null);
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setOpenIndex(isOpen ? null : index)}

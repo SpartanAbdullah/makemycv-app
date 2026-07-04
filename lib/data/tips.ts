@@ -9,6 +9,8 @@
  * rather than a public source we credit it explicitly — vague "studies show"
  * lines have no place here.
  */
+import type { RoleFamily } from "./roleFamily";
+
 export type UaeTip = {
   id: string;
   quote: string;
@@ -23,6 +25,10 @@ export type UaeTip = {
     | "certifications"
     | "projects"
     | "review";
+  /** Domain-scoped tip (Phase 3): shown when the user's confirmed
+   *  settings.domain matches. Domain tips are field-general (no stepId) so they
+   *  rotate alongside step tips on every step. */
+  domain?: RoleFamily;
 };
 
 export const tips: UaeTip[] = [
@@ -169,6 +175,121 @@ export const tips: UaeTip[] = [
     citation: "Bayt UAE recruiter survey, 2024.",
     stepId: "personal",
   },
+
+  // ── Domain-scoped tips (Phase 3) ──────────────────────────────────────────
+  // Field-general advice tagged by domain; surfaces when settings.domain matches.
+  {
+    id: "domain-sales",
+    quote:
+      "In UAE sales CVs, lead every bullet with AED revenue and % of target hit — shortlists are filtered on numbers before the prose is read.",
+    citation: "From our review of UAE sales listings on Bayt and LinkedIn, 2024.",
+    domain: "sales",
+  },
+  {
+    id: "domain-marketing",
+    quote:
+      "Name GA4, Meta and Google Ads, and quantify reach and ROAS — UAE marketing shortlists are keyword-driven, not adjective-driven.",
+    citation: "Pattern from hands-on hiring reviews at Interior360, 2025.",
+    domain: "marketing",
+  },
+  {
+    id: "domain-finance",
+    quote:
+      "State IFRS and FTA VAT exposure explicitly — UAE finance roles screen for both before reading achievements.",
+    citation: "From our review of UAE finance listings on Bayt, 2024.",
+    domain: "finance",
+  },
+  {
+    id: "domain-accounting",
+    quote:
+      "Show month-end close days and VAT filing volume — UAE finance teams read accounting CVs for accuracy and compliance signals.",
+    citation: "Pattern from hands-on hiring reviews at Interior360, 2025.",
+    domain: "accounting",
+  },
+  {
+    id: "domain-operations",
+    quote:
+      "Put team size, budget owned and efficiency % on page one — UAE operations hiring reads for scale and cost control.",
+    citation: "From our review of UAE operations listings on Bayt and LinkedIn, 2024.",
+    domain: "operations",
+  },
+  {
+    id: "domain-logistics",
+    quote:
+      "Name Jebel Ali/JAFZA, customs clearance and a WMS — UAE supply-chain recruiters filter for local trade fluency.",
+    citation: "From our review of UAE logistics listings on Naukrigulf, 2024.",
+    domain: "logistics",
+  },
+  {
+    id: "domain-hr",
+    quote:
+      "Name MOHRE, WPS and a time-to-hire number — UAE HR roles screen first for local compliance fluency.",
+    citation: "MOHRE guidance; pattern from Interior360 hiring reviews, 2025.",
+    domain: "hr",
+  },
+  {
+    id: "domain-admin",
+    quote:
+      "Name Tasheel, Amer/GDRFA and MS Office 365, and how many executives you supported — UAE admin roles read for scope and systems.",
+    citation: "From our review of UAE admin/PRO listings on Bayt, 2024.",
+    domain: "admin",
+  },
+  {
+    id: "domain-engineering",
+    quote:
+      "UAE construction employers expect NEBOSH/IOSH and a project value in AED — put both on page one, with Dubai Municipality/DEWA approvals.",
+    citation: "From our review of UAE construction listings on Bayt, 2024.",
+    domain: "engineering",
+  },
+  {
+    id: "domain-it",
+    quote:
+      "List the exact stack — Python, AWS, Docker — not ‘software development’. UAE ATS keyword-matches the tool names.",
+    citation: "Pattern from hands-on hiring reviews at Interior360, 2025.",
+    domain: "it",
+  },
+  {
+    id: "domain-hospitality",
+    quote:
+      "Name your PMS (Opera, Micros) and your guest-satisfaction score — UAE hospitality recruiters scan for both.",
+    citation: "From our review of UAE hospitality listings on Bayt, 2024.",
+    domain: "hospitality",
+  },
+  {
+    id: "domain-retail",
+    quote:
+      "Show sales-target attainment %, basket size and shrinkage — UAE retail hiring reads for the store numbers, not duties.",
+    citation: "From our review of UAE retail listings on Naukrigulf, 2024.",
+    domain: "retail",
+  },
+  {
+    id: "domain-realestate",
+    quote:
+      "Lead with RERA certification and AED deal value — UAE property employers filter on both before calling.",
+    citation: "Dubai RERA/DLD guidance; Interior360 hiring reviews, 2025.",
+    domain: "realestate",
+  },
+  {
+    id: "domain-healthcare",
+    quote:
+      "Put your DHA/DOH/MOH licence (or DataFlow stage) near the top — it clears the first ATS gate for UAE clinical roles.",
+    citation: "DHA/DOH licensing guidance, 2024.",
+    domain: "healthcare",
+  },
+  {
+    id: "domain-education",
+    quote:
+      "Name the curriculum (KHDA/ADEK, British or IB) and attainment gains — UAE schools shortlist on curriculum fit first.",
+    citation: "KHDA/ADEK guidance; Interior360 hiring reviews, 2025.",
+    domain: "education",
+  },
+  {
+    id: "domain-customerservice",
+    quote:
+      "Quantify CSAT, handling time and the languages you support — UAE contact-centre roles read CVs for those three.",
+    citation: "From our review of UAE customer-service listings on Bayt, 2024.",
+    domain: "customerservice",
+  },
 ];
 
 /**
@@ -196,9 +317,18 @@ export const getDailyTipIndex = (date = new Date()): number => {
 export const resolveTipForStep = (
   stepId: UaeTip["stepId"] | undefined,
   userIndex: number,
+  domain?: RoleFamily,
 ): { tip: UaeTip; positionLabel: string; pool: UaeTip[]; index: number } => {
-  const stepPool = stepId ? tips.filter((t) => t.stepId === stepId) : [];
-  const pool = stepPool.length > 0 ? stepPool : tips;
+  // Pool = tips for the current step PLUS tips for the user's confirmed domain,
+  // so field-specific advice rotates alongside step advice. Falls back to the
+  // universal pool when neither matches. With no domain this is identical to the
+  // pre-Phase-3 behavior (step-scoped pool, else universal).
+  const relevant = tips.filter(
+    (t) =>
+      (stepId ? t.stepId === stepId : false) ||
+      (domain ? t.domain === domain : false),
+  );
+  const pool = relevant.length > 0 ? relevant : tips;
   const normalizedIndex = ((userIndex % pool.length) + pool.length) % pool.length;
   const tip = pool[normalizedIndex];
   const positionLabel = `${String(normalizedIndex + 1).padStart(2, "0")} / ${String(pool.length).padStart(2, "0")}`;

@@ -14,6 +14,11 @@ import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
 import { formatDateRange, normalizeHref } from "../../lib/utils/format";
+import { meaningfulProjects } from "../../lib/utils/projects";
+import { meaningfulExperience } from "../../lib/utils/experience";
+import { meaningfulEducation } from "../../lib/utils/education";
+import { isSkillsFirst } from "../../lib/data/sectionOrder";
+import { splitSkills } from "../../lib/utils/skills";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -73,7 +78,7 @@ const SLATE_200 = "#E2E8F0";
  * pl-4 = 16px → 12pt, space-y-1 = 4px → 3pt
  */
 
-const s = StyleSheet.create({
+const BASE_STYLES: Record<string, Style> = {
   page: {
     paddingTop: 27,
     paddingBottom: 27,
@@ -317,11 +322,61 @@ const s = StyleSheet.create({
     marginBottom: 6,
     marginTop: 16,
   },
-});
+};
+
+/* ─── Per-render style factory ─────────────────────────────── */
+/*
+ * Density sliders scale the sheet at render time. buildStyles(theme) clones
+ * BASE_STYLES and multiplies every numeric fontSize by theme.fontScale and
+ * every numeric lineHeight by theme.lineScale. It then multiplies the
+ * SECTION-GAP margins (the vertical space BETWEEN top-level sections/entries)
+ * by theme.spaceScale — for a KNOWN set of keys only, so headers/chips/photos
+ * do not move. Each scale is EXACTLY 1.0 at the neutral default, so x*1 === x
+ * and every saved CV renders byte-identically.
+ */
+const SECTION_GAP_KEYS: Record<string, ReadonlyArray<"marginTop" | "marginBottom">> = {
+  section: ["marginTop"],
+  entryBlock: ["marginBottom"],
+  sectionHeadingWrap: ["marginBottom"],
+  twoCol: ["marginTop"],
+  // ATS Clean uses atsSectionHeading itself as the section divider; its
+  // marginTop is the gap BETWEEN sections (the first section overrides it to 0
+  // inline, which is unaffected).
+  atsSectionHeading: ["marginTop"],
+};
+
+const buildStyles = (t: {
+  fontScale: number;
+  lineScale: number;
+  spaceScale: number;
+}) => {
+  const out: Record<string, Style> = {};
+  for (const k in BASE_STYLES) {
+    const v: Style = { ...BASE_STYLES[k] };
+    if (typeof v.fontSize === "number") v.fontSize = v.fontSize * t.fontScale;
+    if (typeof v.lineHeight === "number") v.lineHeight = v.lineHeight * t.lineScale;
+    const gapProps = SECTION_GAP_KEYS[k];
+    if (gapProps) {
+      for (const prop of gapProps) {
+        if (typeof v[prop] === "number") {
+          v[prop] = (v[prop] as number) * t.spaceScale;
+        }
+      }
+    }
+    out[k] = v;
+  }
+  return StyleSheet.create(out);
+};
 
 /* ─── Shared bullet renderer ──────────────────────────────── */
 
-const BulletList = ({ bullets }: { bullets: string[] }) => {
+const BulletList = ({
+  bullets,
+  s,
+}: {
+  bullets: string[];
+  s: Record<string, Style>;
+}) => {
   const items = bullets.map((b) => b.trim()).filter(Boolean);
   if (items.length === 0) return null;
   return (
@@ -341,9 +396,13 @@ const BulletList = ({ bullets }: { bullets: string[] }) => {
 const EducationEntry = ({
   edu,
   headingStyle,
+  s,
+  fontScale,
 }: {
   edu: CvData["education"][number];
   headingStyle?: Style;
+  s: Record<string, Style>;
+  fontScale: number;
 }) => (
   <View style={s.entryBlock} wrap={false}>
     <View style={s.entryRow}>
@@ -364,7 +423,7 @@ const EducationEntry = ({
       </Text>
     ) : null}
     {edu.attested ? (
-      <Text style={{ fontSize: 7.5, color: "#15803d", marginTop: 2 }}>
+      <Text style={{ fontSize: 7.5 * fontScale, color: "#15803d", marginTop: 2 }}>
         {edu.attestingBody?.trim()
           ? `\u2713 Attested \u2014 ${edu.attestingBody.trim()}`
           : "Attested"}
@@ -378,17 +437,50 @@ const EducationEntry = ({
    ═══════════════════════════════════════════════════════════ */
 
 const ClassicPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#1e5b54");
+  const s = buildStyles(theme);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const skillsBlock =
+    generalSkills.length > 0 || technicalSkills.length > 0 ? (
+      <>
+        {generalSkills.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeadingWrap}>
+              <Text style={s.sectionHeading}>Skills</Text>
+            </View>
+            <Text style={s.body}>
+              {generalSkills.map((sk) => sk.name).join(", ")}
+            </Text>
+          </View>
+        )}
+        {technicalSkills.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeadingWrap}>
+              <Text style={s.sectionHeading}>Technical Skills</Text>
+            </View>
+            <Text style={s.body}>
+              {technicalSkills.map((sk) => sk.name).join(", ")}
+            </Text>
+          </View>
+        )}
+      </>
+    ) : null;
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
@@ -418,7 +510,6 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
   const essentialChips = getEssentialChips(data.personal);
-  const theme = resolveTheme(data.settings, "#1e5b54");
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -429,11 +520,11 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
           <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, lineHeight: 1 }}>{name}</Text>
+            <Text style={{ ...s.name, lineHeight: 1 * theme.lineScale }}>{name}</Text>
           </View>
           {data.personal.headline?.trim() ? (
             <View style={{ marginBottom: 3 }}>
-              <Text style={{ ...s.headline, lineHeight: 1.2 }}>
+              <Text style={{ ...s.headline, lineHeight: 1.2 * theme.lineScale }}>
                 {data.personal.headline.trim()}
               </Text>
             </View>
@@ -474,14 +565,14 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                 >
                   <Text
                     style={{
-                      fontSize: 9,
+                      fontSize: 9 * theme.fontScale,
                       color: "#0F172A",
                       fontWeight: 600,
                     }}
                   >
                     {chip.label}:
                   </Text>
-                  <Text style={{ fontSize: 9, color: "#475569", marginLeft: 2 }}>
+                  <Text style={{ fontSize: 9 * theme.fontScale, color: "#475569", marginLeft: 2 }}>
                     {chip.value}
                   </Text>
                   {i < essentialChips.length - 1 && (
@@ -507,13 +598,16 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
+      {/* ── Skills (hoisted above experience for skills-first domains) ── */}
+      {isSkillsFirst(data.settings.domain) ? skillsBlock : null}
+
       {/* ── Experience ── */}
       {hasExperience && (
         <View style={s.section}>
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
-          {data.experience.map((role) => (
+          {experience.map((role) => (
             <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -535,7 +629,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
               {role.location?.trim() && (
                 <Text style={s.entrySubtext}>{role.location.trim()}</Text>
               )}
-              <BulletList bullets={role.bullets} />
+              <BulletList bullets={role.bullets} s={s} />
             </View>
           ))}
         </View>
@@ -547,23 +641,14 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {data.education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} />
+          {education.map((edu) => (
+            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
           ))}
         </View>
       )}
 
-      {/* ── Skills ── */}
-      {hasSkills && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Skills</Text>
-          </View>
-          <Text style={s.body}>
-            {data.skills.map((sk) => sk.name).join(", ")}
-          </Text>
-        </View>
-      )}
+      {/* ── Skills (rendered above if skills-first) ── */}
+      {isSkillsFirst(data.settings.domain) ? null : skillsBlock}
 
       {/* ── Languages & Certifications ── */}
       {(hasLanguages || hasCertifications) && (
@@ -615,7 +700,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Projects</Text>
           </View>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -637,7 +722,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                     </Text>
                   ) : null}
                 </Text>
-                <BulletList bullets={project.bullets ?? []} />
+                <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             );
           })}
@@ -656,10 +741,16 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1E2A4A");
+  const s = buildStyles(theme);
+  const m = theme.marginScale;
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -676,7 +767,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       text: `Email: ${email}`,
       href: `mailto:${email}`,
       // Long emails must stay one unbroken string (ATS) — shrink to fit the narrow column.
-      fontSize: email.length > 26 ? 6.2 : undefined,
+      fontSize: email.length > 26 ? 6.2 * theme.fontScale : undefined,
     });
   }
   if (data.personal.phone?.trim())
@@ -729,25 +820,25 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
           <>
             {data.personal.firstName?.trim() ? (
-              <Text style={s.execName}>{data.personal.firstName.trim()}</Text>
+              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.firstName.trim()}</Text>
             ) : null}
             {data.personal.lastName?.trim() ? (
-              <Text style={s.execName}>{data.personal.lastName.trim()}</Text>
+              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.lastName.trim()}</Text>
             ) : null}
           </>
         ) : (
-          <Text style={s.execName}>Your Name</Text>
+          <Text style={{ ...s.execName, color: onAccent }}>Your Name</Text>
         )}
 
         {/* Headline */}
         {data.personal.headline?.trim() ? (
-          <Text style={s.execHeadline}>{data.personal.headline.trim()}</Text>
+          <Text style={{ ...s.execHeadline, color: onAccentMuted }}>{data.personal.headline.trim()}</Text>
         ) : null}
 
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>CONTACT</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
             {sidebarContacts.map((item, i) =>
               item.href ? (
                 <Link
@@ -755,6 +846,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   src={item.href}
                   style={{
                     ...s.execContactItem,
+                    color: onAccentMuted,
                     textDecoration: "underline",
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
@@ -766,6 +858,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   key={i}
                   style={{
                     ...s.execContactItem,
+                    color: onAccentMuted,
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
                 >
@@ -779,9 +872,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>PERSONAL</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
             {essentialChips.map((chip) => (
-              <Text key={chip.label} style={s.execContactItem}>
+              <Text key={chip.label} style={{ ...s.execContactItem, color: onAccentMuted }}>
                 {chip.label}: {chip.value}
               </Text>
             ))}
@@ -791,10 +884,10 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={s.execSideLabel}>SKILLS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
             {data.skills.map((skill) => (
-              <Text key={skill.id} style={s.execSkillItem}>
-                <Text style={{ color: "#94A3B8" }}>{"·  "}</Text>
+              <Text key={skill.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
+                <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
                 {skill.name}
               </Text>
             ))}
@@ -804,9 +897,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={s.execSideLabel}>LANGUAGES</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
-              <Text key={lang.id} style={s.execSkillItem}>
+              <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
                   {lang.name}
                 </Text>
@@ -821,15 +914,15 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={s.execSideLabel}>CERTIFICATIONS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
                   style={{
-                    fontSize: 7.5,
+                    fontSize: 7.5 * theme.fontScale,
                     fontFamily: "Helvetica-Bold",
-                    color: "#FFFFFF",
-                    lineHeight: 1.4,
+                    color: onAccent,
+                    lineHeight: 1.4 * theme.lineScale,
                   }}
                 >
                   {cert.name.trim()}
@@ -837,9 +930,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                 {(cert.issuer || cert.date) && (
                   <Text
                     style={{
-                      fontSize: 7,
-                      color: "#94A3B8",
-                      lineHeight: 1.4,
+                      fontSize: 7 * theme.fontScale,
+                      color: onAccentMuted,
+                      lineHeight: 1.4 * theme.lineScale,
                     }}
                   >
                     {[cert.issuer?.trim(), cert.date?.trim()]
@@ -854,7 +947,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       </View>
 
       {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 20 }}>
+      <View style={{ flex: 1, paddingLeft: 20 * m }}>
         {/* Summary */}
         {hasSummary && (
           <View style={s.section}>
@@ -871,7 +964,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {data.experience.map((role) => (
+            {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -893,7 +986,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                 {role.location?.trim() && (
                   <Text style={s.entrySubtext}>{role.location.trim()}</Text>
                 )}
-                <BulletList bullets={role.bullets} />
+                <BulletList bullets={role.bullets} s={s} />
               </View>
             ))}
           </View>
@@ -905,8 +998,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {data.education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} />
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
             ))}
           </View>
         )}
@@ -917,7 +1010,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Projects</Text>
             </View>
-            {data.projects.map((project) => {
+            {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -930,7 +1023,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                           src={normalizeHref(project.link)}
                           style={{
                             ...s.entryCompany,
-                            color: theme.accent,
+                            color: theme.accentText,
                             textDecoration: "none",
                           }}
                         >
@@ -939,7 +1032,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                       </Text>
                     ) : null}
                   </Text>
-                  <BulletList bullets={project.bullets ?? []} />
+                  <BulletList bullets={project.bullets ?? []} s={s} />
                 </View>
               );
             })}
@@ -992,39 +1085,79 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
     .join(" · ");
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#111827");
+  const s = buildStyles(theme);
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
 
   // atsSectionHeading already has marginTop: 16 baked in.
   // Override first section to marginTop: 0 via inline style.
+  const skillsFirst = isSkillsFirst(data.settings.domain);
   const firstSection = hasSummary
     ? "summary"
-    : hasExperience
-      ? "experience"
-      : hasEducation
-        ? "education"
-        : hasSkills
-          ? "skills"
-          : hasLanguages
-            ? "languages"
-            : hasCertifications
-              ? "certifications"
-              : hasProjects
-                ? "projects"
-                : null;
+    : skillsFirst && hasSkills
+      ? "skills"
+      : hasExperience
+        ? "experience"
+        : hasEducation
+          ? "education"
+          : hasSkills
+            ? "skills"
+            : hasLanguages
+              ? "languages"
+              : hasCertifications
+                ? "certifications"
+                : hasProjects
+                  ? "projects"
+                  : null;
 
   const headingStyle = (id: string) =>
     firstSection === id
       ? { ...s.atsSectionHeading, marginTop: 0 }
       : s.atsSectionHeading;
+
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const skillsBlock =
+    generalSkills.length > 0 || technicalSkills.length > 0 ? (
+      <>
+        {generalSkills.length > 0 && (
+          <View>
+            <Text style={headingStyle("skills")}>Skills</Text>
+            <Text style={{ ...s.body, color: "#374151" }}>
+              {generalSkills.map((sk) => sk.name).join(" · ")}
+            </Text>
+          </View>
+        )}
+        {technicalSkills.length > 0 && (
+          <View>
+            <Text
+              style={
+                generalSkills.length === 0
+                  ? headingStyle("skills")
+                  : s.atsSectionHeading
+              }
+            >
+              Technical Skills
+            </Text>
+            <Text style={{ ...s.body, color: "#374151" }}>
+              {technicalSkills.map((sk) => sk.name).join(" · ")}
+            </Text>
+          </View>
+        )}
+      </>
+    ) : null;
 
   return (
     <View>
@@ -1039,11 +1172,11 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       >
         <View style={{ flex: 1 }}>
           <View style={{ marginBottom: 6 }}>
-            <Text style={{ ...s.atsName, lineHeight: 1 }}>{name}</Text>
+            <Text style={{ ...s.atsName, lineHeight: 1 * theme.lineScale }}>{name}</Text>
           </View>
           {data.personal.headline?.trim() ? (
             <View style={{ marginBottom: 4 }}>
-              <Text style={{ ...s.atsHeadline, lineHeight: 1.2 }}>
+              <Text style={{ ...s.atsHeadline, lineHeight: 1.2 * theme.lineScale }}>
                 {data.personal.headline.trim()}
               </Text>
             </View>
@@ -1092,29 +1225,32 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           />
         )}
       </View>
-      <View style={{ ...s.atsDivider, borderBottomColor: theme.accent }} />
+      <View style={{ ...s.atsDivider, borderBottomColor: theme.accentText }} />
 
       {/* ── Summary ── */}
       {hasSummary && (
         <View>
           <Text style={headingStyle("summary")}>Summary</Text>
-          <Text style={{ ...s.body, color: "#374151", lineHeight: 1.6 }}>
+          <Text style={{ ...s.body, color: "#374151", lineHeight: 1.6 * theme.lineScale }}>
             {data.personal.summary?.trim()}
           </Text>
         </View>
       )}
 
+      {/* ── Skills (hoisted above experience for skills-first domains) ── */}
+      {skillsFirst ? skillsBlock : null}
+
       {/* ── Experience ── */}
       {hasExperience && (
         <View>
           <Text style={headingStyle("experience")}>Experience</Text>
-          {data.experience.map((role) => (
-            <View key={role.id} style={{ marginBottom: 9 }} minPresenceAhead={48}>
+          {experience.map((role) => (
+            <View key={role.id} style={{ marginBottom: 9 * theme.spaceScale }} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text
                   style={{
                     fontFamily: "Helvetica-Bold",
-                    fontSize: 8.6,
+                    fontSize: 8.6 * theme.fontScale,
                     color: "#111827",
                   }}
                 >
@@ -1122,7 +1258,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                 </Text>
                 <Text
                   style={{
-                    fontSize: 7.8,
+                    fontSize: 7.8 * theme.fontScale,
                     color: "#6B7280",
                     flexShrink: 0,
                     paddingLeft: 6,
@@ -1138,7 +1274,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
               {(role.company || role.location) && (
                 <Text
                   style={{
-                    fontSize: 8.25,
+                    fontSize: 8.25 * theme.fontScale,
                     color: "#374151",
                     marginTop: 1,
                     marginBottom: 3,
@@ -1149,7 +1285,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                   {role.location?.trim() || ""}
                 </Text>
               )}
-              <BulletList bullets={role.bullets} />
+              <BulletList bullets={role.bullets} s={s} />
             </View>
           ))}
         </View>
@@ -1159,13 +1295,15 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasEducation && (
         <View>
           <Text style={headingStyle("education")}>Education</Text>
-          {data.education.map((edu) => (
+          {education.map((edu) => (
             <EducationEntry
               key={edu.id}
               edu={edu}
+              s={s}
+              fontScale={theme.fontScale}
               headingStyle={{
                 fontFamily: "Helvetica-Bold",
-                fontSize: 8.6,
+                fontSize: 8.6 * theme.fontScale,
                 color: "#111827",
               }}
             />
@@ -1173,15 +1311,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         </View>
       )}
 
-      {/* ── Skills ── */}
-      {hasSkills && (
-        <View>
-          <Text style={headingStyle("skills")}>Skills</Text>
-          <Text style={{ ...s.body, color: "#374151" }}>
-            {data.skills.map((sk) => sk.name).join(" · ")}
-          </Text>
-        </View>
-      )}
+      {/* ── Skills (rendered above if skills-first) ── */}
+      {skillsFirst ? null : skillsBlock}
 
       {/* ── Languages ── */}
       {hasLanguages && (
@@ -1226,14 +1357,14 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasProjects && (
         <View>
           <Text style={headingStyle("projects")}>Projects</Text>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
-              <View key={project.id} style={{ marginBottom: 8 }} wrap={false}>
+              <View key={project.id} style={{ marginBottom: 8 * theme.spaceScale }} wrap={false}>
                 <Text
                   style={{
                     fontFamily: "Helvetica-Bold",
-                    fontSize: 8.6,
+                    fontSize: 8.6 * theme.fontScale,
                     color: "#111827",
                   }}
                 >
@@ -1242,7 +1373,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                 {showLink && (
                   <Text
                     style={{
-                      fontSize: 7.5,
+                      fontSize: 7.5 * theme.fontScale,
                       color: "#6B7280",
                       marginTop: 1,
                     }}
@@ -1251,7 +1382,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                     <Link
                       src={normalizeHref(project.link)}
                       style={{
-                        fontSize: 7.5,
+                        fontSize: 7.5 * theme.fontScale,
                         color: "#6B7280",
                         textDecoration: "none",
                       }}
@@ -1261,7 +1392,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                     {")"}
                   </Text>
                 )}
-                <BulletList bullets={project.bullets ?? []} />
+                <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             );
           })}
@@ -1281,13 +1412,17 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1e5b54");
+  const s = buildStyles(theme);
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1323,7 +1458,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
 
   const modernSectionHeadingWrap: Style = {
     borderLeftWidth: 3,
-    borderLeftColor: theme.accent,
+    borderLeftColor: theme.accentText,
     paddingLeft: 8,
     marginBottom: 6,
   };
@@ -1334,13 +1469,13 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
           <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, color: theme.accent, lineHeight: 1 }}>
+            <Text style={{ ...s.name, color: theme.accentText, lineHeight: 1 * theme.lineScale }}>
               {name}
             </Text>
           </View>
           {data.personal.headline?.trim() ? (
             <View style={{ marginBottom: 3 }}>
-              <Text style={{ ...s.headline, lineHeight: 1.2 }}>
+              <Text style={{ ...s.headline, lineHeight: 1.2 * theme.lineScale }}>
                 {data.personal.headline.trim()}
               </Text>
             </View>
@@ -1379,10 +1514,10 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   key={chip.label}
                   style={{ flexDirection: "row", alignItems: "center" }}
                 >
-                  <Text style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
+                  <Text style={{ fontSize: 9 * theme.fontScale, color: theme.accentText, fontWeight: 600 }}>
                     {chip.label}:
                   </Text>
-                  <Text style={{ fontSize: 9, color: "#374151", marginLeft: 2 }}>
+                  <Text style={{ fontSize: 9 * theme.fontScale, color: "#374151", marginLeft: 2 }}>
                     {chip.value}
                   </Text>
                   {i < essentialChips.length - 1 && (
@@ -1421,7 +1556,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Experience</Text>
           </View>
-          {data.experience.map((role) => (
+          {experience.map((role) => (
             <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -1443,7 +1578,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               {role.location?.trim() && (
                 <Text style={s.entrySubtext}>{role.location.trim()}</Text>
               )}
-              <BulletList bullets={role.bullets} />
+              <BulletList bullets={role.bullets} s={s} />
             </View>
           ))}
         </View>
@@ -1455,8 +1590,8 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {data.education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} />
+          {education.map((edu) => (
+            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
           ))}
         </View>
       )}
@@ -1523,7 +1658,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <View style={modernSectionHeadingWrap}>
             <Text style={s.sectionHeading}>Projects</Text>
           </View>
-          {data.projects.map((project) => {
+          {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
               <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -1545,7 +1680,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                     </Text>
                   ) : null}
                 </Text>
-                <BulletList bullets={project.bullets ?? []} />
+                <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             );
           })}
@@ -1565,12 +1700,15 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   const contactParts: Array<{ text: string; href?: string }> = [];
   if (data.personal.email?.trim())
@@ -1600,6 +1738,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#1B2A4A");
+  const s = buildStyles(theme);
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1625,10 +1765,10 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         <View style={{ flex: 1 }}>
           <Text
             style={{
-              fontSize: 20,
+              fontSize: 20 * theme.fontScale,
               fontFamily: "Helvetica-Bold",
-              color: "#FFFFFF",
-              lineHeight: 1.15,
+              color: onAccent,
+              lineHeight: 1.15 * theme.lineScale,
             }}
           >
             {name}
@@ -1636,10 +1776,10 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           {data.personal.headline?.trim() ? (
             <Text
               style={{
-                fontSize: 9,
-                color: "#94A3B8",
+                fontSize: 9 * theme.fontScale,
+                color: onAccentMuted,
                 marginTop: 3,
-                lineHeight: 1.4,
+                lineHeight: 1.4 * theme.lineScale,
               }}
             >
               {data.personal.headline.trim()}
@@ -1663,9 +1803,9 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                     <Link
                       src={item.href}
                       style={{
-                        fontSize: 7.5,
-                        color: "#CBD5E1",
-                        lineHeight: 1.6,
+                        fontSize: 7.5 * theme.fontScale,
+                        color: onAccentMuted,
+                        lineHeight: 1.6 * theme.lineScale,
                         textDecoration: "underline",
                       }}
                     >
@@ -1674,9 +1814,9 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   ) : (
                     <Text
                       style={{
-                        fontSize: 7.5,
-                        color: "#CBD5E1",
-                        lineHeight: 1.6,
+                        fontSize: 7.5 * theme.fontScale,
+                        color: onAccentMuted,
+                        lineHeight: 1.6 * theme.lineScale,
                       }}
                     >
                       {item.text}
@@ -1685,9 +1825,9 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   {i < contactParts.length - 1 && (
                     <Text
                       style={{
-                        fontSize: 7.5,
-                        color: "#CBD5E1",
-                        lineHeight: 1.6,
+                        fontSize: 7.5 * theme.fontScale,
+                        color: onAccentMuted,
+                        lineHeight: 1.6 * theme.lineScale,
                         marginHorizontal: 4,
                       }}
                     >
@@ -1723,15 +1863,15 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                 >
                   <Text
                     style={{
-                      fontSize: 7,
-                      color: "#94A3B8",
+                      fontSize: 7 * theme.fontScale,
+                      color: onAccentMuted,
                       fontFamily: "Helvetica-Bold",
                       marginRight: 3,
                     }}
                   >
                     {chip.label}
                   </Text>
-                  <Text style={{ fontSize: 7, color: "#E2E8F0" }}>
+                  <Text style={{ fontSize: 7 * theme.fontScale, color: onAccentMuted }}>
                     {chip.value}
                   </Text>
                 </View>
@@ -1765,7 +1905,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Experience</Text>
               </View>
-              {data.experience.map((role) => (
+              {experience.map((role) => (
                 <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                   <View style={s.entryRow}>
                     <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -1787,7 +1927,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   {role.location?.trim() && (
                     <Text style={s.entrySubtext}>{role.location.trim()}</Text>
                   )}
-                  <BulletList bullets={role.bullets} />
+                  <BulletList bullets={role.bullets} s={s} />
                 </View>
               ))}
             </View>
@@ -1798,8 +1938,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Education</Text>
               </View>
-              {data.education.map((edu) => (
-                <EducationEntry key={edu.id} edu={edu} />
+              {education.map((edu) => (
+                <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
               ))}
             </View>
           )}
@@ -1809,7 +1949,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Projects</Text>
               </View>
-              {data.projects.map((project) => {
+              {projects.map((project) => {
                 const showLink = shouldShowProjectLink(project.link);
                 return (
                   <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -1831,7 +1971,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                         </Text>
                       ) : null}
                     </Text>
-                    <BulletList bullets={project.bullets ?? []} />
+                    <BulletList bullets={project.bullets ?? []} s={s} />
                   </View>
                 );
               })}
@@ -1846,7 +1986,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Summary</Text>
               </View>
-              <Text style={{ ...s.body, fontSize: 8 }}>
+              <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
                 {data.personal.summary?.trim()}
               </Text>
             </View>
@@ -1857,7 +1997,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Skills</Text>
               </View>
-              <Text style={{ ...s.body, fontSize: 8 }}>
+              <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
                 {data.skills.map((sk) => sk.name).join(", ")}
               </Text>
             </View>
@@ -1871,7 +2011,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               {data.languages.map((lang) => (
                 <Text
                   key={lang.id}
-                  style={{ fontSize: 8, color: SLATE_700, lineHeight: 1.6 }}
+                  style={{ fontSize: 8 * theme.fontScale, color: SLATE_700, lineHeight: 1.6 * theme.lineScale }}
                 >
                   <Text style={{ fontFamily: "Helvetica-Bold" }}>
                     {lang.name}
@@ -1893,7 +2033,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                 <View key={cert.id} style={{ marginBottom: 3 }}>
                   <Text
                     style={{
-                      fontSize: 8,
+                      fontSize: 8 * theme.fontScale,
                       fontFamily: "Helvetica-Bold",
                       color: SLATE_800,
                     }}
@@ -1901,7 +2041,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                     {cert.name.trim()}
                   </Text>
                   {(cert.issuer || cert.date) && (
-                    <Text style={{ fontSize: 7.5, color: SLATE_500 }}>
+                    <Text style={{ fontSize: 7.5 * theme.fontScale, color: SLATE_500 }}>
                       {[cert.issuer?.trim(), cert.date?.trim()]
                         .filter(Boolean)
                         .join(" \u00B7 ")}
@@ -1927,12 +2067,15 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     "Your Name";
 
   const hasSummary = Boolean(data.personal.summary?.trim());
-  const hasExperience = data.experience.length > 0;
-  const hasEducation = data.education.length > 0;
+  const experience = meaningfulExperience(data.experience);
+  const hasExperience = experience.length > 0;
+  const education = meaningfulEducation(data.education);
+  const hasEducation = education.length > 0;
   const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const hasProjects = data.projects.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasProjects = projects.length > 0;
 
   const sidebarContacts: Array<{
     label: string;
@@ -1981,6 +2124,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#0F172A");
+  const s = buildStyles(theme);
+  const m = theme.marginScale;
+  const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1988,7 +2134,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
       {/* ── Left main content ── */}
-      <View style={{ flex: 1, paddingRight: 14 }}>
+      <View style={{ flex: 1, paddingRight: 14 * m }}>
         {/* Name header */}
         <View
           style={{
@@ -2000,10 +2146,10 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         >
           <Text
             style={{
-              fontSize: 20,
+              fontSize: 20 * theme.fontScale,
               fontFamily: "Helvetica-Bold",
               color: "#0F172A",
-              lineHeight: 1.15,
+              lineHeight: 1.15 * theme.lineScale,
             }}
           >
             {name}
@@ -2011,7 +2157,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
           {data.personal.headline?.trim() ? (
             <Text
               style={{
-                fontSize: 9,
+                fontSize: 9 * theme.fontScale,
                 color: SLATE_500,
                 marginTop: 2,
               }}
@@ -2035,7 +2181,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {data.experience.map((role) => (
+            {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
                   <Text style={{ ...s.entryTitle, flex: 1 }}>
@@ -2057,7 +2203,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 {role.location?.trim() && (
                   <Text style={s.entrySubtext}>{role.location.trim()}</Text>
                 )}
-                <BulletList bullets={role.bullets} />
+                <BulletList bullets={role.bullets} s={s} />
               </View>
             ))}
           </View>
@@ -2068,8 +2214,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {data.education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} />
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
             ))}
           </View>
         )}
@@ -2079,7 +2225,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Projects</Text>
             </View>
-            {data.projects.map((project) => {
+            {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
                 <View key={project.id} style={s.entryBlock} wrap={false}>
@@ -2101,7 +2247,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                       </Text>
                     ) : null}
                   </Text>
-                  <BulletList bullets={project.bullets ?? []} />
+                  <BulletList bullets={project.bullets ?? []} s={s} />
                 </View>
               );
             })}
@@ -2150,14 +2296,14 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>CONTACT</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
             {sidebarContacts.map((item, i) => (
               <View key={i} style={{ marginBottom: 3 }}>
                 <Text
                   style={{
-                    fontSize: 6,
+                    fontSize: 6 * theme.fontScale,
                     fontFamily: "Helvetica-Bold",
-                    color: "rgba(255,255,255,0.35)",
+                    color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
                 >
@@ -2168,7 +2314,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                     src={item.href}
                     style={{
                       ...s.execContactItem,
-                      fontSize: item.fontSize ?? 7.5,
+                      fontSize: (item.fontSize ?? 7.5) * theme.fontScale,
                       textDecoration: "underline",
                     }}
                   >
@@ -2178,7 +2324,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       ...s.execContactItem,
-                      fontSize: item.fontSize ?? 7.5,
+                      fontSize: (item.fontSize ?? 7.5) * theme.fontScale,
                     }}
                   >
                     {item.value}
@@ -2192,20 +2338,20 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={s.execSideLabel}>PERSONAL</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
             {essentialChips.map((chip) => (
               <View key={chip.label} style={{ marginBottom: 3 }}>
                 <Text
                   style={{
-                    fontSize: 6,
+                    fontSize: 6 * theme.fontScale,
                     fontFamily: "Helvetica-Bold",
-                    color: "rgba(255,255,255,0.35)",
+                    color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
                 >
                   {chip.label.toUpperCase()}
                 </Text>
-                <Text style={{ ...s.execContactItem, fontSize: 7.5 }}>
+                <Text style={{ ...s.execContactItem, fontSize: 7.5 * theme.fontScale }}>
                   {chip.value}
                 </Text>
               </View>
@@ -2216,12 +2362,12 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={s.execSideLabel}>SKILLS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
             <Text
               style={{
-                fontSize: 7.5,
-                color: "#E2E8F0",
-                lineHeight: 1.6,
+                fontSize: 7.5 * theme.fontScale,
+                color: onAccentMuted,
+                lineHeight: 1.6 * theme.lineScale,
               }}
             >
               {data.skills.map((sk) => sk.name).join(", ")}
@@ -2232,9 +2378,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={s.execSideLabel}>LANGUAGES</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
-              <Text key={lang.id} style={s.execSkillItem}>
+              <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
                   {lang.name}
                 </Text>
@@ -2249,15 +2395,15 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={s.execSideLabel}>CERTIFICATIONS</Text>
+            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
                   style={{
-                    fontSize: 7.5,
+                    fontSize: 7.5 * theme.fontScale,
                     fontFamily: "Helvetica-Bold",
-                    color: "#FFFFFF",
-                    lineHeight: 1.4,
+                    color: onAccent,
+                    lineHeight: 1.4 * theme.lineScale,
                   }}
                 >
                   {cert.name.trim()}
@@ -2265,9 +2411,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 {(cert.issuer || cert.date) && (
                   <Text
                     style={{
-                      fontSize: 7,
-                      color: "#94A3B8",
-                      lineHeight: 1.4,
+                      fontSize: 7 * theme.fontScale,
+                      color: onAccentMuted,
+                      lineHeight: 1.4 * theme.lineScale,
                     }}
                   >
                     {[cert.issuer?.trim(), cert.date?.trim()]
@@ -2275,6 +2421,791 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                       .join(" \u00B7 ")}
                   </Text>
                 )}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   PROFESSIONAL PDF LAYOUT (centered single-column; with/without photo)
+   ═══════════════════════════════════════════════════════════ */
+
+const ProPdfHeading = ({
+  children,
+  accent,
+  fontScale,
+  spaceScale,
+}: {
+  children: string;
+  accent: string;
+  fontScale: number;
+  spaceScale: number;
+}) => (
+  <View
+    style={{
+      marginTop: 14 * spaceScale,
+      marginBottom: 8,
+      paddingBottom: 3,
+      borderBottomWidth: 1.5,
+      borderBottomColor: accent,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 9 * fontScale,
+        fontFamily: "Helvetica-Bold",
+        color: "#111827",
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </Text>
+  </View>
+);
+
+const ProfessionalPDFLayout = ({
+  data,
+  withPhoto,
+}: {
+  data: CvData;
+  withPhoto: boolean;
+}) => {
+  const theme = resolveTheme(data.settings, "#1f2937");
+  const s = buildStyles(theme);
+  // On a white page, accent is used only as text/border → use the readable form.
+  const accent = theme.accentText;
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasProjects = projects.length > 0;
+  const skillsFirst = isSkillsFirst(data.settings.domain);
+  const photo =
+    withPhoto && theme.photoVisible && data.personal.photo
+      ? data.personal.photo
+      : null;
+  const essentialChips = getEssentialChips(data.personal);
+
+  const contactBits = [
+    data.personal.email?.trim(),
+    data.personal.phone?.trim(),
+    data.personal.location?.trim(),
+    data.personal.linkedin?.trim()
+      ? shortenDisplayUrl(data.personal.linkedin.trim())
+      : "",
+    data.personal.website?.trim()
+      ? shortenDisplayUrl(data.personal.website.trim())
+      : "",
+  ].filter(Boolean);
+
+  const skillsSection = hasSkills ? (
+    <>
+      {generalSkills.length > 0 && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</ProPdfHeading>
+          <Text style={{ ...s.body, textAlign: "center" }}>
+            {generalSkills.map((sk) => sk.name).join("   •   ")}
+          </Text>
+        </View>
+      )}
+      {technicalSkills.length > 0 && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Technical Skills</ProPdfHeading>
+          <Text style={{ ...s.body, textAlign: "center" }}>
+            {technicalSkills.map((sk) => sk.name).join("   •   ")}
+          </Text>
+        </View>
+      )}
+    </>
+  ) : null;
+
+  return (
+    <View>
+      {/* Centered header */}
+      <View style={{ alignItems: "center", paddingBottom: 4 }}>
+        {photo ? (
+          <Image
+            src={photo}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              objectFit: "cover",
+              borderWidth: 1.5,
+              borderColor: accent,
+              marginBottom: 6,
+            }}
+          />
+        ) : null}
+        <Text
+          style={{
+            fontSize: 20 * theme.fontScale,
+            fontFamily: "Helvetica-Bold",
+            color: "#111827",
+            letterSpacing: 1,
+            textAlign: "center",
+          }}
+        >
+          {name.toUpperCase()}
+        </Text>
+        {headline ? (
+          <Text style={{ fontSize: 10 * theme.fontScale, color: accent, marginTop: 3, textAlign: "center" }}>
+            {headline}
+          </Text>
+        ) : null}
+        {contactBits.length > 0 ? (
+          <Text style={{ fontSize: 8 * theme.fontScale, color: SLATE_500, marginTop: 4, textAlign: "center" }}>
+            {contactBits.join("   •   ")}
+          </Text>
+        ) : null}
+        {essentialChips.length > 0 ? (
+          <Text style={{ fontSize: 7.5 * theme.fontScale, color: SLATE_600, marginTop: 3, textAlign: "center" }}>
+            {essentialChips.map((c) => `${c.label}: ${c.value}`).join("   ·   ")}
+          </Text>
+        ) : null}
+      </View>
+
+      {hasSummary && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Summary</ProPdfHeading>
+          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+        </View>
+      )}
+
+      {skillsFirst ? skillsSection : null}
+
+      {hasExperience && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</ProPdfHeading>
+          {experience.map((role) => (
+            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+              <View style={s.entryRow}>
+                <Text style={{ ...s.entryTitle, flex: 1 }}>
+                  {role.role?.trim() || "Role"}
+                  {role.company ? (
+                    <Text style={s.entryCompany}>{` | ${role.company.trim()}`}</Text>
+                  ) : null}
+                </Text>
+                <Text style={s.entryDate}>
+                  {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                </Text>
+              </View>
+              {role.location?.trim() ? (
+                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
+              ) : null}
+              <BulletList bullets={role.bullets} s={s} />
+            </View>
+          ))}
+        </View>
+      )}
+
+      {hasEducation && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
+          {education.map((edu) => (
+            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          ))}
+        </View>
+      )}
+
+      {skillsFirst ? null : skillsSection}
+
+      {(hasLanguages || hasCertifications) && (
+        <View style={s.twoCol}>
+          {hasLanguages && (
+            <View style={s.twoColItem}>
+              <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Languages</ProPdfHeading>
+              <Text style={{ ...s.body, textAlign: "center" }}>
+                {data.languages
+                  .map(
+                    (lang) =>
+                      `${lang.name}${lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}`,
+                  )
+                  .join("   •   ")}
+              </Text>
+            </View>
+          )}
+          {hasCertifications && (
+            <View style={s.twoColItem}>
+              <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</ProPdfHeading>
+              {data.certifications.map((cert) => (
+                <Text key={cert.id} style={{ ...s.body, textAlign: "center" }}>
+                  {cert.name.trim()}
+                  {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                    ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                    : ""}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {hasProjects && (
+        <View>
+          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
+          {projects.map((project) => (
+            <View key={project.id} style={s.entryBlock} wrap={false}>
+              <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+              <BulletList bullets={project.bullets ?? []} s={s} />
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ONYX PDF LAYOUT (charcoal left sidebar + photo)
+   ═══════════════════════════════════════════════════════════ */
+
+const OnyxHeading = ({
+  children,
+  accent,
+  fontScale,
+  spaceScale,
+}: {
+  children: string;
+  accent: string;
+  fontScale: number;
+  spaceScale: number;
+}) => (
+  <View
+    style={{
+      marginTop: 14 * spaceScale,
+      marginBottom: 7,
+      paddingBottom: 3,
+      borderBottomWidth: 1.5,
+      borderBottomColor: accent,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 9.5 * fontScale,
+        fontFamily: "Helvetica-Bold",
+        color: "#1F2937",
+        letterSpacing: 0.6,
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </Text>
+  </View>
+);
+
+const OnyxPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#262626");
+  const s = buildStyles(theme);
+  const m = theme.marginScale;
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
+  const firstName = data.personal.firstName?.trim() || "First";
+  const lastName = data.personal.lastName?.trim() || "Last";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const essentialChips = getEssentialChips(data.personal);
+
+  const contactItems: Array<{ text: string; href?: string; fontSize?: number }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
+    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 24 ? 6.4 * theme.fontScale : undefined });
+  }
+  if (data.personal.phone?.trim())
+    contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
+  if (data.personal.location?.trim())
+    contactItems.push({ text: data.personal.location.trim() });
+  if (data.personal.linkedin?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
+  if (data.personal.website?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+
+  const sideLabel = {
+    fontSize: 7 * theme.fontScale,
+    fontFamily: "Helvetica-Bold",
+    color: onAccentMuted,
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    marginTop: 14,
+    textTransform: "uppercase" as const,
+  };
+  const sideText = { fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 };
+
+  return (
+    <View style={{ flexDirection: "row", flex: 1 }}>
+      {/* ── Charcoal sidebar (edge-bleed) ── */}
+      <View
+        style={{
+          width: 172,
+          backgroundColor: accent,
+          marginTop: -27,
+          marginBottom: -27,
+          marginLeft: -24,
+          paddingTop: 26,
+          paddingBottom: 26,
+          paddingLeft: 16,
+          paddingRight: 16,
+          flexShrink: 0,
+        }}
+      >
+        {showPhoto && data.personal.photo ? (
+          <View style={{ alignItems: "center", marginBottom: 12 }}>
+            <Image
+              src={data.personal.photo}
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: data.settings.photoShape === "square" ? 8 : 42,
+                objectFit: "cover",
+                borderWidth: 2,
+                borderColor: bandBorder,
+              }}
+            />
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+          {firstName} {lastName}
+        </Text>
+        {headline ? (
+          <Text
+            style={{
+              fontSize: 8 * theme.fontScale,
+              color: onAccentMuted,
+              textAlign: "center",
+              marginTop: 3,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: bandBorder,
+            }}
+          >
+            {headline}
+          </Text>
+        ) : null}
+
+        {hasSummary && (
+          <View>
+            <Text style={sideLabel}>ABOUT ME</Text>
+            <Text style={{ fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.55 * theme.lineScale }}>
+              {data.personal.summary?.trim()}
+            </Text>
+          </View>
+        )}
+
+        {contactItems.length > 0 && (
+          <View>
+            <Text style={sideLabel}>CONTACT</Text>
+            {contactItems.map((item, i) =>
+              item.href ? (
+                <Link
+                  key={i}
+                  src={item.href}
+                  style={{ ...sideText, textDecoration: "none", ...(item.fontSize ? { fontSize: item.fontSize } : {}) }}
+                >
+                  {item.text}
+                </Link>
+              ) : (
+                <Text key={i} style={sideText}>
+                  {item.text}
+                </Text>
+              ),
+            )}
+          </View>
+        )}
+
+        {hasLanguages && (
+          <View>
+            <Text style={sideLabel}>LANGUAGES</Text>
+            {data.languages.map((lang) => (
+              <Text key={lang.id} style={sideText}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: onAccent }}>{lang.name}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {essentialChips.length > 0 && (
+          <View>
+            <Text style={sideLabel}>DETAILS</Text>
+            {essentialChips.map((chip) => (
+              <Text key={chip.label} style={sideText}>
+                <Text style={{ color: onAccentMuted, fontFamily: "Helvetica-Bold" }}>{chip.label}: </Text>
+                {chip.value}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Main column ── */}
+      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+        {hasExperience && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
+            {experience.map((role) => (
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+                <View style={s.entryRow}>
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
+                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
+                    ) : null}
+                  </Text>
+                  <Text style={s.entryDate}>
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  </Text>
+                </View>
+                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
+                <BulletList bullets={role.bullets} s={s} />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {hasEducation && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            ))}
+          </View>
+        )}
+
+        {hasSkills && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+              {data.skills.map((skill) => (
+                <Text
+                  key={skill.id}
+                  style={{
+                    fontSize: 8 * theme.fontScale,
+                    color: "#374151",
+                    backgroundColor: "#F3F4F6",
+                    borderWidth: 0.5,
+                    borderColor: "#E5E7EB",
+                    borderRadius: 3,
+                    paddingVertical: 1.5,
+                    paddingHorizontal: 5,
+                  }}
+                >
+                  {skill.name}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasCertifications && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            {data.certifications.map((cert) => (
+              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                  : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {hasProjects && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            {projects.map((project) => (
+              <View key={project.id} style={s.entryBlock} wrap={false}>
+                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <BulletList bullets={project.bullets ?? []} s={s} />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SANDSTONE PDF LAYOUT (warm beige left sidebar + photo + personal details)
+   ═══════════════════════════════════════════════════════════ */
+
+const SandstonePDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#ECE3D2");
+  const s = buildStyles(theme);
+  const m = theme.marginScale;
+  const { accent, accentText, onAccent, onAccentMuted } = theme;
+  const bandBorder =
+    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)";
+  const firstName = data.personal.firstName?.trim() || "First";
+  const lastName = data.personal.lastName?.trim() || "Last";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasSkills = data.skills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const essentialChips = getEssentialChips(data.personal);
+  const personalDetails = [
+    ...essentialChips.map((c) => ({ label: c.label, value: c.value })),
+    data.personal.dateOfBirth?.trim()
+      ? { label: "Date of birth", value: data.personal.dateOfBirth.trim() }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const contactItems: Array<{ text: string; href?: string; fontSize?: number }> = [];
+  if (data.personal.email?.trim()) {
+    const email = data.personal.email.trim();
+    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 26 ? 6.4 : undefined });
+  }
+  if (data.personal.phone?.trim())
+    contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
+  if (data.personal.location?.trim())
+    contactItems.push({ text: data.personal.location.trim() });
+  if (data.personal.linkedin?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
+  if (data.personal.website?.trim())
+    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+
+  const SIDE_TEXT = onAccent;
+  const SIDE_MUTED = onAccentMuted;
+  const sideLabel = {
+    fontSize: 7 * theme.fontScale,
+    fontFamily: "Helvetica-Bold",
+    color: SIDE_MUTED,
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    marginTop: 14,
+    textTransform: "uppercase" as const,
+  };
+
+  return (
+    <View style={{ flexDirection: "row", flex: 1 }}>
+      {/* ── Warm sidebar (edge-bleed) ── */}
+      <View
+        style={{
+          width: 180,
+          backgroundColor: accent,
+          marginTop: -27,
+          marginBottom: -27,
+          marginLeft: -24,
+          paddingTop: 26,
+          paddingBottom: 26,
+          paddingLeft: 16,
+          paddingRight: 16,
+          flexShrink: 0,
+        }}
+      >
+        {showPhoto && data.personal.photo ? (
+          <View style={{ alignItems: "center", marginBottom: 12 }}>
+            <Image
+              src={data.personal.photo}
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: data.settings.photoShape === "square" ? 8 : 44,
+                objectFit: "cover",
+                borderWidth: 2,
+                borderColor: bandBorder,
+              }}
+            />
+          </View>
+        ) : null}
+
+        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+          {firstName} {lastName}
+        </Text>
+        {headline ? (
+          <Text
+            style={{
+              fontSize: 8 * theme.fontScale,
+              color: onAccentMuted,
+              fontFamily: "Helvetica-Bold",
+              textAlign: "center",
+              marginTop: 3,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: bandBorder,
+            }}
+          >
+            {headline}
+          </Text>
+        ) : null}
+
+        {personalDetails.length > 0 && (
+          <View>
+            <Text style={sideLabel}>PERSONAL DETAILS</Text>
+            {personalDetails.map((d) => (
+              <View key={d.label} style={{ marginBottom: 4 }}>
+                <Text style={{ fontSize: 6.5 * theme.fontScale, fontFamily: "Helvetica-Bold", color: SIDE_MUTED, letterSpacing: 0.4 }}>
+                  {d.label.toUpperCase()}
+                </Text>
+                <Text style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.4 * theme.lineScale }}>{d.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {contactItems.length > 0 && (
+          <View>
+            <Text style={sideLabel}>CONTACT</Text>
+            {contactItems.map((item, i) =>
+              item.href ? (
+                <Link
+                  key={i}
+                  src={item.href}
+                  style={{ fontSize: (item.fontSize ?? 7.8) * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 2, textDecoration: "none" }}
+                >
+                  {item.text}
+                </Link>
+              ) : (
+                <Text key={i} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 }}>
+                  {item.text}
+                </Text>
+              ),
+            )}
+          </View>
+        )}
+
+        {hasLanguages && (
+          <View>
+            <Text style={sideLabel}>LANGUAGES</Text>
+            {data.languages.map((lang) => (
+              <Text key={lang.id} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 1 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: "#292524" }}>{lang.name}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Main column ── */}
+      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+        {hasSummary && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>About Me</OnyxHeading>
+            <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+          </View>
+        )}
+
+        {hasExperience && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
+            {experience.map((role) => (
+              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
+                <View style={s.entryRow}>
+                  <Text style={{ ...s.entryTitle, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
+                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
+                    ) : null}
+                  </Text>
+                  <Text style={s.entryDate}>
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  </Text>
+                </View>
+                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
+                <BulletList bullets={role.bullets} s={s} />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {hasEducation && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            {education.map((edu) => (
+              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            ))}
+          </View>
+        )}
+
+        {hasSkills && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+              {data.skills.map((skill) => (
+                <Text
+                  key={skill.id}
+                  style={{
+                    fontSize: 8 * theme.fontScale,
+                    color: "#44403C",
+                    backgroundColor: "#F5F0E6",
+                    borderWidth: 0.5,
+                    borderColor: "#E2D8C4",
+                    borderRadius: 3,
+                    paddingVertical: 1.5,
+                    paddingHorizontal: 5,
+                  }}
+                >
+                  {skill.name}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasCertifications && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            {data.certifications.map((cert) => (
+              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
+                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
+                  : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {hasProjects && (
+          <View>
+            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            {projects.map((project) => (
+              <View key={project.id} style={s.entryBlock} wrap={false}>
+                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             ))}
           </View>
@@ -2299,6 +3230,35 @@ export const CVDocument = ({
   plan = "free",
   templateId = "classic",
 }: Props) => {
+  // Page Margins (theme.marginScale) scales the shared page padding — but ONLY
+  // for single-column templates, whose content sits directly under s.page. The
+  // two-column/sidebar layouts bleed to the page edge with hardcoded negative
+  // margins tied to s.page's 24/27, so scaling their page padding would break
+  // the bleed; their main-column margins land in the next pass.
+  const theme = resolveTheme(data.settings);
+  const s = buildStyles(theme);
+  const marginScale = theme.marginScale;
+  // Templates whose content sits directly under s.page (no edge-bleed) — their
+  // page padding scales with margins. Modern is two-column but has no bleed, so
+  // it belongs here too. The true edge-bleed sidebars (executive/exec-split/
+  // corp-sidebar/onyx/sandstone) instead scale their MAIN-COLUMN padding.
+  const SINGLE_COLUMN = new Set([
+    "classic",
+    "ats-clean",
+    "professional",
+    "professional-photo",
+    "modern",
+  ]);
+  const pageStyle = SINGLE_COLUMN.has(templateId)
+    ? {
+        ...s.page,
+        paddingTop: 27 * marginScale,
+        paddingBottom: 27 * marginScale,
+        paddingLeft: 24 * marginScale,
+        paddingRight: 24 * marginScale,
+      }
+    : s.page;
+
   const renderLayout = () => {
     switch (templateId) {
       case "executive":
@@ -2311,6 +3271,14 @@ export const CVDocument = ({
         return <ExecSplitPDFLayout data={data} />;
       case "corp-sidebar":
         return <CorpSidebarPDFLayout data={data} />;
+      case "professional":
+        return <ProfessionalPDFLayout data={data} withPhoto={false} />;
+      case "professional-photo":
+        return <ProfessionalPDFLayout data={data} withPhoto={true} />;
+      case "onyx":
+        return <OnyxPDFLayout data={data} />;
+      case "sandstone":
+        return <SandstonePDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }
@@ -2318,7 +3286,7 @@ export const CVDocument = ({
 
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={pageStyle}>
         {plan === "free" && (
           <View style={s.watermarkContainer} fixed>
             <Text style={s.watermarkText}>Created with MakeMyCV.ae — Free Plan</Text>
