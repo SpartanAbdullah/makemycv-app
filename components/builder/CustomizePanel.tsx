@@ -305,7 +305,7 @@ export const CustomizePanel = () => {
   const isCustomColor = !ACCENT_SWATCHES.some(
     (sw) => sw.hex.toLowerCase() === accentColor.toLowerCase(),
   );
-  const pageMargins = settings.pageMargins ?? 2;
+  const pageMargins = settings.pageMargins ?? 3;
 
   // Custom-colour drawer, revealed by the "Use custom colour" link. Opens by
   // default when the saved accent isn't one of the presets so it stays visible.

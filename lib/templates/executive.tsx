@@ -97,6 +97,7 @@ export const ExecutiveTemplate = ({
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1E2A4A");
+  const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
 
   const contactItems = [
@@ -403,7 +404,7 @@ export const ExecutiveTemplate = ({
           flex: 1,
           minWidth: 0,
           backgroundColor: "#ffffff",
-          padding: "28px 28px 28px 28px",
+          padding: `${28 * m}px ${28 * m}px ${28 * m}px ${28 * m}px`,
           boxSizing: "border-box" as const,
         }}
       >

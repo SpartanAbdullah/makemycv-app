@@ -125,9 +125,17 @@ export type CvSettings = {
   fontFamily?: CvFontFamily;
   sectionOrder?: string[];
   photoShape?: PhotoShape;
-  // Design & Font controls. pageMargins is a 1–5 level (2 = current default)
-  // that scales content padding; more sliders (spacing/font/line) land later.
+  // Design & Font density controls, each a 1–5 level (3 = neutral = current
+  // default). resolveTheme maps them to multipliers (lib/templates/theme.ts):
+  //   pageMargins → marginScale, fontSize → fontScale,
+  //   lineHeight  → lineScale,   sectionSpacing → spaceScale.
+  // All optional → old CVs load unchanged (undefined ⇒ level 3 ⇒ ×1.0).
+  // NOTE: the `fontScale` field above is a dead legacy multiplier kept only for
+  // saved-data compat; the live font-size control drives `fontSize` instead.
   pageMargins?: number;
+  fontSize?: number;
+  lineHeight?: number;
+  sectionSpacing?: number;
   // Personalization (Phase 1): the job domain we tailor content for.
   // `domain` is inferred from the headline and confirmable via the chip;
   // `domainSource` records whether the value was inferred or user-chosen so

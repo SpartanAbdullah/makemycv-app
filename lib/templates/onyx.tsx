@@ -102,6 +102,7 @@ export const OnyxTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#262626");
   const { accent, accentText, onAccent, onAccentMuted } = theme;
+  const m = theme.marginScale;
 
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -279,7 +280,7 @@ export const OnyxTemplate = ({
       </div>
 
       {/* ── Main column ── */}
-      <div style={{ flex: 1, minWidth: 0, padding: "30px 30px", boxSizing: "border-box" as const }}>
+      <div style={{ flex: 1, minWidth: 0, padding: `${30 * m}px ${30 * m}px`, boxSizing: "border-box" as const }}>
         {hasExperience && (
           <section>
             <MainHeading accent={accentText} isFirst>

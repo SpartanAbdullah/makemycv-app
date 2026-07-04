@@ -16,6 +16,7 @@ export const ModernTemplate = ({
 }) => {
   const name = getFullName(data) || "Your Name";
   const theme = resolveTheme(data.settings, "#1e5b54");
+  const m = theme.marginScale;
   const projects = meaningfulProjects(data.projects);
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -77,8 +78,8 @@ export const ModernTemplate = ({
 
   return (
     <div
-      className="cv-print bg-white text-slate-900 px-8 py-9 text-[0.9rem] leading-relaxed"
-      style={{ fontFamily: theme.fontFamily }}
+      className="cv-print bg-white text-slate-900 text-[0.9rem] leading-relaxed"
+      style={{ fontFamily: theme.fontFamily, padding: `${36 * m}px ${32 * m}px` }}
     >
       <header className="border-b border-slate-200 pb-4">
         <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>

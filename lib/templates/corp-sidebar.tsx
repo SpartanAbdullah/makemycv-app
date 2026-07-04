@@ -79,6 +79,7 @@ export const CorpSidebarTemplate = ({
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#0F172A");
+  const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
 
   const contactItems: Array<{ label: string; value: string; href?: string }> =
@@ -152,7 +153,7 @@ export const CorpSidebarTemplate = ({
         style={{
           flex: 1,
           minWidth: 0,
-          padding: "36px 28px 36px 32px",
+          padding: `${36 * m}px ${28 * m}px ${36 * m}px ${32 * m}px`,
           boxSizing: "border-box" as const,
         }}
       >

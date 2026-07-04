@@ -21,15 +21,34 @@ export type CvTheme = {
   onAccentMuted: string;
   accentSoft: string;
   fontFamily: string;
+  /** Density multipliers, each from a 1–5 "level" control (level 3 = 1.0 = the
+   *  current design, so existing CVs render byte-identically). Multiply the
+   *  matching template literals by these:
+   *   - fontScale   every font-size
+   *   - lineScale   every line-height
+   *   - spaceScale  the vertical gap BETWEEN sections
+   *   - marginScale content/page margins (single-col page padding, two-col main
+   *                 column padding — NOT the sidebar, whose edge-bleed is fixed)
+   *  Level 3 maps to exactly 1.0 via lookup arrays (no float drift), so the
+   *  neutral default never shifts a saved CV. */
   fontScale: number;
-  /** Multiplier for content padding, from the Page Margins control (1–5 level;
-   *  level 2 = 1.0 = the current design). Multiply a template's content padding
-   *  by this so "narrow ↔ wide" actually changes the whitespace. */
+  lineScale: number;
+  spaceScale: number;
   marginScale: number;
   photoVisible: boolean;
 };
 
 const DEFAULT_ACCENT = "#1e5b54";
+
+// 1–5 level → multiplier. Index 2 (level 3) is EXACTLY 1.0 so the neutral
+// default is float-drift-free and renders identical to the pre-slider design.
+const FONT_SCALES = [0.9, 0.95, 1, 1.05, 1.1];
+const LINE_SCALES = [0.9, 0.95, 1, 1.05, 1.1];
+const SPACE_SCALES = [0.7, 0.85, 1, 1.15, 1.3];
+const MARGIN_SCALES = [0.7, 0.85, 1, 1.15, 1.3];
+
+const scaleFor = (arr: number[], level: number | undefined): number =>
+  arr[Math.min(5, Math.max(1, Math.round(level ?? 3))) - 1];
 
 const FONT_FAMILY_MAP: Record<CvFontFamily, string> = {
   sans: "var(--font-body)",
@@ -46,10 +65,6 @@ export function resolveTheme(
   // Muted-on-band: blend the readable ink ~35% toward the band colour — a
   // softened secondary that stays legible on both dark and light accents.
   const onAccentMuted = mix(onAccent, accent, 0.35);
-  // Page Margins: a 1–5 level → padding multiplier. Level 2 (default) maps to
-  // 1.0 so existing CVs are unchanged; 1 = narrower, 5 = wider.
-  const marginLevel = Math.min(5, Math.max(1, settings.pageMargins ?? 2));
-  const marginScale = 0.85 + (marginLevel - 1) * 0.15;
   return {
     accent,
     accentText: ensureReadableOn(accent, "#ffffff", 4.5),
@@ -57,8 +72,10 @@ export function resolveTheme(
     onAccentMuted,
     accentSoft: softTint(accent, 0.9),
     fontFamily: FONT_FAMILY_MAP[settings.fontFamily ?? "sans"],
-    fontScale: settings.fontScale ?? 1,
-    marginScale,
+    fontScale: scaleFor(FONT_SCALES, settings.fontSize),
+    lineScale: scaleFor(LINE_SCALES, settings.lineHeight),
+    spaceScale: scaleFor(SPACE_SCALES, settings.sectionSpacing),
+    marginScale: scaleFor(MARGIN_SCALES, settings.pageMargins),
     photoVisible: settings.photoShape !== "hidden",
   };
 }

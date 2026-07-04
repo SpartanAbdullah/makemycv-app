@@ -126,6 +126,9 @@ export const settingsSchema = z.object({
   domainSource: z.enum(["inferred", "user"]).optional(),
   fontScale: z.number().optional(),
   pageMargins: z.number().optional(),
+  fontSize: z.number().optional(),
+  lineHeight: z.number().optional(),
+  sectionSpacing: z.number().optional(),
   sectionOrder: z.array(z.string()).optional(),
 });
 

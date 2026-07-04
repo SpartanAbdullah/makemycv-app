@@ -693,6 +693,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1E2A4A");
+  const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -890,7 +891,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       </View>
 
       {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 20 }}>
+      <View style={{ flex: 1, paddingLeft: 20 * m }}>
         {/* Summary */}
         {hasSummary && (
           <View style={s.section}>
@@ -2062,6 +2063,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#0F172A");
+  const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -2070,7 +2072,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View style={{ flexDirection: "row", flex: 1 }}>
       {/* ── Left main content ── */}
-      <View style={{ flex: 1, paddingRight: 14 }}>
+      <View style={{ flex: 1, paddingRight: 14 * m }}>
         {/* Name header */}
         <View
           style={{
@@ -2640,6 +2642,7 @@ const OnyxHeading = ({
 
 const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#262626");
+  const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   const bandBorder =
     onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
@@ -2794,7 +2797,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
       </View>
 
       {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 }}>
+      <View style={{ flex: 1, paddingLeft: 18 * m }}>
         {hasExperience && (
           <View>
             <OnyxHeading accent={accentText}>Experience</OnyxHeading>
@@ -2888,6 +2891,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
 const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#ECE3D2");
+  const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   const bandBorder =
     onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)";
@@ -3043,7 +3047,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
       </View>
 
       {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 }}>
+      <View style={{ flex: 1, paddingLeft: 18 * m }}>
         {hasSummary && (
           <View>
             <OnyxHeading accent={accentText}>About Me</OnyxHeading>
@@ -3159,11 +3163,16 @@ export const CVDocument = ({
   // margins tied to s.page's 24/27, so scaling their page padding would break
   // the bleed; their main-column margins land in the next pass.
   const marginScale = resolveTheme(data.settings).marginScale;
+  // Templates whose content sits directly under s.page (no edge-bleed) — their
+  // page padding scales with margins. Modern is two-column but has no bleed, so
+  // it belongs here too. The true edge-bleed sidebars (executive/exec-split/
+  // corp-sidebar/onyx/sandstone) instead scale their MAIN-COLUMN padding.
   const SINGLE_COLUMN = new Set([
     "classic",
     "ats-clean",
     "professional",
     "professional-photo",
+    "modern",
   ]);
   const pageStyle = SINGLE_COLUMN.has(templateId)
     ? {
