@@ -314,8 +314,8 @@ const TopBar = ({
             <>
               <span
                 style={{
-                  width: 11,
-                  height: 11,
+                  width: 13,
+                  height: 13,
                   border: "2px solid rgba(255,255,255,0.4)",
                   borderTopColor: "white",
                   borderRadius: "50%",
@@ -429,7 +429,7 @@ const PreviewDrawer = ({
             type="button"
             onClick={onPrevTemplate}
             aria-label="Previous template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
@@ -438,7 +438,7 @@ const PreviewDrawer = ({
             type="button"
             onClick={onNextTemplate}
             aria-label="Next template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
@@ -475,6 +475,11 @@ const PreviewDrawer = ({
                 type="button"
                 onClick={() => setFitMode(mode)}
                 aria-pressed={active}
+                // Background/color/hover live on .cv-fit-seg (globals.css);
+                // the aria-pressed attribute drives the active-segment state
+                // via its [aria-pressed="true"] selector — no inline colors,
+                // or they'd override the class :hover rule.
+                className="cv-fit-seg"
                 style={{
                   fontFamily: "var(--font-body)",
                   // 12.5 matches the Fullscreen button label — one font size
@@ -488,11 +493,8 @@ const PreviewDrawer = ({
                   justifyContent: "center",
                   borderRadius: 999,
                   border: "none",
-                  background: active ? "var(--ff-ink)" : "transparent",
-                  color: active ? "white" : "var(--ff-muted)",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
-                  transition: "background 120ms, color 120ms",
                 }}
               >
                 {label}
@@ -503,13 +505,14 @@ const PreviewDrawer = ({
         <button
           type="button"
           onClick={onFullscreen}
+          // Surface + border + hover come from .cv-drawer-ctl (globals.css) —
+          // keeping them off the inline style lets the :hover rule apply.
+          className="cv-drawer-ctl"
           style={{
             flex: 1,
             fontFamily: "var(--font-body)",
             fontSize: 12.5,
             color: "var(--ff-ink)",
-            background: "var(--ff-paper)",
-            border: "1px solid var(--ff-line)",
             // Pill family at the shared 36px footer height — matches the
             // cycler and fit toggle beside it (and the mobile footer's
             // full-width pill Download).
@@ -711,7 +714,9 @@ const MobilePreviewView = ({
             alignItems: "center",
             gap: 2,
             padding: "3px 4px 3px 10px",
-            background: "var(--ff-card)",
+            // Paper, not card — matches the desktop drawer's cycler pill so
+            // the shared drawerChevronBtn circles sit flush on both.
+            background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
             borderRadius: 999,
             flexShrink: 0,
@@ -737,7 +742,7 @@ const MobilePreviewView = ({
             type="button"
             onClick={onPrevTemplate}
             aria-label="Previous template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
@@ -746,7 +751,7 @@ const MobilePreviewView = ({
             type="button"
             onClick={onNextTemplate}
             aria-label="Next template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
@@ -877,9 +882,9 @@ const drawerChevronBtn: React.CSSProperties = {
   height: 28,
   // 28px circle — nested-pill idiom (999 inside 999), same as the fit
   // toggle's inner segments; both cycler containers that use this are pills.
+  // Surface + border live on the .cv-drawer-ctl class (globals.css) so its
+  // :hover rule can restyle them — inline declarations would override it.
   borderRadius: 999,
-  border: "1px solid var(--ff-line)",
-  background: "var(--ff-paper)",
   display: "grid",
   placeItems: "center",
   cursor: "pointer",
@@ -1459,7 +1464,7 @@ export const BuilderShell = ({
             <div
               style={{
                 background: "var(--ff-card)",
-                borderRadius: 16,
+                borderRadius: "var(--radius-2xl)",
                 border: "1px solid var(--ff-line)",
                 padding: "26px 28px",
                 width: "min(360px, calc(100vw - 32px))",

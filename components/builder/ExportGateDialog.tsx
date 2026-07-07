@@ -116,7 +116,7 @@ export const ExportGateDialog = ({
           background: "var(--ff-card)",
           borderRadius: "var(--radius-2xl)",
           border: "1px solid var(--ff-line)",
-          padding: 22,
+          padding: 24,
           boxShadow: "0 24px 60px rgba(11,15,12,0.25)",
         }}
       >
@@ -212,7 +212,6 @@ export const ExportGateDialog = ({
           <button
             type="button"
             className="cv-btn-secondary"
-            style={{ padding: "11px 16px" }}
             onClick={onExportAnyway}
           >
             Export anyway
@@ -221,7 +220,6 @@ export const ExportGateDialog = ({
             ref={primaryRef}
             type="button"
             className="cv-btn-primary"
-            style={{ padding: "11px 16px" }}
             onClick={onGoFix}
           >
             <Icon name="edit" size={13} />

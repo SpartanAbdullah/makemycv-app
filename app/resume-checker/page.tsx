@@ -162,7 +162,7 @@ export default function ResumeCheckerPage() {
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 50% 40% at 50% 35%, rgba(37,99,235,0.22), transparent 70%)",
+              "radial-gradient(ellipse 50% 40% at 50% 35%, rgba(14,124,74,0.25), transparent 70%)",
           }}
         />
         <div className="relative mx-auto max-w-5xl px-6 text-center">

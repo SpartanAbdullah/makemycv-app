@@ -41,7 +41,7 @@ export default function ShareButton() {
       aria-live="polite"
       title={HINT}
       aria-label={`Share report. ${HINT}`}
-      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
+      className="inline-flex min-h-10 min-w-[8.75rem] items-center justify-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
     >
       {copied ? (
         <>

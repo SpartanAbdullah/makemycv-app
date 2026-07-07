@@ -415,7 +415,7 @@ export const ExperienceStep = ({
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
+                      gap: 16,
                       marginBottom: 16,
                     }}
                     className="ff-exp-fields"
@@ -788,8 +788,9 @@ export const ExperienceStep = ({
       {errors.experience?.message && (
         <p
           style={{
-            fontSize: 12,
+            fontSize: 12.5,
             color: "var(--ff-red)",
+            fontWeight: 500,
           }}
         >
           {errors.experience?.message}

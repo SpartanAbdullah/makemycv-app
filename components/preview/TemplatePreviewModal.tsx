@@ -125,20 +125,20 @@ export const TemplatePreviewModal = ({
           )}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", rowGap: 10 }}>
-          {/* Ghost button styled inline on purpose — cv-top-btn-secondary
-              assumes a light surface and would break on this dark overlay. */}
+          {/* Ghost buttons use the scoped ff-preview-ghost class (hover/active
+              feedback lives there) — cv-top-btn-secondary assumes a light
+              surface and would break on this dark overlay. */}
           <button
             type="button"
             onClick={() => onSelect(templateId)}
             disabled={isSelected}
+            className="ff-preview-ghost"
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 13,
               fontWeight: 600,
               padding: "10px 16px",
               borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.25)",
-              background: isSelected ? "rgba(255,255,255,0.10)" : "transparent",
               color: "white",
               cursor: isSelected ? "default" : "pointer",
               opacity: isSelected ? 0.7 : 1,
@@ -161,14 +161,13 @@ export const TemplatePreviewModal = ({
             type="button"
             onClick={onClose}
             aria-label="Close preview"
+            className="ff-preview-ghost"
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 18,
               width: 38,
               height: 38,
               borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.25)",
-              background: "transparent",
               color: "white",
               cursor: "pointer",
               lineHeight: 1,
@@ -214,7 +213,24 @@ export const TemplatePreviewModal = ({
         .ff-preview-overlay {
           padding: 32px 32px 16px;
         }
-        @media (max-width: 640px) {
+        /* Dark-surface ghost buttons — hover/active parity with cv-top-btn.
+           The :not(:disabled) guard keeps the "Selected" state inert. */
+        .ff-preview-ghost {
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.25);
+          transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .ff-preview-ghost:disabled {
+          background: rgba(255,255,255,0.10);
+        }
+        .ff-preview-ghost:hover:not(:disabled) {
+          background: rgba(255,255,255,0.12);
+          border-color: rgba(255,255,255,0.45);
+        }
+        .ff-preview-ghost:active:not(:disabled) {
+          transform: translateY(0.5px);
+        }
+        @media (max-width: 639.98px) {
           .ff-preview-overlay { padding: 20px 16px 12px; }
         }
       `}</style>

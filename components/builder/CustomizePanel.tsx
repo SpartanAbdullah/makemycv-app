@@ -440,7 +440,7 @@ export const CustomizePanel = () => {
                   height: 40,
                   borderRadius: "50%",
                   padding: 3,
-                  background: "#1F2937",
+                  background: "var(--ff-ink)",
                   border: "none",
                   cursor: "pointer",
                   flexShrink: 0,
@@ -502,7 +502,7 @@ export const CustomizePanel = () => {
                 width: 40,
                 height: 34,
                 border: "1px solid var(--ff-line)",
-                borderRadius: 8,
+                borderRadius: 10,
                 background: "transparent",
                 cursor: "pointer",
                 padding: 0,
@@ -525,9 +525,11 @@ export const CustomizePanel = () => {
               className="cv-input"
               style={{
                 width: 96,
+                height: 34,
                 padding: "7px 8px",
                 fontSize: 12,
                 fontFamily: "var(--font-mono)",
+                borderRadius: 10,
               }}
             />
           </div>

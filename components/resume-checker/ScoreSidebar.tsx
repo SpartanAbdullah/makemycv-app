@@ -139,7 +139,7 @@ function CategoryRow({ cat }: { cat: ScoreCategory }) {
               stroke="currentColor"
               strokeWidth="2"
               aria-hidden
-              className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+              className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
             </svg>

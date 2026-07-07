@@ -217,7 +217,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 14,
+            gap: 16,
           }}
           className="ff-core-fields"
         >
@@ -474,8 +474,9 @@ const ImportButton = ({
       color: "var(--ff-ink)",
       background: "var(--ff-card)",
       border: "1px dashed var(--ff-line-strong)",
-      padding: "13px 16px",
-      borderRadius: 12,
+      // Canonical single-line dashed-CTA metrics (matches .cv-btn-ghost).
+      padding: "11px 16px",
+      borderRadius: 10,
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",

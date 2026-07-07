@@ -114,10 +114,13 @@ export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
           UAE-rooted research
         </span>
         <div style={{ display: "flex", gap: 6 }}>
+          {/* -v hit-target variant: the pair sits at gap 6px, so the plain
+              -8px halo would overlap the neighbour's hit area. */}
           <button
             type="button"
             onClick={() => cycle(-1)}
             aria-label="Previous tip"
+            className="ff-hit-target-v"
             style={chevronBtn}
           >
             <Icon name="chevron-left" size={13} color="var(--ff-muted)" />
@@ -126,6 +129,7 @@ export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
             type="button"
             onClick={() => cycle(1)}
             aria-label="Next tip"
+            className="ff-hit-target-v"
             style={chevronBtn}
           >
             <Icon name="chevron-right" size={13} color="var(--ff-muted)" />
@@ -137,8 +141,8 @@ export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
 };
 
 const chevronBtn: React.CSSProperties = {
-  width: 26,
-  height: 26,
+  width: 28,
+  height: 28,
   borderRadius: 6,
   background: "var(--ff-card)",
   border: "1px solid var(--ff-line)",

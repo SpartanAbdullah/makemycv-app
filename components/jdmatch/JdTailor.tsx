@@ -150,8 +150,8 @@ export const JdTailor = ({
           {downloading ? (
             <span
               style={{
-                width: 12,
-                height: 12,
+                width: 14,
+                height: 14,
                 border: "2px solid rgba(255,255,255,0.45)",
                 borderTopColor: "#fff",
                 borderRadius: "50%",

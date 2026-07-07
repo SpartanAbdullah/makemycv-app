@@ -248,7 +248,7 @@ export const ProjectsStep = ({
                       </div>
 
                       <div className="mt-4 space-y-3">
-                        <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-heading)" }}>Highlights</p>
+                        <p style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--ff-ink)" }}>Highlights</p>
                         <div className="cv-tip-box">
                           <p>Tip: Use 3-5 bullets. Keep each 1-2 lines. Start with an action verb + result/metric.</p>
                           <p style={{ marginTop: 4 }}>Example: Built a search feature that cut average lookup time by 40%.</p>

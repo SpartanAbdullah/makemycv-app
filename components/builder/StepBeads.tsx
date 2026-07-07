@@ -1,5 +1,6 @@
 "use client";
 
+import { formatStepCounter } from "../../lib/utils/steps";
 import type { BuilderStep } from "../../lib/utils/steps";
 import type { StepStatus } from "./Stepper";
 
@@ -86,7 +87,7 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
             color: "var(--ff-muted)",
           }}
         >
-          Step {String(currentIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+          {formatStepCounter(currentIndex, total)}
         </span>
         <span
           style={{
@@ -178,7 +179,7 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
           outline-offset: 3px;
           border-radius: 6px;
         }
-        @media (max-width: 640px) {
+        @media (max-width: 639.98px) {
           .cv-step-seg-label { display: none !important; }
           /* With labels hidden each segment collapses to ~9px tall — an
              invisible vertical hit extension restores a ~45px tap target

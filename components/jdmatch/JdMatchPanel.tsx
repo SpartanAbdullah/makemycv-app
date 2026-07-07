@@ -543,16 +543,12 @@ export const JdMatchPanel = () => {
                     onClick={onAnalyze}
                     disabled={disabled}
                     className="cv-btn-primary"
-                    style={{
-                      opacity: disabled ? 0.6 : 1,
-                      cursor: disabled ? "not-allowed" : "pointer",
-                    }}
                   >
                     {isLoading ? (
                       <span
                         style={{
-                          width: 12,
-                          height: 12,
+                          width: 14,
+                          height: 14,
                           border: "2px solid rgba(255,255,255,0.45)",
                           borderTopColor: "#fff",
                           borderRadius: "50%",
@@ -1001,7 +997,7 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
         textAlign: "center",
         background: "var(--ff-card)",
         border: "1px solid var(--ff-line)",
-        borderRadius: 16,
+        borderRadius: "var(--radius-card)",
         padding: "32px 28px",
         boxShadow: "0 10px 34px rgba(40,36,28,0.06)",
       }}
@@ -1099,8 +1095,11 @@ const ChangeControls = ({
   onDiscard: () => void;
 }) => {
   const has = count > 0;
+  // Only the unclassed ghostPill needs manual dimming — the classed buttons
+  // get theirs from the shared :disabled rules. 0.55 = --disabled-opacity,
+  // so all three controls fade to the same depth.
   const dim = (on: boolean): React.CSSProperties => ({
-    opacity: on ? 1 : 0.45,
+    opacity: on ? 1 : 0.55,
     cursor: on ? "pointer" : "not-allowed",
   });
   return (
@@ -1121,7 +1120,7 @@ const ChangeControls = ({
         disabled={!has}
         title={has ? `Save to your CV — ${summary}` : undefined}
         className="cv-btn-primary"
-        style={{ height: "var(--topbar-control-h)", padding: "0 14px", ...dim(has) }}
+        style={{ height: "var(--topbar-control-h)", padding: "0 14px" }}
       >
         <Icon name="check" size={14} />
         Accept all{has ? ` (${count})` : ""}
@@ -1131,7 +1130,7 @@ const ChangeControls = ({
         onClick={onDiscard}
         disabled={!has}
         className="cv-btn-secondary"
-        style={{ height: "var(--topbar-control-h)", padding: "0 14px", ...dim(has) }}
+        style={{ height: "var(--topbar-control-h)", padding: "0 14px" }}
       >
         <Icon name="trash" size={14} />
         Discard all
@@ -1210,7 +1209,7 @@ const BackConfirmDialog = ({
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--ff-card)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-2xl)",
           border: "1px solid var(--ff-line)",
           boxShadow: "0 18px 48px rgba(11,15,12,0.22)",
           padding: 24,
@@ -1659,7 +1658,7 @@ const BulletWeaver = ({
                 gap: 8,
                 textAlign: "left",
                 padding: "9px 11px",
-                borderRadius: 9,
+                borderRadius: 10,
                 background: "var(--ff-card)",
                 border: selected ? "1px solid var(--ff-accent)" : "1px solid var(--ff-line)",
                 cursor: "pointer",
@@ -1680,19 +1679,14 @@ const BulletWeaver = ({
         onClick={onGenerate}
         disabled={isLoading || !selectedBullet.trim()}
         className="cv-btn-primary"
-        style={{
-          alignSelf: "flex-start",
-          padding: "10px 16px",
-          opacity: isLoading || !selectedBullet.trim() ? 0.6 : 1,
-          cursor: isLoading || !selectedBullet.trim() ? "not-allowed" : "pointer",
-        }}
+        style={{ alignSelf: "flex-start", padding: "10px 16px" }}
       >
         <Icon name="sparkle" size={13} />
         {isLoading ? "Rewriting…" : variants !== null ? "Suggest again" : "Suggest a rewrite"}
       </button>
 
       {error && (
-        <div style={{ padding: "10px 12px", borderRadius: 9, background: "#FBEFED", border: "1px solid #F2D2CE" }}>
+        <div style={{ padding: "10px 12px", borderRadius: 10, background: "#FBEFED", border: "1px solid #F2D2CE" }}>
           <p style={{ fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500, margin: 0 }}>{error.message}</p>
           {error.code === "RATE_LIMITED" && error.supportUrl && (
             <a

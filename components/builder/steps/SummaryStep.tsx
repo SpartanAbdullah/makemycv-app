@@ -209,7 +209,7 @@ export const SummaryStep = ({
                       style={{
                         textAlign: "left",
                         padding: "12px 14px",
-                        borderRadius: 12,
+                        borderRadius: 10,
                         background: "var(--ff-card)",
                         border: "1px dashed var(--ff-line-strong)",
                         color: "var(--ff-ink-2)",

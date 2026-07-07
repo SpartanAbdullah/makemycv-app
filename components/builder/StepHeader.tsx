@@ -1,4 +1,4 @@
-import { builderSteps } from "../../lib/utils/steps";
+import { builderSteps, formatStepCounter } from "../../lib/utils/steps";
 import type { BuilderStep } from "../../lib/utils/steps";
 
 /**
@@ -7,7 +7,7 @@ import type { BuilderStep } from "../../lib/utils/steps";
  * was a 12px bead label that scrolls off-screen on phones).
  *
  * Gives every step: an h1 landmark for screen readers with the
- * "Step X of 10" counter inline on its right (kept for phone wayfinding,
+ * "Step 06 / 10" counter inline on its right (kept for phone wayfinding,
  * but no longer costing a line of vertical space), a one-line
  * plain-English purpose statement, and the step's ATS tip.
  *
@@ -35,6 +35,9 @@ export const StepHeader = ({ stepId }: { stepId: BuilderStep["id"] }) => {
           {step.title}
         </h1>
         <p
+          // Padded "06 / 10" reads awkwardly aloud — keep the natural
+          // phrasing for screen readers.
+          aria-label={`Step ${index + 1} of ${builderSteps.length}`}
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: 10,
@@ -47,7 +50,7 @@ export const StepHeader = ({ stepId }: { stepId: BuilderStep["id"] }) => {
             flexShrink: 0,
           }}
         >
-          Step {index + 1} of {builderSteps.length}
+          {formatStepCounter(index, builderSteps.length)}
         </p>
       </div>
       {step.subtitle && (

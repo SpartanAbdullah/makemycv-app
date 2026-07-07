@@ -16,9 +16,9 @@ const BADGE_TONE_STYLE: Record<
     border: "1px solid var(--ff-accent)",
   },
   ats: {
-    background: "#E7F4EE",
-    color: "#0E7C4A",
-    border: "1px solid rgba(14,124,74,0.30)",
+    background: "var(--ff-accent-soft)",
+    color: "var(--ff-accent)",
+    border: "1px solid color-mix(in srgb, var(--ff-accent) 30%, transparent)",
   },
   neutral: {
     background: "var(--ff-paper)",
@@ -78,7 +78,7 @@ export const TemplateBadges = ({
 // The parent card must be `position: relative; overflow: hidden`.
 const RIBBON_TONE: Record<TemplateBadge["tone"], { bg: string; fg: string }> = {
   recommended: { bg: "var(--ff-accent)", fg: "#ffffff" },
-  ats: { bg: "#0E7C4A", fg: "#ffffff" },
+  ats: { bg: "var(--ff-accent)", fg: "#ffffff" },
   neutral: { bg: "#64748B", fg: "#ffffff" },
   new: { bg: "#2563EB", fg: "#ffffff" },
 };

@@ -33,10 +33,14 @@ const linkBtn: React.CSSProperties = {
   background: "none",
   border: "none",
   color: "var(--ff-muted)",
-  fontSize: 13,
+  fontSize: 12,
   cursor: "pointer",
   textDecoration: "underline",
-  padding: "8px 4px",
+  // Padded hit area (audit UI-5 touch-target floor) — vertical-only negative
+  // margin keeps the layout footprint identical; reclaiming the horizontal
+  // padding too would visually collapse the 10px flex gap beside Weave / Add.
+  padding: "13px 4px",
+  margin: "-13px 0",
 };
 
 /**

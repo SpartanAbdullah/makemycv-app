@@ -412,7 +412,7 @@ export const EducationStep = ({
         </div>
 
         {errors.education?.message && (
-          <p style={{ marginTop: 12, fontSize: 12, color: "var(--status-error)" }}>{errors.education?.message}</p>
+          <p style={{ marginTop: 12, fontSize: 12.5, color: "var(--ff-red)", fontWeight: 500 }}>{errors.education?.message}</p>
         )}
 
         <div className="cv-tip-box" style={{ marginTop: 16 }}>
