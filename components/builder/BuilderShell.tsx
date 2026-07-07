@@ -362,16 +362,17 @@ const PreviewDrawer = ({
       style={{
         position: "absolute",
         right: "var(--drawer-gap)",
-        // The drawer is absolute inside MAIN AREA which already sits below the
-        // TopBar + ProgressBar — so we only need a small breathing gap here,
-        // not the full topbar+progressbar offset (that was the old bug that
-        // pushed the drawer ~134px too low).
-        top: "var(--drawer-gap)",
+        // Flush against the progress-bar line (founder request 2026-07: the
+        // 24px inset above the drawer read as wasted space). The bar's own
+        // bottom border acts as the drawer's top edge, so borderTop is off
+        // and only the bottom corners are rounded.
+        top: 0,
         bottom: "var(--drawer-gap)",
         width: "var(--drawer-w)",
         background: "var(--ff-card)",
         border: "1px solid var(--ff-line)",
-        borderRadius: 18,
+        borderTop: "none",
+        borderRadius: "0 0 18px 18px",
         boxShadow: "var(--shadow-drawer)",
         display: "flex",
         flexDirection: "column",
@@ -1505,8 +1506,16 @@ export const BuilderShell = ({
           @media (min-width: 1280px) {
             .ff-form-column {
               padding: 28px 24px 28px 40px;
-              max-width: var(--form-max);
-              margin-right: calc(var(--drawer-w) + var(--drawer-gap) + 28px);
+              /* Fill the space up to 28px short of the drawer, capped at
+                 --form-max for ultra-wide readability. The reservation MUST
+                 live inside max-width: with a plain margin-right, an
+                 over-constrained row (width:100% + margin) resolves by
+                 IGNORING margin-right in LTR, and the form would slide
+                 under the drawer. */
+              max-width: min(
+                var(--form-max),
+                calc(100% - var(--drawer-w) - var(--drawer-gap) - 28px)
+              );
             }
             .ff-form-column-review {
               /* Review step has no preview drawer, so it can use the whole

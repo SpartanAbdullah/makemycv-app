@@ -139,9 +139,15 @@
   /* Segmented-focus stepper height (context line + bar + tiny labels). The
      labels hide ≤640px, so the bar is shorter there — overridden below. */
   --progressbar-h:64px;
-  --drawer-w:     clamp(460px, 48vw, 820px);
+  /* Desktop split (2026-07 rebalance): the drawer grows to 900px on wide
+     screens and the form column fills the remaining width up to 1160px —
+     the old 780px form cap left a ~300px dead band between form and
+     preview at ~1920px. The form's right edge is bounded by its
+     margin-right (drawer + gaps), so --form-max is only the ultra-wide
+     readability ceiling. */
+  --drawer-w:     clamp(460px, 48vw, 900px);
   --drawer-gap:   24px;
-  --form-max:     clamp(540px, 44vw, 780px);
+  --form-max:     1160px;
   /* Legacy alias — old sidebar width; left for backward-compat. */
   --sidebar-w:    220px;
 
