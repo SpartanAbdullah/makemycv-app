@@ -152,16 +152,25 @@ export const SummaryStep = ({
           {(() => {
             const currentSummary = watch("summary") ?? "";
             const wordCount = currentSummary.split(/\s+/).filter(Boolean).length;
+            // Focus Flow tokens (contrast-safe at 12px) \u2014 same ladder and
+            // 12px mono treatment as the SkillsStep count helper.
             const countColor =
               wordCount === 0
-                ? "text-gray-400"
+                ? "var(--ff-muted)"
                 : wordCount < 30
-                  ? "text-red-500"
+                  ? "var(--ff-red)"
                   : wordCount > 120
-                    ? "text-amber-500"
-                    : "text-green-600";
+                    ? "var(--ff-warn)"
+                    : "var(--ff-accent-dark)";
             return (
-              <p className={`mt-2 text-xs ${countColor}`}>
+              <p
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-mono)",
+                  color: countColor,
+                }}
+              >
                 {wordCount} words {"\u00B7"} Recommended: 30{"\u2013"}120
               </p>
             );
@@ -219,11 +228,12 @@ export const SummaryStep = ({
           })()}
 
           <div className="mt-4 flex flex-col items-end">
+            {/* Same accent-outline identity as every other AI-generate CTA
+                (Experience top/per-role, Skills) — was a shrunken secondary. */}
             <button
               type="button"
               onClick={fireAISummary}
-              className="cv-btn-secondary"
-              style={{ fontSize: 12, padding: "11px 16px" }}
+              className="cv-btn-accent-outline"
             >
               <Icon name="sparkle" size={13} />
               Write my summary with AI

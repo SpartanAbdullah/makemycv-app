@@ -13,6 +13,7 @@ import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { Icon } from "../Icon";
+import { BulletRow } from "../BulletRow";
 import type { CvProject } from "../../../lib/types/cv";
 
 type ProjectsForm = { projects: CvProject[] };
@@ -255,7 +256,7 @@ export const ProjectsStep = ({
                         </div>
                         {(watch(`projects.${index}.bullets`) || []).map((_, bulletIndex) => (
                           <div key={bulletIndex} className="space-y-1">
-                            <div className="flex items-start gap-2">
+                            <BulletRow showMarker>
                               <AutoGrowTextarea
                                 className="cv-input cv-textarea flex-1"
                                 placeholder="What did you do or deliver? Start with a verb, add a result."
@@ -264,11 +265,16 @@ export const ProjectsStep = ({
                                 {...register(`projects.${index}.bullets.${bulletIndex}`)}
                                 onFocus={() => setFocusedBullet({ itemIndex: index, bulletIndex })}
                               />
-                              <button type="button" onClick={() => removeBullet(index, bulletIndex)} className="cv-btn-danger">
+                              <button
+                                type="button"
+                                onClick={() => removeBullet(index, bulletIndex)}
+                                className="cv-btn-danger"
+                                aria-label="Remove highlight"
+                                style={{ alignSelf: "center" }}
+                              >
                                 <Icon name="trash" size={12} />
-                                Remove
                               </button>
-                            </div>
+                            </BulletRow>
                             {errors.projects?.[index]?.bullets?.[bulletIndex]?.message && (
                               <p style={{ fontSize: 12, color: "var(--ff-red)" }}>
                                 {errors.projects?.[index]?.bullets?.[bulletIndex]?.message}
@@ -282,19 +288,28 @@ export const ProjectsStep = ({
                           </div>
                         ))}
                         <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-ghost" style={{ width: "auto", padding: "10px 14px", fontSize: 12 }}>
+                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-ghost" style={{ width: "auto", padding: "10px 14px" }}>
                             <Icon name="plus" size={14} />
                             Add bullet
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => splitFocusedBullet(index)}
-                            disabled={!focusedBullet || focusedBullet.itemIndex !== index}
-                            className="cv-btn-secondary"
-                            style={{ fontSize: 12, padding: "6px 14px", opacity: (!focusedBullet || focusedBullet.itemIndex !== index) ? 0.5 : 1 }}
-                          >
-                            Split pasted text
-                          </button>
+                          {focusedBullet?.itemIndex === index && (
+                            <button
+                              type="button"
+                              onClick={() => splitFocusedBullet(index)}
+                              style={{
+                                fontFamily: "var(--font-body)",
+                                fontSize: 12,
+                                color: "var(--ff-muted)",
+                                background: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                padding: 0,
+                              }}
+                            >
+                              Split pasted text into bullets
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

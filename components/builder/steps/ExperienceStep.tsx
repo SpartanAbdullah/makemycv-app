@@ -13,6 +13,8 @@ import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
+import { BulletRow } from "../BulletRow";
+import { CardIconBtn } from "./shared";
 import { AiDisclosure } from "../AiDisclosure";
 import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
@@ -289,21 +291,7 @@ export const ExperienceStep = ({
           type="button"
           onClick={suggestBulletsWithAI}
           disabled={aiLoading || fields.length === 0}
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            color: "white",
-            background: "var(--ff-ink)",
-            border: "none",
-            padding: "10px 16px",
-            borderRadius: 10,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: aiLoading ? "wait" : "pointer",
-            opacity: aiLoading ? 0.7 : 1,
-            fontWeight: 600,
-          }}
+          className="cv-btn-accent-outline"
         >
           <Icon name="sparkle" size={13} />
           {aiLoading ? "Generating…" : "Suggest bullets with AI"}
@@ -384,7 +372,7 @@ export const ExperienceStep = ({
               onAutoCollapse={() => setOpenIndex(null)}
             >
               {isOpen && (
-                <div style={{ padding: 22, borderTop: "1px solid var(--ff-line)" }}>
+                <div style={{ padding: 20, borderTop: "1px solid var(--ff-line)" }}>
                   {/* Actions row */}
                   <div
                     style={{
@@ -886,7 +874,6 @@ const ExpandRoleCard = ({
       onAutoCollapse();
     }}
     style={{
-      borderRadius: 16,
       opacity: isDragging ? 0.5 : 1,
       transform: isDropTarget ? "translateY(-1px)" : undefined,
       boxShadow: isDropTarget
@@ -900,7 +887,7 @@ const ExpandRoleCard = ({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "14px 18px",
+        padding: "14px 20px",
       }}
     >
       <span
@@ -1009,82 +996,12 @@ const ExpandRoleCard = ({
               display: "inline-flex",
             }}
           >
-            <Icon name="chevron-down" size={14} />
+            <Icon name="chevron-down" size={16} />
           </span>
         </div>
       </button>
     </div>
     {children}
-  </div>
-);
-
-const CardIconBtn = ({
-  onClick,
-  disabled,
-  label,
-  children,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  label: string;
-  children: React.ReactNode;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    aria-label={label}
-    title={label}
-    className="ff-hit-target"
-    style={{
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      background: "var(--ff-paper)",
-      border: "1px solid var(--ff-line)",
-      display: "grid",
-      placeItems: "center",
-      color: "var(--ff-muted)",
-      cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.4 : 1,
-      padding: 0,
-    }}
-  >
-    {children}
-  </button>
-);
-
-const BulletRow = ({
-  showMarker,
-  children,
-}: {
-  showMarker: boolean;
-  children: React.ReactNode;
-}) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "flex-start",
-      gap: 10,
-      padding: "10px 12px",
-      background: "var(--ff-card)",
-      border: "1px solid var(--ff-line)",
-      borderRadius: 10,
-    }}
-  >
-    {showMarker && (
-      <span
-        style={{
-          width: 4,
-          height: 4,
-          borderRadius: "50%",
-          background: "var(--ff-ink)",
-          marginTop: 14,
-          flexShrink: 0,
-        }}
-      />
-    )}
-    <div style={{ flex: 1, display: "flex", gap: 8 }}>{children}</div>
   </div>
 );
 

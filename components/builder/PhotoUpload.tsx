@@ -5,6 +5,7 @@ import {
   resizeAndCropToSquare,
   validateImageFile,
 } from "../../lib/utils/imageUtils";
+import { Switch } from "../forms/Switch";
 import type { PhotoShape } from "../../lib/types/cv";
 
 interface PhotoUploadProps {
@@ -274,38 +275,11 @@ export function PhotoUpload({
         >
           Show photo on CV
         </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={showPhoto}
-          onClick={() => onToggleChange(!showPhoto)}
-          style={{
-            width: 36,
-            height: 21,
-            borderRadius: 999,
-            background: showPhoto ? "var(--ff-accent)" : "var(--ff-line-strong)",
-            position: "relative",
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-            transition: "background 150ms",
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              top: 3,
-              left: showPhoto ? 18 : 3,
-              width: 15,
-              height: 15,
-              borderRadius: "50%",
-              background: "white",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.20)",
-              transition: "left 150ms",
-            }}
-          />
-        </button>
+        <Switch
+          checked={showPhoto}
+          onChange={onToggleChange}
+          ariaLabel="Show photo on CV"
+        />
       </div>
 
       {/* Photo shape segmented */}

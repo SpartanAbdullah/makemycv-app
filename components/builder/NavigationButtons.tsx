@@ -8,6 +8,7 @@ export const NavigationButtons = ({
   disableNext,
   showSkip,
   onSkip,
+  nextType = "button",
 }: {
   onBack?: () => void;
   onNext?: () => void;
@@ -16,6 +17,10 @@ export const NavigationButtons = ({
   disableNext?: boolean;
   showSkip?: boolean;
   onSkip?: () => void;
+  /** "submit" when rendered inside a <form> so Enter still implicitly
+   *  submits (react-hook-form's handleSubmit preventDefaults the click,
+   *  so onNext never double-fires). */
+  nextType?: "button" | "submit";
 }) => (
   <div
     style={{
@@ -49,11 +54,11 @@ export const NavigationButtons = ({
     )}
     {onNext && (
       <button
-        type="button"
+        type={nextType}
         onClick={onNext}
         disabled={disableNext}
         className="cv-btn-primary"
-        style={{ flex: 1, padding: "14px 24px", fontSize: 15 }}
+        style={{ flex: 1 }}
       >
         {nextLabel}
       </button>

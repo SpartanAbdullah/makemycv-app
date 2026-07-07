@@ -766,8 +766,14 @@ const TemplateCard = ({
     }}
   >
     {onPreview && (
+      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
+         44px tap zone. The inline position:absolute overrides the class's
+         position:relative but the button is still a positioned containing
+         block, so the halo resolves against it; stopPropagation above means
+         halo taps open the preview, not select the card. */
       <button
         type="button"
+        className="ff-hit-target"
         onClick={(e) => {
           e.stopPropagation();
           onPreview();

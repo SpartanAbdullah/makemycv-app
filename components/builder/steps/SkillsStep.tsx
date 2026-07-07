@@ -242,12 +242,14 @@ export const SkillsStep = ({
     setDraggedIndex(null);
   };
 
+  // Focus Flow tokens (contrast-safe at 12px) — applied via inline color,
+  // matching the SummaryStep word-count ladder.
   const countColor =
     fields.length < 3
-      ? "text-red-500"
+      ? "var(--ff-red)"
       : fields.length < 6
-        ? "text-amber-500"
-        : "text-green-600";
+        ? "var(--ff-warn)"
+        : "var(--ff-accent-dark)";
 
   return (
     <form
@@ -555,7 +557,7 @@ export const SkillsStep = ({
             fontFamily: "var(--font-mono)",
           }}
         >
-          <span className={countColor} style={{ fontWeight: 600 }}>
+          <span style={{ fontWeight: 600, color: countColor }}>
             {fields.length}
           </span>{" "}
           skill{fields.length !== 1 ? "s" : ""} {"\u00B7"} aim for 10{"\u2013"}20

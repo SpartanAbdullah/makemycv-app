@@ -212,7 +212,7 @@ function Banner({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="text-current opacity-60 hover:opacity-100"
+          className="-my-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-current opacity-60 hover:bg-black/5 hover:opacity-100"
         >
           ✕
         </button>

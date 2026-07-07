@@ -9,13 +9,18 @@ export function FieldError({
 }) {
   if (!message) return null;
 
+  // Mirrors Field's helper line (12px, 6px gap, --ff-red) so inline errors
+  // read identically everywhere; --ff-warn keeps warnings above the 4.5:1
+  // floor. No emoji glyph \u2014 the message text itself carries the meaning.
   return (
     <p
-      className={`text-xs mt-1 font-medium ${
-        type === "warning" ? "text-amber-500" : "text-red-500"
-      }`}
+      style={{
+        fontSize: 12,
+        marginTop: 6,
+        color: type === "warning" ? "var(--ff-warn)" : "var(--ff-red)",
+      }}
     >
-      {type === "warning" ? "\u26A0\uFE0F" : "\u26D4"} {message}
+      {message}
     </p>
   );
 }

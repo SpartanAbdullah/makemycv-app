@@ -10,6 +10,7 @@ import { TodaysTipCard } from "../TodaysTipCard";
 import { Icon } from "../Icon";
 import { useImport } from "../BuilderShell";
 import { StepHeader } from "../StepHeader";
+import { NavigationButtons } from "../NavigationButtons";
 import { DomainChip } from "../DomainChip";
 import { inferRoleFamily } from "../../../lib/data/roleFamily";
 import { canTailorByDomain } from "../../../lib/utils/entitlements";
@@ -435,24 +436,12 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       {/* UAE essentials + extras live on their own step now — see
           UAEEssentialsStep. Continue → routes there next. */}
 
-      {/* Footer */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 10,
-          marginTop: 4,
-        }}
-      >
-        <button
-          type="submit"
-          className="cv-btn-primary"
-          style={{ padding: "12px 26px" }}
-        >
-          Continue
-          <Icon name="chevron-right" size={14} strokeWidth={2.5} />
-        </button>
-      </div>
+      {/* Footer — shared NavigationButtons so step 1's Continue matches the
+          shape/position of every other step. nextType="submit" keeps Enter-key
+          implicit submission working (a form with only type="button" controls
+          ignores Enter); handleSubmit preventDefaults the click so onNext
+          never double-fires. */}
+      <NavigationButtons nextType="submit" onNext={handleSubmit(onNext)} />
 
       <style>{`
         @media (max-width: 900px) {

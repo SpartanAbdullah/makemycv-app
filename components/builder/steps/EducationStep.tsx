@@ -7,6 +7,7 @@ import { educationSchema } from "../../../lib/schemas/cvSchemas";
 import { createEmptyItems, useCvStore } from "../../../lib/store/cvStore";
 import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
+import { Switch } from "../../forms/Switch";
 import { useBlurFeedback } from "../../forms/useBlurFeedback";
 import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { Repeater } from "../../forms/Repeater";
@@ -21,6 +22,7 @@ import {
 import type { CvEducation } from "../../../lib/types/cv";
 import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
+import { CardIconBtn } from "./shared";
 
 const ATTESTING_BODIES = [
   "MOFA \u2013 UAE Ministry of Foreign Affairs",
@@ -156,9 +158,14 @@ export const EducationStep = ({
           <Repeater
             title="Education entries"
             action={
-              <button type="button" onClick={handleAddEntry} className="cv-btn-ghost">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                Add Entry
+              <button
+                type="button"
+                onClick={handleAddEntry}
+                className="cv-btn-ghost"
+                style={{ width: "auto", padding: "10px 14px" }}
+              >
+                <Icon name="plus" size={14} />
+                Add education
               </button>
             }
           >
@@ -211,34 +218,26 @@ export const EducationStep = ({
                             here (audit UX-13). */}
                         {fields.length > 1 && (
                           <>
-                            <button
-                              type="button"
+                            <CardIconBtn
                               onClick={() => {
                                 move(index, index - 1);
                                 setOpenIndex(index - 1);
                               }}
                               disabled={index === 0}
-                              className="cv-btn-ghost"
-                              aria-label="Move entry up"
-                              title="Move up"
-                              style={{ padding: "8px 10px", opacity: index === 0 ? 0.4 : 1 }}
+                              label="Move up"
                             >
                               <Icon name="chevron-up" size={12} />
-                            </button>
-                            <button
-                              type="button"
+                            </CardIconBtn>
+                            <CardIconBtn
                               onClick={() => {
                                 move(index, index + 1);
                                 setOpenIndex(index + 1);
                               }}
                               disabled={index === fields.length - 1}
-                              className="cv-btn-ghost"
-                              aria-label="Move entry down"
-                              title="Move down"
-                              style={{ padding: "8px 10px", opacity: index === fields.length - 1 ? 0.4 : 1 }}
+                              label="Move down"
                             >
                               <Icon name="chevron-down" size={12} />
-                            </button>
+                            </CardIconBtn>
                           </>
                         )}
                         {fields.length > 1 && (
@@ -356,42 +355,13 @@ export const EducationStep = ({
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div>
                             <span className="cv-label" style={{ marginBottom: 0 }}>Degree Attested?</span>
-                            <p style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 2 }}>Required for UAE government &amp; semi-government roles</p>
+                            <p style={{ fontSize: 12, color: "var(--ff-muted)", marginTop: 2 }}>Required for UAE government &amp; semi-government roles</p>
                           </div>
-                          <div
-                            role="checkbox"
-                            aria-checked={watch(`education.${index}.attested`) ?? false}
-                            tabIndex={0}
-                            onClick={() => setValue(`education.${index}.attested`, !(watch(`education.${index}.attested`) ?? false), { shouldDirty: true })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                setValue(`education.${index}.attested`, !(watch(`education.${index}.attested`) ?? false), { shouldDirty: true });
-                              }
-                            }}
-                            style={{
-                              position: "relative",
-                              width: 40,
-                              height: 24,
-                              borderRadius: 12,
-                              cursor: "pointer",
-                              transition: "background var(--transition-fast)",
-                              flexShrink: 0,
-                              background: watch(`education.${index}.attested`) ? "var(--brand-primary)" : "var(--border-medium)",
-                            }}
-                          >
-                            <span style={{
-                              position: "absolute",
-                              top: 4,
-                              width: 16,
-                              height: 16,
-                              borderRadius: "50%",
-                              background: "white",
-                              boxShadow: "var(--shadow-xs)",
-                              transition: "transform var(--transition-fast)",
-                              transform: watch(`education.${index}.attested`) ? "translateX(20px)" : "translateX(4px)",
-                            }} />
-                          </div>
+                          <Switch
+                            checked={watch(`education.${index}.attested`) ?? false}
+                            onChange={(v) => setValue(`education.${index}.attested`, v, { shouldDirty: true })}
+                            ariaLabel="Degree Attested?"
+                          />
                         </div>
 
                         {watch(`education.${index}.attested`) && (
