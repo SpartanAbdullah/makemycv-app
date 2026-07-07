@@ -239,9 +239,9 @@ const TopBar = ({
               fontFamily: "var(--font-mono)",
               fontSize: 11,
               fontWeight: 600,
-              color: "var(--ff-red, #B3261E)",
-              background: "#FBEFED",
-              border: "1px solid #F2D2CE",
+              color: "var(--ff-red)",
+              background: "var(--ff-red-soft)",
+              border: "1px solid var(--ff-red-line)",
               borderRadius: 999,
               padding: "4px 10px",
               letterSpacing: "0.04em",
@@ -402,6 +402,9 @@ const PreviewDrawer = ({
             display: "inline-flex",
             alignItems: "center",
             gap: 2,
+            // 36px is the footer's shared control height — the cycler already
+            // computes to exactly 36, pinning it keeps siblings flush.
+            height: 36,
             padding: "3px 4px 3px 10px",
             background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
@@ -448,6 +451,9 @@ const PreviewDrawer = ({
           aria-label="Preview fit mode"
           style={{
             display: "inline-flex",
+            // Shared 36px footer control height: 28px segments + 3+3 padding
+            // + 2px border.
+            height: 36,
             padding: 3,
             background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
@@ -471,9 +477,15 @@ const PreviewDrawer = ({
                 aria-pressed={active}
                 style={{
                   fontFamily: "var(--font-body)",
-                  fontSize: 11.5,
+                  // 12.5 matches the Fullscreen button label — one font size
+                  // across the footer's action controls.
+                  fontSize: 12.5,
                   fontWeight: 500,
-                  padding: "6px 10px",
+                  height: 28,
+                  padding: "0 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   borderRadius: 999,
                   border: "none",
                   background: active ? "var(--ff-ink)" : "transparent",
@@ -498,8 +510,15 @@ const PreviewDrawer = ({
             color: "var(--ff-ink)",
             background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
-            padding: "9px",
-            borderRadius: 8,
+            // Pill family at the shared 36px footer height — matches the
+            // cycler and fit toggle beside it (and the mobile footer's
+            // full-width pill Download).
+            height: 36,
+            padding: "0 9px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 999,
             cursor: "pointer",
             fontWeight: 500,
           }}
@@ -737,20 +756,10 @@ const MobilePreviewView = ({
           type="button"
           onClick={onDownload}
           disabled={isDownloading}
-          style={{
-            flex: 1,
-            fontFamily: "var(--font-body)",
-            fontSize: 12.5,
-            color: "white",
-            background: "var(--ff-accent)",
-            border: "none",
-            padding: "10px",
-            borderRadius: 999,
-            fontWeight: 600,
-            cursor: isDownloading ? "wait" : "pointer",
-            opacity: isDownloading ? 0.7 : 1,
-            whiteSpace: "nowrap",
-          }}
+          className="inline-flex cv-top-btn cv-top-btn-primary"
+          // minHeight 44 keeps the primary mobile download action on the
+          // audit UI-5 touch-target floor.
+          style={{ flex: 1, justifyContent: "center", minHeight: 44 }}
         >
           {isDownloading ? "Preparing…" : "Download PDF"}
         </button>
@@ -866,7 +875,9 @@ const MobileViewToggle = ({
 const drawerChevronBtn: React.CSSProperties = {
   width: 28,
   height: 28,
-  borderRadius: 8,
+  // 28px circle — nested-pill idiom (999 inside 999), same as the fit
+  // toggle's inner segments; both cycler containers that use this are pills.
+  borderRadius: 999,
   border: "1px solid var(--ff-line)",
   background: "var(--ff-paper)",
   display: "grid",

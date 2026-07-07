@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useLayoutEffect, useRef } from "react";
+import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
 import { TemplateBadges } from "../templates/TemplateBadges";
@@ -35,15 +36,9 @@ export const TemplatePreviewModal = ({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Lock body scroll while open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // Lock body scroll while open — reference-counted (shared hook) so
+  // overlapping lock-holders release in any order.
+  useBodyScrollLock(open);
 
   // Compute scale so the A4 page fits the available viewport with padding.
   useLayoutEffect(() => {
@@ -74,23 +69,28 @@ export const TemplatePreviewModal = ({
       aria-modal="true"
       aria-label={`${template.name} preview`}
       onClick={onClose}
+      // Padding lives in the scoped <style> below — it needs a media query
+      // (tighter gutters on phones) and inline styles can't carry one.
+      className="ff-preview-overlay"
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(11,15,12,0.55)",
+        background: "var(--surface-overlay)",
         zIndex: 100,
         display: "flex",
         flexDirection: "column",
-        padding: "32px 32px 16px 32px",
       }}
     >
-      {/* Header bar */}
+      {/* Header bar — wraps at narrow widths so the fixed-width buttons drop
+          to a new line instead of crushing the template-name column. */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          rowGap: 10,
           marginBottom: 16,
           color: "white",
           flexShrink: 0,
@@ -124,7 +124,9 @@ export const TemplatePreviewModal = ({
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", rowGap: 10 }}>
+          {/* Ghost button styled inline on purpose — cv-top-btn-secondary
+              assumes a light surface and would break on this dark overlay. */}
           <button
             type="button"
             onClick={() => onSelect(templateId)}
@@ -140,24 +142,18 @@ export const TemplatePreviewModal = ({
               color: "white",
               cursor: isSelected ? "default" : "pointer",
               opacity: isSelected ? 0.7 : 1,
+              whiteSpace: "nowrap",
             }}
           >
             {isSelected ? "Selected" : "Use this template"}
           </button>
+          {/* Same primary CTA geometry as the TopBar and mobile preview
+              Download buttons — one shared class, not three hand-rolled
+              variants. */}
           <button
             type="button"
             onClick={() => onDownload(templateId)}
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "10px 16px",
-              borderRadius: 10,
-              border: "none",
-              background: "var(--ff-accent)",
-              color: "white",
-              cursor: "pointer",
-            }}
+            className="inline-flex cv-top-btn cv-top-btn-primary"
           >
             Download PDF
           </button>
@@ -176,6 +172,7 @@ export const TemplatePreviewModal = ({
               color: "white",
               cursor: "pointer",
               lineHeight: 1,
+              flexShrink: 0,
             }}
           >
             ×
@@ -210,6 +207,17 @@ export const TemplatePreviewModal = ({
           <Render data={data} />
         </div>
       </div>
+
+      {/* Scoped style — keeps the responsive overlay padding close to the
+          layout that uses it (same pattern as ReviewStep). */}
+      <style>{`
+        .ff-preview-overlay {
+          padding: 32px 32px 16px;
+        }
+        @media (max-width: 640px) {
+          .ff-preview-overlay { padding: 20px 16px 12px; }
+        }
+      `}</style>
     </div>
   );
 };

@@ -41,7 +41,8 @@ export const StepHeader = ({ stepId }: { stepId: BuilderStep["id"] }) => {
             fontWeight: 600,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-            color: "var(--ff-faint)",
+            // Functional wayfinding text — muted, not faint (contrast floor).
+            color: "var(--ff-muted)",
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}

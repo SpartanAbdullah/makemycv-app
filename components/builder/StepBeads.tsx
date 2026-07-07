@@ -81,7 +81,9 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
             fontWeight: 700,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
-            color: "var(--ff-faint)",
+            // --ff-muted, not --ff-faint: this is functional wayfinding text
+            // (~2.3:1 in faint — below the 4.5:1 body-text floor).
+            color: "var(--ff-muted)",
           }}
         >
           Step {String(currentIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
@@ -97,7 +99,7 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
         >
           {activeLabel}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ff-faint)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ff-muted)" }}>
           {nextLabel ? `· next: ${nextLabel}` : "· final step"}
         </span>
         {rightSlot && <span style={{ marginLeft: "auto" }}>{rightSlot}</span>}
@@ -149,13 +151,14 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
                   fontSize: 10,
                   lineHeight: 1,
                   fontWeight: isActive ? 800 : 600,
+                  // Untouched steps share --ff-muted with done ones (faint was
+                  // ~2.3:1); state stays distinguishable via the segment bar
+                  // colors, the tooltip, and the aria-label state text.
                   color: isActive
                     ? "var(--ff-ink)"
-                    : status === "done"
-                      ? "var(--ff-muted)"
-                      : status === "attention"
-                        ? "var(--ff-warn)"
-                        : "var(--ff-faint)",
+                    : status === "attention"
+                      ? "var(--ff-warn)"
+                      : "var(--ff-muted)",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -177,6 +180,12 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
         }
         @media (max-width: 640px) {
           .cv-step-seg-label { display: none !important; }
+          /* With labels hidden each segment collapses to ~9px tall — an
+             invisible vertical hit extension restores a ~45px tap target
+             (audit UI-5 floor) with zero layout shift. Vertical-only so
+             neighbouring segments (5px gaps) never overlap. */
+          .cv-step-seg { position: relative; }
+          .cv-step-seg::before { content: ""; position: absolute; inset: -18px 0; }
         }
       `}</style>
     </div>

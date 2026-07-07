@@ -21,17 +21,23 @@ const TIER_STYLE: Record<
   Tier,
   { fg: string; bg: string; border: string; labelFg: string }
 > = {
+  // Danger reuses the exact tints of the save-error chip in the same bar
+  // (--ff-red on --ff-red-soft is ~5.3:1, passes AA) so the two red states
+  // read as one system rather than two clashing palettes.
   danger: {
-    fg: "#9F1239",
-    bg: "#FEF2F2",
-    border: "#FCA5A5",
-    labelFg: "#B91C1C",
+    fg: "var(--ff-red)",
+    bg: "var(--ff-red-soft)",
+    border: "var(--ff-red-line)",
+    labelFg: "var(--ff-red)",
   },
+  // Warn fg is darkened via color-mix because raw --ff-warn on --ff-warn-soft
+  // is ~4.4:1 — just below AA for the 11.5px bold grade text; the rgba border
+  // mirrors the ok tier's alpha-tint pattern.
   warn: {
-    fg: "#92400E",
-    bg: "#FFFBEB",
-    border: "#FCD34D",
-    labelFg: "#B45309",
+    fg: "color-mix(in srgb, var(--ff-warn) 85%, black)",
+    bg: "var(--ff-warn-soft)",
+    border: "rgba(162, 101, 0, 0.35)",
+    labelFg: "var(--ff-warn)",
   },
   ok: {
     fg: "var(--ff-accent-dark)",
@@ -187,8 +193,8 @@ export const ScoreChip = ({
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 10,
-              color: delta > 0 ? "#065F46" : "#9F1239",
-              background: delta > 0 ? "#D1FAE5" : "#FEE2E2",
+              color: delta > 0 ? "var(--ff-accent-dark)" : "var(--ff-red)",
+              background: delta > 0 ? "var(--ff-accent-soft)" : "var(--ff-red-soft)",
               padding: "3px 7px",
               borderRadius: 999,
               fontWeight: 600,
