@@ -8,6 +8,9 @@ import type {
 } from "@/lib/resumeChecker/types";
 import IssueCard from "./IssueCard";
 
+// sublineText is real 12px text, so it uses the darker -text ramps (4.5:1);
+// iconText only colors icon strokes (3:1 graphics floor) and keeps the
+// brighter solid hues.
 const statusTone: Record<
   ScoreSeverity,
   { iconBg: string; iconText: string; sublineText: string; label: string }
@@ -15,19 +18,19 @@ const statusTone: Record<
   good: {
     iconBg: "bg-severity-good-bg",
     iconText: "text-severity-good",
-    sublineText: "text-severity-good",
+    sublineText: "text-severity-good-text",
     label: "Looking strong",
   },
   review: {
     iconBg: "bg-severity-review-bg",
     iconText: "text-severity-review",
-    sublineText: "text-severity-review",
+    sublineText: "text-severity-review-text",
     label: "Needs review",
   },
   error: {
     iconBg: "bg-severity-error-bg",
     iconText: "text-severity-error",
-    sublineText: "text-severity-error",
+    sublineText: "text-severity-error-text",
     label: "Needs fixing",
   },
 };

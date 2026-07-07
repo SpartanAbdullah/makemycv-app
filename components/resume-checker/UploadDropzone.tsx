@@ -170,13 +170,19 @@ export default function UploadDropzone() {
   return (
     <div id="resume-checker-dropzone" className="w-full">
       <div className="rounded-2xl border border-line bg-paper p-6 shadow-md-soft sm:p-8">
+        {/* Keyboard focus: the file input is sr-only, so the visible ring is
+            surfaced on the label via :has(input:focus-visible) — scoped to the
+            input so the error-state "Try again" button (also a descendant)
+            doesn't ring the whole dropzone. Keyboard-only, matching the
+            documented globals.css focus convention; ring color follows the
+            surface accent (--focus-ring, brand-blue here). */}
         <label
           htmlFor="resume-checker-file"
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           className={[
-            "block w-full cursor-pointer rounded-xl border-2 border-dashed px-6 py-14 text-center transition",
+            "block w-full cursor-pointer rounded-xl border-2 border-dashed px-6 py-14 text-center transition has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-[var(--focus-ring,var(--ff-accent))]",
             isDragging
               ? "border-brand-blue bg-brand-blue/5"
               : phase === "error"
@@ -271,7 +277,7 @@ export default function UploadDropzone() {
                   e.preventDefault();
                   reset();
                 }}
-                className="mt-1 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                className="mt-2 rounded-xl bg-brand-blue px-5 py-2.5 text-sm font-semibold text-white shadow-cta-blue transition hover:bg-brand-blue-dark"
               >
                 Try again
               </button>

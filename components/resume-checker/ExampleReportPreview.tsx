@@ -30,7 +30,7 @@ export default function ExampleReportPreview() {
         <div className="flex items-center gap-2">
           <Logo variant="mark" height={22} href={null} />
           <span className="text-xs font-semibold text-slate-900">makemycv.ae · ATS Checker</span>
-          <span className="rounded-full border border-severity-review/40 bg-severity-review/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-severity-review">
+          <span className="rounded-full border border-severity-review/40 bg-severity-review/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-severity-review-text">
             Example report
           </span>
         </div>
@@ -57,12 +57,14 @@ export default function ExampleReportPreview() {
                 stroke="var(--line)"
                 strokeWidth={STROKE}
               />
+              {/* Grade hues are semantic (green/amber/red), matching the real
+                  report's ScoreRing — an 82 is "good", so the ring is green. */}
               <circle
                 cx="50"
                 cy="50"
                 r={RADIUS}
                 fill="none"
-                stroke="var(--brand-blue)"
+                stroke="var(--severity-good)"
                 strokeWidth={STROKE}
                 strokeLinecap="round"
                 strokeDasharray={`${DASH} ${CIRC}`}
@@ -77,7 +79,15 @@ export default function ExampleReportPreview() {
           </div>
 
           <div className="min-w-0">
-            <div className="inline-flex items-center rounded-full border border-severity-good-border bg-severity-good-bg px-2.5 py-0.5 text-xs font-semibold text-severity-good">
+            {/* Mirrors ScoreRing's real grade pill exactly (geometry + 12%
+                color-mix tint) so the preview matches what the report shows. */}
+            <div
+              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider"
+              style={{
+                color: "var(--severity-good-text)",
+                background: "color-mix(in oklab, var(--severity-good) 12%, transparent)",
+              }}
+            >
               Good
             </div>
             <div className="mt-2 text-sm text-slate-600">
@@ -88,15 +98,15 @@ export default function ExampleReportPreview() {
 
         {/* Issue count chips */}
         <div className="mt-5 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-error-bg px-2.5 py-1 text-xs font-medium text-severity-error">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-error-bg px-2.5 py-1 text-xs font-medium text-severity-error-text">
             <span className="h-1.5 w-1.5 rounded-full bg-severity-error" aria-hidden />
             2 errors
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-review-bg px-2.5 py-1 text-xs font-medium text-severity-review">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-review-bg px-2.5 py-1 text-xs font-medium text-severity-review-text">
             <span className="h-1.5 w-1.5 rounded-full bg-severity-review" aria-hidden />
             3 to review
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-good-bg px-2.5 py-1 text-xs font-medium text-severity-good">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-severity-good-bg px-2.5 py-1 text-xs font-medium text-severity-good-text">
             <span className="h-1.5 w-1.5 rounded-full bg-severity-good" aria-hidden />
             4 strong
           </span>

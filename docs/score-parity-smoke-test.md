@@ -83,5 +83,5 @@ Users upload a CV to /resume-checker, see a score, click "Fix in Builder — $5"
 
 These are cosmetic, not score-altering:
 - Builder pill shows grade as "Good" / "Excellent" / "Needs Work" / "Poor" (title case).
-- Checker uses the same grade for colour but doesn't display it as a label.
+- Checker and Builder use the same green/amber/red hue per grade; checker shows the raw grade label, builder shows GRADE_CHIP_LABELS wording.
 - Issue copy differs by mode (imperative in Builder, diagnostic in Checker) — the **same issues fire**, just worded differently.
