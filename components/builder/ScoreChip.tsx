@@ -130,6 +130,8 @@ export const ScoreChip = ({
         style={{
           background: style.bg,
           border: `1px solid ${style.border}`,
+          // Feeds .cv-score-chip:hover's tier-tinted glow (globals.css).
+          ...({ "--chip-glow": style.fg } as React.CSSProperties),
         }}
       >
         {/* Score dial — ring fills with the score, exact number inside */}
