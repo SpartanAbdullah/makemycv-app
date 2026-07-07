@@ -140,7 +140,7 @@ export const JdCoach = ({
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-accent-dark)" }}>
           Next fix
         </span>
-        <span style={{ fontSize: 11, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontSize: 11, color: "var(--ff-muted)", fontFamily: "var(--font-mono)" }}>
           {queue.length} {queue.length === 1 ? "gap left" : "gaps left"}
         </span>
       </div>
@@ -159,15 +159,19 @@ export const JdCoach = ({
 
       {fixable ? (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+          {/* Compact tier (10px 16px, icon 13) — JdHeatmap's identical Weave /
+              Add pair mirrors these exactly. 11px = compact 10px + 1px: the
+              borderless primary needs the extra vertical padding to render the
+              same height as the bordered secondary beside it. */}
           {showWeave && (
-            <button type="button" className="cv-btn-primary" style={{ padding: "10px 16px" }} onClick={() => onWeave(current.category, current.term)}>
-              <Icon name="sparkle" size={12} />
+            <button type="button" className="cv-btn-primary" style={{ padding: "11px 16px" }} onClick={() => onWeave(current.category, current.term)}>
+              <Icon name="sparkle" size={13} />
               Weave into a bullet
             </button>
           )}
           {showAdd && (
             <button type="button" className={showWeave ? "cv-btn-secondary" : "cv-btn-primary"} style={{ padding: "10px 16px" }} onClick={() => onAdd(current.category, current.term)}>
-              <Icon name="plus" size={12} />
+              <Icon name="plus" size={13} />
               {addLabel}
             </button>
           )}
@@ -184,7 +188,7 @@ export const JdCoach = ({
       <div style={{ height: 5, borderRadius: 999, background: "var(--ff-line)", marginTop: 16, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: "var(--ff-accent-dark)", borderRadius: 999, transition: "width 350ms ease" }} />
       </div>
-      <div style={{ fontSize: 11, color: "var(--ff-faint)", marginTop: 6 }}>
+      <div style={{ fontSize: 11, color: "var(--ff-muted)", marginTop: 6 }}>
         {covered} of {total} covered
       </div>
     </div>

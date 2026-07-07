@@ -66,7 +66,10 @@ export const JdTailor = ({
           onClick={() => onToggleFocus(!focused)}
           style={{
             display: "inline-flex", alignItems: "center", gap: 8,
-            padding: "6px 10px 6px 12px", borderRadius: 999, cursor: "pointer",
+            // 10px vertical padding keeps the switch ~40px tall — audit UI-5
+            // touch-target floor (a standalone pill in a wrapping row, so the
+            // visual growth is safe).
+            padding: "10px 10px 10px 12px", borderRadius: 999, cursor: "pointer",
             fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600,
             border: `1px solid ${focused ? "var(--ff-accent)" : "var(--ff-line-strong)"}`,
             background: focused ? "var(--ff-accent-soft)" : "var(--ff-card)",
@@ -96,7 +99,7 @@ export const JdTailor = ({
           <>
             Keeping the <strong style={{ color: "var(--ff-ink-2)" }}>{kept}</strong> of {totalSkills} skills
             relevant to this role.{" "}
-            <span style={{ color: "var(--ff-faint)" }}>Your master CV keeps all {totalSkills} — this only changes the copy you download.</span>
+            <span style={{ color: "var(--ff-muted)" }}>Your master CV keeps all {totalSkills} — this only changes the copy you download.</span>
           </>
         ) : (
           <>
@@ -133,11 +136,14 @@ export const JdTailor = ({
         </div>
       )}
 
+      {/* Hero download pair: plain class defaults (default tier) — the
+          classes' 12px/11px vertical padding already height-matches the
+          borderless primary against the bordered secondary. */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
         <button
           type="button"
           className="cv-btn-primary"
-          style={{ padding: "11px 18px", opacity: downloading ? 0.7 : 1, cursor: downloading ? "wait" : "pointer" }}
+          style={{ opacity: downloading ? 0.7 : 1, cursor: downloading ? "wait" : "pointer" }}
           onClick={onDownloadPdf}
           disabled={downloading}
         >
@@ -161,7 +167,7 @@ export const JdTailor = ({
         <button
           type="button"
           className="cv-btn-secondary"
-          style={{ padding: "11px 16px", opacity: downloading ? 0.6 : 1, cursor: downloading ? "wait" : "pointer" }}
+          style={{ opacity: downloading ? 0.6 : 1, cursor: downloading ? "wait" : "pointer" }}
           onClick={onDownloadDocx}
           disabled={downloading}
         >

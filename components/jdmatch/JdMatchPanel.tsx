@@ -407,12 +407,12 @@ export const JdMatchPanel = () => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Logo variant="horizontal" height={26} href={null} />
+          <Logo variant="horizontal" height={32} href={null} />
           <button
             type="button"
             onClick={goBack}
             className="cv-btn-secondary"
-            style={{ padding: "9px 16px", fontWeight: 600 }}
+            style={{ height: "var(--topbar-control-h)", padding: "0 16px" }}
           >
             <Icon name="chevron-left" size={14} />
             Back to the builder
@@ -534,7 +534,7 @@ export const JdMatchPanel = () => {
                     gap: 12,
                   }}
                 >
-                  <span style={{ fontSize: 12, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
+                  <span style={{ fontSize: 12, color: "var(--ff-muted)", fontFamily: "var(--font-mono)" }}>
                     {jobText.trim().length} chars
                     {tooShort && jobText.length > 0 ? " · paste a bit more" : ""}
                   </span>
@@ -544,7 +544,6 @@ export const JdMatchPanel = () => {
                     disabled={disabled}
                     className="cv-btn-primary"
                     style={{
-                      padding: "11px 20px",
                       opacity: disabled ? 0.6 : 1,
                       cursor: disabled ? "not-allowed" : "pointer",
                     }}
@@ -562,13 +561,13 @@ export const JdMatchPanel = () => {
                         }}
                       />
                     ) : (
-                      <Icon name="sparkle" size={13} />
+                      <Icon name="sparkle" size={14} />
                     )}
                     {isLoading ? "Reading the job…" : "Find my gaps"}
                   </button>
                 </div>
                 {!hydrated && (
-                  <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-faint)" }}>
+                  <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-muted)" }}>
                     Loading your saved CV…
                   </p>
                 )}
@@ -656,7 +655,7 @@ export const JdMatchPanel = () => {
                   <p
                     style={{
                       fontSize: 12,
-                      color: "var(--ff-faint)",
+                      color: "var(--ff-muted)",
                       lineHeight: 1.5,
                       margin: "16px 0 0",
                       paddingTop: 12,
@@ -722,7 +721,6 @@ export const JdMatchPanel = () => {
                       type="button"
                       onClick={clear}
                       style={{
-                        marginLeft: "auto",
                         alignSelf: "flex-start",
                         background: "none",
                         border: "none",
@@ -730,6 +728,13 @@ export const JdMatchPanel = () => {
                         fontSize: 12,
                         cursor: "pointer",
                         textDecoration: "underline",
+                        // Padded hit area — the bare text link was ~15px tall
+                        // (audit UI-5 touch-target floor); the negative margin
+                        // keeps the layout footprint identical. marginLeft sits
+                        // after the shorthand so the auto right-alignment wins.
+                        padding: "13px 8px",
+                        margin: "-13px -8px",
+                        marginLeft: "auto",
                       }}
                     >
                       Clear
@@ -853,6 +858,11 @@ export const JdMatchPanel = () => {
                               cursor: "pointer",
                               textDecoration: "underline",
                               whiteSpace: "nowrap",
+                              // Padded hit area — the bare text link was ~15px
+                              // tall (audit UI-5 touch-target floor); negative
+                              // margin keeps the layout footprint identical.
+                              padding: "13px 8px",
+                              margin: "-13px -8px",
                             }}
                           >
                             View in CV →
@@ -873,7 +883,7 @@ export const JdMatchPanel = () => {
                             fontSize: 10,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            color: "var(--ff-faint)",
+                            color: "var(--ff-muted)",
                             margin: "2px 0 -4px",
                           }}
                         >
@@ -1030,7 +1040,7 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
           type="button"
           onClick={onBuild}
           className="cv-btn-primary"
-          style={{ padding: "12px 22px", width: "100%", maxWidth: 280 }}
+          style={{ width: "100%", maxWidth: 280 }}
         >
           <Icon name="plus" size={14} />
           Build my CV
@@ -1045,7 +1055,7 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
           Import an existing CV (PDF / DOCX)
         </button>
       </div>
-      <p style={{ fontSize: 11.5, color: "var(--ff-faint)", lineHeight: 1.5, margin: "16px 0 0" }}>
+      <p style={{ fontSize: 11.5, color: "var(--ff-muted)", lineHeight: 1.5, margin: "16px 0 0" }}>
         Your CV stays in your browser. Importing reads your file locally — it&apos;s
         never uploaded.
       </p>
@@ -1053,19 +1063,23 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
   </div>
 );
 
-/* ─── Header change controls: eye-toggle + Accept all + Discard all ──────── */
+/* ─── Header change controls: eye-toggle + Accept all + Discard all ────────
+   Every control in the top-bar row shares --topbar-control-h and the 10px
+   rect radius family (like the builder's .cv-top-btn row), so the bar reads
+   as one aligned system rather than mixed heights and pill/rect shapes. */
 const ghostPill: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  padding: "9px 14px",
-  borderRadius: 999,
+  height: "var(--topbar-control-h)",
+  padding: "0 14px",
+  borderRadius: 10,
   border: "1px solid var(--ff-line)",
   background: "var(--ff-paper)",
   color: "var(--ff-ink)",
   fontFamily: "var(--font-body)",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: 14,
+  fontWeight: 500,
   whiteSpace: "nowrap",
 };
 
@@ -1107,7 +1121,7 @@ const ChangeControls = ({
         disabled={!has}
         title={has ? `Save to your CV — ${summary}` : undefined}
         className="cv-btn-primary"
-        style={{ padding: "9px 14px", ...dim(has) }}
+        style={{ height: "var(--topbar-control-h)", padding: "0 14px", ...dim(has) }}
       >
         <Icon name="check" size={14} />
         Accept all{has ? ` (${count})` : ""}
@@ -1117,7 +1131,7 @@ const ChangeControls = ({
         onClick={onDiscard}
         disabled={!has}
         className="cv-btn-secondary"
-        style={{ padding: "9px 14px", ...dim(has) }}
+        style={{ height: "var(--topbar-control-h)", padding: "0 14px", ...dim(has) }}
       >
         <Icon name="trash" size={14} />
         Discard all
@@ -1179,7 +1193,7 @@ const BackConfirmDialog = ({
         position: "fixed",
         inset: 0,
         zIndex: 80,
-        background: "rgba(11,15,12,0.5)",
+        background: "var(--surface-overlay)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1213,13 +1227,15 @@ const BackConfirmDialog = ({
           saved to your CV yet. Accept them before leaving, or discard them.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" onClick={onCancel} className="cv-btn-secondary" style={{ padding: "9px 14px" }}>
+          <button type="button" onClick={onCancel} className="cv-btn-secondary" style={{ padding: "10px 16px" }}>
             Cancel
           </button>
-          <button type="button" onClick={onDiscard} className="cv-btn-secondary" style={{ padding: "9px 14px" }}>
+          <button type="button" onClick={onDiscard} className="cv-btn-secondary" style={{ padding: "10px 16px" }}>
             Discard &amp; leave
           </button>
-          <button type="button" onClick={onAccept} className="cv-btn-primary" style={{ padding: "9px 14px" }}>
+          {/* 11px = compact 10px + 1px: the borderless primary needs the extra
+              vertical padding to render the same height as its bordered siblings. */}
+          <button type="button" onClick={onAccept} className="cv-btn-primary" style={{ padding: "11px 16px" }}>
             <Icon name="check" size={13} />
             Accept &amp; leave
           </button>
@@ -1263,7 +1279,9 @@ const MobileViewToggle = ({
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              padding: "9px 18px",
+              // 12px vertical padding keeps each segment >=44px tall — audit
+              // UI-5 touch-target floor (mirrors the builder's view toggle).
+              padding: "12px 18px",
               borderRadius: 999,
               border: "none",
               background: active ? "var(--ff-card)" : "transparent",
@@ -1309,11 +1327,15 @@ const ProLockBanner = () => (
   </div>
 );
 
+/* Compact chip action (Add / Weave). The visual stays small by design; the
+   ff-hit-target-v class on the buttons extends the tap area vertically toward
+   the 44px touch floor without overlapping the 4px-gapped neighbour or the
+   chip's term text (audit UI-5). */
 const miniBtn: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: 4,
-  padding: "3px 8px",
+  padding: "5px 9px",
   borderRadius: 999,
   border: "1px solid var(--ff-accent-ring)",
   background: "var(--ff-accent-soft)",
@@ -1371,7 +1393,7 @@ const MissingFix = ({
       ) : (
         <span style={{ display: "inline-flex", gap: 4 }}>
           {showAdd && (
-            <button type="button" title={addTitle} onClick={() => onAdd(category, term)} style={miniBtn}>
+            <button type="button" title={addTitle} className="ff-hit-target-v" onClick={() => onAdd(category, term)} style={miniBtn}>
               <Icon name="plus" size={10} />
               Add
             </button>
@@ -1380,6 +1402,7 @@ const MissingFix = ({
             <button
               type="button"
               title={weaveDisabled ? "Add an experience bullet first" : `Weave “${term}” into one of your bullets`}
+              className="ff-hit-target-v"
               onClick={() => !weaveDisabled && onWeave(category, term)}
               disabled={weaveDisabled}
               style={{
@@ -1456,7 +1479,7 @@ const CategoryBlock = ({
         >
           {JD_CATEGORY_LABELS[cat.category]}
         </span>
-        <span style={{ fontSize: 11, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontSize: 11, color: "var(--ff-muted)", fontFamily: "var(--font-mono)" }}>
           {cat.matched.length}/{total}
         </span>
       </div>
@@ -1585,6 +1608,11 @@ const BulletWeaver = ({
             cursor: "pointer",
             textDecoration: "underline",
             flexShrink: 0,
+            // Padded hit area — the bare text link was ~15px tall (audit UI-5
+            // touch-target floor); negative margin keeps the layout footprint
+            // identical.
+            padding: "13px 8px",
+            margin: "-13px -8px",
           }}
         >
           Cancel
@@ -1594,18 +1622,15 @@ const BulletWeaver = ({
       {roles.length > 1 && (
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={fieldLabelText}>Role</span>
+          {/* .cv-select supplies border/background/radius/custom chevron and
+              the accent focus ring; the inline overrides keep the weaver's
+              compact scale. Right padding stays >=34px so the class's chevron
+              (right 14px, 14px wide) never overlaps the text. */}
           <select
+            className="cv-select"
             value={roleId}
             onChange={(e) => setRoleId(e.target.value)}
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              padding: "9px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--ff-line)",
-              background: "var(--ff-card)",
-              color: "var(--ff-ink)",
-            }}
+            style={{ fontSize: 13, padding: "9px 34px 9px 12px" }}
           >
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
@@ -1662,7 +1687,7 @@ const BulletWeaver = ({
           cursor: isLoading || !selectedBullet.trim() ? "not-allowed" : "pointer",
         }}
       >
-        <Icon name="sparkle" size={12} />
+        <Icon name="sparkle" size={13} />
         {isLoading ? "Rewriting…" : variants !== null ? "Suggest again" : "Suggest a rewrite"}
       </button>
 
@@ -1711,7 +1736,7 @@ const BulletWeaver = ({
                 type="button"
                 onClick={() => role && onApply(role.id, bulletIndex, v)}
                 className="cv-btn-primary"
-                style={{ padding: "8px 14px", flexShrink: 0 }}
+                style={{ padding: "10px 16px", flexShrink: 0 }}
               >
                 Use this
               </button>

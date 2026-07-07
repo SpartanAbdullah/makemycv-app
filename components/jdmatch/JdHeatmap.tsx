@@ -181,17 +181,21 @@ export const JdHeatmap = ({
             <strong style={{ color: "var(--ff-warn)" }}>{pick.term}</strong> — not on your CV yet
           </span>
           <span style={{ display: "inline-flex", gap: 8, marginLeft: "auto" }}>
+            {/* Sized to match JdCoach's identical Weave / Add pair exactly
+                (compact tier: 10px 16px, icon 13). 11px = compact 10px + 1px:
+                the borderless primary needs the extra vertical padding to
+                render the same height as the bordered secondary beside it. */}
             {showWeave && (
               <button
                 type="button"
                 className="cv-btn-primary"
-                style={{ padding: "7px 12px", fontSize: 12.5 }}
+                style={{ padding: "11px 16px" }}
                 onClick={() => {
                   onWeave(pick.category, pick.term);
                   setPick(null);
                 }}
               >
-                <Icon name="sparkle" size={11} />
+                <Icon name="sparkle" size={13} />
                 Weave into a bullet
               </button>
             )}
@@ -199,13 +203,13 @@ export const JdHeatmap = ({
               <button
                 type="button"
                 className="cv-btn-secondary"
-                style={{ padding: "7px 12px", fontSize: 12.5 }}
+                style={{ padding: "10px 16px" }}
                 onClick={() => {
                   onAdd(pick.category, pick.term);
                   setPick(null);
                 }}
               >
-                <Icon name="plus" size={11} />
+                <Icon name="plus" size={13} />
                 {canAddCert(pick.category) ? "Add to certifications" : "Add to skills"}
               </button>
             )}
@@ -219,6 +223,11 @@ export const JdHeatmap = ({
                 fontSize: 12,
                 cursor: "pointer",
                 textDecoration: "underline",
+                // Padded hit area — the bare text link was ~15px tall (audit
+                // UI-5 touch-target floor); negative margin keeps the layout
+                // footprint identical.
+                padding: "13px 8px",
+                margin: "-13px -8px",
               }}
             >
               Cancel
