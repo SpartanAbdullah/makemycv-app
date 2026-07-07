@@ -12,6 +12,7 @@ import { applyPendingChanges, type PendingChange } from "../../lib/jdMatch/apply
 import { createId } from "../../lib/utils/id";
 import { Icon } from "../builder/Icon";
 import { Logo } from "../Logo";
+import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import {
   JD_BAND_LABELS,
   JD_CATEGORY_LABELS,
@@ -448,7 +449,17 @@ export const JdMatchPanel = () => {
         <JdEmptyGuide onBuild={() => router.push("/builder")} />
       ) : (
       <>
-      {!isDesktop && <MobileViewToggle value={mobileView} onChange={setMobileView} />}
+      {!isDesktop && (
+        <SegmentedViewToggle
+          ariaLabel="Switch between fixing gaps and your CV"
+          options={[
+            { value: "work", label: "Fix gaps", icon: "sparkle" },
+            { value: "cv", label: "Your CV", icon: "eye" },
+          ]}
+          value={mobileView}
+          onChange={setMobileView}
+        />
+      )}
 
       <div
         style={{
@@ -459,7 +470,9 @@ export const JdMatchPanel = () => {
           width: "100%",
           maxWidth: 1760,
           margin: "0 auto",
-          padding: isDesktop ? "18px 24px 22px" : "12px 16px 16px",
+          // Mobile bottom padding leaves room for the floating view toggle
+          // (same 96px convention as the builder's mobile preview).
+          padding: isDesktop ? "18px 24px 22px" : "12px 16px 96px",
           boxSizing: "border-box",
         }}
       >
@@ -772,8 +785,7 @@ export const JdMatchPanel = () => {
                       doneCta={
                         <button
                           type="button"
-                          className="cv-btn-primary"
-                          style={{ padding: "10px 16px" }}
+                          className="cv-btn-primary cv-btn--sm"
                           onClick={goToDownload}
                         >
                           <Icon name="download" size={13} />
@@ -1045,7 +1057,7 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
           type="button"
           onClick={onBuild}
           className="cv-btn-secondary"
-          style={{ padding: "11px 20px", width: "100%", maxWidth: 280 }}
+          style={{ width: "100%", maxWidth: 280 }}
         >
           <Icon name="upload" size={14} />
           Import an existing CV (PDF / DOCX)
@@ -1226,15 +1238,13 @@ const BackConfirmDialog = ({
           saved to your CV yet. Accept them before leaving, or discard them.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" onClick={onCancel} className="cv-btn-secondary" style={{ padding: "10px 16px" }}>
+          <button type="button" onClick={onCancel} className="cv-btn-secondary cv-btn--sm">
             Cancel
           </button>
-          <button type="button" onClick={onDiscard} className="cv-btn-secondary" style={{ padding: "10px 16px" }}>
+          <button type="button" onClick={onDiscard} className="cv-btn-secondary cv-btn--sm">
             Discard &amp; leave
           </button>
-          {/* 11px = compact 10px + 1px: the borderless primary needs the extra
-              vertical padding to render the same height as its bordered siblings. */}
-          <button type="button" onClick={onAccept} className="cv-btn-primary" style={{ padding: "11px 16px" }}>
+          <button type="button" onClick={onAccept} className="cv-btn-primary cv-btn--sm">
             <Icon name="check" size={13} />
             Accept &amp; leave
           </button>
@@ -1244,62 +1254,10 @@ const BackConfirmDialog = ({
   );
 };
 
-/* ─── Mobile work / CV toggle (below the desktop split breakpoint) ───────── */
-const MobileViewToggle = ({
-  value,
-  onChange,
-}: {
-  value: "work" | "cv";
-  onChange: (v: "work" | "cv") => void;
-}) => (
-  <div style={{ display: "flex", justifyContent: "center", padding: "10px 16px 0", flexShrink: 0 }}>
-    <div
-      role="tablist"
-      aria-label="Switch between fixing gaps and your CV"
-      style={{
-        display: "inline-flex",
-        padding: 4,
-        gap: 2,
-        background: "var(--ff-sunken)",
-        border: "1px solid var(--ff-line)",
-        borderRadius: 999,
-      }}
-    >
-      {(["work", "cv"] as const).map((v) => {
-        const active = v === value;
-        return (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(v)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              // 12px vertical padding keeps each segment >=44px tall — audit
-              // UI-5 touch-target floor (mirrors the builder's view toggle).
-              padding: "12px 18px",
-              borderRadius: 999,
-              border: "none",
-              background: active ? "var(--ff-card)" : "transparent",
-              color: active ? "var(--ff-ink)" : "var(--ff-muted)",
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: active ? "0 1px 3px rgba(11,15,12,0.10)" : "none",
-            }}
-          >
-            <Icon name={v === "work" ? "sparkle" : "eye"} size={13} />
-            {v === "work" ? "Fix gaps" : "Your CV"}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-);
+/* Mobile work / CV toggle — the shared SegmentedViewToggle (floating dark
+ * bottom pill, same presentation as the builder's Edit | Preview control).
+ * Rendered only below the desktop split via the isDesktop gate at the call
+ * site, so no breakpoint className is needed here. */
 
 /* ─── Locked-state CTA (renders only when isPro is false) ───────────────────
    isPro is force-true today, so this is dead at runtime; built for the
@@ -1678,8 +1636,8 @@ const BulletWeaver = ({
         type="button"
         onClick={onGenerate}
         disabled={isLoading || !selectedBullet.trim()}
-        className="cv-btn-primary"
-        style={{ alignSelf: "flex-start", padding: "10px 16px" }}
+        className="cv-btn-primary cv-btn--sm"
+        style={{ alignSelf: "flex-start" }}
       >
         <Icon name="sparkle" size={13} />
         {isLoading ? "Rewriting…" : variants !== null ? "Suggest again" : "Suggest a rewrite"}
@@ -1729,8 +1687,8 @@ const BulletWeaver = ({
               <button
                 type="button"
                 onClick={() => role && onApply(role.id, bulletIndex, v)}
-                className="cv-btn-primary"
-                style={{ padding: "10px 16px", flexShrink: 0 }}
+                className="cv-btn-primary cv-btn--sm"
+                style={{ flexShrink: 0 }}
               >
                 Use this
               </button>

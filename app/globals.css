@@ -387,7 +387,12 @@ body {
   border-color: var(--ff-line-strong);
 }
 
-/* Primary button (accent fill) */
+/* Primary button (accent fill).
+   The 1px TRANSPARENT border is load-bearing: it gives the borderless
+   primary the same box math as its bordered siblings (secondary/ghost/
+   accent-outline all carry 1px), so one size-tier padding renders the
+   same height on every variant — no more per-callsite ±1px compensation.
+   11px + 1px border = the old 12px, rendered height unchanged. */
 .cv-btn-primary {
   display: inline-flex;
   align-items: center;
@@ -397,9 +402,9 @@ body {
   color: #FFFFFF;
   font-weight: 600;
   font-size: 14px;
-  padding: 12px 22px;
+  padding: 11px 22px;
   border-radius: var(--radius-md);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: background var(--transition-fast),
               transform var(--transition-fast),
@@ -445,6 +450,22 @@ body {
   opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
+
+/* ── Button size tiers ───────────────────────────────────────────────────
+   Compose with any .cv-btn-* variant. All variants share 1px border box
+   math (primary's is transparent), so each tier renders one exact height
+   across variants — the tiers replace ~25 per-callsite inline paddings
+   (audit o13). Font stays the variant's own (14px) except where a tier
+   says otherwise.
+     default        11px 22px  — forms, dialogs, standalone CTAs
+     .cv-btn--sm    10px 16px  — in-card / banner / inline-row actions
+     .cv-btn--input-h 12px 22px — sits in one row with a .cv-input
+     .cv-btn--lg    15px 24px, 15px font — hero CTAs (Review download)
+   The top-bar/JD-header system (height: var(--topbar-control-h)) is a
+   separate, already-unified family — don't apply tiers there. */
+.cv-btn--sm { padding: 10px 16px; }
+.cv-btn--input-h { padding: 12px 22px; }
+.cv-btn--lg { padding: 15px 24px; font-size: 15px; }
 
 /* ── Top-bar toolbar buttons (Score / Templates / Download) ──────────────────
    Crisp rounded-rects with a clear hierarchy and tactile hover — a fintech /

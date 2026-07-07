@@ -185,7 +185,7 @@ export const ProjectsStep = ({
                 type="button"
                 onClick={handleAddEntry}
                 className="cv-btn-ghost"
-                style={{ width: "auto", padding: "10px 14px" }}
+                style={{ width: "auto" }}
               >
                 <Icon name="plus" size={14} />
                 Add project
@@ -288,7 +288,7 @@ export const ProjectsStep = ({
                           </div>
                         ))}
                         <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-ghost" style={{ width: "auto", padding: "10px 14px" }}>
+                          <button type="button" onClick={() => addBullet(index)} className="cv-btn-ghost" style={{ width: "auto" }}>
                             <Icon name="plus" size={14} />
                             Add bullet
                           </button>

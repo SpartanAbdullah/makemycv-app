@@ -182,14 +182,12 @@ export const JdHeatmap = ({
           </span>
           <span style={{ display: "inline-flex", gap: 8, marginLeft: "auto" }}>
             {/* Sized to match JdCoach's identical Weave / Add pair exactly
-                (compact tier: 10px 16px, icon 13). 11px = compact 10px + 1px:
-                the borderless primary needs the extra vertical padding to
-                render the same height as the bordered secondary beside it. */}
+                (compact tier .cv-btn--sm, icon 13 — height parity across
+                variants comes from the shared border box math in globals). */}
             {showWeave && (
               <button
                 type="button"
-                className="cv-btn-primary"
-                style={{ padding: "11px 16px" }}
+                className="cv-btn-primary cv-btn--sm"
                 onClick={() => {
                   onWeave(pick.category, pick.term);
                   setPick(null);
@@ -202,8 +200,7 @@ export const JdHeatmap = ({
             {showAdd && (
               <button
                 type="button"
-                className="cv-btn-secondary"
-                style={{ padding: "10px 16px" }}
+                className="cv-btn-secondary cv-btn--sm"
                 onClick={() => {
                   onAdd(pick.category, pick.term);
                   setPick(null);

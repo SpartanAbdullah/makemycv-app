@@ -162,7 +162,7 @@ export const EducationStep = ({
                 type="button"
                 onClick={handleAddEntry}
                 className="cv-btn-ghost"
-                style={{ width: "auto", padding: "10px 14px" }}
+                style={{ width: "auto" }}
               >
                 <Icon name="plus" size={14} />
                 Add education

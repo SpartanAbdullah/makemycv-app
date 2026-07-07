@@ -715,7 +715,7 @@ export const ExperienceStep = ({
                       onClick={() => addBullet(index)}
                       className="cv-btn-ghost"
                       disabled={filledBullets >= MAX_BULLETS}
-                      style={{ width: "auto", padding: "10px 14px" }}
+                      style={{ width: "auto" }}
                     >
                       <Icon name="plus" size={14} />
                       Add bullet
@@ -779,7 +779,6 @@ export const ExperienceStep = ({
         type="button"
         onClick={handleAddRole}
         className="cv-btn-ghost"
-        style={{ padding: "13px" }}
       >
         <Icon name="plus" size={14} />
         Add another role

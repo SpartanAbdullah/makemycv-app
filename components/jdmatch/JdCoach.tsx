@@ -163,18 +163,17 @@ export const JdCoach = ({
 
       {fixable ? (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
-          {/* Compact tier (10px 16px, icon 13) — JdHeatmap's identical Weave /
-              Add pair mirrors these exactly. 11px = compact 10px + 1px: the
-              borderless primary needs the extra vertical padding to render the
-              same height as the bordered secondary beside it. */}
+          {/* Compact tier (.cv-btn--sm, icon 13) — JdHeatmap's identical
+              Weave / Add pair mirrors these exactly. Height parity across
+              variants comes from the shared 1px border box math in globals. */}
           {showWeave && (
-            <button type="button" className="cv-btn-primary" style={{ padding: "11px 16px" }} onClick={() => onWeave(current.category, current.term)}>
+            <button type="button" className="cv-btn-primary cv-btn--sm" onClick={() => onWeave(current.category, current.term)}>
               <Icon name="sparkle" size={13} />
               Weave into a bullet
             </button>
           )}
           {showAdd && (
-            <button type="button" className={showWeave ? "cv-btn-secondary" : "cv-btn-primary"} style={{ padding: "10px 16px" }} onClick={() => onAdd(current.category, current.term)}>
+            <button type="button" className={`${showWeave ? "cv-btn-secondary" : "cv-btn-primary"} cv-btn--sm`} onClick={() => onAdd(current.category, current.term)}>
               <Icon name="plus" size={13} />
               {addLabel}
             </button>

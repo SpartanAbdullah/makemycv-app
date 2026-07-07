@@ -42,6 +42,7 @@ const MappingReview = dynamic(
 import type { CvData } from "../../lib/types/cv";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
+import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
@@ -801,81 +802,12 @@ const MobilePreviewView = ({
   );
 };
 
-/* ─── Mobile Edit | Preview toggle (below the desktop breakpoint) ──
- *
- * Replaces the old floating "Preview CV" pill. A clear segmented control:
- * one tap to switch between editing the form and previewing the scaled CV.
- * Fixed at the bottom of the viewport so it stays reachable while scrolling
- * either view.
- *
- * Visibility: `inline-flex xl:hidden` — at the desktop breakpoint (xl,
- * 1280 px, the same line where the side-by-side preview turns on) the
- * `xl:hidden` rule sets `display: none` and the toggle drops out.
- *
- * CRITICAL: `display` MUST live on the className, not in the inline `style`
- * prop. Inline styles win over Tailwind's media-queried rules (Tailwind
- * utilities are not `!important` by default), so an inline `display:
- * inline-flex` would silently override `xl:hidden` and keep the toggle
- * visible on desktop — which was the original bug. Don't reintroduce it. */
-const MobileViewToggle = ({
-  value,
-  onChange,
-}: {
-  value: "edit" | "preview";
-  onChange: (next: "edit" | "preview") => void;
-}) => (
-  <div
-    className="inline-flex xl:hidden"
-    role="tablist"
-    aria-label="Switch between editing and previewing your CV"
-    style={{
-      position: "fixed",
-      left: "50%",
-      bottom: 20,
-      transform: "translateX(-50%)",
-      zIndex: 50,
-      padding: 4,
-      background: "var(--ff-ink)",
-      borderRadius: 999,
-      boxShadow: "0 14px 30px rgba(11,15,12,0.30)",
-      gap: 2,
-    }}
-  >
-    {(["edit", "preview"] as const).map((v) => {
-      const active = v === value;
-      return (
-        <button
-          key={v}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          onClick={() => onChange(v)}
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            fontWeight: 600,
-            // 12px vertical padding keeps each segment >=44px tall — this is
-            // THE primary mobile control (audit UI-5 touch-target floor).
-            padding: "12px 18px",
-            borderRadius: 999,
-            border: "none",
-            background: active ? "white" : "transparent",
-            color: active ? "var(--ff-ink)" : "rgba(255,255,255,0.78)",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            textTransform: "capitalize",
-            transition: "background 120ms, color 120ms",
-          }}
-        >
-          <Icon name={v === "edit" ? "edit" : "eye"} size={13} />
-          {v === "edit" ? "Edit" : "Preview"}
-        </button>
-      );
-    })}
-  </div>
-);
+/* Mobile Edit | Preview toggle — now the shared SegmentedViewToggle
+ * (components/ui/SegmentedViewToggle.tsx), which carries the floating
+ * dark-pill presentation, the 44px touch floor, and the CRITICAL
+ * visibility-on-className rule. Builder passes `inline-flex xl:hidden`
+ * so the toggle drops out at the same xl line where the side-by-side
+ * preview turns on. */
 
 const drawerChevronBtn: React.CSSProperties = {
   width: 28,
@@ -1442,7 +1374,16 @@ export const BuilderShell = ({
         {/* Mobile Edit | Preview toggle — replaces the old floating pill.
             Hidden on xl+ via Tailwind (side-by-side handles desktop). */}
         {!stepIsReview && (
-          <MobileViewToggle value={mobileView} onChange={setMobileView} />
+          <SegmentedViewToggle
+            className="inline-flex xl:hidden"
+            ariaLabel="Switch between editing and previewing your CV"
+            options={[
+              { value: "edit", label: "Edit", icon: "edit" },
+              { value: "preview", label: "Preview", icon: "eye" },
+            ]}
+            value={mobileView}
+            onChange={setMobileView}
+          />
         )}
 
         {/* Mobile preview overlay */}
