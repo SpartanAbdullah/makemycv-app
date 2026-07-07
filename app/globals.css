@@ -36,6 +36,10 @@
   --ff-warn:         #A26500;
   --ff-warn-soft:    #FFF5E0;
   --ff-red:          #B43A2E;
+  /* Red tints — shared by the save-error chip and ScoreChip danger tier so
+     the two red treatments in the top bar can never drift apart. */
+  --ff-red-soft:     #FBEFED;
+  --ff-red-line:     #F2D2CE;
 
   /* ── Brand (mapped to Focus Flow) ─────────────────────────
      Existing components reference --brand-primary; remap to the
@@ -144,7 +148,13 @@
   --accent-2:   #d66a3a;
   --ring:       var(--ff-accent-ring);
 
-  /* ─── Checker / marketing tokens (kept) ─────────────────── */
+  /* ─── Checker / marketing tokens (kept) ───────────────────
+     DECIDED 2026-07: the resume-checker funnel keeps brand-blue as its
+     segment accent (distinct from the builder's emerald product accent),
+     but every blue surface must be internally consistent — blue CTAs get
+     blue shadows and a blue focus ring via --focus-ring. Score GRADE
+     colors are semantic, not segment-branded: green/amber/red on every
+     surface so a grade never changes color between checker and builder. */
   --brand-blue:      #2563EB;
   --brand-blue-dark: #1D4ED8;
   --brand-ink:       #0A0F1E;
@@ -159,6 +169,12 @@
   --severity-good: #059669;
   --severity-good-bg: #ECFDF5;
   --severity-good-border: #A7F3D0;
+  /* Text-tone variants — the solid severity hues above are for dots, bars
+     and rings (3:1 graphics floor); 12-14px TEXT on the tinted -bg surfaces
+     needs these darker ramps to clear the 4.5:1 body-text floor. */
+  --severity-error-text:  #B91C1C;
+  --severity-review-text: #92400E;
+  --severity-good-text:   #047857;
 
   --paper: #FFFFFF;
   --paper-2: #F8FAFC;
@@ -170,6 +186,10 @@
   --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
   --shadow-cta: 0 6px 20px rgba(14, 124, 74, 0.30);
   --shadow-cta-hover: 0 10px 28px rgba(14, 124, 74, 0.40);
+  /* Blue-tinted CTA glow for the checker's brand-blue buttons — the emerald
+     --shadow-cta under a blue button read as a green halo (audit 2026-07). */
+  --shadow-cta-blue: 0 6px 20px rgba(37, 99, 235, 0.30);
+  --shadow-cta-blue-hover: 0 10px 28px rgba(37, 99, 235, 0.40);
 }
 
 /* The stepper's tiny per-step labels hide on small screens, so the bar is
@@ -223,6 +243,9 @@
   --color-severity-good: var(--severity-good);
   --color-severity-good-bg: var(--severity-good-bg);
   --color-severity-good-border: var(--severity-good-border);
+  --color-severity-error-text: var(--severity-error-text);
+  --color-severity-review-text: var(--severity-review-text);
+  --color-severity-good-text: var(--severity-good-text);
 
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
@@ -234,6 +257,8 @@
   --shadow-lg-soft: var(--shadow-lg-soft);
   --shadow-cta: var(--shadow-cta);
   --shadow-cta-hover: var(--shadow-cta-hover);
+  --shadow-cta-blue: var(--shadow-cta-blue);
+  --shadow-cta-blue-hover: var(--shadow-cta-blue-hover);
 }
 
 body {
@@ -250,8 +275,11 @@ body {
    default. One low-specificity rule (:where keeps specificity at 0 so
    component styles can still override) gives keyboard users a visible
    green ring without ringing mouse clicks. */
-:where(button, a, [role="button"], [role="tab"], summary):focus-visible {
-  outline: 2px solid var(--ff-accent);
+:where(button, a, [role="button"], [role="tab"], [role="slider"], select, summary):focus-visible {
+  /* --focus-ring lets a surface re-tint the ring to its own accent (the
+     brand-blue checker sets it in app/resume-checker/layout.tsx); unset
+     everywhere else, so the emerald default is unchanged. */
+  outline: 2px solid var(--focus-ring, var(--ff-accent));
   outline-offset: 2px;
 }
 
@@ -415,7 +443,10 @@ body {
 /* ── Top-bar toolbar buttons (Score / Templates / Download) ──────────────────
    Crisp rounded-rects with a clear hierarchy and tactile hover — a fintech /
    SaaS product feel rather than generic marketing pills. `display` is left to
-   the element (Tailwind responsive hidden/inline-flex) so visibility rules win. */
+   the element (Tailwind responsive hidden/inline-flex) so visibility rules win.
+   Every control in the bar — score chip included — shares --topbar-control-h
+   so the row reads as one aligned system (mixed heights looked lopsided). */
+:root { --topbar-control-h: 38px; }
 .cv-top-btn {
   align-items: center;
   gap: 7px;
@@ -423,7 +454,8 @@ body {
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  padding: 9px 14px;
+  height: var(--topbar-control-h);
+  padding: 0 14px;
   border-radius: 10px;
   cursor: pointer;
   white-space: nowrap;
@@ -449,7 +481,7 @@ body {
   color: #ffffff;
   background: var(--ff-accent);
   border: 1px solid transparent;
-  padding: 9px 18px;
+  padding: 0 18px;
   box-shadow: var(--shadow-cta);
 }
 .cv-top-btn-primary:hover {
@@ -464,12 +496,14 @@ body {
   transform: none;
 }
 
-/* Score dial chip — credit-score-style ring + number, tier-coloured inline. */
+/* Score dial chip — credit-score-style ring + number, tier-coloured inline.
+   Same fixed height as .cv-top-btn so the top-bar row stays flush. */
 .cv-score-chip {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 4px 12px 4px 5px;
+  height: var(--topbar-control-h);
+  padding: 0 12px 0 5px;
   border-radius: 10px;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
@@ -526,6 +560,18 @@ body {
   position: absolute;
   inset: -8px;
 }
+/* Vertical-bias variant — for compact controls whose horizontal neighbours
+   sit closer than 8px (e.g. the JD Match chip Add/Weave pair at 4px gap):
+   full vertical extension, minimal horizontal bleed so adjacent hit areas
+   never overlap. */
+.ff-hit-target-v {
+  position: relative;
+}
+.ff-hit-target-v::before {
+  content: "";
+  position: absolute;
+  inset: -8px -2px;
+}
 
 /* Danger / remove button */
 .cv-btn-danger {
@@ -559,7 +605,9 @@ body {
   border: 1px solid rgba(14,124,74,0.45);
   font-weight: 600;
   font-size: 13px;
-  padding: 10px 14px;
+  /* 11px vertical matches .cv-btn-ghost's natural height so the two can sit
+     in one flex row without per-callsite padding overrides. */
+  padding: 11px 14px;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -568,6 +616,14 @@ body {
 .cv-btn-accent-outline:hover {
   background: var(--ff-accent-soft);
   border-color: var(--ff-accent);
+}
+.cv-btn-accent-outline:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cv-btn-accent-outline:disabled:hover {
+  background: var(--ff-card);
+  border-color: rgba(14,124,74,0.45);
 }
 
 /* Tip box — used for inline "ATS tip" footers in some steps */
@@ -738,6 +794,10 @@ body {
   border-radius: var(--radius-lg);
   padding: 13px 38px 13px 16px;
   font-size: 14.5px;
+  /* Same line-height as .cv-input so a select and an input sharing a grid
+     row render at identical heights (without this the select inherits the
+     preflight 1.5 and lands ~3px off). */
+  line-height: 1.4;
   color: var(--ff-ink);
   transition: border-color var(--transition-fast),
               box-shadow var(--transition-fast);
