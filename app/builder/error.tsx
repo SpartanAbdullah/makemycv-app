@@ -50,19 +50,10 @@ export default function BuilderError({
           automatically — picking up where you left off takes one click.
         </p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-            style={{ background: "var(--brand-primary)" }}
-          >
+          <button type="button" onClick={reset} className="cv-btn-primary">
             Continue editing
           </button>
-          <a
-            href="/builder"
-            className="rounded-full border px-5 py-2.5 text-sm font-medium"
-            style={{ borderColor: "var(--border-medium)", color: "var(--text-body)" }}
-          >
+          <a href="/builder" className="cv-btn-secondary">
             Reload the builder
           </a>
         </div>
