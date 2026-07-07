@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { TipJar } from "./TipJar";
+import { ModalCloseButton } from "./ui/ModalCloseButton";
 
 /**
  * TipJarModal — non-blocking, dismissible wrapper around <TipJar />.
@@ -80,15 +82,9 @@ export const TipJarModal = ({ open, onClose, context }: Props) => {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Lock body scroll while open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // Lock body scroll while open — reference-counted (shared hook) so
+  // overlapping lock-holders release in any order.
+  useBodyScrollLock(open);
 
   // Mark the session as having shown the modal the first time it opens.
   // We don't want a second `open=true` later in the same session to slip
@@ -123,7 +119,7 @@ export const TipJarModal = ({ open, onClose, context }: Props) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(11,15,12,0.55)",
+        background: "var(--surface-overlay)",
         padding: 16,
         animation: "tipjar-fade-in 180ms ease-out",
       }}
@@ -132,46 +128,18 @@ export const TipJarModal = ({ open, onClose, context }: Props) => {
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 460,
+          maxWidth: 480,
         }}
       >
-        {/* Close button — absolute over the TipJar card so it always wins
-            the tap target even with the card's lift transform. */}
-        <button
-          type="button"
+        {/* Close button — kept in this wrapper (absolute over the TipJar
+            card) so it always wins the tap target even with the card's
+            lift transform. Visually it sits inside the card bounds using
+            the shared ModalCloseButton treatment; the compact card is
+            bg-white so the gray-on-white icon reads fine. */}
+        <ModalCloseButton
           onClick={handleClose}
-          aria-label="Close"
-          style={{
-            position: "absolute",
-            top: -10,
-            right: -10,
-            zIndex: 2,
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "var(--ff-ink, #0B0F0C)",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-            display: "grid",
-            placeItems: "center",
-            boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+          style={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}
+        />
 
         <TipJar
           variant="compact"
@@ -182,8 +150,8 @@ export const TipJarModal = ({ open, onClose, context }: Props) => {
 
       <style>{`
         @keyframes tipjar-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+          from { opacity: 0; transform: scale(0.98); }
+          to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { AIError, AIImproveType } from "../hooks/useAIImprove";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { ModalCloseButton } from "./ui/ModalCloseButton";
 
 type Props = {
   isOpen: boolean;
@@ -93,7 +95,7 @@ function BulletsView({
         type="button"
         disabled={selected.length === 0}
         onClick={() => onApply(selected)}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
+        className="cv-btn-primary mt-4 w-full"
       >
         Apply Selected Bullets
       </button>
@@ -139,7 +141,7 @@ function SkillsView({
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               selected.has(i)
                 ? "border-[var(--ff-accent)] bg-[var(--ff-accent)] text-white"
-                : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)] hover:bg-[var(--ff-accent-soft)]"
+                : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)] hover:border-[var(--ff-accent)]"
             }`}
           >
             {skill}
@@ -150,7 +152,7 @@ function SkillsView({
         type="button"
         disabled={count === 0}
         onClick={() => onApply(results.filter((_, i) => selected.has(i)))}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
+        className="cv-btn-primary mt-4 w-full"
       >
         Add {count} Skill{count !== 1 ? "s" : ""} to My CV
       </button>
@@ -228,7 +230,7 @@ function SummaryView({
       <button
         type="button"
         onClick={() => onApply([texts[selectedIdx]])}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
+        className="cv-btn-primary mt-4 w-full"
       >
         Use This Summary
       </button>
@@ -264,26 +266,20 @@ export function AIResultsModal({
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
+  // Lock body scroll while open — reference-counted so overlapping modals
+  // (e.g. the download tip firing over this one) release in any order.
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--surface-overlay)]"
       onClick={handleBackdrop}
     >
       <div className="relative mx-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         {/* Close button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-          aria-label="Close"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <ModalCloseButton onClick={onClose} className="absolute right-3 top-3" />
 
         {/* Header */}
         <h2 className="text-lg font-bold text-gray-900">{TITLES[type]}</h2>
@@ -315,7 +311,7 @@ export function AIResultsModal({
                 href={error.supportUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 rounded-xl bg-[var(--ff-accent)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
+                className="cv-btn-primary mt-4"
               >
                 Support MakeMyCV
               </a>
@@ -350,7 +346,7 @@ export function AIResultsModal({
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 block text-center text-sm text-gray-400 underline cursor-pointer hover:text-gray-600"
+              className="mt-2 block text-center text-sm text-gray-500 underline cursor-pointer hover:text-gray-700"
             >
               Continue editing
             </button>

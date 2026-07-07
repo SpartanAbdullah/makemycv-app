@@ -82,7 +82,9 @@ export const TipJar = ({
       <div className="flex items-baseline justify-between gap-3">
         <h3
           className={`font-display font-bold text-slate-900 ${
-            isCompact ? "text-xl" : "text-2xl md:text-3xl"
+            /* 22px matches DownloadTipModal's picking-phase heading — the
+               two tip surfaces share one shell spec (audit o4). */
+            isCompact ? "text-[22px]" : "text-2xl md:text-3xl"
           }`}
         >
           {isCompact ? "Did this help?" : "Support a free tool"}

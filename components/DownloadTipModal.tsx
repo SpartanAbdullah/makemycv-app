@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { SUPPORT_URL } from "../lib/config/support";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { KofiIcon } from "./KofiIcon";
+import { ModalCloseButton } from "./ui/ModalCloseButton";
 
 /**
  * DownloadTipModal — post-download tip jar surface.
@@ -106,16 +108,9 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Lock body scroll while visible
-  useEffect(() => {
-    if (!open) return;
-    if (isWithinSuppressionWindow()) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // Lock body scroll while visible — reference-counted (shared hook) so
+  // overlapping lock-holders release in any order.
+  useBodyScrollLock(open && !isWithinSuppressionWindow());
 
   if (!open) return null;
   // Defense-in-depth: parents already filter via shouldShowDownloadTip(),
@@ -183,7 +178,7 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(11,15,12,0.62)",
+        background: "var(--surface-overlay)",
         padding: 16,
         animation: "dtm-fade-in 180ms ease-out",
       }}
@@ -194,7 +189,7 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
           width: "100%",
           maxWidth: 480,
           background: "white",
-          borderRadius: 20,
+          borderRadius: "var(--radius-2xl)",
           boxShadow:
             "0 28px 80px -16px rgba(37,99,235,0.30), 0 12px 32px rgba(15,23,42,0.18)",
           overflow: "hidden",
@@ -216,40 +211,10 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
 
         {/* Close button — always available; this is a non-blocking tip
             jar, never a gate. */}
-        <button
-          type="button"
+        <ModalCloseButton
           onClick={handleClose}
-          aria-label="Close"
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            zIndex: 2,
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "transparent",
-            border: "none",
-            color: "#64748b",
-            cursor: "pointer",
-            display: "grid",
-            placeItems: "center",
-          }}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+          style={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}
+        />
 
         <div style={{ padding: "32px 28px 28px" }}>
           {phase === "picking" && (
@@ -346,14 +311,15 @@ function PickingView({
         without a PayPal account; tips go directly to him.
       </p>
 
-      {/* Dismiss — small, low-contrast, does NOT write the 90-day flag.
-          The module-level session flag still gets set (in handleClose)
-          so the user isn't re-prompted within the same session. */}
+      {/* Dismiss — small, visually de-emphasised (but AA-contrast), does
+          NOT write the 90-day flag. The module-level session flag still
+          gets set (in handleClose) so the user isn't re-prompted within
+          the same session. */}
       <div className="mt-4 text-center">
         <button
           type="button"
           onClick={onMaybeLater}
-          className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
+          className="text-xs text-slate-500 hover:text-slate-700 hover:underline"
         >
           Maybe later
         </button>

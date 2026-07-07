@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import type { MissingItem } from "../../lib/validation/cvRequirements";
 import { Icon } from "./Icon";
 
@@ -44,6 +45,10 @@ export const ExportGateDialog = ({
     };
   }, [open]);
 
+  // Lock body scroll while open — reference-counted (shared hook) so
+  // overlapping lock-holders release in any order.
+  useBodyScrollLock(open);
+
   if (!open) return null;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -53,8 +58,10 @@ export const ExportGateDialog = ({
       return;
     }
     if (e.key !== "Tab" || !dialogRef.current) return;
+    // :not([disabled]) — disabled controls can't hold focus; counting one as
+    // first/last lets Tab escape the trap (same fix as MappingReview).
     const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
     if (focusables.length === 0) return;
     const first = focusables[0];
@@ -89,7 +96,7 @@ export const ExportGateDialog = ({
         position: "fixed",
         inset: 0,
         zIndex: 95,
-        background: "rgba(11,15,12,0.45)",
+        background: "var(--surface-overlay)",
         display: "grid",
         placeItems: "center",
         padding: 16,
@@ -107,7 +114,7 @@ export const ExportGateDialog = ({
           display: "flex",
           flexDirection: "column",
           background: "var(--ff-card)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-2xl)",
           border: "1px solid var(--ff-line)",
           padding: 22,
           boxShadow: "0 24px 60px rgba(11,15,12,0.25)",
