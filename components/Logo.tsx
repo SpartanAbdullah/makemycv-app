@@ -3,11 +3,13 @@ import Link from "next/link";
 
 type Variant = "horizontal" | "stacked" | "white" | "mark";
 
-/** Native SVG aspect ratios (from viewBox). */
+/** Native SVG aspect ratios (from viewBox). The horizontal variants grew
+ *  380→399 when the wordmark was outlined in true Poppins SemiBold (2026-07)
+ *  — the real face is wider than the Segoe/Arial fallback it replaced. */
 const ASPECT: Record<Variant, { w: number; h: number; src: string }> = {
-  horizontal: { w: 380, h: 100, src: "/logos/logo-horizontal.svg" },
+  horizontal: { w: 399, h: 100, src: "/logos/logo-horizontal.svg" },
   stacked:    { w: 240, h: 190, src: "/logos/logo-stacked.svg" },
-  white:      { w: 380, h: 100, src: "/logos/logo-white.svg" },
+  white:      { w: 399, h: 100, src: "/logos/logo-white.svg" },
   mark:       { w: 64,  h: 64,  src: "/logos/logo-mark.svg" },
 };
 
