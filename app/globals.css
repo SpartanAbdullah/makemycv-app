@@ -19,8 +19,13 @@
   /* Ink */
   --ff-ink:          #0B0F0C;
   --ff-ink-2:        #222A25;
-  --ff-muted:        #6B7368;
+  /* #646C61 (not the old #6B7368): 4.90:1 on --ff-sunken, the darkest
+     light surface — muted text is AA everywhere with no visible shift. */
+  --ff-muted:        #646C61;
   --ff-faint:        #A6ADA4;
+  /* Placeholders only — lighter than body (affordance) but ≥3:1 on white;
+     --ff-faint (2.3:1) made example text illegible. */
+  --ff-placeholder:  #8A9188;
 
   /* Lines */
   --ff-line:         #E6E4DD;
@@ -33,7 +38,9 @@
   --ff-accent-ring:  rgba(14, 124, 74, 0.20);
 
   /* Status */
-  --ff-warn:         #A26500;
+  /* #965D00 (not #A26500): 5.02:1 on --ff-warn-soft so 10-13px warn text
+     passes AA on its own tint; hue reads the same. */
+  --ff-warn:         #965D00;
   --ff-warn-soft:    #FFF5E0;
   --ff-red:          #B43A2E;
   /* Red tints — shared by the save-error chip and ScoreChip danger tier so
@@ -100,10 +107,9 @@
   --radius-card: 14px;
   --radius-pill: 999px;
 
-  /* Spacing scale */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
-  --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
-  --space-8: 32px;  --space-10: 40px; --space-12: 48px;
+  /* Shared disabled look for the standard button family (ghost keeps its
+     lighter 0.45 and .cv-top-btn-primary its 0.75 busy-wait state). */
+  --disabled-opacity: 0.55;
 
   /* Typography stacks — next/font variables first (self-hosted), then the
      plain family name for any environment without the loader. */
@@ -148,13 +154,13 @@
   --accent-2:   #d66a3a;
   --ring:       var(--ff-accent-ring);
 
-  /* ─── Checker / marketing tokens (kept) ───────────────────
-     DECIDED 2026-07: the resume-checker funnel keeps brand-blue as its
-     segment accent (distinct from the builder's emerald product accent),
-     but every blue surface must be internally consistent — blue CTAs get
-     blue shadows and a blue focus ring via --focus-ring. Score GRADE
-     colors are semantic, not segment-branded: green/amber/red on every
-     surface so a grade never changes color between checker and builder. */
+  /* ─── Checker / marketing tokens ──────────────────────────
+     DECIDED 2026-07 (founder call): the resume-checker migrated to the
+     emerald product accent — ONE brand across builder, checker and JD
+     Match. The --brand-blue pair below is legacy; nothing in-app should
+     reference it for new UI (kept only so historic references and the
+     sibling marketing repo don't break). Score GRADE colors are semantic:
+     green/amber/red on every surface. */
   --brand-blue:      #2563EB;
   --brand-blue-dark: #1D4ED8;
   --brand-ink:       #0A0F1E;
@@ -186,15 +192,13 @@
   --shadow-lg-soft: 0 16px 48px rgba(15, 23, 42, 0.08);
   --shadow-cta: 0 6px 20px rgba(14, 124, 74, 0.30);
   --shadow-cta-hover: 0 10px 28px rgba(14, 124, 74, 0.40);
-  /* Blue-tinted CTA glow for the checker's brand-blue buttons — the emerald
-     --shadow-cta under a blue button read as a green halo (audit 2026-07). */
-  --shadow-cta-blue: 0 6px 20px rgba(37, 99, 235, 0.30);
-  --shadow-cta-blue-hover: 0 10px 28px rgba(37, 99, 235, 0.40);
 }
 
 /* The stepper's tiny per-step labels hide on small screens, so the bar is
-   shorter — keep --progressbar-h in sync (used by the Review preview height). */
-@media (max-width: 640px) {
+   shorter — keep --progressbar-h in sync (used by the Review preview height).
+   639.98px: exact complement of Tailwind's sm (min-width: 640px) so no
+   viewport hits both rules. */
+@media (max-width: 639.98px) {
   :root { --progressbar-h: 48px; }
 }
 
@@ -257,8 +261,6 @@
   --shadow-lg-soft: var(--shadow-lg-soft);
   --shadow-cta: var(--shadow-cta);
   --shadow-cta-hover: var(--shadow-cta-hover);
-  --shadow-cta-blue: var(--shadow-cta-blue);
-  --shadow-cta-blue-hover: var(--shadow-cta-blue-hover);
 }
 
 body {
@@ -276,9 +278,9 @@ body {
    component styles can still override) gives keyboard users a visible
    green ring without ringing mouse clicks. */
 :where(button, a, [role="button"], [role="tab"], [role="slider"], select, summary):focus-visible {
-  /* --focus-ring lets a surface re-tint the ring to its own accent (the
-     brand-blue checker sets it in app/resume-checker/layout.tsx); unset
-     everywhere else, so the emerald default is unchanged. */
+  /* --focus-ring lets a future segment re-tint the ring to its own accent;
+     nothing sets it today (the checker did while it was blue), so the
+     emerald default applies everywhere. */
   outline: 2px solid var(--focus-ring, var(--ff-accent));
   outline-offset: 2px;
 }
@@ -305,8 +307,8 @@ body {
   outline: none;
   font-family: var(--font-body);
 }
-.cv-input::placeholder { color: var(--ff-faint); }
-.cv-input:hover:not(:focus) { border-color: var(--ff-line-strong); }
+.cv-input::placeholder { color: var(--ff-placeholder); }
+.cv-input:hover:not(:focus), .cv-select:hover:not(:focus) { border-color: var(--ff-line-strong); }
 .cv-input:focus {
   border-color: var(--ff-accent);
   box-shadow: 0 0 0 3px var(--ff-accent-ring);
@@ -412,7 +414,7 @@ body {
 }
 .cv-btn-primary:active { transform: translateY(0); }
 .cv-btn-primary:disabled {
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -423,7 +425,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--ff-card);
   color: var(--ff-ink);
   font-weight: 500;
@@ -439,6 +441,10 @@ body {
   background: var(--ff-sunken);
   border-color: var(--ff-line-strong);
 }
+.cv-btn-secondary:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
 
 /* ── Top-bar toolbar buttons (Score / Templates / Download) ──────────────────
    Crisp rounded-rects with a clear hierarchy and tactile hover — a fintech /
@@ -449,7 +455,7 @@ body {
 :root { --topbar-control-h: 38px; }
 .cv-top-btn {
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 600;
@@ -496,6 +502,33 @@ body {
   transform: none;
 }
 
+/* Preview-drawer footer controls — chevrons + Fullscreen share the top-bar
+   secondary hover language (background/border shift); the fit-mode segments
+   get their own hover since the active segment is ink-filled. Styles live
+   here (not inline) so :hover can win. */
+.cv-drawer-ctl {
+  background: var(--ff-paper);
+  border: 1px solid var(--ff-line);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.cv-drawer-ctl:hover {
+  background: var(--ff-sunken);
+  border-color: var(--ff-line-strong);
+}
+.cv-fit-seg {
+  background: transparent;
+  color: var(--ff-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+.cv-fit-seg:hover {
+  background: var(--ff-sunken);
+  color: var(--ff-ink);
+}
+.cv-fit-seg[aria-pressed="true"] {
+  background: var(--ff-ink);
+  color: #fff;
+}
+
 /* Score dial chip — credit-score-style ring + number, tier-coloured inline.
    Same fixed height as .cv-top-btn so the top-bar row stays flush. */
 .cv-score-chip {
@@ -516,7 +549,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   background: transparent;
   color: var(--ff-muted);
   font-weight: 500;
@@ -577,7 +610,7 @@ body {
 .cv-btn-danger {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: transparent;
   color: var(--ff-muted);
   font-weight: 500;
@@ -758,6 +791,15 @@ body {
 .cv-skill-chip-remove:hover {
   background: var(--ff-accent);
   color: white;
+}
+/* Disabled move/remove chips must not invite a click — freeze the hover at
+   the resting style (mirrors .cv-btn-ghost:disabled). */
+.cv-skill-chip-remove:disabled {
+  cursor: not-allowed;
+}
+.cv-skill-chip-remove:disabled:hover {
+  background: rgba(14,124,74,0.18);
+  color: var(--ff-accent-dark);
 }
 
 /* Step heading — large Bricolage display */

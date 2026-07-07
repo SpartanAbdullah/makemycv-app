@@ -114,7 +114,7 @@ export default function CategoryCard({
             <span className="font-display text-xl font-bold tabular-nums text-slate-900">
               {category.score}
             </span>
-            <span className="text-sm text-slate-400">/100</span>
+            <span className="text-sm text-slate-400">%</span>
           </div>
           <svg
             viewBox="0 0 24 24"
@@ -152,7 +152,7 @@ export default function CategoryCard({
                 {category.faqs.map((faq) => (
                   <details
                     key={faq.q}
-                    className="group rounded-lg border border-line bg-paper p-3 open:border-brand-blue/40"
+                    className="group rounded-lg border border-line bg-paper p-3 open:border-ff-accent/40"
                   >
                     <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-sm font-medium text-slate-900 marker:hidden">
                       <span>{faq.q}</span>

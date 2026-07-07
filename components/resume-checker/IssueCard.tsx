@@ -47,7 +47,7 @@ export default function IssueCard({ issue }: { issue: CheckerIssue }) {
         className={`flex items-center gap-3 rounded-lg border border-l-4 border-line ${cfg.borderLeft} ${cfg.tint} px-4 py-3`}
       >
         <div
-          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${cfg.iconBg} ${cfg.iconText}`}
+          className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${cfg.iconBg} ${cfg.iconText}`}
           aria-hidden
         >
           {cfg.icon}
@@ -87,12 +87,12 @@ export default function IssueCard({ issue }: { issue: CheckerIssue }) {
               stroke="currentColor"
               strokeWidth="2.5"
               aria-hidden
-              className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-blue"
+              className="mt-0.5 h-4 w-4 flex-shrink-0 text-ff-accent-dark"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
             </svg>
             <div className="min-w-0">
-              <span className="font-semibold text-brand-blue">How to fix: </span>
+              <span className="font-semibold text-ff-accent-dark">How to fix: </span>
               <span className="text-slate-700">{issue.actionable}</span>
             </div>
           </div>

@@ -369,14 +369,16 @@ function ThanksView({
         </p>
       </div>
 
-      {/* Spread the word */}
+      {/* Spread the word — accent-soft emerald family (was an off-brand
+          Tailwind-blue callout, the last blue surface after the 2026-07
+          emerald unification). */}
       <div
         style={{
           marginTop: 22,
           padding: 16,
           borderRadius: 12,
-          background: "#EFF6FF",
-          border: "1px solid #DBEAFE",
+          background: "var(--ff-accent-soft)",
+          border: "1px solid rgba(14,124,74,0.25)",
         }}
       >
         <p
@@ -384,7 +386,7 @@ function ThanksView({
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: "#1e3a8a",
+            color: "var(--ff-accent-dark)",
             margin: 0,
           }}
         >
@@ -394,7 +396,7 @@ function ThanksView({
           style={{
             marginTop: 4,
             fontSize: 12.5,
-            color: "#1e40af",
+            color: "var(--ff-accent-dark)",
             lineHeight: 1.55,
           }}
         >
@@ -408,9 +410,9 @@ function ThanksView({
             marginTop: 10,
             padding: "9px 14px",
             borderRadius: 8,
-            border: "1px solid #2563eb",
+            border: "1px solid rgba(14,124,74,0.45)",
             background: "white",
-            color: "#1d4ed8",
+            color: "var(--ff-accent-dark)",
             fontSize: 12.5,
             fontWeight: 600,
             cursor: "pointer",
@@ -435,7 +437,7 @@ function ThanksView({
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            color: "#2563eb",
+            color: "var(--ff-accent-dark)",
             textDecoration: "underline",
             textUnderlineOffset: 2,
           }}

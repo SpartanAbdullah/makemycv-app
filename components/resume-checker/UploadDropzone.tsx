@@ -174,8 +174,7 @@ export default function UploadDropzone() {
             surfaced on the label via :has(input:focus-visible) — scoped to the
             input so the error-state "Try again" button (also a descendant)
             doesn't ring the whole dropzone. Keyboard-only, matching the
-            documented globals.css focus convention; ring color follows the
-            surface accent (--focus-ring, brand-blue here). */}
+            documented globals.css focus convention. */}
         <label
           htmlFor="resume-checker-file"
           onDrop={onDrop}
@@ -184,10 +183,10 @@ export default function UploadDropzone() {
           className={[
             "block w-full cursor-pointer rounded-xl border-2 border-dashed px-6 py-14 text-center transition has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-[var(--focus-ring,var(--ff-accent))]",
             isDragging
-              ? "border-brand-blue bg-brand-blue/5"
+              ? "border-ff-accent bg-ff-accent/5"
               : phase === "error"
                 ? "border-severity-error-border bg-severity-error-bg/40"
-                : "border-line-strong bg-paper-2 hover:border-brand-blue hover:bg-brand-blue/5",
+                : "border-line-strong bg-paper-2 hover:border-ff-accent hover:bg-ff-accent/5",
             isBusy ? "pointer-events-none opacity-95" : "",
           ].join(" ")}
         >
@@ -204,7 +203,7 @@ export default function UploadDropzone() {
           {!isBusy && phase !== "error" && (
             <div className="flex flex-col items-center gap-3">
               <div
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue"
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-ff-accent-soft text-ff-accent-dark"
                 aria-hidden
               >
                 <svg
@@ -238,7 +237,7 @@ export default function UploadDropzone() {
               aria-live="polite"
             >
               <div
-                className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong border-t-brand-blue"
+                className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong border-t-ff-accent"
                 aria-hidden
               />
               <div className="text-base font-medium text-slate-900">
@@ -277,7 +276,7 @@ export default function UploadDropzone() {
                   e.preventDefault();
                   reset();
                 }}
-                className="mt-2 rounded-xl bg-brand-blue px-5 py-2.5 text-sm font-semibold text-white shadow-cta-blue transition hover:bg-brand-blue-dark"
+                className="mt-2 rounded-xl bg-ff-accent px-5 py-2.5 text-sm font-semibold text-white shadow-cta transition hover:bg-ff-accent-dark"
               >
                 Try again
               </button>
@@ -320,7 +319,7 @@ export default function UploadDropzone() {
 function TrustChip({ label, icon }: { label: string; icon: React.ReactNode }) {
   return (
     <div className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-paper-2 px-3 py-2 text-xs font-medium text-slate-600">
-      <span className="text-brand-blue" aria-hidden>
+      <span className="text-ff-accent-dark" aria-hidden>
         {icon}
       </span>
       {label}
