@@ -63,10 +63,10 @@ export default async function ReportPage({
           </p>
           <Link
             href="/resume-checker"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-cta transition hover:shadow-cta-hover"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:shadow-cta-hover"
             style={{
               backgroundImage:
-                "linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-dark) 100%)",
+                "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)",
             }}
           >
             Upload a new CV
@@ -85,7 +85,7 @@ export default async function ReportPage({
       <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-6">
           <div className="flex items-center gap-3">
-            <Logo variant="horizontal" height={28} href="/resume-checker" />
+            <Logo variant="horizontal" height={32} href="/resume-checker" />
             <span className="hidden text-xs text-slate-500 sm:inline">· ATS Checker</span>
           </div>
           <div className="flex items-center gap-3">

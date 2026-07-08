@@ -19,8 +19,13 @@
   /* Ink */
   --ff-ink:          #0B0F0C;
   --ff-ink-2:        #222A25;
-  --ff-muted:        #6B7368;
+  /* #646C61 (not the old #6B7368): 4.90:1 on --ff-sunken, the darkest
+     light surface — muted text is AA everywhere with no visible shift. */
+  --ff-muted:        #646C61;
   --ff-faint:        #A6ADA4;
+  /* Placeholders only — lighter than body (affordance) but ≥3:1 on white;
+     --ff-faint (2.3:1) made example text illegible. */
+  --ff-placeholder:  #8A9188;
 
   /* Lines */
   --ff-line:         #E6E4DD;
@@ -33,9 +38,15 @@
   --ff-accent-ring:  rgba(14, 124, 74, 0.20);
 
   /* Status */
-  --ff-warn:         #A26500;
+  /* #965D00 (not #A26500): 5.02:1 on --ff-warn-soft so 10-13px warn text
+     passes AA on its own tint; hue reads the same. */
+  --ff-warn:         #965D00;
   --ff-warn-soft:    #FFF5E0;
   --ff-red:          #B43A2E;
+  /* Red tints — shared by the save-error chip and ScoreChip danger tier so
+     the two red treatments in the top bar can never drift apart. */
+  --ff-red-soft:     #FBEFED;
+  --ff-red-line:     #F2D2CE;
 
   /* ── Brand (mapped to Focus Flow) ─────────────────────────
      Existing components reference --brand-primary; remap to the
@@ -96,10 +107,9 @@
   --radius-card: 14px;
   --radius-pill: 999px;
 
-  /* Spacing scale */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
-  --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
-  --space-8: 32px;  --space-10: 40px; --space-12: 48px;
+  /* Shared disabled look for the standard button family (ghost keeps its
+     lighter 0.45 and .cv-top-btn-primary its 0.75 busy-wait state). */
+  --disabled-opacity: 0.55;
 
   /* Typography stacks — next/font variables first (self-hosted), then the
      plain family name for any environment without the loader. */
@@ -129,9 +139,15 @@
   /* Segmented-focus stepper height (context line + bar + tiny labels). The
      labels hide ≤640px, so the bar is shorter there — overridden below. */
   --progressbar-h:64px;
-  --drawer-w:     clamp(460px, 48vw, 820px);
+  /* Desktop split (2026-07 rebalance): the drawer grows to 900px on wide
+     screens and the form column fills the remaining width up to 1160px —
+     the old 780px form cap left a ~300px dead band between form and
+     preview at ~1920px. The form's right edge is bounded by its
+     margin-right (drawer + gaps), so --form-max is only the ultra-wide
+     readability ceiling. */
+  --drawer-w:     clamp(460px, 48vw, 900px);
   --drawer-gap:   24px;
-  --form-max:     clamp(540px, 44vw, 780px);
+  --form-max:     1160px;
   /* Legacy alias — old sidebar width; left for backward-compat. */
   --sidebar-w:    220px;
 
@@ -144,7 +160,13 @@
   --accent-2:   #d66a3a;
   --ring:       var(--ff-accent-ring);
 
-  /* ─── Checker / marketing tokens (kept) ─────────────────── */
+  /* ─── Checker / marketing tokens ──────────────────────────
+     DECIDED 2026-07 (founder call): the resume-checker migrated to the
+     emerald product accent — ONE brand across builder, checker and JD
+     Match. The --brand-blue pair below is legacy; nothing in-app should
+     reference it for new UI (kept only so historic references and the
+     sibling marketing repo don't break). Score GRADE colors are semantic:
+     green/amber/red on every surface. */
   --brand-blue:      #2563EB;
   --brand-blue-dark: #1D4ED8;
   --brand-ink:       #0A0F1E;
@@ -159,6 +181,12 @@
   --severity-good: #059669;
   --severity-good-bg: #ECFDF5;
   --severity-good-border: #A7F3D0;
+  /* Text-tone variants — the solid severity hues above are for dots, bars
+     and rings (3:1 graphics floor); 12-14px TEXT on the tinted -bg surfaces
+     needs these darker ramps to clear the 4.5:1 body-text floor. */
+  --severity-error-text:  #B91C1C;
+  --severity-review-text: #92400E;
+  --severity-good-text:   #047857;
 
   --paper: #FFFFFF;
   --paper-2: #F8FAFC;
@@ -173,8 +201,10 @@
 }
 
 /* The stepper's tiny per-step labels hide on small screens, so the bar is
-   shorter — keep --progressbar-h in sync (used by the Review preview height). */
-@media (max-width: 640px) {
+   shorter — keep --progressbar-h in sync (used by the Review preview height).
+   639.98px: exact complement of Tailwind's sm (min-width: 640px) so no
+   viewport hits both rules. */
+@media (max-width: 639.98px) {
   :root { --progressbar-h: 48px; }
 }
 
@@ -223,6 +253,9 @@
   --color-severity-good: var(--severity-good);
   --color-severity-good-bg: var(--severity-good-bg);
   --color-severity-good-border: var(--severity-good-border);
+  --color-severity-error-text: var(--severity-error-text);
+  --color-severity-review-text: var(--severity-review-text);
+  --color-severity-good-text: var(--severity-good-text);
 
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
@@ -250,8 +283,11 @@ body {
    default. One low-specificity rule (:where keeps specificity at 0 so
    component styles can still override) gives keyboard users a visible
    green ring without ringing mouse clicks. */
-:where(button, a, [role="button"], [role="tab"], summary):focus-visible {
-  outline: 2px solid var(--ff-accent);
+:where(button, a, [role="button"], [role="tab"], [role="slider"], select, summary):focus-visible {
+  /* --focus-ring lets a future segment re-tint the ring to its own accent;
+     nothing sets it today (the checker did while it was blue), so the
+     emerald default applies everywhere. */
+  outline: 2px solid var(--focus-ring, var(--ff-accent));
   outline-offset: 2px;
 }
 
@@ -277,8 +313,8 @@ body {
   outline: none;
   font-family: var(--font-body);
 }
-.cv-input::placeholder { color: var(--ff-faint); }
-.cv-input:hover:not(:focus) { border-color: var(--ff-line-strong); }
+.cv-input::placeholder { color: var(--ff-placeholder); }
+.cv-input:hover:not(:focus), .cv-select:hover:not(:focus) { border-color: var(--ff-line-strong); }
 .cv-input:focus {
   border-color: var(--ff-accent);
   box-shadow: 0 0 0 3px var(--ff-accent-ring);
@@ -357,7 +393,12 @@ body {
   border-color: var(--ff-line-strong);
 }
 
-/* Primary button (accent fill) */
+/* Primary button (accent fill).
+   The 1px TRANSPARENT border is load-bearing: it gives the borderless
+   primary the same box math as its bordered siblings (secondary/ghost/
+   accent-outline all carry 1px), so one size-tier padding renders the
+   same height on every variant — no more per-callsite ±1px compensation.
+   11px + 1px border = the old 12px, rendered height unchanged. */
 .cv-btn-primary {
   display: inline-flex;
   align-items: center;
@@ -367,9 +408,9 @@ body {
   color: #FFFFFF;
   font-weight: 600;
   font-size: 14px;
-  padding: 12px 22px;
+  padding: 11px 22px;
   border-radius: var(--radius-md);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: background var(--transition-fast),
               transform var(--transition-fast),
@@ -384,7 +425,7 @@ body {
 }
 .cv-btn-primary:active { transform: translateY(0); }
 .cv-btn-primary:disabled {
-  opacity: 0.55;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -395,7 +436,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--ff-card);
   color: var(--ff-ink);
   font-weight: 500;
@@ -411,19 +452,43 @@ body {
   background: var(--ff-sunken);
   border-color: var(--ff-line-strong);
 }
+.cv-btn-secondary:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* ── Button size tiers ───────────────────────────────────────────────────
+   Compose with any .cv-btn-* variant. All variants share 1px border box
+   math (primary's is transparent), so each tier renders one exact height
+   across variants — the tiers replace ~25 per-callsite inline paddings
+   (audit o13). Font stays the variant's own (14px) except where a tier
+   says otherwise.
+     default        11px 22px  — forms, dialogs, standalone CTAs
+     .cv-btn--sm    10px 16px  — in-card / banner / inline-row actions
+     .cv-btn--input-h 12px 22px — sits in one row with a .cv-input
+     .cv-btn--lg    15px 24px, 15px font — hero CTAs (Review download)
+   The top-bar/JD-header system (height: var(--topbar-control-h)) is a
+   separate, already-unified family — don't apply tiers there. */
+.cv-btn--sm { padding: 10px 16px; }
+.cv-btn--input-h { padding: 12px 22px; }
+.cv-btn--lg { padding: 15px 24px; font-size: 15px; }
 
 /* ── Top-bar toolbar buttons (Score / Templates / Download) ──────────────────
    Crisp rounded-rects with a clear hierarchy and tactile hover — a fintech /
    SaaS product feel rather than generic marketing pills. `display` is left to
-   the element (Tailwind responsive hidden/inline-flex) so visibility rules win. */
+   the element (Tailwind responsive hidden/inline-flex) so visibility rules win.
+   Every control in the bar — score chip included — shares --topbar-control-h
+   so the row reads as one aligned system (mixed heights looked lopsided). */
+:root { --topbar-control-h: 38px; }
 .cv-top-btn {
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  padding: 9px 14px;
+  height: var(--topbar-control-h);
+  padding: 0 14px;
   border-radius: 10px;
   cursor: pointer;
   white-space: nowrap;
@@ -441,20 +506,24 @@ body {
 }
 .cv-top-btn-secondary:hover {
   background: var(--ff-card);
-  border-color: var(--ff-line-strong);
-  box-shadow: 0 1px 2px rgba(11, 15, 12, 0.05);
+  /* Accent border + soft ring — hover must be unmistakable on the primary
+     toolbar (founder feedback 2026-07: the old sunken→card swap read as
+     "nothing happened"). */
+  border-color: rgba(14, 124, 74, 0.45);
+  box-shadow: 0 0 0 3px var(--ff-accent-ring);
 }
 
 .cv-top-btn-primary {
   color: #ffffff;
   background: var(--ff-accent);
   border: 1px solid transparent;
-  padding: 9px 18px;
+  padding: 0 18px;
   box-shadow: var(--shadow-cta);
 }
 .cv-top-btn-primary:hover {
   background: var(--ff-accent-dark);
-  box-shadow: var(--shadow-cta-hover);
+  /* Ring + lifted glow — pairs with the secondaries' hover ring. */
+  box-shadow: 0 0 0 3px var(--ff-accent-ring), var(--shadow-cta-hover);
   transform: translateY(-1px);
 }
 .cv-top-btn-primary:disabled {
@@ -464,17 +533,52 @@ body {
   transform: none;
 }
 
-/* Score dial chip — credit-score-style ring + number, tier-coloured inline. */
+/* Preview-drawer footer controls — chevrons + Fullscreen share the top-bar
+   secondary hover language (background/border shift); the fit-mode segments
+   get their own hover since the active segment is ink-filled. Styles live
+   here (not inline) so :hover can win. */
+.cv-drawer-ctl {
+  background: var(--ff-paper);
+  border: 1px solid var(--ff-line);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.cv-drawer-ctl:hover {
+  background: var(--ff-sunken);
+  border-color: var(--ff-line-strong);
+}
+.cv-fit-seg {
+  background: transparent;
+  color: var(--ff-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+.cv-fit-seg:hover {
+  background: var(--ff-sunken);
+  color: var(--ff-ink);
+}
+.cv-fit-seg[aria-pressed="true"] {
+  background: var(--ff-ink);
+  color: #fff;
+}
+
+/* Score dial chip — credit-score-style ring + number, tier-coloured inline.
+   Same fixed height as .cv-top-btn so the top-bar row stays flush. */
 .cv-score-chip {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 4px 12px 4px 5px;
+  height: var(--topbar-control-h);
+  padding: 0 12px 0 5px;
   border-radius: 10px;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
-.cv-score-chip:hover { box-shadow: 0 1px 2px rgba(11, 15, 12, 0.06); }
+/* Hover glow follows the chip's tier color (--chip-glow is set inline by
+   ScoreChip from the tier fg) so a red "needs work" chip glows red, not
+   brand green. Falls back to the accent ring. */
+.cv-score-chip:hover {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--chip-glow, var(--ff-accent)) 22%, transparent);
+}
 .cv-score-chip:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
 
 /* Ghost dashed button — used for "Add another" rows */
@@ -482,7 +586,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   background: transparent;
   color: var(--ff-muted);
   font-weight: 500;
@@ -526,12 +630,24 @@ body {
   position: absolute;
   inset: -8px;
 }
+/* Vertical-bias variant — for compact controls whose horizontal neighbours
+   sit closer than 8px (e.g. the JD Match chip Add/Weave pair at 4px gap):
+   full vertical extension, minimal horizontal bleed so adjacent hit areas
+   never overlap. */
+.ff-hit-target-v {
+  position: relative;
+}
+.ff-hit-target-v::before {
+  content: "";
+  position: absolute;
+  inset: -8px -2px;
+}
 
 /* Danger / remove button */
 .cv-btn-danger {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: transparent;
   color: var(--ff-muted);
   font-weight: 500;
@@ -559,7 +675,9 @@ body {
   border: 1px solid rgba(14,124,74,0.45);
   font-weight: 600;
   font-size: 13px;
-  padding: 10px 14px;
+  /* 11px vertical matches .cv-btn-ghost's natural height so the two can sit
+     in one flex row without per-callsite padding overrides. */
+  padding: 11px 14px;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -568,6 +686,14 @@ body {
 .cv-btn-accent-outline:hover {
   background: var(--ff-accent-soft);
   border-color: var(--ff-accent);
+}
+.cv-btn-accent-outline:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cv-btn-accent-outline:disabled:hover {
+  background: var(--ff-card);
+  border-color: rgba(14,124,74,0.45);
 }
 
 /* Tip box — used for inline "ATS tip" footers in some steps */
@@ -703,6 +829,15 @@ body {
   background: var(--ff-accent);
   color: white;
 }
+/* Disabled move/remove chips must not invite a click — freeze the hover at
+   the resting style (mirrors .cv-btn-ghost:disabled). */
+.cv-skill-chip-remove:disabled {
+  cursor: not-allowed;
+}
+.cv-skill-chip-remove:disabled:hover {
+  background: rgba(14,124,74,0.18);
+  color: var(--ff-accent-dark);
+}
 
 /* Step heading — large Bricolage display */
 .cv-step-heading {
@@ -738,6 +873,10 @@ body {
   border-radius: var(--radius-lg);
   padding: 13px 38px 13px 16px;
   font-size: 14.5px;
+  /* Same line-height as .cv-input so a select and an input sharing a grid
+     row render at identical heights (without this the select inherits the
+     preflight 1.5 and lands ~3px off). */
+  line-height: 1.4;
   color: var(--ff-ink);
   transition: border-color var(--transition-fast),
               box-shadow var(--transition-fast);

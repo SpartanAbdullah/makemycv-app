@@ -15,10 +15,12 @@ const dotColor: Record<ScoreSeverity, string> = {
   error: "bg-severity-error",
 };
 
+// Text uses the darker -text ramps (4.5:1 on tinted backgrounds); dots keep
+// the brighter solid hues (graphics only need 3:1).
 const severityTextColor: Record<ScoreSeverity, string> = {
-  good: "text-severity-good",
-  review: "text-severity-review",
-  error: "text-severity-error",
+  good: "text-severity-good-text",
+  review: "text-severity-review-text",
+  error: "text-severity-error-text",
 };
 
 export default function ScoreSidebar({
@@ -81,10 +83,10 @@ function IssueChip({
   const base = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium";
   const toneClass = active
     ? tone === "error"
-      ? "bg-severity-error-bg text-severity-error"
+      ? "bg-severity-error-bg text-severity-error-text"
       : tone === "review"
-        ? "bg-severity-review-bg text-severity-review"
-        : "bg-severity-good-bg text-severity-good"
+        ? "bg-severity-review-bg text-severity-review-text"
+        : "bg-severity-good-bg text-severity-good-text"
     : "bg-paper-2 text-slate-400";
   const dotClass = active ? dotColor[tone] : "bg-slate-300";
 
@@ -137,7 +139,7 @@ function CategoryRow({ cat }: { cat: ScoreCategory }) {
               stroke="currentColor"
               strokeWidth="2"
               aria-hidden
-              className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+              className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
             </svg>

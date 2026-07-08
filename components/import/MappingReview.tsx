@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 import type {
   CvCertification,
@@ -11,6 +11,8 @@ import type {
 } from "../../lib/types/cv";
 import { mapParsedToCv } from "../../lib/importers/fieldMapper";
 import { getDir } from "../../lib/utils/rtl";
+import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
+import { ModalCloseButton } from "../ui/ModalCloseButton";
 
 // The import pipeline is heuristic — role ↔ company and school ↔ degree
 // sometimes get swapped, locations can end up in company, etc. Rather than
@@ -39,6 +41,68 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
   // file always re-seeds — no stale-state risk.
   const [edited, setEdited] = useState<EditableCv>(() => mapParsedToCv(parsed));
   const [mode, setMode] = useState<MergeMode>("replace");
+
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Backdrop dismiss guard: a drag-select that starts inside a text input
+  // and releases over the backdrop fires `click` on the backdrop (the
+  // common ancestor) — dismissing on that alone would silently discard all
+  // edits. Only dismiss when the mousedown ALSO landed on the backdrop.
+  const backdropMouseDown = useRef(false);
+
+  // Escape closes — document-level listener (TipJarModal pattern) rather
+  // than a container onKeyDown, so Escape works even before focus has
+  // moved into the dialog. MappingReview only mounts while visible, so no
+  // `open` gate is needed.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // During IME composition Escape only cancels the composition — closing
+      // here would discard every edit in the review. keyCode 229 covers
+      // Safari delivering the keydown just after compositionend.
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  // Focus moves into the dialog on mount (the ✕ button) and returns to the
+  // previously-focused element on unmount — the Tab trap below is inert
+  // without an initial focus inside. Mirrors ExportGateDialog.
+  useEffect(() => {
+    restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+    closeRef.current?.focus();
+    return () => {
+      restoreFocusRef.current?.focus?.();
+    };
+  }, []);
+
+  // Lock body scroll while mounted — reference-counted (shared hook) so
+  // overlapping lock-holders release in any order. Mount/unmount IS the
+  // visibility lifetime here (no `open` prop).
+  useBodyScrollLock();
+
+  // Tab wraps within the dialog — ported from ExportGateDialog.
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    // :not([disabled]) matters here: a disabled Import button (empty parse)
+    // can never hold focus, so counting it as `last` lets forward-Tab escape
+    // the dialog and freezes Shift+Tab on the close button.
+    const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   // ── Personal / contact updaters ────────────────────────────────────────
   const updatePersonal = (
@@ -220,12 +284,26 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--surface-overlay)] p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`Import from ${source} — review and edit before import`}
+      onKeyDown={handleKeyDown}
+      onMouseDown={(e) => {
+        backdropMouseDown.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        // Dismiss only when the interaction both started AND ended on the
+        // backdrop — see backdropMouseDown above.
+        if (e.target === e.currentTarget && backdropMouseDown.current) {
+          onCancel();
+        }
+      }}
     >
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div
+        ref={dialogRef}
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
           <div className="min-w-0">
@@ -247,14 +325,12 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
               </p>
             )}
           </div>
-          <button
-            type="button"
+          <ModalCloseButton
+            ref={closeRef}
             onClick={onCancel}
-            className="ml-4 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             aria-label="Cancel import"
-          >
-            ✕
-          </button>
+            className="ml-4 flex-shrink-0"
+          />
         </div>
 
         {/* Scrollable body */}
@@ -510,7 +586,7 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              className="cv-btn-secondary"
             >
               Cancel
             </button>
@@ -518,7 +594,7 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
               type="button"
               disabled={sectionCount === 0}
               onClick={() => onConfirm(edited, mode)}
-              className="rounded-full bg-slate-900 px-5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="cv-btn-primary"
             >
               Import
               {sectionCount > 0 ? ` (${sectionCount} section${sectionCount !== 1 ? "s" : ""})` : ""}
@@ -554,7 +630,7 @@ const Section = ({
   children: React.ReactNode;
 }) => (
   <div>
-    <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+    <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
       {title}
     </p>
     {children}
@@ -592,7 +668,7 @@ const TextField = ({
     <div className={fullSpan ? "sm:col-span-2" : ""}>
       <label
         htmlFor={id}
-        className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+        className="block text-[10px] font-semibold uppercase tracking-widest text-slate-600"
       >
         {label}
       </label>
@@ -607,7 +683,7 @@ const TextField = ({
         onChange={(e) => onChange(e.target.value)}
       />
       {hint ? (
-        <p className="mt-1 text-[11px] leading-snug text-slate-400">{hint}</p>
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">{hint}</p>
       ) : null}
     </div>
   );
@@ -629,7 +705,7 @@ const Chip = ({
       type="button"
       onClick={onRemove}
       aria-label={`Remove ${label}`}
-      className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+      className="flex h-7 w-7 -my-1.5 -mr-1 flex-shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
     >
       ×
     </button>
@@ -653,7 +729,7 @@ const EntryShell = ({
 }) => (
   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
     <div className="mb-2 flex items-center justify-between gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">
         Entry {typeof index === "number" ? index + 1 : ""}
       </span>
       <div className="flex items-center gap-1">
@@ -721,7 +797,7 @@ const ExperienceCard = ({
         onChange={(v) => onPatch({ location: v })}
       />
       <div>
-        <label className="block text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        <label className="block text-[10px] font-semibold uppercase tracking-widest text-slate-600">
           Currently working here
         </label>
         <label className="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
@@ -753,7 +829,7 @@ const ExperienceCard = ({
 
     {exp.bullets.length > 0 ? (
       <div className="mt-3">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
           Achievements ({exp.bullets.length})
         </p>
         <div className="space-y-1.5">

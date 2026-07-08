@@ -194,12 +194,13 @@ function Banner({
   dismissible?: boolean;
   onDismiss?: () => void;
 }) {
+  // Success shares the ff-accent tokens with info — one green, not two.
+  // The states never coexist and stay distinguished by spinner vs
+  // dismissible content.
   const toneClass =
-    tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-      : tone === "error"
-        ? "border-red-200 bg-red-50 text-red-900"
-        : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)]";
+    tone === "error"
+      ? "border-red-200 bg-red-50 text-red-900"
+      : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)]";
 
   return (
     <div
@@ -212,7 +213,7 @@ function Banner({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="text-current opacity-60 hover:opacity-100"
+          className="-my-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-current opacity-60 hover:bg-black/5 hover:opacity-100"
         >
           ✕
         </button>

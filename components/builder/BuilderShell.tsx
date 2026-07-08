@@ -42,6 +42,7 @@ const MappingReview = dynamic(
 import type { CvData } from "../../lib/types/cv";
 import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
+import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
@@ -239,9 +240,9 @@ const TopBar = ({
               fontFamily: "var(--font-mono)",
               fontSize: 11,
               fontWeight: 600,
-              color: "var(--ff-red, #B3261E)",
-              background: "#FBEFED",
-              border: "1px solid #F2D2CE",
+              color: "var(--ff-red)",
+              background: "var(--ff-red-soft)",
+              border: "1px solid var(--ff-red-line)",
               borderRadius: 999,
               padding: "4px 10px",
               letterSpacing: "0.04em",
@@ -314,8 +315,8 @@ const TopBar = ({
             <>
               <span
                 style={{
-                  width: 11,
-                  height: 11,
+                  width: 13,
+                  height: 13,
                   border: "2px solid rgba(255,255,255,0.4)",
                   borderTopColor: "white",
                   borderRadius: "50%",
@@ -361,16 +362,17 @@ const PreviewDrawer = ({
       style={{
         position: "absolute",
         right: "var(--drawer-gap)",
-        // The drawer is absolute inside MAIN AREA which already sits below the
-        // TopBar + ProgressBar — so we only need a small breathing gap here,
-        // not the full topbar+progressbar offset (that was the old bug that
-        // pushed the drawer ~134px too low).
-        top: "var(--drawer-gap)",
+        // Flush against the progress-bar line (founder request 2026-07: the
+        // 24px inset above the drawer read as wasted space). The bar's own
+        // bottom border acts as the drawer's top edge, so borderTop is off
+        // and only the bottom corners are rounded.
+        top: 0,
         bottom: "var(--drawer-gap)",
         width: "var(--drawer-w)",
         background: "var(--ff-card)",
         border: "1px solid var(--ff-line)",
-        borderRadius: 18,
+        borderTop: "none",
+        borderRadius: "0 0 18px 18px",
         boxShadow: "var(--shadow-drawer)",
         display: "flex",
         flexDirection: "column",
@@ -402,6 +404,9 @@ const PreviewDrawer = ({
             display: "inline-flex",
             alignItems: "center",
             gap: 2,
+            // 36px is the footer's shared control height — the cycler already
+            // computes to exactly 36, pinning it keeps siblings flush.
+            height: 36,
             padding: "3px 4px 3px 10px",
             background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
@@ -426,7 +431,7 @@ const PreviewDrawer = ({
             type="button"
             onClick={onPrevTemplate}
             aria-label="Previous template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
@@ -435,7 +440,7 @@ const PreviewDrawer = ({
             type="button"
             onClick={onNextTemplate}
             aria-label="Next template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
@@ -448,6 +453,9 @@ const PreviewDrawer = ({
           aria-label="Preview fit mode"
           style={{
             display: "inline-flex",
+            // Shared 36px footer control height: 28px segments + 3+3 padding
+            // + 2px border.
+            height: 36,
             padding: 3,
             background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
@@ -469,18 +477,26 @@ const PreviewDrawer = ({
                 type="button"
                 onClick={() => setFitMode(mode)}
                 aria-pressed={active}
+                // Background/color/hover live on .cv-fit-seg (globals.css);
+                // the aria-pressed attribute drives the active-segment state
+                // via its [aria-pressed="true"] selector — no inline colors,
+                // or they'd override the class :hover rule.
+                className="cv-fit-seg"
                 style={{
                   fontFamily: "var(--font-body)",
-                  fontSize: 11.5,
+                  // 12.5 matches the Fullscreen button label — one font size
+                  // across the footer's action controls.
+                  fontSize: 12.5,
                   fontWeight: 500,
-                  padding: "6px 10px",
+                  height: 28,
+                  padding: "0 10px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   borderRadius: 999,
                   border: "none",
-                  background: active ? "var(--ff-ink)" : "transparent",
-                  color: active ? "white" : "var(--ff-muted)",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
-                  transition: "background 120ms, color 120ms",
                 }}
               >
                 {label}
@@ -491,15 +507,23 @@ const PreviewDrawer = ({
         <button
           type="button"
           onClick={onFullscreen}
+          // Surface + border + hover come from .cv-drawer-ctl (globals.css) —
+          // keeping them off the inline style lets the :hover rule apply.
+          className="cv-drawer-ctl"
           style={{
             flex: 1,
             fontFamily: "var(--font-body)",
             fontSize: 12.5,
             color: "var(--ff-ink)",
-            background: "var(--ff-paper)",
-            border: "1px solid var(--ff-line)",
-            padding: "9px",
-            borderRadius: 8,
+            // Pill family at the shared 36px footer height — matches the
+            // cycler and fit toggle beside it (and the mobile footer's
+            // full-width pill Download).
+            height: 36,
+            padding: "0 9px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 999,
             cursor: "pointer",
             fontWeight: 500,
           }}
@@ -692,7 +716,9 @@ const MobilePreviewView = ({
             alignItems: "center",
             gap: 2,
             padding: "3px 4px 3px 10px",
-            background: "var(--ff-card)",
+            // Paper, not card — matches the desktop drawer's cycler pill so
+            // the shared drawerChevronBtn circles sit flush on both.
+            background: "var(--ff-paper)",
             border: "1px solid var(--ff-line)",
             borderRadius: 999,
             flexShrink: 0,
@@ -718,7 +744,7 @@ const MobilePreviewView = ({
             type="button"
             onClick={onPrevTemplate}
             aria-label="Previous template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-left" size={12} color="var(--ff-muted)" />
@@ -727,7 +753,7 @@ const MobilePreviewView = ({
             type="button"
             onClick={onNextTemplate}
             aria-label="Next template"
-            className="ff-hit-target"
+            className="ff-hit-target cv-drawer-ctl"
             style={drawerChevronBtn}
           >
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
@@ -737,20 +763,10 @@ const MobilePreviewView = ({
           type="button"
           onClick={onDownload}
           disabled={isDownloading}
-          style={{
-            flex: 1,
-            fontFamily: "var(--font-body)",
-            fontSize: 12.5,
-            color: "white",
-            background: "var(--ff-accent)",
-            border: "none",
-            padding: "10px",
-            borderRadius: 999,
-            fontWeight: 600,
-            cursor: isDownloading ? "wait" : "pointer",
-            opacity: isDownloading ? 0.7 : 1,
-            whiteSpace: "nowrap",
-          }}
+          className="inline-flex cv-top-btn cv-top-btn-primary"
+          // minHeight 44 keeps the primary mobile download action on the
+          // audit UI-5 touch-target floor.
+          style={{ flex: 1, justifyContent: "center", minHeight: 44 }}
         >
           {isDownloading ? "Preparing…" : "Download PDF"}
         </button>
@@ -787,88 +803,21 @@ const MobilePreviewView = ({
   );
 };
 
-/* ─── Mobile Edit | Preview toggle (below the desktop breakpoint) ──
- *
- * Replaces the old floating "Preview CV" pill. A clear segmented control:
- * one tap to switch between editing the form and previewing the scaled CV.
- * Fixed at the bottom of the viewport so it stays reachable while scrolling
- * either view.
- *
- * Visibility: `inline-flex xl:hidden` — at the desktop breakpoint (xl,
- * 1280 px, the same line where the side-by-side preview turns on) the
- * `xl:hidden` rule sets `display: none` and the toggle drops out.
- *
- * CRITICAL: `display` MUST live on the className, not in the inline `style`
- * prop. Inline styles win over Tailwind's media-queried rules (Tailwind
- * utilities are not `!important` by default), so an inline `display:
- * inline-flex` would silently override `xl:hidden` and keep the toggle
- * visible on desktop — which was the original bug. Don't reintroduce it. */
-const MobileViewToggle = ({
-  value,
-  onChange,
-}: {
-  value: "edit" | "preview";
-  onChange: (next: "edit" | "preview") => void;
-}) => (
-  <div
-    className="inline-flex xl:hidden"
-    role="tablist"
-    aria-label="Switch between editing and previewing your CV"
-    style={{
-      position: "fixed",
-      left: "50%",
-      bottom: 20,
-      transform: "translateX(-50%)",
-      zIndex: 50,
-      padding: 4,
-      background: "var(--ff-ink)",
-      borderRadius: 999,
-      boxShadow: "0 14px 30px rgba(11,15,12,0.30)",
-      gap: 2,
-    }}
-  >
-    {(["edit", "preview"] as const).map((v) => {
-      const active = v === value;
-      return (
-        <button
-          key={v}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          onClick={() => onChange(v)}
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: 13,
-            fontWeight: 600,
-            // 12px vertical padding keeps each segment >=44px tall — this is
-            // THE primary mobile control (audit UI-5 touch-target floor).
-            padding: "12px 18px",
-            borderRadius: 999,
-            border: "none",
-            background: active ? "white" : "transparent",
-            color: active ? "var(--ff-ink)" : "rgba(255,255,255,0.78)",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            textTransform: "capitalize",
-            transition: "background 120ms, color 120ms",
-          }}
-        >
-          <Icon name={v === "edit" ? "edit" : "eye"} size={13} />
-          {v === "edit" ? "Edit" : "Preview"}
-        </button>
-      );
-    })}
-  </div>
-);
+/* Mobile Edit | Preview toggle — now the shared SegmentedViewToggle
+ * (components/ui/SegmentedViewToggle.tsx), which carries the floating
+ * dark-pill presentation, the 44px touch floor, and the CRITICAL
+ * visibility-on-className rule. Builder passes `inline-flex xl:hidden`
+ * so the toggle drops out at the same xl line where the side-by-side
+ * preview turns on. */
 
 const drawerChevronBtn: React.CSSProperties = {
   width: 28,
   height: 28,
-  borderRadius: 8,
-  border: "1px solid var(--ff-line)",
-  background: "var(--ff-paper)",
+  // 28px circle — nested-pill idiom (999 inside 999), same as the fit
+  // toggle's inner segments; both cycler containers that use this are pills.
+  // Surface + border live on the .cv-drawer-ctl class (globals.css) so its
+  // :hover rule can restyle them — inline declarations would override it.
+  borderRadius: 999,
   display: "grid",
   placeItems: "center",
   cursor: "pointer",
@@ -1426,7 +1375,16 @@ export const BuilderShell = ({
         {/* Mobile Edit | Preview toggle — replaces the old floating pill.
             Hidden on xl+ via Tailwind (side-by-side handles desktop). */}
         {!stepIsReview && (
-          <MobileViewToggle value={mobileView} onChange={setMobileView} />
+          <SegmentedViewToggle
+            className="inline-flex xl:hidden"
+            ariaLabel="Switch between editing and previewing your CV"
+            options={[
+              { value: "edit", label: "Edit", icon: "edit" },
+              { value: "preview", label: "Preview", icon: "eye" },
+            ]}
+            value={mobileView}
+            onChange={setMobileView}
+          />
         )}
 
         {/* Mobile preview overlay */}
@@ -1448,7 +1406,7 @@ export const BuilderShell = ({
             <div
               style={{
                 background: "var(--ff-card)",
-                borderRadius: 16,
+                borderRadius: "var(--radius-2xl)",
                 border: "1px solid var(--ff-line)",
                 padding: "26px 28px",
                 width: "min(360px, calc(100vw - 32px))",
@@ -1548,8 +1506,16 @@ export const BuilderShell = ({
           @media (min-width: 1280px) {
             .ff-form-column {
               padding: 28px 24px 28px 40px;
-              max-width: var(--form-max);
-              margin-right: calc(var(--drawer-w) + var(--drawer-gap) + 28px);
+              /* Fill the space up to 28px short of the drawer, capped at
+                 --form-max for ultra-wide readability. The reservation MUST
+                 live inside max-width: with a plain margin-right, an
+                 over-constrained row (width:100% + margin) resolves by
+                 IGNORING margin-right in LTR, and the form would slide
+                 under the drawer. */
+              max-width: min(
+                var(--form-max),
+                calc(100% - var(--drawer-w) - var(--drawer-gap) - 28px)
+              );
             }
             .ff-form-column-review {
               /* Review step has no preview drawer, so it can use the whole

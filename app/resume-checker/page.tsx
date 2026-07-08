@@ -115,7 +115,7 @@ const FAQS: Array<{ q: string; a: string; aJsx?: React.ReactNode }> = [
     aJsx: (
       <>
         Yes &mdash; the report and{" "}
-        <a href="/builder" className="underline underline-offset-2 text-brand-blue hover:text-brand-blue-dark">
+        <a href="/builder" className="underline underline-offset-2 text-ff-accent-dark hover:text-ff-accent">
           the builder
         </a>{" "}
         are both free, no sign-up, no payment. If MakeMyCV saves you time and
@@ -162,7 +162,7 @@ export default function ResumeCheckerPage() {
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 50% 40% at 50% 35%, rgba(37,99,235,0.22), transparent 70%)",
+              "radial-gradient(ellipse 50% 40% at 50% 35%, rgba(14,124,74,0.25), transparent 70%)",
           }}
         />
         <div className="relative mx-auto max-w-5xl px-6 text-center">
@@ -230,7 +230,7 @@ export default function ResumeCheckerPage() {
                 key={c.title}
                 className="rounded-2xl border border-line bg-paper p-5 shadow-sm-soft transition hover:shadow-md-soft"
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-ff-accent-soft text-ff-accent-dark">
                   {c.icon}
                 </div>
                 <h3 className="font-display text-base font-semibold text-slate-900">
@@ -244,12 +244,12 @@ export default function ResumeCheckerPage() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="bg-paper-2 py-12">
+      <section className="bg-paper-2 py-12 md:py-16">
         <div className="mx-auto max-w-5xl px-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             {STEPS.map((s) => (
               <div key={s.n} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-blue text-sm font-bold text-white shadow-sm-soft">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-ff-accent text-sm font-bold text-white shadow-sm-soft">
                   {s.n}
                 </div>
                 <div>
@@ -274,7 +274,7 @@ export default function ResumeCheckerPage() {
             {FAQS.map((f) => (
               <details
                 key={f.q}
-                className="group rounded-xl border border-line bg-paper p-5 shadow-sm-soft open:border-brand-blue/40"
+                className="group rounded-xl border border-line bg-paper p-5 shadow-sm-soft open:border-ff-accent/40"
               >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-base font-medium text-slate-900 marker:hidden">
                   <span>{f.q}</span>
@@ -307,7 +307,7 @@ export default function ResumeCheckerPage() {
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 40% 45% at 50% 50%, rgba(37,99,235,0.20), transparent 70%)",
+              "radial-gradient(ellipse 40% 45% at 50% 50%, rgba(14,124,74,0.22), transparent 70%)",
           }}
         />
         <div className="relative mx-auto max-w-3xl px-6">
@@ -316,8 +316,8 @@ export default function ResumeCheckerPage() {
           </h2>
           <a
             href="#resume-checker-dropzone"
-            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-brand-blue px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:bg-brand-blue-dark hover:shadow-cta-hover"
-            style={{ backgroundImage: "linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-dark) 100%)" }}
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-ff-accent px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:bg-ff-accent-dark hover:shadow-cta-hover"
+            style={{ backgroundImage: "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)" }}
           >
             Upload your CV
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">

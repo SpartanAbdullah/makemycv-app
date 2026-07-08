@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { AIError, AIImproveType } from "../hooks/useAIImprove";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { ModalCloseButton } from "./ui/ModalCloseButton";
 
 type Props = {
   isOpen: boolean;
@@ -58,7 +60,7 @@ function BulletsView({
         {cards.map((card, i) => (
           <div
             key={i}
-            className={`rounded-xl border p-3 transition ${card.selected ? "border-[var(--ff-accent)] bg-[var(--ff-accent-soft)]" : "border-gray-200 bg-gray-50"}`}
+            className={`rounded-xl border p-3 transition ${card.selected ? "border-[var(--ff-accent)] bg-[var(--ff-accent-soft)]" : "border-[var(--ff-line)] bg-[var(--ff-sunken)]"}`}
           >
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -68,7 +70,7 @@ function BulletsView({
                 className="mt-1 accent-[var(--ff-accent)]"
               />
               {!card.editing && (
-                <span className="text-sm text-gray-800 flex-1">{card.text}</span>
+                <span className="text-sm text-[var(--ff-ink-2)] flex-1">{card.text}</span>
               )}
             </label>
             {card.editing && (
@@ -76,7 +78,7 @@ function BulletsView({
                 rows={2}
                 value={card.text}
                 onChange={(e) => setText(i, e.target.value)}
-                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--ff-line-strong)] px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
               />
             )}
             <button
@@ -93,7 +95,7 @@ function BulletsView({
         type="button"
         disabled={selected.length === 0}
         onClick={() => onApply(selected)}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
+        className="cv-btn-primary mt-4 w-full"
       >
         Apply Selected Bullets
       </button>
@@ -139,7 +141,7 @@ function SkillsView({
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               selected.has(i)
                 ? "border-[var(--ff-accent)] bg-[var(--ff-accent)] text-white"
-                : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)] hover:bg-[var(--ff-accent-soft)]"
+                : "border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] text-[var(--ff-accent-dark)] hover:border-[var(--ff-accent)]"
             }`}
           >
             {skill}
@@ -150,7 +152,7 @@ function SkillsView({
         type="button"
         disabled={count === 0}
         onClick={() => onApply(results.filter((_, i) => selected.has(i)))}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)] disabled:opacity-40"
+        className="cv-btn-primary mt-4 w-full"
       >
         Add {count} Skill{count !== 1 ? "s" : ""} to My CV
       </button>
@@ -195,10 +197,10 @@ function SummaryView({
             className={`cursor-pointer rounded-xl border-2 p-4 transition ${
               selectedIdx === i
                 ? "border-[var(--ff-accent)] bg-[var(--ff-accent-soft)]"
-                : "border-gray-200 hover:border-gray-300"
+                : "border-[var(--ff-line)] hover:border-[var(--ff-line-strong)]"
             }`}
           >
-            <p className="mb-1 text-xs font-bold text-gray-400">
+            <p className="mb-1 text-xs font-bold text-[var(--ff-faint)]">
               Variation {i + 1}
             </p>
             {editingIdx === i ? (
@@ -207,10 +209,10 @@ function SummaryView({
                 value={text}
                 onChange={(e) => setText(i, e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
+                className="w-full rounded-lg border border-[var(--ff-line-strong)] px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
               />
             ) : (
-              <p className="text-sm leading-relaxed text-gray-700">{text}</p>
+              <p className="text-sm leading-relaxed text-[var(--ff-ink-2)]">{text}</p>
             )}
             <button
               type="button"
@@ -228,7 +230,7 @@ function SummaryView({
       <button
         type="button"
         onClick={() => onApply([texts[selectedIdx]])}
-        className="mt-4 w-full rounded-xl bg-[var(--ff-accent)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
+        className="cv-btn-primary mt-4 w-full"
       >
         Use This Summary
       </button>
@@ -264,36 +266,30 @@ export function AIResultsModal({
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
+  // Lock body scroll while open — reference-counted so overlapping modals
+  // (e.g. the download tip firing over this one) release in any order.
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--surface-overlay)]"
       onClick={handleBackdrop}
     >
       <div className="relative mx-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         {/* Close button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-          aria-label="Close"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <ModalCloseButton onClick={onClose} className="absolute right-3 top-3" />
 
         {/* Header */}
-        <h2 className="text-lg font-bold text-gray-900">{TITLES[type]}</h2>
-        <p className="mb-4 text-sm text-gray-500">{SUBTITLES[type]}</p>
+        <h2 className="text-lg font-bold text-[var(--ff-ink)]">{TITLES[type]}</h2>
+        <p className="mb-4 text-sm text-[var(--ff-muted)]">{SUBTITLES[type]}</p>
 
         {/* Loading state */}
         {isLoading && (
           <div className="flex flex-col items-center py-12">
-            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[var(--ff-accent)]" />
-            <p className="text-sm font-medium text-gray-600">
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-[var(--ff-line)] border-t-[var(--ff-accent)]" />
+            <p className="text-sm font-medium text-[var(--ff-muted)]">
               Claude is writing for you...
             </p>
             <span className="mt-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--ff-accent)]" />
@@ -304,10 +300,10 @@ export function AIResultsModal({
         {error?.code === "RATE_LIMITED" && (
           <div className="flex flex-col items-center py-8 text-center">
             <span className="mb-3 text-4xl">{"\u{1F4A1}"}</span>
-            <h3 className="text-base font-bold text-gray-900">
+            <h3 className="text-base font-bold text-[var(--ff-ink)]">
               Take a breather
             </h3>
-            <p className="mt-2 max-w-sm text-sm text-gray-500">
+            <p className="mt-2 max-w-sm text-sm text-[var(--ff-muted)]">
               {error.message}
             </p>
             {error.supportUrl && (
@@ -315,7 +311,7 @@ export function AIResultsModal({
                 href={error.supportUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 rounded-xl bg-[var(--ff-accent)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--ff-accent-dark)]"
+                className="cv-btn-primary mt-4"
               >
                 Support MakeMyCV
               </a>
@@ -343,14 +339,14 @@ export function AIResultsModal({
                   /* clipboard blocked */
                 }
               }}
-              className="mt-3 text-sm text-gray-500 underline cursor-pointer hover:text-gray-700"
+              className="mt-3 text-sm text-[var(--ff-muted)] underline cursor-pointer hover:text-[var(--ff-ink-2)]"
             >
               Can&apos;t tip? Sharing helps too &rarr;
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 block text-center text-sm text-gray-400 underline cursor-pointer hover:text-gray-600"
+              className="mt-2 block text-center text-sm text-[var(--ff-muted)] underline cursor-pointer hover:text-[var(--ff-ink-2)]"
             >
               Continue editing
             </button>
@@ -365,7 +361,7 @@ export function AIResultsModal({
               <button
                 type="button"
                 onClick={onRetry}
-                className="mt-3 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="cv-btn-secondary mt-3"
               >
                 Try again
               </button>
@@ -389,7 +385,7 @@ export function AIResultsModal({
         )}
 
         {/* Footer */}
-        <p className="mt-4 text-center text-xs text-gray-400">
+        <p className="mt-4 text-center text-xs text-[var(--ff-faint)]">
           {"\u2728"} Powered by Claude AI
         </p>
       </div>

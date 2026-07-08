@@ -33,10 +33,14 @@ const linkBtn: React.CSSProperties = {
   background: "none",
   border: "none",
   color: "var(--ff-muted)",
-  fontSize: 13,
+  fontSize: 12,
   cursor: "pointer",
   textDecoration: "underline",
-  padding: "8px 4px",
+  // Padded hit area (audit UI-5 touch-target floor) — vertical-only negative
+  // margin keeps the layout footprint identical; reclaiming the horizontal
+  // padding too would visually collapse the 10px flex gap beside Weave / Add.
+  padding: "13px 4px",
+  margin: "-13px 0",
 };
 
 /**
@@ -140,7 +144,7 @@ export const JdCoach = ({
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-accent-dark)" }}>
           Next fix
         </span>
-        <span style={{ fontSize: 11, color: "var(--ff-faint)", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontSize: 11, color: "var(--ff-muted)", fontFamily: "var(--font-mono)" }}>
           {queue.length} {queue.length === 1 ? "gap left" : "gaps left"}
         </span>
       </div>
@@ -159,15 +163,18 @@ export const JdCoach = ({
 
       {fixable ? (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+          {/* Compact tier (.cv-btn--sm, icon 13) — JdHeatmap's identical
+              Weave / Add pair mirrors these exactly. Height parity across
+              variants comes from the shared 1px border box math in globals. */}
           {showWeave && (
-            <button type="button" className="cv-btn-primary" style={{ padding: "10px 16px" }} onClick={() => onWeave(current.category, current.term)}>
-              <Icon name="sparkle" size={12} />
+            <button type="button" className="cv-btn-primary cv-btn--sm" onClick={() => onWeave(current.category, current.term)}>
+              <Icon name="sparkle" size={13} />
               Weave into a bullet
             </button>
           )}
           {showAdd && (
-            <button type="button" className={showWeave ? "cv-btn-secondary" : "cv-btn-primary"} style={{ padding: "10px 16px" }} onClick={() => onAdd(current.category, current.term)}>
-              <Icon name="plus" size={12} />
+            <button type="button" className={`${showWeave ? "cv-btn-secondary" : "cv-btn-primary"} cv-btn--sm`} onClick={() => onAdd(current.category, current.term)}>
+              <Icon name="plus" size={13} />
               {addLabel}
             </button>
           )}
@@ -184,7 +191,7 @@ export const JdCoach = ({
       <div style={{ height: 5, borderRadius: 999, background: "var(--ff-line)", marginTop: 16, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: "var(--ff-accent-dark)", borderRadius: 999, transition: "width 350ms ease" }} />
       </div>
-      <div style={{ fontSize: 11, color: "var(--ff-faint)", marginTop: 6 }}>
+      <div style={{ fontSize: 11, color: "var(--ff-muted)", marginTop: 6 }}>
         {covered} of {total} covered
       </div>
     </div>

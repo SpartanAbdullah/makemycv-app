@@ -41,14 +41,14 @@ export default function ShareButton() {
       aria-live="polite"
       title={HINT}
       aria-label={`Share report. ${HINT}`}
-      className="inline-flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
+      className="inline-flex min-h-10 min-w-[8.75rem] items-center justify-center gap-2 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-paper-2"
     >
       {copied ? (
         <>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4 text-severity-good" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          <span className="text-severity-good">Copied!</span>
+          <span className="text-severity-good-text">Copied!</span>
         </>
       ) : (
         <>

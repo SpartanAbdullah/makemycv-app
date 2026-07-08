@@ -166,7 +166,7 @@ export const UAEEssentialsStep = ({
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 12,
+            gap: 16,
           }}
           className="ff-uae-grid"
         >
@@ -311,7 +311,7 @@ export const UAEEssentialsStep = ({
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 14,
+            gap: 16,
           }}
           className="ff-core-fields"
         >

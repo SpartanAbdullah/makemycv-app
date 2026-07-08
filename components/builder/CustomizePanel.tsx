@@ -40,7 +40,7 @@ const PHOTO_SHAPES: { label: string; value: PhotoShape }[] = [
   { label: "Hidden", value: "hidden" },
 ];
 
-const SLIDER_GREEN = "#22C55E";
+const SLIDER_GREEN = "var(--ff-accent)";
 const SLIDER_TRACK = "#2B3648";
 const SLIDER_TICK = "#94A3B8";
 
@@ -86,12 +86,13 @@ const StepButton = ({
 }) => (
   <button
     type="button"
+    className="ff-hit-target"
     onClick={onClick}
     disabled={disabled}
     aria-label={ariaLabel}
     style={{
-      width: 26,
-      height: 26,
+      width: 28,
+      height: 28,
       flexShrink: 0,
       borderRadius: 8,
       border: "1px solid var(--ff-line)",
@@ -123,6 +124,7 @@ const StepSlider = ({
   onChange,
   leftLabel,
   rightLabel,
+  ariaLabel,
 }: {
   value: number;
   min: number;
@@ -130,6 +132,7 @@ const StepSlider = ({
   onChange: (v: number) => void;
   leftLabel: string;
   rightLabel: string;
+  ariaLabel: string;
 }) => {
   const steps = max - min;
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
@@ -151,6 +154,7 @@ const StepSlider = ({
         <div
           role="slider"
           tabIndex={0}
+          aria-label={ariaLabel}
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={clamp(value)}
@@ -174,7 +178,7 @@ const StepSlider = ({
           style={{
             position: "relative",
             flex: 1,
-            height: 26,
+            height: 36,
             cursor: "pointer",
           }}
         >
@@ -369,6 +373,7 @@ export const CustomizePanel = () => {
           onChange={(v) => setSetting("pageMargins", v)}
           leftLabel="narrow"
           rightLabel="wide"
+          ariaLabel="Page margins"
         />
       </Group>
 
@@ -380,6 +385,7 @@ export const CustomizePanel = () => {
           onChange={(v) => setSetting("fontSize", v)}
           leftLabel="smaller"
           rightLabel="larger"
+          ariaLabel="Font size"
         />
       </Group>
 
@@ -391,6 +397,7 @@ export const CustomizePanel = () => {
           onChange={(v) => setSetting("lineHeight", v)}
           leftLabel="tight"
           rightLabel="loose"
+          ariaLabel="Line height"
         />
       </Group>
 
@@ -402,6 +409,7 @@ export const CustomizePanel = () => {
           onChange={(v) => setSetting("sectionSpacing", v)}
           leftLabel="compact"
           rightLabel="airy"
+          ariaLabel="Section spacing"
         />
       </Group>
 
@@ -432,7 +440,7 @@ export const CustomizePanel = () => {
                   height: 40,
                   borderRadius: "50%",
                   padding: 3,
-                  background: "#1F2937",
+                  background: "var(--ff-ink)",
                   border: "none",
                   cursor: "pointer",
                   flexShrink: 0,
@@ -494,7 +502,7 @@ export const CustomizePanel = () => {
                 width: 40,
                 height: 34,
                 border: "1px solid var(--ff-line)",
-                borderRadius: 8,
+                borderRadius: 10,
                 background: "transparent",
                 cursor: "pointer",
                 padding: 0,
@@ -517,9 +525,11 @@ export const CustomizePanel = () => {
               className="cv-input"
               style={{
                 width: 96,
+                height: 34,
                 padding: "7px 8px",
                 fontSize: 12,
                 fontFamily: "var(--font-mono)",
+                borderRadius: 10,
               }}
             />
           </div>

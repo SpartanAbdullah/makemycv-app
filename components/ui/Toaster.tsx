@@ -93,6 +93,9 @@ const ToastCard = ({ toast }: { toast: Toast }) => {
       {toast.actionLabel && toast.onAction && (
         <button
           type="button"
+          // ff-hit-target's invisible inset extends the tap zone to meet the
+          // 44px touch-target rule without changing the layout box.
+          className="ff-hit-target"
           onClick={() => {
             toast.onAction?.();
             dismissToast(toast.id);
@@ -119,6 +122,8 @@ const ToastCard = ({ toast }: { toast: Toast }) => {
       )}
       <button
         type="button"
+        // Same ff-hit-target extension as the action button above.
+        className="ff-hit-target"
         onClick={() => dismissToast(toast.id)}
         aria-label="Dismiss"
         style={{

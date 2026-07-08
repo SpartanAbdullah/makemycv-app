@@ -12,9 +12,11 @@ export const AiDisclosure = ({ align = "right" }: { align?: "left" | "right" }) 
   <p
     style={{
       marginTop: 6,
-      fontSize: 11,
+      // --ff-muted (not --ff-faint) + 12px: this disclosure is load-bearing
+      // copy, so it must clear AA contrast rather than read as decorative.
+      fontSize: 12,
       lineHeight: 1.5,
-      color: "var(--ff-faint)",
+      color: "var(--ff-muted)",
       textAlign: align,
     }}
   >

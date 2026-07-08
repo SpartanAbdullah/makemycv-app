@@ -53,36 +53,44 @@ const SuggestionChips = ({
       >
         Quick add
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {/* Chip metrics match the SkillsStep suggestion chips (13px, 7px 12px,
+          ff-hit-target 44px zone) — same-purpose tap-to-add controls should
+          feel identical. We keep the isAdded state SkillsStep doesn't have. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {COMMON_LANGUAGES.map((lang) => {
           const isAdded = taken.has(lang.toLowerCase());
           return (
             <button
               key={lang}
               type="button"
+              className="ff-hit-target"
               onClick={() => {
                 if (!isAdded) onAdd(lang);
               }}
               disabled={isAdded}
               style={{
                 fontFamily: "var(--font-body)",
-                fontSize: 12,
-                padding: "5px 12px",
+                fontSize: 13,
+                padding: "7px 12px",
                 borderRadius: 999,
                 border: isAdded
                   ? "1px solid var(--ff-accent-soft)"
                   : "1px solid var(--ff-line)",
-                background: isAdded ? "var(--ff-accent-soft)" : "white",
+                background: isAdded ? "var(--ff-accent-soft)" : "var(--ff-card)",
                 color: isAdded ? "var(--ff-accent-dark)" : "var(--ff-ink)",
                 cursor: isAdded ? "default" : "pointer",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
+                gap: 6,
                 transition: "border-color 120ms, background 120ms",
                 opacity: isAdded ? 0.75 : 1,
               }}
             >
-              {isAdded ? "✓ " : "+ "}
+              {isAdded ? (
+                <Icon name="check" size={11} />
+              ) : (
+                <Icon name="plus" size={11} />
+              )}
               {lang}
             </button>
           );
@@ -131,16 +139,19 @@ const LevelDropdown = ({
 
   return (
     <div ref={ref} className="relative">
+      {/* .cv-input keeps the trigger pixel-identical to the sibling Language
+          input (padding, font, border, hover/focus) — now and if the shared
+          class ever changes. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-4 py-2.5 border border-[var(--ff-line)] rounded-xl text-sm text-left flex justify-between items-center hover:border-[var(--ff-accent)] focus:ring-2 focus:ring-[var(--ff-accent-ring)] focus:outline-none bg-white transition"
+        className="cv-input flex items-center justify-between text-left cursor-pointer"
       >
-        <span className={displayLabel ? "text-gray-800" : "text-gray-400"}>
+        <span className={displayLabel ? "text-[var(--ff-ink)]" : "text-[var(--ff-faint)]"}>
           {displayLabel || "Select proficiency level"}
         </span>
         <svg
-          className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-[var(--ff-faint)] transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

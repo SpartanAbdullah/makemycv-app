@@ -377,8 +377,8 @@ export const ReviewStep = ({
               type="button"
               onClick={handleDownloadPdf}
               disabled={isDownloading}
-              className="cv-btn-primary"
-              style={{ width: "100%", padding: "16px", fontSize: 15 }}
+              className="cv-btn-primary cv-btn--lg"
+              style={{ width: "100%" }}
             >
               {isDownloading ? (
                 <>
@@ -407,7 +407,7 @@ export const ReviewStep = ({
                 type="button"
                 onClick={handleExportDocx}
                 className="cv-btn-secondary"
-                style={{ flex: 1, padding: "12px" }}
+                style={{ flex: 1 }}
               >
                 Export .docx
               </button>
@@ -415,7 +415,7 @@ export const ReviewStep = ({
                 type="button"
                 onClick={handleShareLink}
                 className="cv-btn-secondary"
-                style={{ flex: 1, padding: "12px" }}
+                style={{ flex: 1 }}
               >
                 {shareCopied ? "Link copied ✓" : "Share MakeMyCV"}
               </button>
@@ -436,7 +436,7 @@ export const ReviewStep = ({
             <Link
               href="/jd-match"
               className="cv-btn-secondary"
-              style={{ width: "100%", padding: "12px", textDecoration: "none" }}
+              style={{ width: "100%", textDecoration: "none" }}
             >
               <Icon name="lightbulb" size={14} />
               Tailor to a job
@@ -516,7 +516,6 @@ export const ReviewStep = ({
           type="button"
           onClick={onBack}
           className="cv-btn-secondary"
-          style={{ padding: "11px 22px" }}
         >
           <Icon name="chevron-left" size={13} />
           Back
@@ -766,8 +765,14 @@ const TemplateCard = ({
     }}
   >
     {onPreview && (
+      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
+         44px tap zone. The inline position:absolute overrides the class's
+         position:relative but the button is still a positioned containing
+         block, so the halo resolves against it; stopPropagation above means
+         halo taps open the preview, not select the card. */
       <button
         type="button"
+        className="ff-hit-target"
         onClick={(e) => {
           e.stopPropagation();
           onPreview();

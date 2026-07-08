@@ -97,7 +97,12 @@ export const DomainChip = () => {
             fontWeight: 600,
             color: active ? "var(--ff-accent)" : "var(--ff-ink-2)",
             cursor: "pointer",
-            paddingRight: 18,
+            // Invisible hit-box extension — ff-hit-target's ::before can't
+            // render on a <select>, so padding + negative margin grows the
+            // tappable box to ~40px while the chip's ~30px visual is unchanged
+            // (background is transparent, so the bleed never shows).
+            padding: "12px 18px 12px 0",
+            margin: "-12px 0",
             maxWidth: "100%",
           }}
         >

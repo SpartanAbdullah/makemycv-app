@@ -1,10 +1,24 @@
 import type { ScoreGrade } from "@/lib/resumeChecker/types";
 
+// Grade hues must track the builder ScoreChip tiers (green/green/amber/red)
+// so a score never changes color language across surfaces — see
+// docs/score-parity-smoke-test.md. good/excellent share the green hue and
+// are distinguished by label, exactly like the builder.
 const GRADE_COLOR: Record<ScoreGrade, string> = {
   excellent: "var(--severity-good)",
-  good: "var(--brand-blue)",
+  good: "var(--severity-good)",
   "needs-work": "var(--severity-review)",
   poor: "var(--severity-error)",
+};
+
+// Darker -text ramps for the pill LABEL only — 12px text on the pill's 12%
+// tint needs 4.5:1; the ring stroke and tint keep the brighter GRADE_COLOR
+// hues (graphics floor is 3:1).
+const GRADE_TEXT_COLOR: Record<ScoreGrade, string> = {
+  excellent: "var(--severity-good-text)",
+  good: "var(--severity-good-text)",
+  "needs-work": "var(--severity-review-text)",
+  poor: "var(--severity-error-text)",
 };
 
 const GRADE_LABEL: Record<ScoreGrade, string> = {
@@ -69,7 +83,7 @@ export default function ScoreRing({
       <div
         className="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider"
         style={{
-          color: GRADE_COLOR[grade],
+          color: GRADE_TEXT_COLOR[grade],
           background: `color-mix(in oklab, ${GRADE_COLOR[grade]} 12%, transparent)`,
         }}
       >

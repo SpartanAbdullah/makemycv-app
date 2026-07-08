@@ -87,3 +87,9 @@ export const builderSteps: BuilderStep[] = [
 ];
 
 export const totalSteps = builderSteps.length;
+
+/** One counter format everywhere ("Step 06 / 10") — StepBeads' context line
+ *  and StepHeader's inline counter previously disagreed ("STEP 06 / 10" vs
+ *  "Step 6 of 10") while both were visible at once. */
+export const formatStepCounter = (index: number, total: number) =>
+  `Step ${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;

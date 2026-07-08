@@ -181,31 +181,32 @@ export const JdHeatmap = ({
             <strong style={{ color: "var(--ff-warn)" }}>{pick.term}</strong> — not on your CV yet
           </span>
           <span style={{ display: "inline-flex", gap: 8, marginLeft: "auto" }}>
+            {/* Sized to match JdCoach's identical Weave / Add pair exactly
+                (compact tier .cv-btn--sm, icon 13 — height parity across
+                variants comes from the shared border box math in globals). */}
             {showWeave && (
               <button
                 type="button"
-                className="cv-btn-primary"
-                style={{ padding: "7px 12px", fontSize: 12.5 }}
+                className="cv-btn-primary cv-btn--sm"
                 onClick={() => {
                   onWeave(pick.category, pick.term);
                   setPick(null);
                 }}
               >
-                <Icon name="sparkle" size={11} />
+                <Icon name="sparkle" size={13} />
                 Weave into a bullet
               </button>
             )}
             {showAdd && (
               <button
                 type="button"
-                className="cv-btn-secondary"
-                style={{ padding: "7px 12px", fontSize: 12.5 }}
+                className="cv-btn-secondary cv-btn--sm"
                 onClick={() => {
                   onAdd(pick.category, pick.term);
                   setPick(null);
                 }}
               >
-                <Icon name="plus" size={11} />
+                <Icon name="plus" size={13} />
                 {canAddCert(pick.category) ? "Add to certifications" : "Add to skills"}
               </button>
             )}
@@ -219,6 +220,11 @@ export const JdHeatmap = ({
                 fontSize: 12,
                 cursor: "pointer",
                 textDecoration: "underline",
+                // Padded hit area — the bare text link was ~15px tall (audit
+                // UI-5 touch-target floor); negative margin keeps the layout
+                // footprint identical.
+                padding: "13px 8px",
+                margin: "-13px -8px",
               }}
             >
               Cancel
