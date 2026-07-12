@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node scripts/run-all-tests.mjs",
     "test:parser": "tsc lib/importers/textParser.ts --outDir .parser-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node scripts/parser-fixtures.test.cjs",
     "test:migrate": "tsc lib/store/migrate.ts lib/store/migrate.test.ts --outDir .migrate-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .migrate-test-build/store/migrate.test.js",
     "test:jdmatch": "tsc lib/jdMatch/match.ts lib/jdMatch/match.test.ts --rootDir lib --outDir .jdmatch-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .jdmatch-test-build/jdMatch/match.test.js",
@@ -24,6 +25,7 @@
     "test:sectionorder": "tsc lib/data/sectionOrder.ts lib/data/sectionOrder.test.ts --rootDir lib --outDir .sectionorder-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .sectionorder-test-build/data/sectionOrder.test.js",
     "test:color": "tsc lib/utils/color.ts lib/utils/color.test.ts --rootDir lib --outDir .color-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .color-test-build/utils/color.test.js",
     "test:skills": "tsc lib/utils/skills.ts lib/utils/skills.test.ts --rootDir lib --outDir .skills-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .skills-test-build/utils/skills.test.js",
+    "test:pdf-smoke": "tsc scripts/pdf-smoke.tsx --outDir .pdfsmoke-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck --jsx react-jsx && node .pdfsmoke-test-build/scripts/pdf-smoke.js",
     "capture:previews": "node scripts/capture-previews.js"
   },
   "dependencies": {
