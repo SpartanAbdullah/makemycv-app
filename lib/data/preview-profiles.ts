@@ -435,12 +435,66 @@ const aishaGraduate: CvData = {
   settings: baseSettings("ats-clean"),
 };
 
+/**
+ * Generic flat-style avatar for photo-forward templates (professional-photo,
+ * onyx, sandstone). A neutral bust silhouette in warm greys on a light
+ * background — deliberately NOT a real person's photo, embedded as an SVG
+ * data URI so the capture pipeline needs no external fetches. All templates
+ * render `personal.photo` through a plain <img src>, which accepts SVG data
+ * URIs natively.
+ */
+const AVATAR_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">' +
+  '<rect width="240" height="240" fill="#F1ECE4"/>' +
+  '<circle cx="120" cy="94" r="42" fill="#988E82"/>' +
+  '<path d="M104 128h32v26h-32z" fill="#988E82"/>' +
+  '<path d="M120 148c-46 0-77 27-83 68a8 8 0 0 0 8 9h150a8 8 0 0 0 8-9c-6-41-37-68-83-68z" fill="#AFA396"/>' +
+  "</svg>";
+export const previewAvatarDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(
+  AVATAR_SVG,
+)}`;
+
+/**
+ * Re-point a base persona at another template. Spread-only (no deep clone
+ * needed — templates never mutate props), so the four personas above stay the
+ * single source of truth. `accentColor` should be the target template's
+ * signature accent (the resolveTheme fallback in lib/templates/<id>.tsx),
+ * because the persisted settings.accentColor would otherwise override it.
+ * `withPhoto` attaches the generic avatar for photo-forward templates.
+ */
+const forTemplate = (
+  base: CvData,
+  templateId: string,
+  accentColor: string,
+  opts?: { withPhoto?: boolean },
+): CvData => ({
+  ...base,
+  personal: opts?.withPhoto
+    ? { ...base.personal, photo: previewAvatarDataUri, showPhoto: true }
+    : base.personal,
+  settings: { ...base.settings, templateId, accentColor },
+});
+
 /** Profiles keyed by the template id they are designed for. */
 export const previewProfiles: Record<string, CvData> = {
   classic: omarClassic,
   modern: saraModern,
   executive: laylaExecutive,
   "ats-clean": aishaGraduate,
+  // Derived variants — persona chosen to fit each template's positioning:
+  // navy/charcoal executive layouts get Layla (COO), corporate single/sidebar
+  // layouts get Omar (finance), warm/photo-forward layouts get Sara
+  // (marketing, has a personal website + full UAE-essentials chips).
+  "exec-split": forTemplate(laylaExecutive, "exec-split", "#1B2A4A"),
+  "corp-sidebar": forTemplate(omarClassic, "corp-sidebar", "#0F172A"),
+  onyx: forTemplate(laylaExecutive, "onyx", "#262626", { withPhoto: true }),
+  sandstone: forTemplate(saraModern, "sandstone", "#ECE3D2", {
+    withPhoto: true,
+  }),
+  professional: forTemplate(omarClassic, "professional", "#1f2937"),
+  "professional-photo": forTemplate(saraModern, "professional-photo", "#1f2937", {
+    withPhoto: true,
+  }),
 };
 
 /** Template ids the capture pipeline screenshots (scripts/capture-previews.js). */

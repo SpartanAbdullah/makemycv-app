@@ -15,7 +15,22 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 
-const TEMPLATE_IDS = ["classic", "modern", "executive", "ats-clean"];
+// All registered template ids — the ONE place this script lists them.
+// Keep in sync with the registry (lib/templates/index.tsx `templates`) and
+// the profile map (lib/data/preview-profiles.ts `previewProfiles`); this is a
+// plain-Node script, so it can't import those TypeScript modules directly.
+const TEMPLATE_IDS = [
+  "classic",
+  "modern",
+  "executive",
+  "ats-clean",
+  "exec-split",
+  "corp-sidebar",
+  "onyx",
+  "sandstone",
+  "professional",
+  "professional-photo",
+];
 const BASE_URL = (
   process.env.PREVIEW_BASE_URL ||
   process.argv[2] ||
