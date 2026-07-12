@@ -13,6 +13,12 @@ import { kv } from "@vercel/kv";
 import { parseCvText } from "@/lib/resumeChecker/parse";
 import { computeScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
+import {
+  PARSE_SPEND_UNITS,
+  spendCapResponse,
+  takePerIpFallback,
+  takeSpendUnits,
+} from "@/lib/server/spendGuard";
 import type { StoredReport } from "@/lib/resumeChecker/types";
 
 export const runtime = "nodejs";
@@ -67,17 +73,27 @@ function rateLimitedResponse(resetAtMs: number, requestId: string) {
 export async function POST(request: Request) {
   const requestId = nanoid(10);
 
-  // Rate limit first — before any parsing work. Fails OPEN if KV is
-  // unreachable (local dev without env vars) so the free tool never breaks
-  // on infrastructure hiccups.
+  // Rate limit first — before any parsing work. When KV is unreachable
+  // (local dev without env vars, Upstash hiccup) this used to fail OPEN,
+  // which left the single most expensive Claude route unlimited exactly when
+  // the throttle infrastructure was down. Now it degrades to a bounded
+  // in-memory per-IP bucket (lib/server/spendGuard) instead — the free tool
+  // keeps working through hiccups, but never unmetered.
+  const ip = getClientIp(request);
   try {
-    const ip = getClientIp(request);
     const burst = await burstLimit.limit(ip);
     if (!burst.success) return rateLimitedResponse(burst.reset, requestId);
     const daily = await dailyLimit.limit(ip);
     if (!daily.success) return rateLimitedResponse(daily.reset, requestId);
   } catch (err) {
-    console.warn("[parse] rate limiter unavailable, failing open:", err);
+    console.warn("[parse] rate limiter unavailable, in-memory fallback:", err);
+    const fallback = takePerIpFallback(ip);
+    if (!fallback.allowed) {
+      return rateLimitedResponse(
+        Date.now() + fallback.retryAfterSeconds * 1000,
+        requestId,
+      );
+    }
   }
 
   let body: unknown;
@@ -122,6 +138,13 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  // Global daily spend cap — after the per-IP limiter (per-IP 429s win) and
+  // after text validation (bad uploads never burn budget). This route sends
+  // up to 100k chars with max_tokens 4096 — by far the most expensive Claude
+  // call in the app — so it charges 3 units against the shared daily budget.
+  const spend = await takeSpendUnits(PARSE_SPEND_UNITS);
+  if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
   let result;
   try {
