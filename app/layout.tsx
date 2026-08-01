@@ -6,8 +6,7 @@ import {
   Inter,
   JetBrains_Mono,
 } from "next/font/google";
-import { JsonLd } from "@/components/seo/JsonLd";
-import { organizationSchema } from "@/lib/seo/schema";
+import { SITE_NAME } from "@/lib/seo/schema";
 
 /* Focus Flow font pipeline (audit PERF-2). Exactly the four families the
    UI renders, all self-hosted through next/font (no render-blocking
@@ -46,8 +45,10 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.makemycv.ae"),
   title: {
-    default: "MakeMyCV - Free CV Builder for UAE Jobs",
-    template: "%s | MakeMyCV",
+    // Entity name, not the logotype: title case with the .ae, matching the
+    // marketing site, LinkedIn and the manifest verbatim. See SITE_NAME.
+    default: `${SITE_NAME} - Free CV Builder for UAE Jobs`,
+    template: `%s | ${SITE_NAME}`,
   },
   description:
     "Build a professional, ATS-friendly CV in minutes. " +
@@ -63,15 +64,15 @@ export const metadata: Metadata = {
     "CV template Dubai",
     "makemycv",
   ],
-  authors: [{ name: "MakeMyCV", url: "https://makemycv.ae" }],
-  creator: "MakeMyCV",
-  publisher: "MakeMyCV",
+  authors: [{ name: SITE_NAME, url: "https://www.makemycv.ae" }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   openGraph: {
     type: "website",
     locale: "en_AE",
     url: "https://app.makemycv.ae",
-    siteName: "MakeMyCV",
-    title: "MakeMyCV - Free CV Builder for UAE Jobs",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} - Free CV Builder for UAE Jobs`,
     description:
       "Build a professional, ATS-friendly CV in minutes. " +
       "Designed for the UAE job market. Free, instant PDF export.",
@@ -80,13 +81,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MakeMyCV - CV Builder for UAE Job Seekers",
+        alt: `${SITE_NAME} - CV Builder for UAE Job Seekers`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MakeMyCV - Free CV Builder for UAE Jobs",
+    title: `${SITE_NAME} - Free CV Builder for UAE Jobs`,
     description:
       "ATS-friendly CVs built for the UAE job market. " +
       "Free, fast, no sign-up needed.",
@@ -117,7 +118,9 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
   appleWebApp: {
-    title: "makemycv",
+    // iOS home-screen label. Must agree with the manifest short_name, or the
+    // same install shows two different brand strings across platforms.
+    title: SITE_NAME,
     capable: true,
     statusBarStyle: "default",
   },
@@ -140,10 +143,12 @@ export default function RootLayout({
       className={`${inter.variable} ${bricolage.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body className="antialiased">
-        {/* Site-wide Organization identity. Pages that need surface-specific
-            schema (WebApplication, FAQPage, BreadcrumbList) emit it locally
-            and link back to this @id via the publisher field. */}
-        <JsonLd data={organizationSchema()} />
+        {/* No Organization node here, deliberately. www.makemycv.ae owns the
+            entity: it emits Organization, WebSite and the WebApplication that
+            describes THIS host, all cross-linked by @id. This subdomain used
+            to emit a second, thinner Organization on the same @id, which is
+            the entity split that work exists to prevent. Pages here reference
+            those nodes by @id instead — see lib/seo/schema.ts. */}
         {children}
       </body>
     </html>
