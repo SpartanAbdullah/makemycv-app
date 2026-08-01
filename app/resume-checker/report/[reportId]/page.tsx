@@ -12,7 +12,10 @@ import { SUPPORT_URL } from "@/lib/config/support";
 export const runtime = "nodejs";
 
 export const metadata: Metadata = {
-  title: "Your ATS Report | MakeMyCV",
+  // Bare title: the layout's template appends the brand suffix. Hardcoding it
+  // here rendered "Your ATS Report | MakeMyCV | MakeMyCV" (same doubling as
+  // audit ENG-19 on /resume-checker).
+  title: "Your ATS Report",
   robots: { index: false, follow: false },
 };
 

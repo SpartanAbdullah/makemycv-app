@@ -1,11 +1,28 @@
 /**
- * Schema.org JSON-LD builders for MakeMyCV.
+ * Schema.org JSON-LD builders for MakeMyCV.ae.
  *
  * Why this lives here:
  * - Keep schema authoring DRY and type-safe so future pages can add blocks
- *   without re-implementing org/identity facts.
- * - The Organization @id is the single shared anchor that links the app
- *   subdomain to the marketing site as one entity in search graphs.
+ *   without re-implementing identity facts.
+ * - The apex domain owns the entity. This subdomain only ever *references*
+ *   the marketing site's nodes by @id — it never restates them.
+ *
+ * ENTITY OWNERSHIP (do not break this):
+ *   www.makemycv.ae/#organization  Organization  — defined in makemycv-site
+ *   www.makemycv.ae/#website       WebSite       — defined in makemycv-site
+ *   www.makemycv.ae/#webapp        WebApplication, url = app.makemycv.ae,
+ *                                  publisher-linked to #organization
+ *                                                — defined in makemycv-site
+ *
+ * This repo used to emit its own Organization on that same @id with thinner,
+ * conflicting facts (name "MakeMyCV", no sameAs, no address, logo pointing at
+ * the OG image) plus its own WebApplication describing the same builder at
+ * the same URL. Two descriptions of one entity is exactly the entity split
+ * the LinkedIn entity-linking work exists to prevent, so both were dropped:
+ * makemycv-site is the single source of truth for both nodes.
+ *
+ * The only node this repo owns is the app subdomain's WebSite — a genuinely
+ * distinct site, on its own @id, deferring upward by reference.
  *
  * Rule (per the SEO checklist's integrity rule): every claim in schema
  * must mirror visible on-page content. No fabricated stats, no ratings.
@@ -13,73 +30,46 @@
 
 const SITE_URL = "https://www.makemycv.ae";
 const APP_URL = "https://app.makemycv.ae";
+
+/**
+ * Canonical entity name. Must match the marketing site, LinkedIn and every
+ * other owned profile verbatim — inconsistent name strings split the entity
+ * and are what let the similarly-named European makemycv.* operators absorb
+ * our brand signals. Mirrors SITE_NAME in makemycv-site/lib/seo.ts.
+ *
+ * Title case, always: this is the entity NAME. The drawn wordmark in
+ * public/logos/ is the logotype and stays lowercase. Different strings for
+ * different jobs — never swap one for the other.
+ */
+export const SITE_NAME = "MakeMyCV.ae";
+
+/** Owned by makemycv-site. Reference by @id only — never define them here. */
 const ORG_ID = `${SITE_URL}/#organization`;
+const WEBAPP_ID = `${SITE_URL}/#webapp`;
+
 const APP_WEBSITE_ID = `${APP_URL}/#website`;
 
 export type JsonLdGraph = Record<string, unknown> | Record<string, unknown>[];
 
-export const organizationSchema = () =>
-  ({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "@id": ORG_ID,
-    name: "MakeMyCV",
-    url: SITE_URL,
-    logo: `${SITE_URL}/og-image.png`,
-    description:
-      "Free, ATS-clean CV builder designed for the UAE and GCC job market.",
-    areaServed: { "@type": "Country", name: "United Arab Emirates" },
-    founder: { "@type": "Person", name: "Abdullah" },
-    contactPoint: {
-      "@type": "ContactPoint",
-      email: "hello@makemycv.ae",
-      contactType: "customer support",
-      areaServed: "AE",
-      availableLanguage: ["English", "Arabic"],
-    },
-  }) as const;
-
+/**
+ * The app subdomain as a WebSite. The one node this repo owns.
+ *
+ * Both outbound links are bare @id references, and that is what makes engines
+ * resolve this subdomain into the apex entity graph instead of treating it as
+ * a second, unrelated property:
+ * - publisher  → the Organization defined on www
+ * - mainEntity → the WebApplication defined on www, whose url is this host
+ */
 export const appWebSiteSchema = () =>
   ({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": APP_WEBSITE_ID,
     url: APP_URL,
-    name: "MakeMyCV",
+    name: SITE_NAME,
     publisher: { "@id": ORG_ID },
+    mainEntity: { "@id": WEBAPP_ID },
     inLanguage: "en-AE",
-  }) as const;
-
-/**
- * The builder/app surface as a WebApplication. Used on the app's only
- * public, indexable entry surface (/resume-checker). The featureList
- * mirrors what's actually built and visible on the page — no aspirational
- * features.
- */
-export const webApplicationSchema = () =>
-  ({
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    name: "MakeMyCV",
-    applicationCategory: "BusinessApplication",
-    operatingSystem: "Web",
-    url: APP_URL,
-    description:
-      "Free ATS-optimized CV builder with UAE-specific fields (visa status, " +
-      "Emirates ID, nationality, driving licence). No sign-up, no paywall, " +
-      "data stays in the browser.",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "AED" },
-    featureList: [
-      "ATS-parseable structure",
-      "UAE-specific fields",
-      "Instant PDF and DOCX export",
-      "Live preview",
-      "AI bullet-point rewriter",
-      "Browser-only data (no accounts)",
-    ],
-    inLanguage: "en-AE",
-    publisher: { "@id": ORG_ID },
-    isPartOf: { "@id": APP_WEBSITE_ID },
   }) as const;
 
 export type FaqEntry = { q: string; a: string };

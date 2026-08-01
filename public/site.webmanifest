@@ -1,7 +1,8 @@
 {
-  "name": "makemycv.ae",
-  "short_name": "makemycv",
+  "name": "MakeMyCV.ae",
+  "short_name": "MakeMyCV.ae",
   "description": "Build a UAE-ready CV in minutes.",
+  "lang": "en-AE",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
