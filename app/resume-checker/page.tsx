@@ -17,7 +17,8 @@ export const metadata: Metadata = {
   description:
     "ATS-check your CV in about 30 seconds. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
-  robots: { index: true, follow: true },
+  // No robots override: the app subdomain inherits the layout's noindex —
+  // www.makemycv.ae/resume-checker is the indexable SEO surface (see app/sitemap.ts).
   // Page-level openGraph/twitter REPLACE the layout's objects wholesale, so
   // images/siteName/locale must be restated or WhatsApp/LinkedIn previews
   // lose their image on the one page built to be shared (audit ENG-19).

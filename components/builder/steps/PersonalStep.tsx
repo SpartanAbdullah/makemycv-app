@@ -306,8 +306,14 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             no store-shape change — with an "Other" escape to free text. */}
         <Field label="City / Emirate" leftIcon="pin">
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* The Field label can't associate here — Field only wires
+                htmlFor to a SINGLE child, and this select sits inside a
+                composite <div> (select + "Other" input), so the generated id
+                lands on the div. Explicit aria-label keeps the control named
+                (Lighthouse select-name). */}
             <select
               className="cv-select"
+              aria-label="City / Emirate"
               style={{ paddingLeft: ICON_INPUT_PAD }}
               value={
                 EMIRATE_OPTIONS.includes(watch("location") ?? "")
@@ -339,6 +345,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
               <input
                 className="cv-input"
                 placeholder="e.g. Muscat, Oman"
+                aria-label="Other city"
                 autoComplete="address-level2"
                 {...register("location")}
                 onChange={(e) => {

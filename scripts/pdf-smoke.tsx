@@ -1,9 +1,13 @@
 /**
- * PDF smoke render — exports all 6 templates with a stress-test fixture so
+ * PDF smoke render — exports all 10 templates with a stress-test fixture so
  * output regressions are caught without clicking through the app.
  *
- * Run: npx tsx scripts/pdf-smoke.tsx
+ * Run: npm run test:pdf-smoke   (also part of the aggregate `npm test`)
  * Output: .smoke-pdfs/<templateId>.pdf
+ *
+ * Exit 0 = pass (every template rendered without throwing). The
+ * "Incomplete or corrupt PNG file" warnings are expected — the fixture's
+ * 1x1 base64 photo exists purely to exercise the <Image> path.
  *
  * The fixture deliberately stresses the known failure modes: long name +
  * long email (sidebar hyphenation), scheme-less URLs (link normalization),

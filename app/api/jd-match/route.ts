@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { kv } from "@vercel/kv";
+import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
 import type { JdRequirements } from "@/lib/jdMatch/types";
 
 /**
@@ -173,6 +174,11 @@ export async function POST(request: Request) {
       );
     }
     const clipped = jobText.slice(0, MAX_JD_CHARS);
+
+    // Global daily spend cap — after the per-IP windows (per-IP 429s win) and
+    // after validation. 1 unit: JD extraction is a small max_tokens-1024 call.
+    const spend = await takeSpendUnits(1);
+    if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
     // First attempt + one retry on invalid/empty JSON (hardened parser).
     let requirements: JdRequirements | null = null;
