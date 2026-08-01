@@ -4,20 +4,26 @@ import ExampleReportPreview from "@/components/resume-checker/ExampleReportPrevi
 import { Logo } from "@/components/Logo";
 import { JsonLd } from "@/components/seo/JsonLd";
 import {
+  SITE_NAME,
   appWebSiteSchema,
   breadcrumbListSchema,
   faqPageSchema,
-  webApplicationSchema,
 } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
-  // No "| MakeMyCV" here — the layout's title template appends it, and
+  // No "| MakeMyCV.ae" here — the layout's title template appends it, and
   // including it twice produced "… | MakeMyCV | MakeMyCV" (audit ENG-19).
   title: "Free ATS Resume Checker for UAE Jobs",
   description:
     "ATS-check your CV in about 30 seconds. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
-  robots: { index: true, follow: true },
+  // No robots override: the app subdomain inherits the layout's noindex —
+  // www.makemycv.ae/resume-checker is the indexable SEO surface (see
+  // app/sitemap.ts). The override here published a second indexable copy of
+  // that page on this host, which is the duplicate the apex is meant to win.
+  // The canonical stays self-referential on purpose: pointing it at the www
+  // page while this page is noindex sends conflicting signals and can carry
+  // the noindex across to the canonical target.
   // Page-level openGraph/twitter REPLACE the layout's objects wholesale, so
   // images/siteName/locale must be restated or WhatsApp/LinkedIn previews
   // lose their image on the one page built to be shared (audit ENG-19).
@@ -27,14 +33,14 @@ export const metadata: Metadata = {
       "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
     url: "https://app.makemycv.ae/resume-checker",
     type: "website",
-    siteName: "MakeMyCV",
+    siteName: SITE_NAME,
     locale: "en_AE",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MakeMyCV - Free ATS Resume Checker for UAE Jobs",
+        alt: `${SITE_NAME} - Free ATS Resume Checker for UAE Jobs`,
       },
     ],
   },
@@ -134,11 +140,13 @@ export default function ResumeCheckerPage() {
   return (
     <main className="min-h-screen bg-paper-2">
       {/* JSON-LD — emitted server-side so crawlers and AI fetchers see schema
-          in the initial HTML. WebApplication describes the tool itself;
-          FAQPage mirrors the visible <details> Q/As below; BreadcrumbList
-          gives the page its position in the site graph. */}
+          in the initial HTML. WebSite is this subdomain, pointing by @id at
+          the Organization and the WebApplication that www.makemycv.ae owns
+          (this page used to restate that WebApplication itself, duplicating
+          the tool at the same URL under a second description). FAQPage
+          mirrors the visible <details> Q/As below; BreadcrumbList gives the
+          page its position in the site graph. */}
       <JsonLd data={appWebSiteSchema()} />
-      <JsonLd data={webApplicationSchema()} />
       <JsonLd
         data={faqPageSchema(FAQS.map((f) => ({ q: f.q, a: f.a })))}
       />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { kv } from "@vercel/kv";
+import { spendCapResponse, takeSpendUnits } from "../../../lib/server/spendGuard";
 import type { RoleFamily } from "../../../lib/data/roleFamily";
 
 type AIType = "bullets" | "skills" | "summary";
@@ -233,6 +234,12 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    // Global daily spend cap — checked AFTER the per-IP windows (so hammering
+    // users still see the friendlier 429) and after validation (so malformed
+    // requests never burn budget). 1 unit: small prompt, max_tokens 1024.
+    const spend = await takeSpendUnits(1);
+    if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
     const { system, user } = buildPrompt(body);
 

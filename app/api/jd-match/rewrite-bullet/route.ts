@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { kv } from "@vercel/kv";
+import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
 
 /**
  * JD Match Phase B — truthful single-bullet rewrite (Pro apply-fix).
@@ -223,6 +224,11 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    // Global daily spend cap — after the per-IP windows (per-IP 429s win) and
+    // after validation. 1 unit: single-bullet rewrite, max_tokens 512.
+    const spend = await takeSpendUnits(1);
+    if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
     // First attempt + one retry. A clean empty array (the truthful refusal) is
     // a valid SUCCESS and is returned immediately — never retried. We retry on
