@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -30,7 +31,11 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com",
+              // *.ingest.de.sentry.io — the Sentry org is on the EU region, so
+              // the ingest host is .de. and NOT the .us. host most docs show.
+              // Getting this wrong fails silently: the browser blocks the
+              // request and errors simply never arrive.
+              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -44,4 +49,38 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withSentryConfig WRAPS the config above — it does not replace it. Everything
+// in `nextConfig` (notably the headers() block, which is this app's entire
+// security-header set including the CSP) is preserved. If you ever refactor
+// this line, verify the headers still ship: `curl -sI https://app.makemycv.ae
+// | grep -i content-security-policy`.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  // Source-map upload needs SENTRY_AUTH_TOKEN at BUILD time only; it is never
+  // bundled. Without it the build still succeeds — you just get minified stack
+  // traces instead of your real code.
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Keep the build log readable; real failures still surface.
+  silent: !process.env.CI,
+
+  // Strip source maps from the client bundle after uploading them to Sentry.
+  // Without this the .map files are served publicly, which would hand anyone
+  // the app's original source.
+  widenClientFileUpload: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+
+  // Do NOT proxy Sentry through our own domain. tunnelRoute would dodge
+  // ad-blockers, but it also routes browser traffic through a Vercel function
+  // (invocation cost) and, more importantly, would make requests carrying
+  // error data appear same-origin — which is exactly the kind of thing the
+  // CSP above exists to make visible. Explicit connect-src entry instead.
+  tunnelRoute: undefined,
+
+  // The React component-name annotation adds a data attribute to every element.
+  // Off: it bloats the DOM and the builder already has large render trees.
+  reactComponentAnnotation: { enabled: false },
+
+  disableLogger: true,
+});

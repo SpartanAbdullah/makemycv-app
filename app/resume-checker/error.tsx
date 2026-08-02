@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Resume-checker segment boundary (audit 2026-06-12, gap #2).
  * Covers /resume-checker and the /report/[reportId] subtree. Reports
@@ -15,6 +16,7 @@ export default function ResumeCheckerError({
 }) {
   useEffect(() => {
     console.error("[resume-checker/error]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

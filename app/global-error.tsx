@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Last-resort boundary (audit 2026-06-12, gap #2). Replaces the ROOT
  * layout when it crashes, so it must render its own <html>/<body> and
  * CANNOT rely on globals.css or next/font — every style is inline with
  * hardcoded Focus Flow hex values (paper #FBFAF7, ink #0B0F0C,
- * UAE green #0E7C4A). Keep this file dependency-free. */
+ * UAE green #0E7C4A). Keep this file dependency-free.
+ *
+ * ONE DELIBERATE EXCEPTION (2026-08-02): @sentry/nextjs. The rule above is
+ * about RENDERING — this file must not depend on anything that could itself be
+ * broken when the root layout has already failed, because then the user sees a
+ * blank page instead of an apology. Sentry is imported for reporting only and
+ * is never on the render path: if the capture throws, the JSX below still
+ * renders. And this is precisely the boundary whose errors you most need to
+ * see, since reaching it means the whole app failed to mount. Do not add any
+ * other import here. */
 export default function GlobalError({
   error,
 }: {
@@ -14,6 +24,8 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[app/global-error]", error);
+    // Reporting only — never on the render path. See the header note.
+    Sentry.captureException(error);
   }, [error]);
 
   return (

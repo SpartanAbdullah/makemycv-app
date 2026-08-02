@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Builder segment boundary (audit 2026-06-12, gap #2).
  * More specific copy than the root boundary: the user was mid-edit, so
@@ -17,6 +18,9 @@ export default function BuilderError({
 }) {
   useEffect(() => {
     console.error("[builder/error]", error);
+    // Highest-value capture in the product: this fires when a user was
+    // mid-edit, which is when a crash actually costs them something.
+    Sentry.captureException(error);
   }, [error]);
 
   return (

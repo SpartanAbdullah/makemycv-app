@@ -6,6 +6,8 @@ import {
   Inter,
   JetBrains_Mono,
 } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME } from "@/lib/seo/schema";
 
 /* Focus Flow font pipeline (audit PERF-2). Exactly the four families the
@@ -150,6 +152,22 @@ export default function RootLayout({
             the entity split that work exists to prevent. Pages here reference
             those nodes by @id instead — see lib/seo/schema.ts. */}
         {children}
+        {/* Analytics (2026-08-02, audit A-W8-003 / A-W4-017 / A-W5-036).
+            app.makemycv.ae previously ran NO analytics of any kind, so not one
+            CV export could be attributed to the traffic that produced it and
+            the entire SEO/link-building spend was unmeasurable.
+
+            These two give RUM and Web Vitals for THIS host only — Vercel
+            Analytics is per-project and does NOT follow a session across the
+            www -> app domain hop. Cross-domain attribution needs the GA4
+            cross-domain config, which lands separately; do not assume this
+            covers it. The app's CSP already allowed vitals.vercel-insights.com
+            from an install that never happened, so no header change was needed.
+
+            Neither library sends CV content: they report route, referrer and
+            timing only. */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -21,6 +21,19 @@ export const AiDisclosure = ({ align = "right" }: { align?: "left" | "right" }) 
     }}
   >
     Uses AI: this text is sent securely to our AI provider to generate
-    suggestions. Not stored by MakeMyCV.
+    suggestions. Not stored by MakeMyCV.{" "}
+    {/* The app is the surface actually holding the PII and, until 2026-08-02,
+        linked to no privacy policy anywhere (audit A-W8-015). The policy lives
+        on www because that host owns the entity; rel=noopener noreferrer
+        because every outbound link here should be, and the Referer would
+        otherwise leak the builder URL. */}
+    <a
+      href="https://www.makemycv.ae/privacy"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: "inherit", textDecoration: "underline" }}
+    >
+      Privacy
+    </a>
   </p>
 );

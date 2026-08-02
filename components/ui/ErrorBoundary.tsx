@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Generic client-side error boundary (audit 2026-06-12, gap #2).
  *
@@ -50,9 +51,15 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Console is our telemetry until an error monitor (Sentry) lands —
-    // Vercel captures these in the function/browser logs.
+    // Console stays: it is still the fastest signal in local dev, and Vercel
+    // captures it in browser logs.
     console.error("[ErrorBoundary]", error, info.componentStack);
+    // Sentry landed 2026-08-02. This is the richest capture point in the app —
+    // it is the ONLY place with componentStack, which tells you which island
+    // crashed rather than just which route.
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info.componentStack } },
+    });
     this.props.onError?.(error, info);
   }
 

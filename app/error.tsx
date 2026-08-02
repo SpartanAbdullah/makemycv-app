@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /* Root segment error boundary (audit 2026-06-12, gap #2).
  * Catches render/data crashes anywhere under app/ that a more specific
@@ -21,8 +22,8 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Vercel picks console.error up in browser logs; swap for Sentry later.
     console.error("[app/error]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
