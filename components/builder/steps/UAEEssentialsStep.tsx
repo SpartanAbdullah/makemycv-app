@@ -27,12 +27,41 @@ const ICON_INPUT_PAD = 40;
  * licence) plus optional extras (LinkedIn, Website, Nationality, Country,
  * Date of birth). Sits between Contact and Summary in the builder flow.
  *
- * Shares the `personal` store slice with PersonalStep (only one step is
- * mounted at a time so there's no write race). Deliberately has NO zod
- * resolver: every field on this screen is optional, and binding the full
- * personalSchema meant an invalid firstName/email — fields that are not
- * even on this screen — silently killed the Continue button (audit UX-3).
+ * Shares the `personal` store slice with PersonalStep. Only one step is
+ * mounted at a time, so there is no simultaneous-write race — but that was
+ * never the real hazard. This step used to write the WHOLE slice from its own
+ * form snapshot, which does not contain the fields it doesn't render (photo,
+ * showPhoto, firstName…), so every edit here silently blanked them (audit
+ * A-W1-014). Writes are now narrowed to OWNED_FIELDS below.
+ *
+ * Deliberately has NO zod resolver: every field on this screen is optional,
+ * and binding the full personalSchema meant an invalid firstName/email —
+ * fields that are not even on this screen — silently killed the Continue
+ * button (audit UX-3).
  */
+
+/** The personal fields THIS step registers. See PersonalStep for the split. */
+const OWNED_FIELDS = [
+  "nationality",
+  "country",
+  "dateOfBirth",
+  "visaStatus",
+  "drivingLicense",
+  "availability",
+  "linkedin",
+  "website",
+] as const;
+
+const pickOwned = (source: Record<string, unknown>) => {
+  const out: Record<string, unknown> = {};
+  for (const key of OWNED_FIELDS) {
+    if (key in source) out[key] = source[key];
+  }
+  return out;
+};
+
+const serializeOwned = (source: Record<string, unknown>) =>
+  JSON.stringify(OWNED_FIELDS.map((key) => source[key] ?? ""));
 export const UAEEssentialsStep = ({
   onNext,
   onBack,
@@ -44,7 +73,9 @@ export const UAEEssentialsStep = ({
 }) => {
   const personal = useCvStore((state) => state.data.personal);
   const updateSection = useCvStore((state) => state.updateSection);
-  const lastSerializedRef = useRef<string>(JSON.stringify(personal));
+  const lastSerializedRef = useRef<string>(
+    serializeOwned(personal as unknown as Record<string, unknown>),
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string | null>
@@ -90,18 +121,26 @@ export const UAEEssentialsStep = ({
   }, [personal, reset, isDirty]);
 
   useEffect(() => {
-    lastSerializedRef.current = JSON.stringify(personal);
+    lastSerializedRef.current = serializeOwned(
+      personal as unknown as Record<string, unknown>,
+    );
   }, [personal]);
 
   useEffect(() => {
     const subscription = watch((value) => {
-      const nextSerialized = JSON.stringify(value);
+      const nextSerialized = serializeOwned(value as Record<string, unknown>);
       if (nextSerialized === lastSerializedRef.current) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
-          updateSection("personal", value as CvPersonal);
+          // Merge only this step's fields over the live store — never replace
+          // the slice. See the header comment and PersonalStep.
+          const current = useCvStore.getState().data.personal;
+          updateSection("personal", {
+            ...current,
+            ...pickOwned(value as Record<string, unknown>),
+          } as CvPersonal);
         }
       }, 250);
     });

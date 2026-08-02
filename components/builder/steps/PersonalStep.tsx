@@ -47,6 +47,41 @@ const EMIRATE_OPTIONS = [
   "Al Ain, UAE",
 ];
 
+/**
+ * The personal fields THIS step registers with react-hook-form.
+ *
+ * `personal` is a shared slice: PersonalStep owns these six, UAEEssentialsStep
+ * owns nationality/country/dateOfBirth/visaStatus/drivingLicense/availability/
+ * linkedin/website, and photo/showPhoto are written straight to the store by
+ * the upload control, never through RHF. Writes must be narrowed to the fields
+ * a step actually owns — a whole-slice write from a form snapshot is what was
+ * wiping uploaded photos (audit A-W1-014).
+ */
+const OWNED_FIELDS = [
+  "firstName",
+  "lastName",
+  "headline",
+  "email",
+  "phone",
+  "location",
+] as const;
+
+const pickOwned = (source: Record<string, unknown>) => {
+  const out: Record<string, unknown> = {};
+  for (const key of OWNED_FIELDS) {
+    // `in` rather than a truthiness check: a field the user cleared is "" and
+    // must still be written, but a key RHF has never seen must not be.
+    if (key in source) out[key] = source[key];
+  }
+  return out;
+};
+
+/** Serialise ONLY the owned fields, so the store-shaped and form-shaped
+ *  snapshots are actually comparable. Comparing the whole objects never
+ *  matched, so the de-dupe below silently never fired. */
+const serializeOwned = (source: Record<string, unknown>) =>
+  JSON.stringify(OWNED_FIELDS.map((key) => source[key] ?? ""));
+
 export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const personal = useCvStore((state) => state.data.personal);
   const photoShape = useCvStore(
@@ -55,7 +90,9 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const updateSection = useCvStore((state) => state.updateSection);
   const settings = useCvStore((state) => state.data.settings);
   const { handleImport } = useImport();
-  const lastSerializedRef = useRef<string>(JSON.stringify(personal));
+  const lastSerializedRef = useRef<string>(
+    serializeOwned(personal as unknown as Record<string, unknown>),
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True once the user explicitly picks "Other city…" in the emirate select.
   const [customLocation, setCustomLocation] = useState(false);
@@ -111,18 +148,32 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   }, [personal, reset, isDirty]);
 
   useEffect(() => {
-    lastSerializedRef.current = JSON.stringify(personal);
+    lastSerializedRef.current = serializeOwned(
+      personal as unknown as Record<string, unknown>,
+    );
   }, [personal]);
 
   useEffect(() => {
     const subscription = watch((value) => {
-      const nextSerialized = JSON.stringify(value);
+      const nextSerialized = serializeOwned(value as Record<string, unknown>);
       if (nextSerialized === lastSerializedRef.current) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
-          updateSection("personal", value as CvPersonal);
+          // Merge THIS step's fields over the live store instead of replacing
+          // the whole personal slice (audit A-W1-014). Once the user types,
+          // isDirty stays true and the reset() above never re-syncs, so RHF
+          // keeps its mount-time snapshot forever. Fields this step does not
+          // own — photo and showPhoto, which are written directly to the store
+          // by handlePhotoChange / handleToggleChange — were absent from that
+          // snapshot, so the old whole-slice write silently wiped a photo the
+          // user had just uploaded.
+          const current = useCvStore.getState().data.personal;
+          updateSection("personal", {
+            ...current,
+            ...pickOwned(value as Record<string, unknown>),
+          } as CvPersonal);
         }
       }, 250);
     });

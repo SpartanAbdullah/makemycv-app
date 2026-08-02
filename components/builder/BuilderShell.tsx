@@ -854,6 +854,7 @@ export const BuilderShell = ({
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
   const saveError = useCvStore((state) => state.saveError);
+  const staleTab = useCvStore((state) => state.staleTab);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
@@ -1225,6 +1226,41 @@ export const BuilderShell = ({
             }
           />
         </div>
+
+        {/* Stale-tab bar (audit A-W3-003). Another tab has saved a newer CV,
+            so autosave in THIS tab is now stopped to stop it overwriting the
+            newer copy. Not dismissible: dismissing would leave the user typing
+            into a tab that silently no longer saves, which is worse than the
+            bug this replaced. Sits above the error bar because it invalidates
+            everything below it. */}
+        {staleTab && (
+          <div
+            role="alert"
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              background: "#FFF7E6",
+              borderBottom: "1px solid #F5D9A0",
+              padding: "10px 24px",
+            }}
+          >
+            <p style={{ fontSize: 13, color: "#7A4B00", fontWeight: 500 }}>
+              You edited this CV in another tab. Changes here are no longer
+              being saved, so they can&rsquo;t overwrite the newer version.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="cv-btn-secondary"
+              style={{ flexShrink: 0 }}
+            >
+              Reload this tab
+            </button>
+          </div>
+        )}
 
         {/* Error bar */}
         {(errorMsg || downloadError) && (

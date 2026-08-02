@@ -14,6 +14,7 @@ import {
   debounce,
   loadCvFromStorage,
   saveCvToStorage,
+  STORAGE_KEY,
 } from "../utils/localStorage";
 import { createId } from "../utils/id";
 
@@ -142,6 +143,19 @@ type CvStore = {
   /** True when the last localStorage write failed — the autosave chip
    *  must stop claiming "saved on this device". */
   saveError: boolean;
+  /**
+   * True when ANOTHER TAB has written a newer CV to localStorage.
+   *
+   * Each tab hydrates once and then autosaves its own in-memory copy, so two
+   * open builders used to overwrite each other silently: whichever tab you
+   * typed in last won, and the other tab's work vanished with no error and no
+   * undo (audit A-W3-003). When this flips true the autosave in THIS tab
+   * stops, so the stale copy can no longer clobber the newer one, and the UI
+   * tells the user to reload. Deliberately one-way — there is no safe
+   * automatic merge, and silently discarding either side is what caused the
+   * bug in the first place.
+   */
+  staleTab: boolean;
   isPro: boolean;
   hasUsedFreeDownload: boolean;
   appliedCouponCode: string;
@@ -219,6 +233,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
   data: defaultCvData,
   hydrated: false,
   saveError: false,
+  staleTab: false,
   // KEEP — isPro deletion cancelled 2026-06-12 (paid tier returning).
   isPro: true,
   hasUsedFreeDownload: false,
@@ -344,6 +359,12 @@ export const bindCvStorage = () => {
 
   useCvStore.getState().setHydrated(true);
   const saveDebounced = debounce((data: CvData) => {
+    // A stale tab must never write. Its in-memory copy predates whatever
+    // another tab has since saved, so writing would replace newer work with
+    // older — the exact clobber this guard exists to prevent. Checked here
+    // rather than only in the subscription because the write is debounced:
+    // another tab can win the race during those 500ms.
+    if (useCvStore.getState().staleTab) return;
     const ok = saveCvToStorage(data);
     // Only write on transitions — and guard the subscription on data
     // identity below, so flipping saveError can never re-trigger a save.
@@ -353,6 +374,25 @@ export const bindCvStorage = () => {
   }, 500);
   useCvStore.subscribe((state, prev) => {
     if (state.data !== prev.data) saveDebounced(state.data);
+  });
+
+  // Cross-tab guard (audit A-W3-003). The `storage` event fires only in OTHER
+  // tabs of the same origin, so receiving one means a second builder just
+  // saved a CV this tab does not have. Before this, each tab hydrated once and
+  // then autosaved its own copy, so whichever tab you typed in last silently
+  // overwrote the other — no error, no undo, and no backup to recover from.
+  //
+  // `newValue === null` is a clear (reset / "start over" elsewhere), not a
+  // competing edit, so it is ignored rather than treated as a conflict.
+  //
+  // Deliberately one-way and non-recoverable in-tab: there is no safe
+  // automatic merge of two divergent CVs, and silently picking a winner is
+  // precisely the behaviour being fixed. The user reloads to continue.
+  window.addEventListener("storage", (event) => {
+    if (event.key !== STORAGE_KEY) return;
+    if (event.newValue === null) return;
+    if (useCvStore.getState().staleTab) return;
+    useCvStore.setState({ staleTab: true });
   });
 };
 
