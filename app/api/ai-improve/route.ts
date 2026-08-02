@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
-import { kv } from "@vercel/kv";
-import { spendCapResponse, takeSpendUnits } from "../../../lib/server/spendGuard";
-import type { RoleFamily } from "../../../lib/data/roleFamily";
+import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
+import {
+  checkRateLimit,
+  getClientIp,
+  makeLimiter,
+} from "@/lib/server/rateLimit";
+import type { RoleFamily } from "@/lib/data/roleFamily";
 
 type AIType = "bullets" | "skills" | "summary";
 
@@ -61,31 +65,16 @@ const SUPPORT_URL = "https://www.makemycv.ae/support";
 
 // Per-IP rate limits backed by the same Upstash instance that powers @vercel/kv.
 // Two windows compose: daily (slow drip) + burst (anti-hammer).
-const dailyLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(10, "24 h"),
-  analytics: true,
-  prefix: "mmcv_ai_daily",
-});
-
-const burstLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(3, "60 s"),
-  analytics: true,
-  prefix: "mmcv_ai_burst",
-});
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  // Local dev / no proxy — fall back to a stable string so the window still works.
-  return "anon";
-}
+const limits = {
+  daily: makeLimiter({
+    limiter: Ratelimit.slidingWindow(10, "24 h"),
+    prefix: "mmcv_ai_daily",
+  }),
+  burst: makeLimiter({
+    limiter: Ratelimit.slidingWindow(3, "60 s"),
+    prefix: "mmcv_ai_burst",
+  }),
+};
 
 function rateLimitedResponse(retryAfterSeconds: number) {
   const safeRetryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
@@ -211,19 +200,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Burst window first, then daily — and when Upstash is slow or unreachable,
+    // a bounded in-memory bucket rather than a silent pass. See
+    // lib/server/rateLimit.ts for why a timeout is NOT treated as success.
     const ip = getClientIp(request);
-
-    // Burst window first — cheaper to reject, smaller window.
-    const burst = await burstLimit.limit(ip);
-    if (!burst.success) {
-      const retryAfter = Math.max(1, (burst.reset - Date.now()) / 1000);
-      return rateLimitedResponse(retryAfter);
-    }
-
-    const daily = await dailyLimit.limit(ip);
-    if (!daily.success) {
-      const retryAfter = Math.max(1, (daily.reset - Date.now()) / 1000);
-      return rateLimitedResponse(retryAfter);
+    const throttle = await checkRateLimit(ip, limits);
+    if (!throttle.allowed) {
+      return rateLimitedResponse(throttle.retryAfterSeconds);
     }
 
     const body = (await request.json()) as RequestBody;

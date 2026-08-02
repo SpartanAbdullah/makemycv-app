@@ -9,16 +9,19 @@
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { Ratelimit } from "@upstash/ratelimit";
-import { kv } from "@vercel/kv";
 import { parseCvText } from "@/lib/resumeChecker/parse";
 import { computeScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
 import {
   PARSE_SPEND_UNITS,
   spendCapResponse,
-  takePerIpFallback,
   takeSpendUnits,
 } from "@/lib/server/spendGuard";
+import {
+  checkRateLimit,
+  getClientIp,
+  makeLimiter,
+} from "@/lib/server/rateLimit";
 import type { StoredReport } from "@/lib/resumeChecker/types";
 
 export const runtime = "nodejs";
@@ -32,30 +35,16 @@ const MIN_TEXT_LENGTH = 200;
 // vector on the server's Anthropic key. Mirrors /api/ai-improve's pattern:
 // burst window (anti-hammer) + daily window (slow drip). Limits are looser
 // than ai-improve's because one check = one report a human reads.
-const dailyLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(15, "24 h"),
-  analytics: true,
-  prefix: "mmcv_parse_daily",
-});
-
-const burstLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(3, "60 s"),
-  analytics: true,
-  prefix: "mmcv_parse_burst",
-});
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "anon";
-}
+const limits = {
+  daily: makeLimiter({
+    limiter: Ratelimit.slidingWindow(15, "24 h"),
+    prefix: "mmcv_parse_daily",
+  }),
+  burst: makeLimiter({
+    limiter: Ratelimit.slidingWindow(3, "60 s"),
+    prefix: "mmcv_parse_burst",
+  }),
+};
 
 function rateLimitedResponse(resetAtMs: number, requestId: string) {
   const retryAfter = Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000));
@@ -73,27 +62,23 @@ function rateLimitedResponse(resetAtMs: number, requestId: string) {
 export async function POST(request: Request) {
   const requestId = nanoid(10);
 
-  // Rate limit first — before any parsing work. When KV is unreachable
-  // (local dev without env vars, Upstash hiccup) this used to fail OPEN,
-  // which left the single most expensive Claude route unlimited exactly when
-  // the throttle infrastructure was down. Now it degrades to a bounded
-  // in-memory per-IP bucket (lib/server/spendGuard) instead — the free tool
-  // keeps working through hiccups, but never unmetered.
+  // Rate limit first — before any parsing work. When KV is unreachable this
+  // degrades to a bounded in-memory per-IP bucket (lib/server/spendGuard)
+  // rather than failing open: the free tool keeps working through hiccups, but
+  // never unmetered.
+  //
+  // 2026-08-02: the try/catch that used to live here only caught a THROWN
+  // limiter error, and @upstash/ratelimit's default 5s timeout resolves
+  // { success: true } instead of throwing — so on the most likely failure mode
+  // (Upstash slow, not refused) the fallback below never ran and this route
+  // was unlimited. checkRateLimit now owns both paths; see lib/server/rateLimit.ts.
   const ip = getClientIp(request);
-  try {
-    const burst = await burstLimit.limit(ip);
-    if (!burst.success) return rateLimitedResponse(burst.reset, requestId);
-    const daily = await dailyLimit.limit(ip);
-    if (!daily.success) return rateLimitedResponse(daily.reset, requestId);
-  } catch (err) {
-    console.warn("[parse] rate limiter unavailable, in-memory fallback:", err);
-    const fallback = takePerIpFallback(ip);
-    if (!fallback.allowed) {
-      return rateLimitedResponse(
-        Date.now() + fallback.retryAfterSeconds * 1000,
-        requestId,
-      );
-    }
+  const throttle = await checkRateLimit(ip, limits);
+  if (!throttle.allowed) {
+    return rateLimitedResponse(
+      Date.now() + throttle.retryAfterSeconds * 1000,
+      requestId,
+    );
   }
 
   let body: unknown;

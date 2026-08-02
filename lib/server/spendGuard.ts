@@ -17,12 +17,22 @@
 // with a 25h TTL so keys self-clean. Cap is env-tunable via
 // AI_DAILY_GLOBAL_CAP (default 1500 units/day).
 //
-// When KV is UNREACHABLE the guard does NOT fail open (the parse route's old
-// per-IP limiter did, which left the most expensive route unlimited during KV
-// hiccups). Instead it falls back to a module-scope in-memory token bucket —
-// 30 units/hour per lambda instance. Bounded availability, bounded spend:
-// local dev and short KV outages keep working, but a KV outage can no longer
-// be used to bypass all throttling.
+// When KV is UNREACHABLE this guard does NOT fail open. It falls back to a
+// module-scope in-memory token bucket — 30 units/hour per lambda instance.
+// Bounded availability, bounded spend: local dev and short KV outages keep
+// working, but a KV outage cannot be used to bypass throttling entirely.
+//
+// CAVEAT, stated honestly: that bound is PER INSTANCE. A fleet of N warm
+// lambdas can spend N x 30 units/hour while KV is down, and N is set by
+// Vercel's autoscaler, not by this file. It is bounded per instance and
+// unbounded in aggregate (audit A-W9-002).
+//
+// 2026-08-02: an earlier version of this comment claimed the per-IP limiters
+// had already been fixed to match. They had not — @upstash/ratelimit's default
+// 5s timeout RESOLVES { success: true } rather than throwing, so the per-IP
+// windows silently passed every request during an Upstash slowdown and the
+// routes' try/catch never fired. That is fixed in lib/server/rateLimit.ts,
+// which now owns limiter construction and routes timeouts here instead.
 
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
@@ -154,12 +164,14 @@ export function spendCapResponse(retryAfterSeconds: number) {
   );
 }
 
-// --- Per-IP in-memory fallback (parse route) ---
+// --- Per-IP in-memory fallback (all four AI routes) ---
 //
-// Replaces the parse route's old fail-open when its Upstash per-IP limiter is
-// unreachable. Roughly mirrors the KV windows (3 burst / 15 per 24h) as a
-// token bucket: capacity 3, refilling at 15 tokens per 24h. Per instance, so
-// it's looser than the real limiter — but bounded, which is the point.
+// Used when an Upstash per-IP limiter is unreachable OR times out. Called from
+// lib/server/rateLimit.ts on behalf of every AI route — not just parse, which
+// was the only route with any fallback at all before 2026-08-02. Roughly
+// mirrors the KV windows (3 burst / 15 per 24h) as a token bucket: capacity 3,
+// refilling at 15 tokens per 24h. Per instance, so it's looser than the real
+// limiter — but bounded, which is the point.
 
 const PER_IP_CAPACITY = 3;
 const PER_IP_REFILL_PER_HOUR = 15 / 24;

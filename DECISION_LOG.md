@@ -161,3 +161,82 @@ Ko-fi offers PayPal as a payout method alternative. The supporter pays via Ko-fi
 - Pipeline (explicitly deferred): cover letter generator, application tracker.
 
 ---
+
+## 2026-08-02 — Rate limiter: IP retention stopped, fail-open closed
+
+Arising from the external technical audit (Audit A, findings A-W3-001, A-W2-001, A-W1-019).
+Recorded here because both defects were **invisible from the code that appeared to handle
+them** — the comments claimed protection that did not exist, which is exactly the failure
+mode a decision log is for.
+
+### What was wrong
+
+**1. We were retaining client IP addresses forever, against our own privacy policy.**
+
+All eight `Ratelimit` constructors (two windows × four AI routes) were built with
+`analytics: true`. That flag is an **Upstash feature flag, not a telemetry tool** — the name
+misled. `@upstash/ratelimit` asks `@upstash/core-analytics` for `retention: "90d"`, but
+core-analytics 0.0.10 never reads that option. Its `ingest` is a single `ZINCRBY` and issues no
+`EXPIRE` — verified: `grep -c -i expire node_modules/@upstash/core-analytics/dist/index.js`
+returns **0**.
+
+The identifier it records is the raw client IP. So every rate-limited request since that flag
+was added wrote a personal identifier into KV permanently, while
+`makemycv-site/app/privacy/page.tsx` told users their IP is "held briefly in short-lived
+storage" and granted an erasure right we could not service. Nothing in the product ever read
+that data back. It was also the only unbounded growth in KV.
+
+**2. Per-IP rate limiting silently disengaged whenever Upstash was slow.**
+
+`@upstash/ratelimit@2.0.8` defaults to `timeout: 5000`, and on expiry it **resolves**
+`{ success: true, limit: 0, remaining: 0, reset: 0, reason: "timeout" }` — it does not throw.
+Verified directly in `node_modules/@upstash/ratelimit/dist/index.mjs`
+(`this.timeout = config.timeout ?? 5e3`, and the `setTimeout` that resolves `success: true`).
+
+Consequences we had not seen:
+- `parse/route.ts` wrapped `.limit()` in a `try/catch` that fell back to a bounded in-memory
+  bucket. A resolved promise never enters a catch, so **that fallback was dead code for the
+  exact scenario it was written for** — Upstash slow rather than refused.
+- The other three routes had no fallback at all; a thrown limiter error would have landed in
+  their outer catch and returned a generic 500, not a 429.
+- No route inspected `.reason`, so a timeout was indistinguishable from a genuine pass.
+- `@upstash/redis` retries 5 times with exponential backoff (~4.29s of sleeps) before it would
+  throw, so during a real outage the 5s race almost always resolved into the fail-open first.
+
+During any Upstash slowdown, one IP could therefore spend the entire 1500-unit daily AI budget.
+
+### How it was fixed
+
+New `lib/server/rateLimit.ts` now owns limiter construction and the limit check:
+
+- `makeLimiter()` — the only place a `Ratelimit` is constructed. Hardcodes `analytics: false`
+  and an **explicit `timeout` (3s)**, so no future route can inherit the fail-open default by
+  forgetting to pass one.
+- `getClientIp()` — one copy replacing four near-duplicates (three byte-identical, one
+  differing only by a comment). Carries a written note about the `x-forwarded-for` caveat
+  still open as Audit A question A1.
+- `checkRateLimit()` — runs both windows and treats `reason === "timeout"` **and** a thrown
+  error identically: as *limiter unavailable*, degrading to `takePerIpFallback` in
+  `spendGuard.ts`. All four routes now share that behaviour; previously only `parse` had any
+  fallback, and it did not work.
+
+Also corrected: `spendGuard.ts`'s header claimed the per-IP limiters had already been fixed to
+not fail open. They had not. The comment now says what is actually true, including the honest
+caveat that the in-memory bound is per lambda instance and therefore unbounded in aggregate
+(A-W9-002).
+
+### Deliberately not done
+- **Retry-After is never computed from `reset` on the timeout path.** The library returns
+  `reset: 0` there, so `reset - Date.now()` goes hugely negative.
+- **The four 429 response bodies stay per-route.** Their copy differs on purpose ("AI
+  improvements" / "JD Match checks" / "bullet rewrites" / the checker's plain-English string,
+  which also carries a `requestId`). Only the limiter is shared.
+- **Analytics was not re-enabled with a purge.** Nothing reads it. If it is ever wanted back,
+  it needs a scheduled purge of `<prefix>:events:*` and a privacy-policy edit in the same PR.
+
+### Open, not closed by this change
+- Whether Vercel overwrites or appends to `x-forwarded-for`. If it appends, the first entry is
+  attacker-controlled and every per-IP window here is bypassable with a random header per
+  request. See Audit A open question A1 — this is the single highest-value thing left to settle.
+- Whether existing `mmcv_*:events:*` keys should be purged from KV. They contain historical IPs
+  and are no longer written to, but they do not expire on their own.

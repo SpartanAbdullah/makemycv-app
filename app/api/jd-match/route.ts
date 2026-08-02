@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
-import { kv } from "@vercel/kv";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
+import {
+  checkRateLimit,
+  getClientIp,
+  makeLimiter,
+} from "@/lib/server/rateLimit";
 import type { JdRequirements } from "@/lib/jdMatch/types";
 
 /**
@@ -18,30 +22,16 @@ import type { JdRequirements } from "@/lib/jdMatch/types";
 const SUPPORT_URL = "https://www.makemycv.ae/support";
 const MAX_JD_CHARS = 12000; // guard against pasting a whole careers page
 
-const dailyLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(10, "24 h"),
-  analytics: true,
-  prefix: "mmcv_jd_daily",
-});
-
-const burstLimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(3, "60 s"),
-  analytics: true,
-  prefix: "mmcv_jd_burst",
-});
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "anon";
-}
+const limits = {
+  daily: makeLimiter({
+    limiter: Ratelimit.slidingWindow(10, "24 h"),
+    prefix: "mmcv_jd_daily",
+  }),
+  burst: makeLimiter({
+    limiter: Ratelimit.slidingWindow(3, "60 s"),
+    prefix: "mmcv_jd_burst",
+  }),
+};
 
 function rateLimitedResponse(retryAfterSeconds: number) {
   const safeRetryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
@@ -150,15 +140,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "API not configured" }, { status: 500 });
     }
 
+    // Per-IP windows, degrading to a bounded in-memory bucket when Upstash is
+    // slow or unreachable — see lib/server/rateLimit.ts for why a timeout is
+    // NOT treated as success.
     const ip = getClientIp(request);
-
-    const burst = await burstLimit.limit(ip);
-    if (!burst.success) {
-      return rateLimitedResponse((burst.reset - Date.now()) / 1000);
-    }
-    const daily = await dailyLimit.limit(ip);
-    if (!daily.success) {
-      return rateLimitedResponse((daily.reset - Date.now()) / 1000);
+    const throttle = await checkRateLimit(ip, limits);
+    if (!throttle.allowed) {
+      return rateLimitedResponse(throttle.retryAfterSeconds);
     }
 
     const body = (await request.json().catch(() => null)) as
