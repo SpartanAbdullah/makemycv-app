@@ -88,64 +88,93 @@
 
 import type { CvData } from "../types/cv";
 
-export const CURRENT_VERSION = 2 as const;
+export const CURRENT_VERSION = 3 as const;
 
 // ── Language level mapping ──────────────────────────────────────────────────
+//
+// (2026-08-02, audit A-W1-009 / A-W1-010.) The v1→v2 step used to remap levels
+// onto a four-value "v2" enum — native | fluent | professional | conversational
+// — that THE UI NEVER ADOPTED. lib/language.ts still offers the original five,
+// so that enum was fictional, and two concrete defects followed from it:
+//
+//   1. It RAISED stated proficiency. elementary→conversational,
+//      beginner→conversational, intermediate→professional. A user who honestly
+//      selected "Intermediate" German ended up with a CV asserting
+//      "Professional Working (C1)" — a claim they never made, on a job
+//      application, with no notice and no undo.
+//   2. advanced→"fluent" wrote a value nothing in the product can handle.
+//      LevelDropdown cannot select it (it renders the placeholder, so the field
+//      looks empty) and formatLanguageLevel has no entry for it, so all ten
+//      templates, the DOCX exporter and CVDocument print the raw token
+//      "fluent".
+//   3. full_professional→professional silently discarded C2.
+//
+// The canonical set below IS lib/language.ts's LANGUAGE_LEVELS. Keep the two in
+// step: a value that cannot be selected and rendered must never be written.
+//
+// THE RULE: a migration may lower or preserve a stated level. It may never
+// raise one. Inventing proficiency on someone's CV is the worst thing this
+// file can do.
+//
+// Honest limitation: users migrated by the old code cannot be fully recovered.
+// A stored "professional" is indistinguishable from a genuine one, so only
+// "fluent" — which the UI could never have produced — is unambiguously
+// repairable. v2→v3 repairs that one; the rest is unrecoverable and the
+// original values are gone.
 
-const V1_LANGUAGE_LEVELS = [
+export const CANONICAL_LANGUAGE_LEVELS = [
   "elementary",
   "conversational",
   "professional",
   "full_professional",
   "native",
-  "beginner",
-  "intermediate",
-  "advanced",
 ] as const;
-type V1LanguageLevel = (typeof V1_LANGUAGE_LEVELS)[number];
+export type CanonicalLanguageLevel = (typeof CANONICAL_LANGUAGE_LEVELS)[number];
 
-const V2_LANGUAGE_LEVELS = [
-  "native",
-  "fluent",
-  "professional",
-  "conversational",
-] as const;
-export type V2LanguageLevel = (typeof V2_LANGUAGE_LEVELS)[number];
-
-const LANGUAGE_LEVEL_MAP: Record<V1LanguageLevel, V2LanguageLevel> = {
-  elementary: "conversational",
+/**
+ * Every level value the store has ever written, mapped to one the UI can both
+ * select and render. Equivalences follow lib/language.ts's own CEFR labels:
+ * beginner = Elementary (A1–A2), intermediate = Conversational (B1–B2),
+ * advanced = Professional Working (C1).
+ */
+const LANGUAGE_LEVEL_MAP: Record<string, CanonicalLanguageLevel> = {
+  // Canonical values map to themselves.
+  elementary: "elementary",
   conversational: "conversational",
   professional: "professional",
-  full_professional: "professional",
+  full_professional: "full_professional",
   native: "native",
-  beginner: "conversational",
-  intermediate: "professional",
-  advanced: "fluent",
+  // Pre-v2 vocabulary.
+  beginner: "elementary",
+  intermediate: "conversational",
+  advanced: "professional",
+  // Written only by the broken v1→v2 step. "advanced" was its source, so C1 /
+  // professional is the faithful landing spot — not full_professional, which
+  // would raise it.
+  fluent: "professional",
 };
 
-const UNMAPPED_LANGUAGE_FALLBACK: V2LanguageLevel = "conversational";
-
-const isV2LanguageLevel = (v: string): v is V2LanguageLevel =>
-  (V2_LANGUAGE_LEVELS as readonly string[]).includes(v);
-
-const isV1LanguageLevel = (v: string): v is V1LanguageLevel =>
-  (V1_LANGUAGE_LEVELS as readonly string[]).includes(v);
-
-export function migrateLanguageLevel(raw: unknown): V2LanguageLevel | undefined {
+/**
+ * Canonicalise a stored level.
+ *
+ * Returns undefined for absent, empty and UNRECOGNISED values. Unrecognised
+ * deliberately yields "no level" rather than a default: asserting a
+ * mid-range proficiency for a value we cannot interpret is the same
+ * fabrication this mapping exists to stop. The user sees an empty dropdown and
+ * re-picks, which is recoverable; a fabricated C1 on a submitted CV is not.
+ */
+export function migrateLanguageLevel(
+  raw: unknown,
+): CanonicalLanguageLevel | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
   if (typeof raw !== "string") {
-    console.warn(
-      `[makemycv] migrate: language level was non-string → defaulting to '${UNMAPPED_LANGUAGE_FALLBACK}'`
-    );
-    return UNMAPPED_LANGUAGE_FALLBACK;
+    console.warn("[makemycv] migrate: language level was non-string → dropping");
+    return undefined;
   }
-  const normalised = raw.toLowerCase();
-  if (isV1LanguageLevel(normalised)) return LANGUAGE_LEVEL_MAP[normalised];
-  if (isV2LanguageLevel(normalised)) return normalised;
-  console.warn(
-    `[makemycv] migrate: unmapped language level → defaulting to '${UNMAPPED_LANGUAGE_FALLBACK}'`
-  );
-  return UNMAPPED_LANGUAGE_FALLBACK;
+  const mapped = LANGUAGE_LEVEL_MAP[raw.toLowerCase()];
+  if (mapped) return mapped;
+  console.warn("[makemycv] migrate: unrecognised language level → dropping");
+  return undefined;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -198,10 +227,38 @@ function migrateV1ToV2(payload: AnyObject): AnyObject {
   return out;
 }
 
+// ── v2 → v3 ─────────────────────────────────────────────────────────────────
+//
+// Repairs the language levels the old v1→v2 step wrote. Only "fluent" is
+// unambiguously repairable (the UI could never produce it); a raised
+// "professional" is indistinguishable from a genuine one and is not recovered.
+// Idempotent: canonical values map to themselves, so re-running is a no-op.
+
+function migrateV2ToV3(payload: AnyObject): AnyObject {
+  const out: AnyObject = { ...payload };
+
+  if (Array.isArray(out.languages)) {
+    out.languages = out.languages.map((entry) => {
+      if (!isPlainObject(entry)) return entry;
+      const next: AnyObject = { ...entry };
+      if (next.level !== undefined) {
+        const canonical = migrateLanguageLevel(next.level);
+        if (canonical === undefined) delete next.level;
+        else next.level = canonical;
+      }
+      return next;
+    });
+  }
+
+  // Version stamp LAST, same integrity rule as v1→v2.
+  out.version = 3;
+  return out;
+}
+
 // ── Public entry point ──────────────────────────────────────────────────────
 
 export type MigrationOutcome =
-  | { status: "migrated"; from: 1; to: 2 }
+  | { status: "migrated"; from: number; to: number }
   | { status: "skipped"; version: number }
   | { status: "fresh" }
   | { status: "failed"; reason: string };
@@ -233,10 +290,14 @@ export function migrate(parsed: unknown): MigrationResult {
   }
 
   try {
-    const migrated = migrateV1ToV2(parsed);
+    // Sequential chain — each step is applied only if the payload predates it,
+    // so a v1 payload runs v1→v2→v3 and a v2 payload runs only v2→v3.
+    let working: AnyObject = parsed;
+    if (version < 2) working = migrateV1ToV2(working);
+    if (version < 3) working = migrateV2ToV3(working);
     return {
-      data: migrated as unknown as CvData,
-      outcome: { status: "migrated", from: 1, to: 2 },
+      data: working as unknown as CvData,
+      outcome: { status: "migrated", from: version, to: CURRENT_VERSION },
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";

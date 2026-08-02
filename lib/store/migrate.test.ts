@@ -1,14 +1,15 @@
 /**
- * Tests for the v1 → v2 storage migrator.
+ * Tests for the storage migrator (v1 → v2 → v3).
  *
  * Run with a TypeScript-aware Node test runner. With `tsx` installed
  * as a dev dep:
  *
  *   node --test --import tsx lib/store/migrate.test.ts
  *
- * No test framework is in package.json yet — the tests use only the
- * Node 18+ built-in `node:test` + `node:assert`. They are reviewable
- * as code without execution.
+ * or via the repo's own harness: `npm run test:migrate`.
+ *
+ * The tests use only the Node 18+ built-in `node:test` + `node:assert`,
+ * so they are reviewable as code without execution.
  */
 
 import { test, describe } from "node:test";
@@ -18,8 +19,9 @@ import {
   CURRENT_VERSION,
   migrate,
   migrateLanguageLevel,
-  type V2LanguageLevel,
+  type CanonicalLanguageLevel,
 } from "./migrate";
+import { LANGUAGE_LEVELS } from "../language";
 
 // A minimal but complete v1-shaped payload for reuse across tests.
 const v1Payload = () => ({
@@ -78,16 +80,20 @@ const v1Payload = () => ({
 // ─── language level mapping ───────────────────────────────────────────
 
 describe("migrateLanguageLevel", () => {
-  test("maps each of the 8 v1 source values to a valid v2 target", () => {
-    const expected: Record<string, V2LanguageLevel> = {
-      elementary: "conversational",
+  test("maps every known source value to a canonical target", () => {
+    const expected: Record<string, CanonicalLanguageLevel> = {
+      // canonical → itself
+      elementary: "elementary",
       conversational: "conversational",
       professional: "professional",
-      full_professional: "professional",
+      full_professional: "full_professional",
       native: "native",
-      beginner: "conversational",
-      intermediate: "professional",
-      advanced: "fluent",
+      // pre-v2 vocabulary, per lib/language.ts's own CEFR labels
+      beginner: "elementary",
+      intermediate: "conversational",
+      advanced: "professional",
+      // written by the old, broken v1→v2 step
+      fluent: "professional",
     };
     for (const [source, target] of Object.entries(expected)) {
       assert.equal(
@@ -98,33 +104,102 @@ describe("migrateLanguageLevel", () => {
     }
   });
 
-  test("passes through values that are already v2-shape", () => {
-    for (const v of ["native", "fluent", "professional", "conversational"]) {
-      assert.equal(migrateLanguageLevel(v), v);
+  // THE core guarantee of this module. A migration may lower or preserve a
+  // stated proficiency; it must never raise one, because that puts a claim on
+  // someone's CV that they never made and cannot see.
+  test("NEVER raises a stated proficiency", () => {
+    const rank: Record<CanonicalLanguageLevel, number> = {
+      elementary: 0,
+      conversational: 1,
+      professional: 2,
+      full_professional: 3,
+      native: 4,
+    };
+    // Where each legacy value genuinely sits, from lib/language.ts's labels.
+    const sourceRank: Record<string, number> = {
+      elementary: 0,
+      beginner: 0,
+      conversational: 1,
+      intermediate: 1,
+      professional: 2,
+      advanced: 2,
+      fluent: 2,
+      full_professional: 3,
+      native: 4,
+    };
+    for (const [source, expectedRank] of Object.entries(sourceRank)) {
+      const mapped = migrateLanguageLevel(source);
+      assert.ok(mapped, `'${source}' should map to something`);
+      assert.ok(
+        rank[mapped] <= expectedRank,
+        `'${source}' (rank ${expectedRank}) was RAISED to '${mapped}' (rank ${rank[mapped]})`
+      );
     }
   });
 
-  test("normalises case (UPPER / Mixed → lowercase v2 value)", () => {
-    assert.equal(migrateLanguageLevel("NATIVE"), "native");
-    assert.equal(migrateLanguageLevel("Full_Professional"), "professional");
+  test("every mapped value is selectable in the UI's LANGUAGE_LEVELS", () => {
+    // Regression guard for the 'fluent' defect: the migration must never write
+    // a value the dropdown cannot select and the formatter cannot render.
+    const selectable = new Set<string>(
+      LANGUAGE_LEVELS.map((l) => l.value as string)
+    );
+    for (const source of [
+      "elementary",
+      "conversational",
+      "professional",
+      "full_professional",
+      "native",
+      "beginner",
+      "intermediate",
+      "advanced",
+      "fluent",
+    ]) {
+      const mapped = migrateLanguageLevel(source);
+      assert.ok(mapped, `'${source}' should map to something`);
+      assert.ok(
+        selectable.has(mapped),
+        `'${source}' → '${mapped}', which LANGUAGE_LEVELS cannot select`
+      );
+    }
   });
 
-  test("preserves missing / empty as undefined (not 'no level filled' → fallback)", () => {
+  test("normalises case", () => {
+    assert.equal(migrateLanguageLevel("NATIVE"), "native");
+    assert.equal(migrateLanguageLevel("Full_Professional"), "full_professional");
+  });
+
+  test("preserves missing / empty as undefined", () => {
     assert.equal(migrateLanguageLevel(undefined), undefined);
     assert.equal(migrateLanguageLevel(null), undefined);
     assert.equal(migrateLanguageLevel(""), undefined);
   });
 
-  test("unmapped string value falls back to 'conversational' + warns", () => {
-    assert.equal(migrateLanguageLevel("expert"), "conversational");
-    assert.equal(migrateLanguageLevel("c2"), "conversational");
-    assert.equal(migrateLanguageLevel("garbage-text"), "conversational");
+  test("unrecognised string is DROPPED, not defaulted", () => {
+    // Asserting a mid-range level for a value we cannot interpret is the same
+    // fabrication this mapping exists to prevent. Empty is recoverable; a
+    // fabricated C1 on a submitted CV is not.
+    assert.equal(migrateLanguageLevel("expert"), undefined);
+    assert.equal(migrateLanguageLevel("c2"), undefined);
+    assert.equal(migrateLanguageLevel("garbage-text"), undefined);
   });
 
-  test("non-string input falls back to 'conversational' + warns", () => {
-    assert.equal(migrateLanguageLevel(7), "conversational");
-    assert.equal(migrateLanguageLevel({ x: 1 }), "conversational");
-    assert.equal(migrateLanguageLevel(true), "conversational");
+  test("non-string input is DROPPED, not defaulted", () => {
+    assert.equal(migrateLanguageLevel(7), undefined);
+    assert.equal(migrateLanguageLevel({ x: 1 }), undefined);
+    assert.equal(migrateLanguageLevel(true), undefined);
+  });
+
+  test("v2→v3 repairs a stored 'fluent' end to end", () => {
+    const v2Payload = {
+      version: 2,
+      personal: {},
+      languages: [{ id: "l1", name: "German", level: "fluent" }],
+    };
+    const r = migrate(v2Payload);
+    assert.equal(r.outcome.status, "migrated");
+    const langs = (r.data as unknown as { languages: { level: string }[] })
+      .languages;
+    assert.equal(langs[0].level, "professional");
   });
 });
 
@@ -144,18 +219,36 @@ describe("migrate — version routing", () => {
     }
   });
 
-  test("v2 payload (already migrated) → skipped, identity-passthrough, no double-migration", () => {
-    const already = { ...v1Payload(), version: 2 };
-    // sentinel — should NOT be normalised by a second pass
-    already.languages = [{ id: "l1", name: "X", level: "advanced" }];
+  test("current-version payload → skipped, identity-passthrough, no double-migration", () => {
+    const already = { ...v1Payload(), version: CURRENT_VERSION };
+    // sentinel — a canonical value that must NOT be touched by a second pass
+    already.languages = [{ id: "l1", name: "X", level: "full_professional" }];
     const r = migrate(already);
-    assert.deepEqual(r.outcome, { status: "skipped", version: 2 });
+    assert.deepEqual(r.outcome, { status: "skipped", version: CURRENT_VERSION });
     // Same object reference handed back; no transforms applied.
     assert.equal(r.data, already as unknown);
-    assert.equal((r.data as { languages: { level: string }[] }).languages[0].level, "advanced");
+    assert.equal(
+      (r.data as { languages: { level: string }[] }).languages[0].level,
+      "full_professional"
+    );
   });
 
-  test("future-version payload (e.g. v3) → skipped, returned as-is", () => {
+  test("a v2 payload is carried forward to v3 rather than skipped", () => {
+    // v2 stopped being current on 2026-08-02; its language levels may contain
+    // the unrenderable "fluent", so it must NOT be treated as up to date.
+    const v2 = { ...v1Payload(), version: 2 };
+    v2.languages = [{ id: "l1", name: "X", level: "fluent" }];
+    const r = migrate(v2);
+    assert.equal(r.outcome.status, "migrated");
+    assert.equal((r.outcome as { from: number }).from, 2);
+    assert.equal((r.outcome as { to: number }).to, CURRENT_VERSION);
+    assert.equal(
+      (r.data as { languages: { level: string }[] }).languages[0].level,
+      "professional"
+    );
+  });
+
+  test("future-version payload → skipped, returned as-is", () => {
     const future = { ...v1Payload(), version: 99 };
     const r = migrate(future);
     assert.equal(r.outcome.status, "skipped");
@@ -163,21 +256,32 @@ describe("migrate — version routing", () => {
   });
 });
 
-describe("migrate — v1 → v2 transforms", () => {
+describe("migrate — v1 → v3 transforms", () => {
   test("stamps version = CURRENT_VERSION on a clean v1 payload", () => {
     const r = migrate(v1Payload());
-    assert.deepEqual(r.outcome, { status: "migrated", from: 1, to: 2 });
+    assert.deepEqual(r.outcome, {
+      status: "migrated",
+      from: 1,
+      to: CURRENT_VERSION,
+    });
     assert.equal((r.data as unknown as { version: number }).version, CURRENT_VERSION);
   });
 
-  test("language enum tightening applies to all entries", () => {
+  test("language levels are canonicalised without being raised", () => {
     const r = migrate(v1Payload());
     const langs = (r.data as unknown as {
       languages: { name: string; level?: string }[];
     }).languages;
-    assert.equal(langs.find((l) => l.name === "English")?.level, "professional"); // full_professional → professional
+    // full_professional is PRESERVED — the old migration flattened it to
+    // "professional" and silently discarded C2.
+    assert.equal(
+      langs.find((l) => l.name === "English")?.level,
+      "full_professional"
+    );
     assert.equal(langs.find((l) => l.name === "Arabic")?.level, "native");
-    assert.equal(langs.find((l) => l.name === "French")?.level, "conversational"); // elementary → conversational
+    // elementary stays elementary — the old migration RAISED it to
+    // "conversational".
+    assert.equal(langs.find((l) => l.name === "French")?.level, "elementary");
   });
 
   test("language entry with no level is preserved without a level key", () => {

@@ -6,6 +6,10 @@ export const LANGUAGE_LEVELS = [
   { value: "native", label: "Native / Bilingual", description: "Mother tongue or equivalent" },
 ] as const;
 
+// LANGUAGE_LEVELS above is the canonical set. lib/store/migrate.ts mirrors it
+// as CANONICAL_LANGUAGE_LEVELS and will only ever write one of these values \u2014
+// keep the two in step. A level that cannot be selected here must never be
+// stored, or it renders as a raw token on the CV.
 export function formatLanguageLevel(value: string): string {
   const map: Record<string, string> = {
     elementary: "Elementary (A1\u2013A2)",
@@ -17,6 +21,11 @@ export function formatLanguageLevel(value: string): string {
     beginner: "Elementary (A1\u2013A2)",
     intermediate: "Conversational (B1\u2013B2)",
     advanced: "Professional Working (C1)",
+    // Written by the old v1\u2192v2 migration before 2026-08-02. The v2\u2192v3 step
+    // repairs it on load, but a payload can still reach a renderer unmigrated
+    // (a stale tab, an old backup), and printing the bare word "fluent" on
+    // someone's CV is worse than a wrong-but-plausible label.
+    fluent: "Professional Working (C1)",
   };
   return map[value] ?? value;
 }
