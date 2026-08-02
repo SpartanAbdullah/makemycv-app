@@ -1,0 +1,78 @@
+# CI for app.makemycv.ae (2026-08-02, audit A-W5-018).
+#
+# Before this, NOTHING gated a push in either repo: no Actions, no git hooks,
+# no husky. Both repos push straight to branches that auto-deploy on Vercel,
+# and the only automated check anywhere in the pipeline was the `tsc` run
+# inside `next build`. A regression in the score engine, the CV parser, the JD
+# matcher or a UAE-law calculator shipped the moment it was pushed.
+#
+# This deliberately does NOT run `next build`. Vercel already builds every
+# push and blocks the deploy on failure, so building here would double the
+# wall-clock for no extra signal. What Vercel does NOT do is run lint or tests
+# — that is the gap this closes.
+
+name: CI
+
+on:
+  push:
+    branches: [main, stagingmmc]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · lint · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 rather than 20: `node --test` only accepts glob patterns from
+          # Node 21+, and the consolidated suite runs
+          # `node --test ".test-build/**/*.test.js"`.
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Ordered cheapest-first so an obvious break fails in seconds. Each step
+      # runs even if an earlier one failed, so one push surfaces every problem
+      # instead of one per round-trip — the same reasoning that removed
+      # fail-fast from scripts/run-all-tests.mjs.
+      - name: Typecheck
+        if: '!cancelled()'
+        run: npx tsc --noEmit
+
+      - name: Lint
+        if: '!cancelled()'
+        run: npm run lint
+
+      - name: Test
+        if: '!cancelled()'
+        run: npm test
+
+  # Separate, non-blocking: pdf-smoke renders all 10 templates to real PDFs
+  # via @react-pdf/renderer. It is a rendering smoke test, not a unit test, and
+  # it is slow enough that gating PRs on it would get CI bypassed. Failures
+  # here are worth seeing but should not block a merge.
+  smoke:
+    name: pdf render smoke (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run smoke:pdf
