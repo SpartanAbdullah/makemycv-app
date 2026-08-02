@@ -21,8 +21,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+// Reuses the shared .test-build/ output from tsconfig.test.json rather than a
+// dedicated .parser-test-build/. One compile now covers every lib/ suite
+// including this one (2026-08-02, audit A-W5-016).
 const { parseTextToDocument } = require(
-  path.join(__dirname, "..", ".parser-test-build", "textParser.js"),
+  path.join(__dirname, "..", ".test-build", "importers", "textParser.js"),
 );
 
 const FIXTURE_DIR = path.join(__dirname, "..", "__fixtures__");

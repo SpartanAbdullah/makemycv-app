@@ -26,27 +26,32 @@ if (suites.length === 0) {
 }
 
 const startedAt = Date.now();
-let passed = 0;
+const failed = [];
 
-for (const suite of suites) {
-  console.log(`\n──── ${suite} (${passed + 1}/${suites.length}) ────`);
+// No fail-fast (changed 2026-08-02, audit A-W5-016). Exiting on the first
+// failure meant one broken suite hid every other result, so a CI run told you
+// about exactly one bug per round-trip. Run everything, report at the end.
+for (const [i, suite] of suites.entries()) {
+  console.log(`\n──── ${suite} (${i + 1}/${suites.length}) ────`);
   const result = spawnSync("npm", ["run", suite], {
     cwd: root,
     stdio: "inherit",
     // npm is npm.cmd on Windows; shell:true resolves it on every platform.
     shell: true,
   });
-  if (result.status !== 0) {
-    console.error(
-      `\nrun-all-tests: FAILED at ${suite} ` +
-        `(${passed} of ${suites.length} suites passed before it).`,
-    );
-    process.exit(result.status ?? 1);
-  }
-  passed += 1;
+  if (result.status !== 0) failed.push(suite);
 }
 
 const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+
+if (failed.length > 0) {
+  console.error(
+    `\nrun-all-tests: ${failed.length} of ${suites.length} suites FAILED ` +
+      `in ${seconds}s — ${failed.join(", ")}`,
+  );
+  process.exit(1);
+}
+
 console.log(
   `\nrun-all-tests: all ${suites.length} suites passed in ${seconds}s.`,
 );

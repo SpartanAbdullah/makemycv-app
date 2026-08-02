@@ -1,0 +1,36 @@
+{
+  // Single compile for the whole lib/ test suite.
+  //
+  // (2026-08-02, audit A-W5-016.) Before this, each of 18 suites ran its own
+  // `tsc` with the source files listed on the command line. Passing filenames
+  // to tsc DISABLES tsconfig.json discovery entirely, so every suite
+  // cold-started the compiler, re-parsed the full default lib.d.ts set and
+  // re-typechecked its whole import graph from zero — with no incremental
+  // build, no shared program, and several modules (roleFamily, color,
+  // genericPhrases) compiled two or three times across suites. `npm test`
+  // took roughly an hour, which is why it was never wired into CI.
+  //
+  // One program, one output directory, and `node --test` then parallelises
+  // across all 18 files by itself.
+  //
+  // lib/ is self-contained: no file under it imports components/ or any .tsx,
+  // so no JSX handling is needed here. If that ever changes, this config needs
+  // "jsx": "react-jsx" and the include list needs *.tsx.
+  "compilerOptions": {
+    "rootDir": "lib",
+    "outDir": ".test-build",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    // Genuinely incremental now that discovery works — a re-run after touching
+    // one file recompiles that file, not the world.
+    "incremental": true,
+    "tsBuildInfoFile": ".test-build/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["lib/**/*.ts"],
+  "exclude": ["node_modules", ".test-build", "lib/**/*.tsx"]
+}
