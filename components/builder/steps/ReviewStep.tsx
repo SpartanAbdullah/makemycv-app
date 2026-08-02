@@ -14,6 +14,8 @@ import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
+import { downloadCvBackup } from "../../../lib/utils/download";
+import { readCvBackup } from "../../../lib/utils/localStorage";
 import { templates, type TemplateBadge } from "../../../lib/templates";
 import { TemplateRibbon } from "../../templates/TemplateBadges";
 import {
@@ -134,7 +136,8 @@ export const ReviewStep = ({
   const fallbackExport = async (kind: ExportKind) => {
     setFallbackDownloading(true);
     try {
-      if (kind === "docx") await exportToDocx(data);
+      if (kind === "json") downloadCvBackup(data);
+      else if (kind === "docx") await exportToDocx(data);
       else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
     } finally {
       setFallbackDownloading(false);
@@ -148,6 +151,54 @@ export const ReviewStep = ({
 
   const handleExportDocx = () => requestExport("docx");
   const handleDownloadPdf = () => requestExport("pdf");
+  const handleDownloadBackup = () => requestExport("json");
+
+  // ---- Backup / restore ----
+  // The CV exists only in this browser's localStorage. Clearing site data,
+  // switching device, or a corrupted store loses it with no recovery path and
+  // no server-side copy to fall back on. These two controls are that path.
+  const importJson = useCvStore((s) => s.importJson);
+  const restoreInputRef = useRef<HTMLInputElement | null>(null);
+  const [restoreNotice, setRestoreNotice] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleRestoreFile = async (file: File) => {
+    setRestoreNotice(null);
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setRestoreNotice({ tone: "error", text: "Couldn't read that file." });
+      return;
+    }
+    const result = readCvBackup(text);
+    if (!result.ok) {
+      setRestoreNotice({
+        tone: "error",
+        text:
+          result.reason === "unreadable"
+            ? "That file isn't valid JSON. Pick the .json backup you downloaded here."
+            : "That doesn't look like a MakeMyCV backup. Pick the .json file you downloaded here.",
+      });
+      return;
+    }
+    // Restoring replaces everything — confirm before destroying current work.
+    const confirmed = window.confirm(
+      "Restore this backup?\n\nThis replaces the CV currently in the builder. " +
+        "If you want to keep it, cancel and download a backup first.",
+    );
+    if (!confirmed) return;
+    importJson(result.data);
+    setRestoreNotice({
+      tone: "ok",
+      text:
+        result.migratedFrom !== null
+          ? `Backup restored, and upgraded from an older version (v${result.migratedFrom}).`
+          : "Backup restored.",
+    });
+  };
 
   // The CV lives only in this browser's localStorage — sharing the builder
   // URL would hand the recipient an EMPTY builder (audit UX-5). We share
@@ -443,6 +494,89 @@ export const ReviewStep = ({
             </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
+            </div>
+
+            {/* Backup / restore — deliberately separated from the export
+                actions above. A .json backup is not something you send to an
+                employer, and grouping it with "Download CV as PDF" would
+                invite exactly that mistake. */}
+            <div
+              style={{
+                marginTop: 4,
+                padding: 12,
+                border: "1px solid var(--ff-hairline, rgba(0,0,0,0.1))",
+                borderRadius: 10,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  margin: 0,
+                  color: "var(--ff-ink, inherit)",
+                }}
+              >
+                Keep a backup
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--ff-faint)",
+                  margin: "4px 0 10px",
+                  lineHeight: 1.5,
+                }}
+              >
+                Your CV is saved in this browser only — there is no account. A
+                backup file lets you restore it on another device, or if this
+                browser&rsquo;s data is cleared.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleDownloadBackup}
+                  className="cv-btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Download backup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => restoreInputRef.current?.click()}
+                  className="cv-btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Restore backup
+                </button>
+              </div>
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  // Reset first so picking the same file twice re-fires change.
+                  e.target.value = "";
+                  if (file) void handleRestoreFile(file);
+                }}
+              />
+              {restoreNotice ? (
+                <p
+                  role="status"
+                  style={{
+                    fontSize: 12,
+                    marginTop: 8,
+                    marginBottom: 0,
+                    lineHeight: 1.5,
+                    color:
+                      restoreNotice.tone === "error"
+                        ? "var(--ff-danger, #b42318)"
+                        : "var(--ff-success, #0E7C4A)",
+                  }}
+                >
+                  {restoreNotice.text}
+                </p>
+              ) : null}
             </div>
           </div>
 

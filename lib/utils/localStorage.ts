@@ -69,8 +69,65 @@ export const clearCvStorage = () => {
   window.localStorage.removeItem(STORAGE_KEY);
 };
 
-export const exportCvJson = (data: CvData) => JSON.stringify(data, null, 2);
+/**
+ * Serialise a CV for the user to keep as a backup file.
+ *
+ * Stamps `version` for the same reason saveCvToStorage does: without it a
+ * restored backup looks like an unversioned (v1) payload and re-runs the whole
+ * migration chain against data that is already current.
+ */
+export const exportCvJson = (data: CvData) =>
+  JSON.stringify({ ...data, version: CURRENT_VERSION }, null, 2);
 
+export type BackupReadResult =
+  | { ok: true; data: CvData; migratedFrom: number | null }
+  | { ok: false; reason: "unreadable" | "not-a-cv" };
+
+/**
+ * Parse a file the user picked as a backup.
+ *
+ * Runs the same migration chain as a localStorage load, so a backup taken
+ * months ago restores as current data rather than as a stale shape. Rejects
+ * anything that does not look like a CV instead of overwriting the user's work
+ * with an arbitrary JSON file — restoring is destructive, so a wrong file must
+ * fail loudly rather than silently blank the builder.
+ */
+export const readCvBackup = (json: string): BackupReadResult => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, reason: "not-a-cv" };
+  }
+  // Shape check: every CV has these, and no other JSON a user is likely to pick
+  // by accident has all of them at once.
+  const candidate = parsed as Record<string, unknown>;
+  const looksLikeCv =
+    typeof candidate.personal === "object" &&
+    candidate.personal !== null &&
+    Array.isArray(candidate.experience) &&
+    Array.isArray(candidate.education) &&
+    Array.isArray(candidate.skills);
+  if (!looksLikeCv) return { ok: false, reason: "not-a-cv" };
+
+  const { data, outcome } = migrate(parsed);
+  // migrate() returns null when it cannot produce a usable payload (and on
+  // outcome.status === "failed"). A backup we cannot migrate is a backup we
+  // must not import — restoring is destructive, so fail rather than guess.
+  if (!data || outcome.status === "failed") {
+    return { ok: false, reason: "not-a-cv" };
+  }
+  return {
+    ok: true,
+    data,
+    migratedFrom: outcome.status === "migrated" ? outcome.from : null,
+  };
+};
+
+/** @deprecated Use readCvBackup — this neither validates nor migrates. */
 export const importCvJson = (json: string): CvData | null => {
   try {
     return JSON.parse(json) as CvData;

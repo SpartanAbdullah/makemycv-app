@@ -44,6 +44,7 @@ import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
+import { downloadCvBackup } from "../../lib/utils/download";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
@@ -75,7 +76,22 @@ export const useSharedScoreReport = () => useContext(ScoreReportContext);
 // ReviewStep actions, TemplatePreviewModal, PDF or DOCX — must flow through
 // the ExportGateDialog check. ReviewStep previously called downloadCV
 // directly and bypassed the gate.
-export type ExportKind = "pdf" | "docx";
+export type ExportKind = "pdf" | "docx" | "json";
+
+const EXPORT_COPY: Record<ExportKind, { success: string; error: string }> = {
+  pdf: {
+    success: "Your PDF downloaded — check your Downloads folder.",
+    error: "Couldn't generate PDF. Try again or export as DOCX.",
+  },
+  docx: {
+    success: "Your Word file downloaded — check your Downloads folder.",
+    error: "Couldn't generate DOCX. Try again or export as PDF.",
+  },
+  json: {
+    success: "Backup saved — keep the .json file to restore this CV later.",
+    error: "Couldn't save the backup file. Try again.",
+  },
+};
 type DownloadContextValue = {
   requestDownload: (kind: ExportKind) => void | Promise<void>;
   isDownloading: boolean;
@@ -1032,24 +1048,21 @@ export const BuilderShell = ({
     setIsDownloading(true);
     setDownloadError(null);
     try {
-      if (kind === "docx") {
+      if (kind === "json") {
+        downloadCvBackup(data);
+      } else if (kind === "docx") {
         await exportToDocx(data);
       } else {
         await downloadCV(data, "pro", data.settings.templateId ?? "classic");
       }
-      pushToast(
-        `Your ${kind === "docx" ? "Word file" : "PDF"} downloaded — check your Downloads folder.`,
-        { tone: "success", duration: 4000 },
-      );
-      if (shouldShowDownloadTip()) {
+      pushToast(EXPORT_COPY[kind].success, { tone: "success", duration: 4000 });
+      // A backup is housekeeping, not a finished-CV moment — don't ask for a
+      // tip for it.
+      if (kind !== "json" && shouldShowDownloadTip()) {
         window.setTimeout(() => setDownloadTipOpen(true), 1500);
       }
     } catch {
-      setDownloadError(
-        kind === "docx"
-          ? "Couldn't generate DOCX. Try again or export as PDF."
-          : "Couldn't generate PDF. Try again or export as DOCX.",
-      );
+      setDownloadError(EXPORT_COPY[kind].error);
     } finally {
       setIsDownloading(false);
     }
@@ -1063,7 +1076,11 @@ export const BuilderShell = ({
   // flow through here via the DownloadContext.
   const [pendingExportKind, setPendingExportKind] = useState<ExportKind>("pdf");
   const handleDownload = async (kind: ExportKind = "pdf") => {
-    if (getMissingItems(data).length > 0) {
+    // The completeness gate exists to stop a half-finished CV reaching an
+    // employer. A backup of a half-finished CV is precisely what a user wants,
+    // so JSON bypasses it — gating the recovery path on completeness would
+    // withhold it exactly when work is most likely to be lost.
+    if (kind !== "json" && getMissingItems(data).length > 0) {
       setPendingExportKind(kind);
       setDownloadGuardOpen(true);
       return;
