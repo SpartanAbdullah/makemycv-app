@@ -168,8 +168,17 @@ export const Field = ({
       }
     : undefined;
 
+  // react-hooks/refs below is a FALSE POSITIVE, verified rather than assumed.
+  // The rule fires because tintProps carries a `ref` into cloneElement and it
+  // cannot tell whether a ref VALUE is read during render. It is not: the
+  // child's ref is only CAPTURED at `const childRef = single?.props.ref`, and
+  // the sole `.current` access sits inside the callback ref, which React
+  // invokes at commit — never during render. Restructuring to satisfy the rule
+  // would mean giving up the wrapper-calls-original ordering that the
+  // sanitize-on-blur contract above depends on. Re-check if ref merging changes.
   const content = single
-    ? cloneElement(single, {
+    ? // eslint-disable-next-line react-hooks/refs
+      cloneElement(single, {
         id: single.props.id ?? fieldId,
         className: stateClass
           ? `${single.props.className ?? ""} ${stateClass}`.trim()

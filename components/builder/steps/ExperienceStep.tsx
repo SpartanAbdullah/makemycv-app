@@ -16,7 +16,6 @@ import { Icon } from "../Icon";
 import { BulletRow } from "../BulletRow";
 import { CardIconBtn } from "./shared";
 import { AiDisclosure } from "../AiDisclosure";
-import { UAEDot } from "../UAEDot";
 import { MAX_BULLETS, splitPastedBulletText } from "../../../lib/utils/bullets";
 import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
 import { inferRoleFamily } from "../../../lib/data/roleFamily";

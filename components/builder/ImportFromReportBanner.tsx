@@ -112,7 +112,6 @@ export default function ImportFromReportBanner() {
       cancelled = true;
     };
     // Intentionally only depends on reportId + hydrated — currentData snapshot taken once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportId, hydrated]);
 
   if (phase.kind === "idle" && !reportId) return null;

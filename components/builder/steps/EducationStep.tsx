@@ -20,7 +20,6 @@ import {
   sanitizeJobTitleLive,
 } from "../../../lib/sanitize";
 import type { CvEducation } from "../../../lib/types/cv";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import { CardIconBtn } from "./shared";
 

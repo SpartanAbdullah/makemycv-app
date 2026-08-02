@@ -45,7 +45,6 @@ export async function exportToDocx(data: CvData): Promise<void> {
       spacing: { after: 40 },
     });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const children: InstanceType<typeof Paragraph>[] = [];
 
   // Header

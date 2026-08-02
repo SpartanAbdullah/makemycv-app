@@ -37,13 +37,20 @@ function BulletsView({
   results: string[];
   onApply: (s: string[]) => void;
 }) {
-  const [cards, setCards] = useState(
+  const [cards, setCards] = useState(() =>
     results.map((r) => ({ selected: true, editing: false, text: r })),
   );
 
-  useEffect(() => {
+  // Reset when a new batch of suggestions arrives. Adjusting state DURING
+  // render is React's documented pattern for "derive state from a prop
+  // change" — React discards the in-progress render and re-runs immediately,
+  // so the user never sees a frame with stale cards. The useEffect version
+  // this replaces committed the stale frame first, then re-rendered.
+  const [prevResults, setPrevResults] = useState(results);
+  if (prevResults !== results) {
+    setPrevResults(results);
     setCards(results.map((r) => ({ selected: true, editing: false, text: r })));
-  }, [results]);
+  }
 
   const toggle = (i: number) =>
     setCards((p) => p.map((c, j) => (j === i ? { ...c, selected: !c.selected } : c)));
@@ -116,9 +123,12 @@ function SkillsView({
     () => new Set(results.map((_, i) => i)),
   );
 
-  useEffect(() => {
+  // Reset on a new batch — see the note in BulletsView.
+  const [prevResults, setPrevResults] = useState(results);
+  if (prevResults !== results) {
+    setPrevResults(results);
     setSelected(new Set(results.map((_, i) => i)));
-  }, [results]);
+  }
 
   const toggle = (i: number) =>
     setSelected((prev) => {
@@ -173,11 +183,14 @@ function SummaryView({
   const [texts, setTexts] = useState(results);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
-  useEffect(() => {
+  // Reset on a new batch — see the note in BulletsView.
+  const [prevResults, setPrevResults] = useState(results);
+  if (prevResults !== results) {
+    setPrevResults(results);
     setTexts(results);
     setSelectedIdx(0);
     setEditingIdx(null);
-  }, [results]);
+  }
 
   const setText = (i: number, t: string) =>
     setTexts((p) => p.map((v, j) => (j === i ? t : v)));

@@ -86,12 +86,18 @@ export const DownloadTipModal = ({ open, onClose, userName }: Props) => {
   const [phase, setPhase] = useState<Phase>("picking");
   const [shareCopied, setShareCopied] = useState(false);
 
-  // Reset to picking each time the modal opens
-  useEffect(() => {
-    if (!open) return;
-    setPhase("picking");
-    setShareCopied(false);
-  }, [open]);
+  // Reset to picking each time the modal opens. Adjusted during render rather
+  // than in an effect: the effect version committed one frame showing the
+  // PREVIOUS phase (e.g. the post-tip "thanks" screen) before resetting, which
+  // was a visible flash on reopen.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setPhase("picking");
+      setShareCopied(false);
+    }
+  }
 
   // Escape closes — inline the dismiss logic so the effect closure
   // doesn't have to capture a handleClose ref.

@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { StepStatus } from "./Stepper";
 import { StepBeads } from "./StepBeads";
@@ -112,8 +111,14 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   // Keep the latest onClose without re-running the mount effect (the parent
   // re-renders on every keystroke; the inline closure changes each time).
+  // Assigned in an effect, not during render: mutating a ref while rendering
+  // is unsafe under concurrent rendering, where React may render a component
+  // without committing it — the ref would then hold a callback from a render
+  // that never happened.
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -850,7 +855,6 @@ export const BuilderShell = ({
   children: React.ReactNode;
   onStepChange: (stepId: string) => void;
 }) => {
-  const router = useRouter();
   const data = useCvStore((state) => state.data);
   const hydrated = useCvStore((state) => state.hydrated);
   const saveError = useCvStore((state) => state.saveError);

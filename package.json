@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint . --max-warnings=11",
     "test": "node scripts/run-all-tests.mjs",
     "test:parser": "tsc lib/importers/textParser.ts --outDir .parser-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node scripts/parser-fixtures.test.cjs",
     "test:migrate": "tsc lib/store/migrate.ts lib/store/migrate.test.ts --outDir .migrate-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .migrate-test-build/store/migrate.test.js",

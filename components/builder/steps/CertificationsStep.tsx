@@ -9,7 +9,6 @@ import { useUiStore } from "../../../lib/store/uiStore";
 import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import type { CvCertification } from "../../../lib/types/cv";
 

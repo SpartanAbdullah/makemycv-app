@@ -476,7 +476,6 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const hasExperience = experience.length > 0;
   const education = meaningfulEducation(data.education);
   const hasEducation = education.length > 0;
-  const hasSkills = data.skills.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
   const projects = meaningfulProjects(data.projects);

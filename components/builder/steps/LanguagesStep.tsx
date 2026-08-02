@@ -11,7 +11,6 @@ import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
 import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
-import { UAEDot } from "../UAEDot";
 import { Icon } from "../Icon";
 import type { CvLanguage, LanguageLevel } from "../../../lib/types/cv";
 
