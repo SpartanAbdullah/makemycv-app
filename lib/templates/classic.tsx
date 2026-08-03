@@ -10,7 +10,7 @@ import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
-export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: PlanTier }) => {
+export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
   const name = getFullName(data) || "Your Name";
   const headline = data.personal.headline?.trim();
   const theme = resolveTheme(data.settings, "#1e5b54");
@@ -146,16 +146,12 @@ export const ClassicTemplate = ({ data, plan = "free" }: { data: CvData; plan?: 
         ["--sp" as string]: theme.spaceScale,
       }}
     >
-      {plan === "free" && (
-        <div
-          aria-hidden="true"
-          className="cv-watermark pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
-        >
-          <span className="select-none rotate-[-28deg] text-[42px] font-semibold tracking-wide text-slate-500 opacity-[0.08]">
-            MakeMyCV | Free
-          </span>
-        </div>
-      )}
+      {/* No watermark: downloads have always been clean (useDownloadCV
+          forces the pro path), and the product promise is "no watermark".
+          The diagonal "MakeMyCV | Free" that used to render here reached
+          users through one gap only — the builder preview, which never
+          passed `plan` and hit the "free" default — contradicting the
+          promise exactly where trust is decided. Removed 2026-08-03. */}
       <div className="cv-content relative z-10">
         <header className="border-b border-slate-200 pb-3 mb-4">
           <div className="relative flex items-start">
