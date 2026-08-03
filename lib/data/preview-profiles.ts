@@ -455,12 +455,22 @@ export const previewAvatarDataUri = `data:image/svg+xml;utf8,${encodeURIComponen
 )}`;
 
 /**
+ * Real headshot for photo-forward previews (owner decision 2026-08-03: the
+ * marketing hero uses this photo, and template previews should match it).
+ * Unsplash License, photo-1771240730278 facearea crop — same asset as the
+ * site's public/static/cv-photo-amira.jpg. Served from /public so the
+ * capture pipeline still needs no external fetches. The SVG bust above is
+ * kept for tests/fallbacks that must not ship a real face.
+ */
+export const previewPhotoSrc = "/preview-photo.jpg";
+
+/**
  * Re-point a base persona at another template. Spread-only (no deep clone
  * needed — templates never mutate props), so the four personas above stay the
  * single source of truth. `accentColor` should be the target template's
  * signature accent (the resolveTheme fallback in lib/templates/<id>.tsx),
  * because the persisted settings.accentColor would otherwise override it.
- * `withPhoto` attaches the generic avatar for photo-forward templates.
+ * `withPhoto` attaches the preview headshot for photo-forward templates.
  */
 const forTemplate = (
   base: CvData,
@@ -470,7 +480,7 @@ const forTemplate = (
 ): CvData => ({
   ...base,
   personal: opts?.withPhoto
-    ? { ...base.personal, photo: previewAvatarDataUri, showPhoto: true }
+    ? { ...base.personal, photo: previewPhotoSrc, showPhoto: true }
     : base.personal,
   settings: { ...base.settings, templateId, accentColor },
 });

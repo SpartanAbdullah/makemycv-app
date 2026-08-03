@@ -20,12 +20,24 @@ export const metadata: Metadata = {
 
 export default async function TemplatePreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ templateId: string }>;
+  searchParams: Promise<{ photo?: string }>;
 }) {
   const { templateId } = await params;
+  const { photo } = await searchParams;
   const template = getTemplateById(templateId);
-  const data = getPreviewProfile(template.id);
+  const profile = getPreviewProfile(template.id);
+  // ?photo=0 renders the same template without its photo — the marketing
+  // site shows both variants so users can compare with/without.
+  const data =
+    photo === "0"
+      ? {
+          ...profile,
+          personal: { ...profile.personal, photo: undefined, showPhoto: false },
+        }
+      : profile;
 
   return (
     <>

@@ -31,6 +31,10 @@ const TEMPLATE_IDS = [
   "professional",
   "professional-photo",
 ];
+// Photo-forward templates additionally captured without their photo
+// (?photo=0) as <id>-nophoto-preview.png, so the marketing site can offer
+// a with/without-photo comparison per template.
+const PHOTO_TEMPLATE_IDS = ["onyx", "sandstone", "professional-photo"];
 const BASE_URL = (
   process.env.PREVIEW_BASE_URL ||
   process.argv[2] ||
@@ -51,13 +55,31 @@ async function main() {
     const context = await browser.newContext({
       viewport: VIEWPORT,
       deviceScaleFactor: 2, // retina-crisp PNGs
+      // Dev-mode CSP rejects Vercel Analytics' debug script at the document
+      // level, and the violation intermittently propagates into Playwright
+      // calls. Bypass CSP for the capture context (screenshots only) and
+      // drop the analytics request at the network instead.
+      bypassCSP: true,
     });
+    // Vercel Analytics' dev-mode debug script is CSP-blocked on this route;
+    // the violation intermittently surfaces through addStyleTag and kills the
+    // run. It has no place in a screenshot anyway — drop it at the network.
+    await context.route(/va\.vercel-scripts\.com/, (route) => route.abort());
     const page = await context.newPage();
 
-    for (const id of TEMPLATE_IDS) {
-      const url = `${BASE_URL}/preview/${id}`;
-      const outPath = path.join(OUT_DIR, `${id}-preview.png`);
-      process.stdout.write(`  ${id.padEnd(12)} ${url} ... `);
+    const jobs = [
+      ...TEMPLATE_IDS.map((id) => ({ id, label: id, query: "", suffix: "" })),
+      ...PHOTO_TEMPLATE_IDS.map((id) => ({
+        id,
+        label: `${id} (no photo)`,
+        query: "?photo=0",
+        suffix: "-nophoto",
+      })),
+    ];
+    for (const { id, label, query, suffix } of jobs) {
+      const url = `${BASE_URL}/preview/${id}${query}`;
+      const outPath = path.join(OUT_DIR, `${id}${suffix}-preview.png`);
+      process.stdout.write(`  ${label.padEnd(24)} ${url} ... `);
 
       await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
       await page.waitForSelector('[data-preview-ready="true"]', { timeout: 15_000 });
