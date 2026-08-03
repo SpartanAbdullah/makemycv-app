@@ -284,6 +284,24 @@ export const ExperienceStep = ({
       style={{ display: "flex", flexDirection: "column", gap: 22 }}
     >
       <StepHeader stepId="experience" />
+
+      {/* Fresh-grad reassurance — a core UAE audience arrives with no work
+          history and reads "your work history" as a wall. Skipping is a
+          first-class path; say so before they hit required-field errors on
+          a role they never had. */}
+      <p
+        style={{
+          margin: "-10px 0 0",
+          fontSize: 13,
+          lineHeight: 1.5,
+          color: "var(--ff-muted)",
+        }}
+      >
+        No work experience yet? Internships and part-time roles count — or
+        use <strong style={{ fontWeight: 600 }}>Skip for now</strong> below:
+        a graduate CV leads with education, skills and projects instead.
+      </p>
+
       {/* AI bullet suggestions — first (most recent) role */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <button
