@@ -1367,9 +1367,9 @@ export const BuilderShell = ({
                   bottom of the scrollable column so it appears below content
                   when the form is short and below the fold when it's long. */}
               <div
+                className="ff-support-footer"
                 style={{
                   marginTop: "auto",
-                  padding: "16px 24px 20px",
                   fontFamily: "var(--font-mono)",
                   fontSize: 11,
                   color: "var(--ff-faint)",
@@ -1559,6 +1559,18 @@ export const BuilderShell = ({
             /* Toggle is still visible until xl (1280px) — keep the bottom
                clearance until the drawer layout takes over. */
             .ff-form-column { padding: 36px 40px 110px; max-width: 860px; }
+          }
+          /* The support/privacy footer is a SIBLING of the form column (so
+             it sits below content on short forms), which means the column's
+             110px clearance never covered it — at full scroll the fixed
+             Edit|Preview pill parked exactly on the privacy line and the
+             credit link (measured 390x844, 2026-08-03). Give the footer its
+             own dock clearance below xl; the pill disappears at xl. */
+          .ff-support-footer {
+            padding: 16px 24px 96px;
+          }
+          @media (min-width: 1280px) {
+            .ff-support-footer { padding: 16px 24px 20px; }
           }
           @media (min-width: 1280px) {
             .ff-form-column {
