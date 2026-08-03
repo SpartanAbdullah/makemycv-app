@@ -17,6 +17,17 @@ const TIER_BY_GRADE: Record<ScoreGrade, Tier> = {
   excellent: "great",
 };
 
+// Before the user has typed anything meaningful (total === 0) the chip is a
+// coach, not a judge: neutral greys, a dash in the dial, "Builds as you
+// type" — a red "0 · Needs work" verdict on an empty page punishes people
+// for arriving (Part 2 polish, 2026-08-03).
+const PRISTINE_STYLE = {
+  fg: "var(--ff-muted)",
+  bg: "var(--ff-card)",
+  border: "var(--ff-line)",
+  labelFg: "var(--ff-muted)",
+};
+
 const TIER_STYLE: Record<
   Tier,
   { fg: string; bg: string; border: string; labelFg: string }
@@ -64,8 +75,9 @@ export const ScoreChip = ({
   delta?: number;
 }) => {
   const animated = useAnimatedNumber(report.total);
+  const pristine = report.total === 0;
   const tier = TIER_BY_GRADE[report.grade];
-  const style = TIER_STYLE[tier];
+  const style = pristine ? PRISTINE_STYLE : TIER_STYLE[tier];
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -124,7 +136,11 @@ export const ScoreChip = ({
         type="button"
         className="cv-score-chip"
         onClick={() => (open ? setOpen(false) : openPopover())}
-        aria-label={`CV Score: ${report.total} out of 100. Click for details.`}
+        aria-label={
+          pristine
+            ? "CV Score: builds as you type. Click for details."
+            : `CV Score: ${report.total} out of 100. Click for details.`
+        }
         aria-expanded={open}
         aria-haspopup="dialog"
         style={{
@@ -170,7 +186,7 @@ export const ScoreChip = ({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {animated}
+            {pristine ? "—" : animated}
           </span>
         </span>
         {/* Label + grade — hidden on the tightest screens (the dial stands alone) */}
@@ -187,7 +203,7 @@ export const ScoreChip = ({
             CV SCORE
           </span>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: style.fg }}>
-            {GRADE_CHIP_LABELS[report.grade]}
+            {pristine ? "Builds as you type" : GRADE_CHIP_LABELS[report.grade]}
           </span>
         </span>
         {delta !== undefined && delta !== 0 && (
@@ -241,7 +257,7 @@ export const ScoreChip = ({
                 color: "var(--ff-muted)",
               }}
             >
-              CV SCORE · {report.total}/100
+              CV SCORE · {pristine ? "—" : report.total}/100
             </span>
             <span
               style={{
@@ -250,11 +266,24 @@ export const ScoreChip = ({
                 fontWeight: 600,
               }}
             >
-              {GRADE_CHIP_LABELS[report.grade]}
+              {pristine ? "Builds as you type" : GRADE_CHIP_LABELS[report.grade]}
             </span>
           </div>
 
-          {issues.length === 0 ? (
+          {pristine ? (
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--ff-ink-2)",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Your score grows with every section you complete — name and
+              contact details first, then UAE essentials, experience and
+              skills. 65+ counts as a Strong CV here.
+            </p>
+          ) : issues.length === 0 ? (
             <p
               style={{
                 fontSize: 13,
