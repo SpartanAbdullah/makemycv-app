@@ -4,7 +4,72 @@ import { useMemo } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import { meaningfulExperience } from "../../lib/utils/experience";
+import { meaningfulEducation } from "../../lib/utils/education";
+import { meaningfulProjects } from "../../lib/utils/projects";
 import type { CvData } from "../../lib/types/cv";
+
+/* Empty-state ghost (Part 2 polish, 2026-08-03). Before any body section
+ * has content the sheet collapses to a header stub and the pane reads as
+ * a void — the live preview's "watch it build" promise is invisible at the
+ * exact moment it should be selling itself. While the body is empty we
+ * hold the sheet at A4 aspect and sketch where the CV will grow: three
+ * fading skeleton sections under a quiet hint pill. Pure decoration
+ * (aria-hidden) — it disappears with the first real body content. */
+const GHOST_SECTIONS: Array<{ label: string; lines: string[]; opacity: number }> = [
+  { label: "38%", lines: ["100%", "94%", "82%"], opacity: 0.9 },
+  { label: "30%", lines: ["100%", "88%"], opacity: 0.6 },
+  { label: "26%", lines: ["96%", "74%"], opacity: 0.35 },
+];
+
+const PreviewGhost = () => (
+  <div
+    aria-hidden="true"
+    className="pointer-events-none absolute inset-x-0"
+    style={{ top: "27%", padding: "0 10%" }}
+  >
+    <div style={{ display: "flex", justifyContent: "center", marginBottom: 30 }}>
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 9.5,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--ff-muted)",
+          background: "var(--ff-paper)",
+          border: "1px solid var(--ff-line)",
+          borderRadius: 999,
+          padding: "5px 12px",
+        }}
+      >
+        Your CV builds here as you type
+      </span>
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+      {GHOST_SECTIONS.map((s, i) => (
+        <div key={i} style={{ opacity: s.opacity }}>
+          <div
+            style={{
+              height: 9,
+              width: s.label,
+              borderRadius: 4,
+              background: "#CBD5E1",
+              marginBottom: 10,
+            }}
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {s.lines.map((w, j) => (
+              <div
+                key={j}
+                style={{ height: 7, width: w, borderRadius: 4, background: "#E2E8F0" }}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 /* Preview crash fallback (audit 2026-06-12, gap #2).
  * A template render crash must NOT take the form down with it — the
@@ -95,6 +160,17 @@ export const PreviewPanel = ({
     [templateId]
   );
 
+  // Ghost only while EVERY body section is empty — contact details alone
+  // still count as "not started" (they only fill the header).
+  const bodyEmpty =
+    !data.personal.summary?.trim() &&
+    meaningfulExperience(data.experience).length === 0 &&
+    meaningfulEducation(data.education).length === 0 &&
+    data.skills.length === 0 &&
+    data.certifications.length === 0 &&
+    data.languages.length === 0 &&
+    meaningfulProjects(data.projects).length === 0;
+
   if (collapsed) {
     return (
       <button
@@ -125,7 +201,25 @@ export const PreviewPanel = ({
             />
           )}
         >
-          <template.Render data={data} />
+          {/* While the body is empty, hold the sheet at A4 aspect (the
+              template alone collapses to a header stub) and sketch the
+              ghost. Filled CVs render exactly as before — no wrapper
+              constraints, multi-page height untouched. */}
+          <div
+            style={
+              bodyEmpty
+                ? {
+                    position: "relative",
+                    background: "#ffffff",
+                    aspectRatio: "1 / 1.414",
+                    overflow: "hidden",
+                  }
+                : undefined
+            }
+          >
+            <template.Render data={data} />
+            {bodyEmpty && <PreviewGhost />}
+          </div>
         </ErrorBoundary>
       </div>
     </div>
