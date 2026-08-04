@@ -167,6 +167,28 @@ function normalizeHeader(line: string): string {
   return line.trim().replace(/[:\-_=*•·]+$/, "").trim();
 }
 
+/**
+ * Collapse letter-spaced headings so tracked/spaced section titles still
+ * match SECTION_PATTERNS. Designed CV templates — including our own PDF
+ * export — render headings with letter-spacing, which pdf.js re-emits as
+ * "E X P E R I E N C E" / "S U M M A RY" (glyph gaps become spaces, and
+ * kerning makes the splits uneven: "E D U C AT I O N"). Without this,
+ * every section of our own exported PDF landed in `unplaced` and imports
+ * shrank to contact-only (Part 5 funnel audit, 2026-08-04).
+ *
+ * The collapsed form is ONLY tested against the known heading patterns, so
+ * a false collapse of a genuine content line can never misfile text — it
+ * simply fails the match like any other non-heading.
+ */
+function despaceIfLetterSpaced(line: string): string | null {
+  const tokens = line.split(/\s+/);
+  if (tokens.length < 3) return null;
+  const avg = tokens.reduce((n, t) => n + t.length, 0) / tokens.length;
+  if (avg > 2.6) return null;
+  if (!tokens.every((t) => /^[A-Za-z&]+$/.test(t))) return null;
+  return tokens.join("");
+}
+
 function detectSection(line: string): string | null {
   const trimmed = normalizeHeader(line);
   // Section headers are rarely longer than ~50 chars. Also reject lines with
@@ -175,6 +197,12 @@ function detectSection(line: string): string | null {
   if (/[.!?]$/.test(trimmed)) return null;
   for (const { key, re } of SECTION_PATTERNS) {
     if (re.test(trimmed)) return key;
+  }
+  const despaced = despaceIfLetterSpaced(trimmed);
+  if (despaced) {
+    for (const { key, re } of SECTION_PATTERNS) {
+      if (re.test(despaced)) return key;
+    }
   }
   return null;
 }
