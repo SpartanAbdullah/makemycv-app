@@ -40,9 +40,14 @@ type EducationForm = { education: CvEducation[] };
 export const EducationStep = ({
   onNext,
   onBack,
+  onSkip,
 }: {
   onNext: () => void;
   onBack: () => void;
+  /** Education was the ONLY content step without Skip (Part 5 funnel walk,
+   *  2026-08-04): with required fields inside the default entry card it was
+   *  a hard wall for anyone whose highest qualification isn't a degree. */
+  onSkip?: () => void;
 }) => {
   const education = useCvStore((state) => state.data.education);
   const updateSection = useCvStore((state) => state.updateSection);
@@ -419,7 +424,13 @@ export const EducationStep = ({
         </div>
       </section>
 
-      <NavigationButtons onBack={onBack} onNext={handleSubmit(onNext, onInvalid)} nextLabel="Continue to Skills" />
+      <NavigationButtons
+        onBack={onBack}
+        onNext={handleSubmit(onNext, onInvalid)}
+        nextLabel="Continue to Skills"
+        showSkip={Boolean(onSkip)}
+        onSkip={onSkip}
+      />
     </form>
   );
 };
