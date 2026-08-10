@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import {
   Bricolage_Grotesque,
   Instrument_Serif,
@@ -9,6 +10,24 @@ import {
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME } from "@/lib/seo/schema";
+
+/* GTM container ID — the SAME container the marketing site loads (GA4 audit,
+   10 Aug 2026). Deliberately one container and one data stream, not two:
+   app.makemycv.ae and www.makemycv.ae share the root domain makemycv.ae, so
+   gtag sets the _ga cookie on .makemycv.ae and sessions stitch across the
+   www → app hop automatically. A second property or stream would break that
+   into two sessions and turn the handoff into a self-referral. Cross-domain
+   linking is for different ROOT domains and is not needed here.
+
+   This is the GTM CONTAINER id (GTM-…), not the GA4 measurement id
+   (G-8MWPD87FJH) — that lives inside the container, never in this codebase.
+
+   Set ONLY in Vercel's Production environment, so localhost and preview
+   deployments load no Google tag and cannot pollute the production property.
+   Format-guarded because the value is interpolated into an inline <script>. */
+const RAW_GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
+const GTM_ID =
+  RAW_GTM_ID && /^GTM-[A-Z0-9]+$/.test(RAW_GTM_ID) ? RAW_GTM_ID : null;
 
 /* Focus Flow font pipeline (audit PERF-2). Exactly the four families the
    UI renders, all self-hosted through next/font (no render-blocking
@@ -168,6 +187,28 @@ export default function RootLayout({
             timing only. */}
         <Analytics />
         <SpeedInsights />
+        {/* Google Tag Manager (2026-08-10, GA4 audit). This host appeared in ZERO
+            hostname rows across 28 days of GA4 data — the actual product was
+            entirely unmeasured while the marketing site was fully tagged.
+
+            This is the piece the 2026-08-02 note above called "the GA4
+            cross-domain config, which lands separately". It is now here, and it
+            is NOT cross-domain config: same container, same stream, shared root
+            domain. See the GTM_ID comment at the top of this file.
+
+            No <noscript> iframe counterpart, unlike the marketing site: this app
+            is a client-rendered CV builder that does nothing without JavaScript,
+            so a noscript pixel would measure users who cannot use the product —
+            and it would need a CSP frame-src exemption to load at all. */}
+        {GTM_ID && (
+          <Script id="google-tag-manager" strategy="lazyOnload">
+            {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${GTM_ID}');`}
+          </Script>
+        )}
       </body>
     </html>
   );
