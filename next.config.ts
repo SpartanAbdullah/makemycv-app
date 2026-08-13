@@ -27,7 +27,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com",
+              // www.googletagmanager.com serves BOTH gtm.js and the gtag.js
+              // that GTM's GA4 tag injects, so this one entry covers the whole
+              // chain (2026-08-10, GA4 audit). Without it the browser blocks
+              // the tag and this host stays unmeasured — which is the exact
+              // state the audit found: zero GA4 hostname rows in 28 days.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.googletagmanager.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
@@ -35,7 +40,16 @@ const nextConfig: NextConfig = {
               // the ingest host is .de. and NOT the .us. host most docs show.
               // Getting this wrong fails silently: the browser blocks the
               // request and errors simply never arrive.
-              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io",
+              //
+              // The three google-analytics/analytics.google.com entries are
+              // where GA4 POSTs its hits. The wildcards are not cosmetic: GA4
+              // routes collection through REGIONAL endpoints
+              // (region1.google-analytics.com and similar), so allowing only
+              // the bare www host drops hits for some users and not others —
+              // the worst failure mode, because the data looks present.
+              // No frame-src entry is needed: unlike the marketing site, this
+              // app deliberately ships no GTM <noscript> iframe.
+              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
