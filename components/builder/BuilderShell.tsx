@@ -43,6 +43,7 @@ import { templates, getTemplateById } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
+import { track } from "../../lib/analytics";
 import { downloadCvBackup } from "../../lib/utils/download";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
@@ -1061,6 +1062,27 @@ export const BuilderShell = ({
         await downloadCV(data, "pro", data.settings.templateId ?? "classic");
       }
       pushToast(EXPORT_COPY[kind].success, { tone: "success", duration: 4000 });
+
+      /* North-star metric. Fired here and nowhere else: this is the single
+         export gate for the whole builder (TopBar, ReviewStep and the template
+         preview modal all route through it), and it sits after the await, so it
+         only counts exports that actually produced a file — not clicks, and not
+         attempts that threw.
+
+         `json` is excluded deliberately. A backup is housekeeping, not a
+         finished CV; the tip jar makes exactly that distinction three lines
+         below. Counting backups here would inflate the one number the product
+         gets judged on.
+
+         No `plan` parameter: every call site passes "pro", so it would be a
+         constant masquerading as a dimension. Add it when a real free/pro
+         split exists. */
+      if (kind !== "json") {
+        track("cv_export", {
+          format: kind,
+          template: data.settings.templateId ?? "classic",
+        });
+      }
       // A backup is housekeeping, not a finished-CV moment — don't ask for a
       // tip for it.
       if (kind !== "json" && shouldShowDownloadTip()) {

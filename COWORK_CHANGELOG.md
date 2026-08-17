@@ -16,6 +16,60 @@ Format:
 
 ---
 
+## [2026-08-17 22:20] Instrument cv_export — the north-star metric
+
+**Goal:** the 10 Aug GA4 audit found seven event types, all Google automatics, and zero product
+events. `app.makemycv.ae` has been tagged since this morning's `stagingmmc` → `main` push, so it now
+records pageviews — but nothing about whether anyone finishes a CV. This adds the one event the
+product is actually judged on.
+
+**Files:**
+- created: `lib/analytics.ts` — `track()`, a dataLayer push. Deliberately mirrors
+  `makemycv-site/lib/analytics.ts`: both surfaces share ONE container (GTM-5H2LMVJT) and ONE GA4
+  stream, so an event name must mean the same thing on both.
+- edited: `components/builder/BuilderShell.tsx` — import + one `track("cv_export", …)` call.
+
+**Why in BuilderShell and nowhere else.** `runDownload()` is the single export gate for the whole
+builder — TopBar, ReviewStep and the template preview modal all route through it (ReviewStep's
+`fallbackExport` only exists for a mount outside the shell). The call sits **after** the `await` and
+inside the success path, so it counts exports that produced a file, not clicks and not attempts that
+threw.
+
+**Two deliberate omissions, both to keep the number honest:**
+- **`json` excluded.** A backup is housekeeping, not a finished CV. The code already draws that line
+  three lines below, where the tip jar is suppressed for `json`. Counting backups would inflate the
+  one metric that matters.
+- **No `plan` parameter.** Every call site passes `"pro"` — it would be a constant dressed up as a
+  dimension. Add it when a real free/pro split exists.
+
+Parameters sent: `format` (`pdf` | `docx`) and `template`.
+
+**🔴 THIS IS HALF A PIPELINE — it records nothing until GTM is configured.**
+A `dataLayer.push` with no matching trigger goes nowhere: the code is right, the build passes, and GA4
+stays empty. Still required in container **GTM-5H2LMVJT**:
+1. Custom Event trigger, event name exactly `cv_export`
+2. GA4 Event tag → measurement ID `G-8MWPD87FJH`, event name `cv_export`, firing on that trigger
+3. Data Layer Variables for `format` and `template`, mapped as event parameters
+4. **Publish the container** — an unpublished change ships nothing
+5. GA4 Admin → Custom definitions: register `format` and `template` as event-scoped dimensions, and
+   mark `cv_export` a key event. Parameters do not appear in reports until registered.
+The container currently holds exactly one tag (`GA4 - Config`, Google Tag, Initialization – All
+Pages), audited 13 Aug — so none of the above exists yet.
+
+**Notes / risks / follow-up:**
+- **Not committed** — needs `git add` / `commit` / `push`. Production branch is `main`; dev is `stagingmmc`.
+- Zero product risk: `track()` no-ops on SSR and when the container is absent, and never throws.
+- The site's ~21 `[data-event]` CTA pushes are in the same position — pushing correctly into a
+  container with nothing listening. Worth fixing in the same GTM session.
+- **Stale docs corrected while here:** `PENDING-FEATURES.md` line 34 and the project log both say the
+  JD Match entry link from the builder is outstanding. It is not — there are **two** live entry
+  points, `BuilderShell.tsx:300` and `ReviewStep.tsx:488` ("Tailor to a job"), and `app/jd-match`
+  exists, so neither link 404s.
+
+**Suggested commit:** feat(analytics): fire cv_export on successful PDF/DOCX export
+
+---
+
 ## [2026-08-10 18:40] Tag app.makemycv.ae with the marketing site's GTM container
 
 **Goal:** §2 of the 10 Aug GA4 analytics brief. `app.makemycv.ae` appeared in **zero** hostname
