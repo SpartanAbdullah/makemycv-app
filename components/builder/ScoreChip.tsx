@@ -139,7 +139,11 @@ export const ScoreChip = ({
         aria-label={
           pristine
             ? "CV Score: builds as you type. Click for details."
-            : `CV Score: ${report.total} out of 100. Click for details.`
+            : `CV Score: ${report.total} out of 100${
+                delta !== undefined && delta !== 0
+                  ? `, ${delta > 0 ? "up" : "down"} ${Math.abs(delta)} since import`
+                  : ""
+              }. Click for details.`
         }
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -208,6 +212,11 @@ export const ScoreChip = ({
         </span>
         {delta !== undefined && delta !== 0 && (
           <span
+            title={
+              delta > 0
+                ? `Up ${delta} points since you imported this CV`
+                : `Down ${Math.abs(delta)} points since you imported this CV`
+            }
             style={{
               fontFamily: "var(--font-body)",
               fontSize: 10,

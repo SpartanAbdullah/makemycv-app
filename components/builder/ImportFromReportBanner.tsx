@@ -33,6 +33,7 @@ export default function ImportFromReportBanner() {
   const hydrated = useCvStore((s) => s.hydrated);
   const importCvVersion = useCvStore((s) => s.importCvVersion);
   const setParseSignals = useCvStore((s) => s.setParseSignals);
+  const captureScoreBaseline = useCvStore((s) => s.captureScoreBaseline);
 
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const hasRunRef = useRef(false);
@@ -138,6 +139,10 @@ export default function ImportFromReportBanner() {
         onConfirm={(partial, mode) => {
           importCvVersion(partial, mode);
           setParseSignals(phase.importedSignals);
+          // MUST stay after setParseSignals: the baseline has to be scored with
+          // the same signals the live score uses, or the delta measures the
+          // signals arriving rather than the user improving anything.
+          captureScoreBaseline();
           setPhase({ kind: "imported", replaced: mode === "replace" });
           stripParam();
         }}

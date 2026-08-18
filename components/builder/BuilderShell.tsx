@@ -214,6 +214,7 @@ const TopBar = ({
   cvName,
   saveError,
   scoreReport,
+  scoreDelta,
   onTemplates,
   onDownload,
   isDownloading,
@@ -221,6 +222,8 @@ const TopBar = ({
   cvName: string;
   saveError: boolean;
   scoreReport: ScoreReport;
+  /** Points gained/lost since import. undefined = no baseline, pill hidden. */
+  scoreDelta?: number;
   onTemplates: () => void;
   onDownload: () => void;
   isDownloading: boolean;
@@ -293,7 +296,7 @@ const TopBar = ({
 
       {/* Right — score chip + JD match + templates + download */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <ScoreChip report={scoreReport} />
+        <ScoreChip report={scoreReport} delta={scoreDelta} />
         {/* Free CV-vs-job diagnosis. Hidden below lg so the bar stays
             uncluttered on smaller screens; the Review step carries the same
             entry point for everyone else. */}
@@ -861,6 +864,9 @@ export const BuilderShell = ({
   const saveError = useCvStore((state) => state.saveError);
   const staleTab = useCvStore((state) => state.staleTab);
   const importCvVersion = useCvStore((state) => state.importCvVersion);
+  const captureScoreBaseline = useCvStore(
+    (state) => state.captureScoreBaseline,
+  );
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
   const previewOpen = useUiStore((s) => s.previewDrawerOpen);
@@ -1025,6 +1031,15 @@ export const BuilderShell = ({
     [deferredData, parseSignals],
   );
 
+  // Delta vs the score at import time. undefined (pill hidden) when there is
+  // no baseline — i.e. the CV was typed from scratch — or while the CV is still
+  // empty, where a large negative would punish someone for arriving.
+  const scoreBaseline = useCvStore((state) => state.scoreBaseline);
+  const scoreDelta =
+    scoreBaseline && scoreReport.total > 0
+      ? scoreReport.total - scoreBaseline.total
+      : undefined;
+
   const cvName =
     (data.personal.firstName?.trim() || data.personal.lastName?.trim())
       ? `${data.personal.firstName?.trim() ?? ""} ${data.personal.lastName?.trim() ?? ""}`
@@ -1175,6 +1190,11 @@ export const BuilderShell = ({
     mode: "replace" | "merge",
   ) => {
     importCvVersion(partial, mode);
+    // Snapshot the "before" for the TopBar delta. Zustand set() is synchronous,
+    // so this reads the CV that importCvVersion just wrote. This path sets no
+    // parseSignals, so both baseline and live score run without them — the
+    // comparison stays like-for-like, which is the only thing that matters.
+    captureScoreBaseline();
     setImportState({ phase: "idle" });
     const n = [
       partial.personal?.firstName || partial.personal?.email ? 1 : 0,
@@ -1214,6 +1234,7 @@ export const BuilderShell = ({
           cvName={cvName}
           saveError={saveError}
           scoreReport={scoreReport}
+          scoreDelta={scoreDelta}
           onTemplates={() => onStepChange("review")}
           onDownload={() => handleDownload("pdf")}
           isDownloading={isDownloading}

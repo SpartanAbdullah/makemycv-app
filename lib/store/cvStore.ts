@@ -8,7 +8,8 @@ import type {
   CvSkill,
   SkillLevel,
 } from "../types/cv";
-import type { ParseSignals } from "../resumeChecker/types";
+import type { ParseSignals, ScoreGrade } from "../resumeChecker/types";
+import { computeScore } from "../scoreEngine";
 import {
   clearCvStorage,
   debounce,
@@ -19,6 +20,22 @@ import {
 import { createId } from "../utils/id";
 
 const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
+const SCORE_BASELINE_STORAGE_KEY = "makemycv:scoreBaseline";
+
+/**
+ * The score of the CV at the moment it was IMPORTED — the honest "before" for
+ * the TopBar delta pill.
+ *
+ * Only ever set by an import. A CV typed from scratch has no baseline, so no
+ * delta is shown: "you went from 0 to 77" is not a real improvement, it is just
+ * the user existing, and claiming it would be the same unsourced-uplift move we
+ * criticise competitors for.
+ */
+export type ScoreBaseline = {
+  total: number;
+  grade: ScoreGrade;
+  capturedAt: number;
+};
 
 const createEmptyExperience = (): CvExperience => ({
   id: crypto.randomUUID(),
@@ -166,6 +183,8 @@ type CvStore = {
    * produce a checker-parity score in the Builder. null for hand-entered CVs.
    */
   parseSignals: ParseSignals | null;
+  /** Score at import time. null for hand-typed CVs — see ScoreBaseline. */
+  scoreBaseline: ScoreBaseline | null;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
@@ -187,6 +206,17 @@ type CvStore = {
   ) => void;
   /** Set (or clear with null) parseSignals. Persists to localStorage. */
   setParseSignals: (signals: ParseSignals | null) => void;
+  /**
+   * Snapshot the CURRENT score as the "before" for the TopBar delta.
+   *
+   * Deliberately a separate action rather than a side effect inside
+   * importCvVersion: ImportFromReportBanner calls importCvVersion() and THEN
+   * setParseSignals(), so a baseline captured inside importCvVersion would be
+   * scored WITHOUT the signals the live score is scored WITH. The delta would
+   * then be measuring a change in scoring inputs rather than the user's work.
+   * Call this last, once data and signals are both settled.
+   */
+  captureScoreBaseline: () => void;
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
@@ -240,6 +270,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
   appliedCouponCode: "",
   proAccessSource: "free",
   parseSignals: null,
+  scoreBaseline: null,
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
@@ -275,7 +306,10 @@ export const useCvStore = create<CvStore>((set, get) => ({
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
     }
-    set({ data: defaultCvData, parseSignals: null });
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SCORE_BASELINE_STORAGE_KEY);
+    }
+    set({ data: defaultCvData, parseSignals: null, scoreBaseline: null });
   },
   importJson: (data) => set({ data }),
   setParseSignals: (signals) => {
@@ -290,6 +324,32 @@ export const useCvStore = create<CvStore>((set, get) => ({
       }
     }
     set({ parseSignals: signals });
+  },
+  captureScoreBaseline: () => {
+    const { data, parseSignals } = get();
+    // mode MUST be "builder" — the same mode the live TopBar score uses.
+    // ScoreReport.total is normalised so builder and checker modes agree "when
+    // the non-conditional sub-signals match" (lib/resumeChecker/types.ts), but
+    // CONDITIONAL signals change which sub-signals are applicable at all. So a
+    // baseline scored in one mode against a live score in the other can drift,
+    // and the delta would be reporting our own scoring inputs as if they were
+    // the user's progress.
+    const report = computeScore(data, {
+      mode: "builder",
+      parseSignals: parseSignals ?? undefined,
+    });
+    const baseline: ScoreBaseline = {
+      total: report.total,
+      grade: report.grade,
+      capturedAt: Date.now(),
+    };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        SCORE_BASELINE_STORAGE_KEY,
+        JSON.stringify(baseline),
+      );
+    }
+    set({ scoreBaseline: baseline });
   },
   importCvVersion: (partial, mode) => {
     const current = get().data;
@@ -355,6 +415,23 @@ export const bindCvStorage = () => {
     }
   } catch {
     // Malformed — ignore, leave as null.
+  }
+
+  // Hydrate the import-time score baseline (drives the TopBar delta pill).
+  try {
+    const rawBaseline = window.localStorage.getItem(SCORE_BASELINE_STORAGE_KEY);
+    if (rawBaseline) {
+      const parsed = JSON.parse(rawBaseline) as ScoreBaseline;
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof parsed.total === "number"
+      ) {
+        useCvStore.setState({ scoreBaseline: parsed });
+      }
+    }
+  } catch {
+    // Malformed — ignore, no delta is better than a wrong delta.
   }
 
   useCvStore.getState().setHydrated(true);

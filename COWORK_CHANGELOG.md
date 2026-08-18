@@ -16,6 +16,63 @@ Format:
 
 ---
 
+## [2026-08-18 01:30] Wire the score delta pill (was built, never connected)
+
+**Goal:** competitor teardown found dubaicv.app frames its ATS score as a
+before/after ("up from 41%") while we show a static "77 · Strong". A delta reads
+as proof the product did something; a bare number does not.
+
+**Finding that changed the shape of the work:** the delta pill **already exists**
+in `ScoreChip.tsx` — green/red tinting, `+N` formatting, the lot. It was simply
+never passed a value (`<ScoreChip report={scoreReport} />`, no `delta`). This was
+wiring, not a build.
+
+**Files:**
+- edited: `lib/store/cvStore.ts` — new `scoreBaseline: ScoreBaseline | null`
+  (persisted to `makemycv:scoreBaseline`, hydrated on load, cleared by `reset()`)
+  and a new `captureScoreBaseline()` action.
+- edited: `components/builder/BuilderShell.tsx` — computes `scoreDelta`, threads
+  it through `TopBar` (new optional prop) into `ScoreChip`; calls
+  `captureScoreBaseline()` after a file import.
+- edited: `components/builder/ImportFromReportBanner.tsx` — calls
+  `captureScoreBaseline()` after the Checker-report import.
+- edited: `components/builder/ScoreChip.tsx` — `title` on the pill and the delta
+  folded into the button's `aria-label`, so "+36" is not a mystery number to
+  either sighted or screen-reader users.
+
+**Two traps found and avoided — read before changing this:**
+
+1. **Ordering.** `ImportFromReportBanner` calls `importCvVersion()` and THEN
+   `setParseSignals()`. Capturing the baseline inside `importCvVersion` (the
+   obvious place) would score the "before" WITHOUT the signals the live score is
+   scored WITH. The delta would then be measuring our own scoring inputs
+   arriving, not the user improving anything. Hence `captureScoreBaseline()` is
+   a separate action called LAST, at both call sites.
+2. **Scope.** `<ScoreChip>` lives inside the `TopBar` sub-component, ~740 lines
+   above where `scoreDelta` is computed. Declaring the const in `BuilderShell`
+   alone leaves `scoreDelta` undefined inside `TopBar` — a build-breaking
+   `Cannot find name` on Vercel. It is passed as an explicit prop.
+
+**Honesty guardrail:** a baseline is set **only by an import**. A CV typed from
+scratch has none, so no pill is shown. "You went from 0 to 77" is not an
+improvement, it is just the user existing — and claiming it would be the same
+unsourced-uplift move the competitor teardown criticises dubaicv.app for
+("87% vs 45% without AI"). Negative deltas are shown, in red: the component was
+built for both directions and hiding a regression would be the dishonest half.
+
+**Notes / risks / follow-up:**
+- Full `tsc --noEmit` could not be completed over the device mount (>5 min, killed).
+  Types were verified by inspection instead: `ScoreGrade` is exported from
+  `lib/resumeChecker/types`, `ScoreReport` carries `.total` and `.grade`, no
+  import cycle (`scoreEngine` imports only types + `data/genericPhrases`).
+  **Run `npm run typecheck`/`build` locally before pushing.**
+- Existing users mid-CV get no pill until their next import — there is no
+  retroactive baseline, by design.
+
+**Suggested commit:** feat(builder): show CV score as a delta from the imported baseline
+
+---
+
 ## [2026-08-17 22:20] Instrument cv_export — the north-star metric
 
 **Goal:** the 10 Aug GA4 audit found seven event types, all Google automatics, and zero product
