@@ -112,11 +112,24 @@
   --disabled-opacity: 0.55;
 
   /* Typography stacks — next/font variables first (self-hosted), then the
-     plain family name for any environment without the loader. */
-  --font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
+     plain family name for any environment without the loader.
+
+     UI vs CV DECOUPLING (2026-08 reskin): the UI tokens (--font-body /
+     --font-display) point at Outfit; the user's on-screen CV renders through
+     the --cv-font-* tokens below, which keep the original template faces.
+     lib/templates/theme.ts consumes ONLY --cv-font-* — never retarget those
+     to a UI face, or every user's CV silently restyles while the PDF stays
+     Helvetica. */
+  --font-display: var(--font-outfit), 'Outfit', system-ui, sans-serif;
+  --font-body:    var(--font-outfit), 'Outfit', system-ui, sans-serif;
   --font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
   --font-mono:    var(--font-jetbrains), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* CV template faces — the pre-reskin stacks, frozen for the product output
+     (FONT_FAMILY_MAP in lib/templates/theme.ts). */
+  --cv-font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
+  --cv-font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
+  --cv-font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
   /* Brand wordmark token kept for back-compat; the Poppins loader was dead
      weight (the Logo renders SVG files) and was removed in the 2026-06 audit. */
   --font-brand:   'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
@@ -294,6 +307,17 @@ body {
 .font-display { font-family: var(--font-display); }
 .font-serif   { font-family: var(--font-serif); }
 .font-mono    { font-family: var(--font-mono); }
+
+/* Inside a rendered CV (every template root carries .cv-print), the generic
+   font tokens resolve back to the CV faces — so a template using a Tailwind
+   utility like `font-display` (modern.tsx's name h1) keeps rendering
+   Bricolage after the 2026-08 UI move to Outfit. Product output is sacred;
+   see the --cv-font-* block in :root. */
+.cv-print {
+  --font-body: var(--cv-font-body);
+  --font-display: var(--cv-font-display);
+  --font-serif: var(--cv-font-serif);
+}
 
 /* ─── Builder v3 utility classes ───────────────────────────── */
 

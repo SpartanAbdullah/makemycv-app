@@ -50,10 +50,14 @@ const MARGIN_SCALES = [0.7, 0.85, 1, 1.15, 1.3];
 const scaleFor = (arr: number[], level: number | undefined): number =>
   arr[Math.min(5, Math.max(1, Math.round(level ?? 3))) - 1];
 
+/* CV-scoped font tokens (globals.css), NOT the UI tokens: the 2026-08 UI
+   reskin moved --font-body/--font-display to Outfit, while the user's CV
+   must keep rendering in the faces they picked (Inter / Bricolage /
+   Instrument). --cv-font-* freezes those stacks for the product output. */
 const FONT_FAMILY_MAP: Record<CvFontFamily, string> = {
-  sans: "var(--font-body)",
-  display: "var(--font-display)",
-  serif: "var(--font-serif)",
+  sans: "var(--cv-font-body)",
+  display: "var(--cv-font-display)",
+  serif: "var(--cv-font-serif)",
 };
 
 export function resolveTheme(
