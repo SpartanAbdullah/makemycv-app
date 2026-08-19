@@ -324,7 +324,7 @@ export default function ResumeCheckerPage() {
           </h2>
           <a
             href="#resume-checker-dropzone"
-            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-ff-accent px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:bg-ff-accent-dark hover:shadow-cta-hover"
+            className="mt-7 inline-flex items-center gap-2 rounded-full bg-ff-accent px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:brightness-[1.08] hover:shadow-cta-hover"
             style={{ backgroundImage: "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)" }}
           >
             Upload your CV

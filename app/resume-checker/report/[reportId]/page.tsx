@@ -66,7 +66,7 @@ export default async function ReportPage({
           </p>
           <Link
             href="/resume-checker"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:shadow-cta-hover"
+            className="mt-5 inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:brightness-[1.08] hover:shadow-cta-hover"
             style={{
               backgroundImage:
                 "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)",

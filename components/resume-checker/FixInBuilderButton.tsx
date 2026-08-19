@@ -17,7 +17,7 @@ export default function FixInBuilderButton({ reportId }: { reportId: string }) {
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className="group flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:shadow-cta-hover disabled:translate-y-0 disabled:opacity-75"
+      className="group flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:brightness-[1.08] hover:shadow-cta-hover disabled:translate-y-0 disabled:opacity-75"
       style={{
         backgroundImage: "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)",
       }}
