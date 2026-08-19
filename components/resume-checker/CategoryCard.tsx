@@ -82,7 +82,7 @@ export default function CategoryCard({
   return (
     <section
       id={`category-${category.id}`}
-      className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm-soft"
+      className="overflow-hidden rounded-2xl bg-paper shadow-float"
     >
       <button
         type="button"

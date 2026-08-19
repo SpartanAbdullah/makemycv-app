@@ -236,7 +236,7 @@ export default function ResumeCheckerPage() {
             {CHECKS.map((c) => (
               <div
                 key={c.title}
-                className="rounded-2xl border border-line bg-paper p-5 shadow-sm-soft transition hover:shadow-md-soft"
+                className="rounded-2xl bg-paper p-5 shadow-float"
               >
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-ff-accent-soft text-ff-accent-dark">
                   {c.icon}

@@ -34,7 +34,7 @@ export default function ScoreSidebar({
 
   return (
     <aside className="lg:sticky lg:top-20 lg:self-start">
-      <div className="rounded-2xl border border-line bg-paper p-6 shadow-sm-soft">
+      <div className="rounded-2xl bg-paper p-6 shadow-float">
         <div className="flex flex-col items-center">
           <ScoreRing score={score.total} grade={score.grade} />
         </div>

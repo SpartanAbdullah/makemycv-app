@@ -94,7 +94,7 @@ const StepButton = ({
       width: 28,
       height: 28,
       flexShrink: 0,
-      borderRadius: 8,
+      borderRadius: 999,
       border: "1px solid var(--ff-line)",
       background: "var(--ff-paper)",
       color: "var(--ff-ink-2)",

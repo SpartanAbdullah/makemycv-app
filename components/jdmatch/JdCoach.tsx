@@ -20,7 +20,7 @@ const WHY: Record<JdCategory, string> = {
   keywords: "A domain term recruiters scan for.",
 };
 
-const cardBase: React.CSSProperties = { borderRadius: 14, padding: 18 };
+const cardBase: React.CSSProperties = { borderRadius: 16, padding: 18 };
 const iconCircle: React.CSSProperties = {
   width: 30,
   height: 30,

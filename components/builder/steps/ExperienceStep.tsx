@@ -1093,7 +1093,7 @@ const SuggestionBullet = ({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: 999,
           background: "var(--ff-accent)",
           border: "none",
           color: "white",
@@ -1114,7 +1114,7 @@ const SuggestionBullet = ({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: 999,
           background: "var(--ff-card)",
           border: "1px solid var(--ff-line)",
           color: "var(--ff-muted)",

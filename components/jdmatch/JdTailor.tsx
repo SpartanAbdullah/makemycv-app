@@ -38,8 +38,8 @@ export const JdTailor = ({
     <div
       style={{
         background: "var(--ff-card)",
-        border: "1px solid var(--ff-line)",
-        borderRadius: 14,
+        boxShadow: "var(--shadow-float)",
+        borderRadius: 16,
         padding: 18,
       }}
     >

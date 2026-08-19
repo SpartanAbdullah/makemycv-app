@@ -24,7 +24,7 @@ const toneBar: Record<"good" | "review" | "error", string> = {
 
 export default function ExampleReportPreview() {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-line bg-paper shadow-lg-soft">
+    <div className="relative overflow-hidden rounded-2xl bg-paper shadow-float">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-line bg-paper-2 px-5 py-3">
         <div className="flex items-center gap-2">
