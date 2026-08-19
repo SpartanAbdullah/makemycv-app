@@ -149,7 +149,7 @@ export function PhotoUpload({
           ) : (
             <span
               style={{
-                fontFamily: "var(--font-mono)",
+                fontFamily: "var(--font-body)",
                 fontSize: 9,
                 color: "var(--ff-faint)",
                 letterSpacing: "0.12em",

@@ -189,7 +189,7 @@ export const UAEEssentialsStep = ({
               fields directly (same class of claim as the removed "+4 pts"). */}
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               color: "var(--ff-accent)",
               fontWeight: 600,
@@ -310,7 +310,7 @@ export const UAEEssentialsStep = ({
           </span>
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               color: "var(--ff-muted)",
               fontWeight: 600,

@@ -111,7 +111,7 @@ export const JdTailor = ({
 
       {focused && hiddenSkills.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-muted)", marginBottom: 8 }}>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-muted)", marginBottom: 8 }}>
             Hidden for this job ({hiddenSkills.length}) — tap to keep
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

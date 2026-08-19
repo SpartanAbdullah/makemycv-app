@@ -367,7 +367,7 @@ export const SkillsStep = ({
             <div style={{ marginBottom: 16 }}>
               <div
                 style={{
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                   fontSize: 10,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
@@ -423,7 +423,7 @@ export const SkillsStep = ({
             <div style={{ marginBottom: 16 }}>
               <div
                 style={{
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                   fontSize: 10,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",

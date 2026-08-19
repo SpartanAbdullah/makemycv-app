@@ -104,7 +104,7 @@
   --radius-lg:  12px;
   --radius-xl:  14px;
   --radius-2xl: 18px;
-  --radius-card: 14px;
+  --radius-card: 16px;
   --radius-pill: 999px;
 
   /* Shared disabled look for the standard button family (ghost keeps its
@@ -424,27 +424,26 @@ body {
 /* Field group */
 .cv-field { display: flex; flex-direction: column; gap: 0; }
 
-/* Step card — the white form container */
+/* Step card — the white form container. Floating paper (2026-08 reskin):
+   the float shadow's ring layer replaces the old 1px border — never add a
+   border back on top of it (double ring). Non-interactive: no hover lift. */
 .cv-step-card {
   background: var(--ff-card);
-  border: 1px solid var(--ff-line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-float);
   padding: 22px;
 }
 
-/* Entry card — accordion item */
+/* Entry card — accordion item (interactive: floats up on hover) */
 .cv-entry-card {
   background: var(--ff-card);
-  border: 1px solid var(--ff-line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--transition-base),
-              border-color var(--transition-base);
+  box-shadow: var(--shadow-float);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cv-entry-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--ff-line-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-float-hover);
 }
 
 /* Primary button (accent fill).
@@ -757,10 +756,11 @@ body {
   border-color: rgba(14,124,74,0.45);
 }
 
-/* Tip box — used for inline "ATS tip" footers in some steps */
+/* Tip box — used for inline "ATS tip" footers in some steps. Sits INSIDE a
+   floating card, so it's a flat inset: background + radius only (2026-08
+   reskin rule — no border, no shadow-in-shadow). */
 .cv-tip-box {
   background: var(--ff-sunken);
-  border: 1px solid var(--ff-line);
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: 12.5px;
@@ -769,11 +769,12 @@ body {
 }
 .cv-tip-box strong { color: var(--ff-accent-dark); }
 
-/* Today's Tip card */
+/* Today's Tip card — floating paper; the green gradient carries the accent
+   identity that the old tinted border used to. Non-interactive: no lift. */
 .tip-card {
   padding: 20px;
   background: linear-gradient(135deg, #F0F7F2 0%, var(--ff-paper) 70%);
-  border: 1px solid rgba(14,124,74,0.33);
+  box-shadow: var(--shadow-float);
   border-radius: var(--radius-card);
   position: relative;
   overflow: hidden;

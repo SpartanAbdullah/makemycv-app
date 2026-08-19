@@ -197,7 +197,7 @@ export const ScoreChip = ({
         <span className="hidden sm:flex" style={{ flexDirection: "column", lineHeight: 1.15, textAlign: "left" }}>
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 9,
               letterSpacing: "0.12em",
               fontWeight: 600,
@@ -260,7 +260,7 @@ export const ScoreChip = ({
           >
             <span
               style={{
-                fontFamily: "var(--font-mono)",
+                fontFamily: "var(--font-body)",
                 fontSize: 10,
                 letterSpacing: "0.12em",
                 color: "var(--ff-muted)",

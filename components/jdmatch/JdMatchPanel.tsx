@@ -887,7 +887,7 @@ export const JdMatchPanel = () => {
                       {heatmap && heatmap.located.size > 0 && (
                         <p
                           style={{
-                            fontFamily: "var(--font-mono)",
+                            fontFamily: "var(--font-body)",
                             fontSize: 10,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
@@ -1427,7 +1427,7 @@ const CategoryBlock = ({
       >
         <span
           style={{
-            fontFamily: "var(--font-mono)",
+            fontFamily: "var(--font-body)",
             fontSize: 10,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
@@ -1466,7 +1466,7 @@ const CategoryBlock = ({
    rewrite that surfaces the keyword (only { bullet, keyword, roleTitle } is
    sent), review, and stage it. An empty result is an honest refusal. */
 const fieldLabelText: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: "0.08em",
   textTransform: "uppercase",

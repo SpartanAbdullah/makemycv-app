@@ -24,7 +24,7 @@ export default function NotFound() {
       >
         <p
           className="text-sm font-semibold tracking-wide"
-          style={{ color: "var(--brand-primary)", fontFamily: "var(--font-mono)" }}
+          style={{ color: "var(--brand-primary)", fontFamily: "var(--font-body)" }}
         >
           404
         </p>

@@ -53,7 +53,7 @@ export const TodaysTipCard = ({ stepId, compact = false }: Props) => {
           <UAEDot size={13} />
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               color: "var(--ff-accent-dark)",
               letterSpacing: "0.18em",

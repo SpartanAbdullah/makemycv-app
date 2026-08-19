@@ -54,7 +54,7 @@ export const TemplateBadges = ({
         <span
           key={b.label}
           style={{
-            fontFamily: "var(--font-mono)",
+            fontFamily: "var(--font-body)",
             fontSize: 9,
             padding: "3px 8px",
             borderRadius: 999,

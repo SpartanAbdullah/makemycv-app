@@ -157,7 +157,7 @@ export const ExportGateDialog = ({
             <div key={g.title}>
               <p
                 style={{
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                   fontSize: 10,
                   fontWeight: 600,
                   letterSpacing: "0.1em",
