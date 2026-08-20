@@ -63,6 +63,10 @@ export function Logo({
         </span>
         <span
           aria-hidden="true"
+          // Collapse to mark-only in very tight bars (the builder top bar at
+          // 375px can't fit tile + wordmark + score chip + Download). The
+          // mark <img> alt + the Link aria-label keep the accessible name.
+          className="hidden min-[480px]:inline"
           style={{
             fontFamily: "var(--font-display)",
             fontWeight: 600,
