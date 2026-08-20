@@ -16,6 +16,74 @@ Format:
 
 ---
 
+## [2026-08-20 01:00] Premium design reskin — match the marketing site (Outfit, glass pills, floating paper)
+
+**Goal:** the site shipped its premium reskin on 2026-08-19 (site commits
+`df81f23`/`0c7689d`/`ddf5b0f`): Outfit as the single UI face, fully-rounded
+pill CTAs with a 5-layer 3D-glass shadow, 5-layer "floating paper" card
+shadows whose ring layer replaces 1px borders, retired mono labels, and a
+glass-mark + live-text logo lockup. The app must read as the same brand.
+Colors unchanged; CV output pixel-identical (verified — see below).
+
+**The one thing future edits must not "simplify" away — the font decoupling:**
+`FONT_FAMILY_MAP` in `lib/templates/theme.ts` used to point CV font picks at
+`var(--font-body/display/serif)` — the SAME tokens the UI uses. Retargeting
+the UI to Outfit would have silently restyled every user's on-screen CV while
+the PDF stayed Helvetica. So the CV faces are frozen behind new
+`--cv-font-body/display/serif` tokens (globals.css), theme.ts consumes only
+those, and `.cv-print` (every template root) REMAPS `--font-body/display/serif`
+back to the CV faces — because modern.tsx's name `<h1>` uses the Tailwind
+`font-display` utility inside the CV, which would otherwise have leaked
+Outfit into the product output. Never point `--cv-font-*` at a UI face, and
+never remove the `.cv-print` remap block.
+
+**Files:**
+- created: `app/fonts/app.ts` + six woff2 files — ALL faces now self-hosted
+  via next/font/local (Outfit new; Inter/Bricolage/Instrument/JetBrains moved
+  off next/font/google, whose build-time gstatic URLs killed a site deploy on
+  2026-08-11). Outfit + JetBrains copied byte-identical from the site repo.
+- edited: `app/layout.tsx` — font loaders swapped to the local module; Outfit
+  variable added to <html>.
+- edited: `app/globals.css` — UI tokens → Outfit; `--cv-font-*` block;
+  `.cv-print` token remap; `--shadow-cta(-hover)` replaced (green glow → 5-layer
+  glass), `--shadow-float(-hover)` added (+ Tailwind exposure); all `.cv-btn-*`,
+  `.cv-top-btn*`, `.cv-score-chip` fully rounded (glass on primaries, float on
+  secondaries; hover = lift + brightness, no bg-darken); `.cv-step-card` /
+  `.cv-entry-card` / `.tip-card` drop borders for `--shadow-float` (entry card
+  lifts on hover); `.cv-tip-box` becomes a flat inset; `--radius-card` 14→16px;
+  `.logo-mark-3d` glass tile rules.
+- edited: `lib/templates/theme.ts` — FONT_FAMILY_MAP → `--cv-font-*` (the ONLY
+  template-layer edit, exists to keep output identical).
+- edited: `components/Logo.tsx` — `horizontal` variant is now a live lockup
+  (glass mark tile + Outfit wordmark, navy/gold); collapses to mark-only under
+  480px; `white`/`stacked`/`mark` SVG variants untouched.
+- edited: 21 builder/jdmatch/checker component files — 33 mono eyebrow/label
+  sites moved to the UI face (mono kept ONLY on counters/numeric readouts:
+  char/word counts, step counters, "n of m", scores, hex input, report id);
+  jd-match + resume-checker line-border cards → float; small icon buttons and
+  ad-hoc CTAs → fully rounded; report headline got the single allowed gradient
+  accent word.
+
+**Verified:** tsc clean, lint at the 11-warning cap, 90/90 tests, smoke:pdf
+renders all 10 templates. In-browser: `/preview/classic` renders Inter and
+`/preview/modern`'s `font-display` h1 renders **Bricolage** (decoupling proven);
+UI computed styles show Outfit, glass + float shadows with the exact site
+layer values, ring `rgb(230,228,221)`, accent `#0e7c4a`, paper
+`rgb(251,250,247)`; zero elements carry border + float simultaneously; no
+horizontal overflow at 375px.
+
+**Notes / risks:** PDF/DOCX/print pipeline untouched (Helvetica, off-limits
+list respected). `--font-brand` (Poppins stack) is now dead weight for the
+horizontal logo but still referenced nowhere critical — left as-is. FAQ
+`<details>` cards on /resume-checker keep their border (it carries the open
+state). Founder's 2026-07 "hover must be unmistakable" rule preserved on the
+top bar via accent ring + lift.
+
+**Suggested commit:** shipped as five commits, `0d31f21`…`386a483` on
+`stagingmmc` (fonts / tokens+buttons / cards+labels / logo+sweep / mobile fix).
+
+---
+
 ## [2026-08-18 01:30] Wire the score delta pill (was built, never connected)
 
 **Goal:** competitor teardown found dubaicv.app frames its ATS score as a
