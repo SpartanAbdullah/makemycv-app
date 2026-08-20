@@ -1,13 +1,13 @@
-/* Focus Flow display & UI fonts — Bricolage Grotesque (display), Inter (UI),
-   Instrument Serif (editorial italic for Today's Tip), JetBrains Mono (badges
-   and counters). All four are self-hosted via next/font in app/layout.tsx —
-   the render-blocking Google @import chain was removed in the 2026-06 audit
-   (PERF-2), along with the dead Sora/Fraunces/Poppins/Plus Jakarta loaders. */
+/* Fonts: Outfit is the UI face (body + display) since the 2026-08 reskin;
+   Inter / Bricolage Grotesque / Instrument Serif render the user's CV via the
+   --cv-font-* tokens, and JetBrains Mono is numeric readouts only. All five
+   are self-hosted through next/font/local in app/fonts/app.ts — see that file
+   for why (gstatic build-time URLs are not hermetic). */
 @import "tailwindcss";
 
 /* ─── MakeMyCV Design System v3 — "Focus Flow" ───────────────
    Calm, modern, UAE-rooted CV builder. Single emerald accent
-   replaces the prior indigo/violet gradient. Bricolage + Inter.
+   replaces the prior indigo/violet gradient.
    ─────────────────────────────────────────────────────────── */
 :root {
   /* ── Focus Flow tokens (canonical) ── */
@@ -53,42 +53,24 @@
      UAE green so the whole builder shifts in one place. Legacy
      "primary-s" stays as the soft accent. */
   --brand-primary:     var(--ff-accent);
-  --brand-primary-h:   var(--ff-accent-dark);
-  --brand-primary-s:   var(--ff-accent-soft);
-  --brand-accent:      var(--ff-accent);
-  --brand-accent-text: var(--ff-accent-dark);
 
   /* Surfaces — kept for backward compat, mapped to ff tones */
   --surface-page:    var(--ff-paper);
   --surface-card:    var(--ff-card);
-  --surface-raised:  var(--ff-card);
-  --surface-sunken:  var(--ff-sunken);
   --surface-overlay: rgba(11, 15, 12, 0.45);
 
   /* Borders */
   --border-soft:     var(--ff-line);
   --border-medium:   var(--ff-line-strong);
-  --border-focus:    var(--ff-accent);
 
   /* Text — mapped to ff ink scale */
   --text-heading:    var(--ff-ink);
   --text-body:       var(--ff-ink-2);
   --text-muted:      var(--ff-muted);
   --text-faint:      var(--ff-faint);
-  --text-inverse:    #FFFFFF;
-
-  /* Sidebar (legacy — sidebar dropped, kept so old refs don't 404) */
-  --sidebar-bg:      var(--ff-ink);
-  --sidebar-border:  #1E293B;
-  --sidebar-text:    var(--ff-muted);
-  --sidebar-active:  #FFFFFF;
-  --sidebar-icon-bg: #1E293B;
 
   /* Status */
-  --status-success:  var(--ff-accent);
   --status-warning:  var(--ff-warn);
-  --status-error:    var(--ff-red);
-  --status-info:     #2563EB;
 
   /* Shadows — Focus Flow soft shadows */
   --shadow-xs:  0 1px 2px rgba(11, 15, 12, 0.04);
@@ -130,9 +112,6 @@
   --cv-font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
   --cv-font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
   --cv-font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
-  /* Brand wordmark token kept for back-compat; the Poppins loader was dead
-     weight (the Logo renders SVG files) and was removed in the 2026-06 audit. */
-  --font-brand:   'Poppins', 'Montserrat', 'Segoe UI', Arial, sans-serif;
 
   /* ─── Brand tokens (May 2026 handoff) ──────────────────────
      Source of truth for marketing surfaces, social cards, and
@@ -161,27 +140,13 @@
   --drawer-w:     clamp(460px, 48vw, 900px);
   --drawer-gap:   24px;
   --form-max:     1160px;
-  /* Legacy alias — old sidebar width; left for backward-compat. */
-  --sidebar-w:    220px;
-
-  /* Legacy aliases (backward compat with older callers) */
-  --background: var(--ff-paper);
-  --foreground: var(--ff-ink);
-  --surface:    var(--ff-card);
-  --muted:      var(--ff-muted);
-  --accent:     var(--ff-accent);
-  --accent-2:   #d66a3a;
-  --ring:       var(--ff-accent-ring);
 
   /* ─── Checker / marketing tokens ──────────────────────────
      DECIDED 2026-07 (founder call): the resume-checker migrated to the
      emerald product accent — ONE brand across builder, checker and JD
      Match. The --brand-blue pair below is legacy; nothing in-app should
      reference it for new UI (kept only so historic references and the
-     sibling marketing repo don't break). Score GRADE colors are semantic:
      green/amber/red on every surface. */
-  --brand-blue:      #2563EB;
-  --brand-blue-dark: #1D4ED8;
   --brand-ink:       #0A0F1E;
   --brand-deep:      #111827;
 
@@ -272,8 +237,6 @@
   --color-ff-accent-soft: var(--ff-accent-soft);
 
   /* Checker polish tokens */
-  --color-brand-blue: var(--brand-blue);
-  --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-ink: var(--brand-ink);
   --color-brand-deep: var(--brand-deep);
 
@@ -283,7 +246,6 @@
   --color-brand-gold:    var(--brand-gold);
   --color-brand-gold-lt: var(--brand-gold-lt);
   --color-brand-cream:   var(--brand-cream);
-  --font-brand:          var(--font-brand);
 
   --color-severity-error: var(--severity-error);
   --color-severity-error-bg: var(--severity-error-bg);

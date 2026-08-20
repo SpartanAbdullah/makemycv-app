@@ -58,12 +58,6 @@ export type ScoreCategory = {
   status: ScoreSeverity;
   issues: ScoreIssue[];
   faqs: ScoreFaq[];
-  // Legacy aliases — kept so older UI that reads `.category` / `.label`
-  // keeps working until every consumer is migrated to `.id` / `.name`.
-  /** @deprecated use .id */
-  category: ScoreCategoryId;
-  /** @deprecated use .name */
-  label: string;
 };
 
 export type ScoreReport = {
@@ -75,12 +69,6 @@ export type ScoreReport = {
   /** Non-good issues broken down by severity — drives sidebar counters. */
   issueCounts: { error: number; review: number; good: number };
   categories: ScoreCategory[];
-  // Legacy aliases — kept so older UI that reads `.status` (severity-like)
-  // or `.issueCount` as a flat integer keeps working until migration completes.
-  /** @deprecated use .grade; kept as a category-like severity for legacy UI. */
-  status: ScoreSeverity;
-  /** @deprecated use .issueCounts.error + .issueCounts.review */
-  issueCount: number;
 };
 
 // --- Persistence shapes ---

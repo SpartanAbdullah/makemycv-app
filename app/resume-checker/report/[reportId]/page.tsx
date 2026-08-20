@@ -132,7 +132,7 @@ export default async function ReportPage({
           <ScoreSidebar score={score} reportId={reportId} />
           <div className="space-y-4">
             {score.categories.map((cat) => (
-              <CategoryCard key={cat.category} category={cat} />
+              <CategoryCard key={cat.id} category={cat} />
             ))}
             {/* Sentinel for PostReportTipJar — the tip prompt waits until
                 the reader actually reaches the end of the report. */}

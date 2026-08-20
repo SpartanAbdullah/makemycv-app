@@ -402,7 +402,6 @@ describe("golden scores (characterization)", () => {
     );
     const weightSum = r.categories.reduce((s, c) => s + c.weight, 0);
     assert.ok(Math.abs(weightSum - 1) < 1e-9);
-    assert.equal(r.issueCount, r.issueCounts.error + r.issueCounts.review);
   });
 
   test("derived stats characterize the strong fixture", () => {
