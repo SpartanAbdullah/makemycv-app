@@ -16,6 +16,60 @@ Format:
 
 ---
 
+## [2026-08-20 10:30] Dead-weight removal + ROADMAP rebuilt from git history
+
+**Goal:** close the four ROADMAP cleanup items, delete code and tokens with zero
+consumers, and make ROADMAP.md true again — it was last updated 2026-04-19 while
+100+ commits shipped, so its "must do next" was already done twice and its
+backlog still listed JD Match, AI bullet improvement, a 5th template and
+thumbnail generation as unstarted work. All four are shipped.
+
+**Files:**
+- deleted: `lib/resumeChecker/storage.ts` legacy KV adapter (~90 lines —
+  `MaybeLegacy*` types, `upgradeScore`, `upgradeStored`, `gradeFromTotal`). It
+  re-shaped pre-2026-06 reports on read; entries have a 24h TTL, so nothing it
+  could upgrade has existed for ~2 months. `getReport`/`devGet` now return the
+  stored value directly.
+- edited: `lib/resumeChecker/types.ts` + `lib/scoreEngine.ts` — deprecated
+  aliases `ScoreCategory.category/.label` and `ScoreReport.status/.issueCount`
+  removed, along with the writes that fed them.
+- edited: `app/resume-checker/report/[reportId]/page.tsx` (`cat.category` →
+  `cat.id`) and `lib/scoreEngine.test.ts` (dropped the assertion that only
+  checked the removed alias stayed in sync with `issueCounts`) — the two live
+  consumers a first-pass grep missed; `tsc` caught both.
+- edited: `app/globals.css` — ~20 zero-consumer tokens deleted: the retired
+  `--sidebar-*` set, the `/* Legacy aliases */` block, the pre-emerald
+  `--brand-blue` pair, unused surface/status/border/text aliases, and
+  `--font-brand` (the wordmark has been live text since the reskin). Stale
+  pre-reskin header comment rewritten.
+- rewrote: `ROADMAP.md` — Shipped rebuilt from the commit log by month; new
+  🗄️ Superseded section so decisions can't be silently reverted (the Pro-tier →
+  tip-jar pivot in particular); governance rule 5 added for it.
+- removed: empty `_to_delete/` directory; the `mmc-polish-wt` git worktree and
+  its `tmp/builder-polish` branch (0 unique commits, fully merged, clean tree —
+  262 MB reclaimed).
+
+**Method:** every token in `:root` was checked against a repo-wide scan for
+`var(--token)`, generated Tailwind utilities AND `[var(--token)]` arbitrary
+values before deletion — the arbitrary-value form is easy to miss and would
+have broken `--surface-overlay`, which is used that way and was kept.
+
+**Notes / risks:** deliberately KEPT — dead members of live sets, because
+deleting them would leave an incoherent system: `--radius-sm/-xl`,
+`--shadow-sm/-md-soft/-lg-soft`, `--transition-slow`, the
+`--severity-*-border` triple (one member live), and `--brand-cream` /
+`--brand-gold-lt` (documented May-2026 brand palette, siblings live). The Pro/
+coupon scaffolding is untouched per the standing rule. No dependency is unused
+— all 16 runtime deps were checked.
+
+**Verified:** tsc clean, lint at the 11-warning cap, 90/90 tests, `npm run
+build` succeeds — the first production build since the font migration, which
+also proves the self-hosted faces need no network at build time.
+
+**Suggested commit:** `cedcec2` (cleanup) + `be6a0af` (roadmap) on `stagingmmc`.
+
+---
+
 ## [2026-08-20 01:00] Premium design reskin — match the marketing site (Outfit, glass pills, floating paper)
 
 **Goal:** the site shipped its premium reskin on 2026-08-19 (site commits
