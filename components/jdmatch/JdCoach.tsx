@@ -20,7 +20,7 @@ const WHY: Record<JdCategory, string> = {
   keywords: "A domain term recruiters scan for.",
 };
 
-const cardBase: React.CSSProperties = { borderRadius: 14, padding: 18 };
+const cardBase: React.CSSProperties = { borderRadius: 16, padding: 18 };
 const iconCircle: React.CSSProperties = {
   width: 30,
   height: 30,
@@ -141,7 +141,7 @@ export const JdCoach = ({
   return (
     <div style={{ ...cardBase, background: "var(--ff-card)", border: "1px solid var(--ff-accent)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-accent-dark)" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ff-accent-dark)" }}>
           Next fix
         </span>
         <span style={{ fontSize: 11, color: "var(--ff-muted)", fontFamily: "var(--font-mono)" }}>

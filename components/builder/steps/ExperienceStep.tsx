@@ -991,7 +991,7 @@ const ExpandRoleCard = ({
           {isCurrent && (
             <span
               style={{
-                fontFamily: "var(--font-mono)",
+                fontFamily: "var(--font-body)",
                 fontSize: 10,
                 color: "var(--ff-accent)",
                 background: "var(--ff-accent-soft)",
@@ -1061,7 +1061,7 @@ const SuggestionBullet = ({
     <div style={{ flex: 1, minWidth: 0 }}>
       <div
         style={{
-          fontFamily: "var(--font-mono)",
+          fontFamily: "var(--font-body)",
           fontSize: 10,
           color: "var(--ff-accent-dark)",
           letterSpacing: "0.1em",
@@ -1093,7 +1093,7 @@ const SuggestionBullet = ({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: 999,
           background: "var(--ff-accent)",
           border: "none",
           color: "white",
@@ -1114,7 +1114,7 @@ const SuggestionBullet = ({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: 999,
           background: "var(--ff-card)",
           border: "1px solid var(--ff-line)",
           color: "var(--ff-muted)",
@@ -1197,7 +1197,7 @@ const IdeaPanel = ({
         >
           <div
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               letterSpacing: "0.08em",
               textTransform: "uppercase",

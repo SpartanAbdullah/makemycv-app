@@ -169,7 +169,7 @@ export default function UploadDropzone() {
 
   return (
     <div id="resume-checker-dropzone" className="w-full">
-      <div className="rounded-2xl border border-line bg-paper p-6 shadow-md-soft sm:p-8">
+      <div className="rounded-2xl bg-paper p-6 shadow-float sm:p-8">
         {/* Keyboard focus: the file input is sr-only, so the visible ring is
             surfaced on the label via :has(input:focus-visible) — scoped to the
             input so the error-state "Try again" button (also a descendant)
@@ -276,7 +276,7 @@ export default function UploadDropzone() {
                   e.preventDefault();
                   reset();
                 }}
-                className="mt-2 rounded-xl bg-ff-accent px-5 py-2.5 text-sm font-semibold text-white shadow-cta transition hover:bg-ff-accent-dark"
+                className="mt-2 rounded-full bg-ff-accent px-5 py-2.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:brightness-[1.08] hover:shadow-cta-hover"
               >
                 Try again
               </button>

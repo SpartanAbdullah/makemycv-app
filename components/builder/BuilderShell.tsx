@@ -262,7 +262,7 @@ const TopBar = ({
           <span
             role="status"
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 11,
               fontWeight: 600,
               color: "var(--ff-red)",
@@ -280,7 +280,7 @@ const TopBar = ({
           <span
             className="hidden md:inline"
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 11,
               color: "var(--ff-muted)",
               letterSpacing: "0.06em",
@@ -441,7 +441,7 @@ const PreviewDrawer = ({
         >
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               color: "var(--ff-muted)",
               letterSpacing: "0.08em",
@@ -752,7 +752,7 @@ const MobilePreviewView = ({
         >
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-body)",
               fontSize: 10,
               color: "var(--ff-muted)",
               letterSpacing: "0.08em",
@@ -1260,7 +1260,7 @@ export const BuilderShell = ({
                 style={{
                   alignItems: "center",
                   gap: 8,
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                   fontSize: 10,
                   color: "var(--ff-muted)",
                   letterSpacing: "0.1em",
@@ -1413,7 +1413,7 @@ export const BuilderShell = ({
                 className="ff-support-footer"
                 style={{
                   marginTop: "auto",
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                   fontSize: 11,
                   color: "var(--ff-faint)",
                   letterSpacing: "0.06em",

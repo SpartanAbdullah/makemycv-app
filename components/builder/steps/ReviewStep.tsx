@@ -288,7 +288,7 @@ export const ReviewStep = ({
                   color: "var(--ff-warn)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-body)",
                 }}
               >
                 Missing sections
@@ -363,7 +363,7 @@ export const ReviewStep = ({
                     alignItems: "center",
                     gap: 6,
                     marginTop: 8,
-                    fontFamily: "var(--font-mono)",
+                    fontFamily: "var(--font-body)",
                     fontSize: 10,
                     color: "var(--ff-accent)",
                     fontWeight: 600,
@@ -961,7 +961,7 @@ const TemplateCard = ({
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            fontFamily: "var(--font-mono)",
+            fontFamily: "var(--font-body)",
             fontSize: 10,
             color: "var(--ff-accent)",
             fontWeight: 600,

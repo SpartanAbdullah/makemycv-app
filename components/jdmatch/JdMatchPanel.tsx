@@ -638,9 +638,9 @@ export const JdMatchPanel = () => {
                 <div
                   style={{
                     padding: 18,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     background: "var(--ff-card)",
-                    border: "1px solid var(--ff-line)",
+                    boxShadow: "var(--shadow-float)",
                   }}
                 >
                   <div
@@ -687,8 +687,8 @@ export const JdMatchPanel = () => {
                       gap: 18,
                       padding: 18,
                       background: "var(--ff-card)",
-                      border: "1px solid var(--ff-line)",
-                      borderRadius: 14,
+                      boxShadow: "var(--shadow-float)",
+                      borderRadius: 16,
                     }}
                   >
                     <div
@@ -887,7 +887,7 @@ export const JdMatchPanel = () => {
                       {heatmap && heatmap.located.size > 0 && (
                         <p
                           style={{
-                            fontFamily: "var(--font-mono)",
+                            fontFamily: "var(--font-body)",
                             fontSize: 10,
                             letterSpacing: "0.08em",
                             textTransform: "uppercase",
@@ -1008,10 +1008,9 @@ const JdEmptyGuide = ({ onBuild }: { onBuild: () => void }) => (
         width: "100%",
         textAlign: "center",
         background: "var(--ff-card)",
-        border: "1px solid var(--ff-line)",
         borderRadius: "var(--radius-card)",
         padding: "32px 28px",
-        boxShadow: "0 10px 34px rgba(40,36,28,0.06)",
+        boxShadow: "var(--shadow-float)",
       }}
     >
       <span
@@ -1427,7 +1426,7 @@ const CategoryBlock = ({
       >
         <span
           style={{
-            fontFamily: "var(--font-mono)",
+            fontFamily: "var(--font-body)",
             fontSize: 10,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
@@ -1466,7 +1465,7 @@ const CategoryBlock = ({
    rewrite that surfaces the keyword (only { bullet, keyword, roleTitle } is
    sent), review, and stage it. An empty result is an honest refusal. */
 const fieldLabelText: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: "0.08em",
   textTransform: "uppercase",

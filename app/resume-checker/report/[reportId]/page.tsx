@@ -66,7 +66,7 @@ export default async function ReportPage({
           </p>
           <Link
             href="/resume-checker"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:shadow-cta-hover"
+            className="mt-5 inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-cta transition hover:-translate-y-0.5 hover:brightness-[1.08] hover:shadow-cta-hover"
             style={{
               backgroundImage:
                 "linear-gradient(135deg, var(--ff-accent) 0%, var(--ff-accent-dark) 100%)",
@@ -104,8 +104,19 @@ export default async function ReportPage({
       <section className="border-b border-line bg-paper">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Here&apos;s what we found in{" "}
-            {firstName === "your" ? "your" : `${firstName}'s`} CV.
+            Here&apos;s what we{" "}
+            <span
+              style={{
+                backgroundImage:
+                  "linear-gradient(90deg, #0e7c4a 0%, #10b981 50%, #34d399 100%)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              found
+            </span>{" "}
+            in {firstName === "your" ? "your" : `${firstName}'s`} CV.
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Save this URL if you want to return. Not linked to any account —
@@ -121,7 +132,7 @@ export default async function ReportPage({
           <ScoreSidebar score={score} reportId={reportId} />
           <div className="space-y-4">
             {score.categories.map((cat) => (
-              <CategoryCard key={cat.category} category={cat} />
+              <CategoryCard key={cat.id} category={cat} />
             ))}
             {/* Sentinel for PostReportTipJar — the tip prompt waits until
                 the reader actually reaches the end of the report. */}

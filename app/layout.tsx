@@ -2,11 +2,12 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import {
-  Bricolage_Grotesque,
-  Instrument_Serif,
-  Inter,
-  JetBrains_Mono,
-} from "next/font/google";
+  bricolage,
+  instrumentSerif,
+  inter,
+  jetbrainsMono,
+  outfit,
+} from "./fonts/app";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME } from "@/lib/seo/schema";
@@ -29,39 +30,13 @@ const RAW_GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 const GTM_ID =
   RAW_GTM_ID && /^GTM-[A-Z0-9]+$/.test(RAW_GTM_ID) ? RAW_GTM_ID : null;
 
-/* Focus Flow font pipeline (audit PERF-2). Exactly the four families the
-   UI renders, all self-hosted through next/font (no render-blocking
-   Google @import chain). The previous setup loaded EIGHT families —
-   Sora/Fraunces/Poppins/Plus Jakarta were preloaded but never painted,
-   and Inter was loaded twice. The Logo renders SVG files, so no
-   wordmark font is needed. */
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage",
-  display: "swap",
-  weight: ["500", "600", "700"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  variable: "--font-instrument",
-  display: "swap",
-  weight: "400",
-  style: ["normal", "italic"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
-  display: "swap",
-  weight: ["500", "600"],
-});
+/* Focus Flow font pipeline (audit PERF-2, reworked for the 2026-08 premium
+   reskin). Five families, all self-hosted via next/font/local in
+   `app/fonts/app.ts` — Outfit for the UI, Inter/Bricolage/Instrument for the
+   user's on-screen CV (decoupled through the --cv-font-* tokens), JetBrains
+   Mono for numeric readouts. Self-hosted because next/font/google resolves
+   gstatic URLs at build time and Google rotates them — the exact failure
+   that killed a site deploy on 2026-08-11. See app/fonts/app.ts. */
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.makemycv.ae"),
@@ -161,7 +136,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${bricolage.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
+      className={`${outfit.variable} ${inter.variable} ${bricolage.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body className="antialiased">
         {/* No Organization node here, deliberately. www.makemycv.ae owns the

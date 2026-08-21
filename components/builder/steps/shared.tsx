@@ -26,7 +26,7 @@ export const CardIconBtn = ({
     style={{
       width: 28,
       height: 28,
-      borderRadius: 8,
+      borderRadius: 999,
       background: "var(--ff-paper)",
       border: "1px solid var(--ff-line)",
       display: "grid",

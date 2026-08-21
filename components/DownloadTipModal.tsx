@@ -415,7 +415,7 @@ function ThanksView({
           style={{
             marginTop: 10,
             padding: "9px 14px",
-            borderRadius: 8,
+            borderRadius: 999,
             border: "1px solid rgba(14,124,74,0.45)",
             background: "white",
             color: "var(--ff-accent-dark)",

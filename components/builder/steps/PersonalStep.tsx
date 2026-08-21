@@ -240,7 +240,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             position: "relative",
             background: "var(--ff-paper)",
             padding: "0 14px",
-            fontFamily: "var(--font-mono)",
+            fontFamily: "var(--font-body)",
             fontSize: 10,
             color: "var(--ff-faint)",
             letterSpacing: "0.14em",

@@ -1303,8 +1303,6 @@ export function computeScore(
       status: statusFromScore(catScore),
       issues,
       faqs: meta.faqs,
-      category: id,
-      label: meta.name,
     };
   });
 
@@ -1322,8 +1320,6 @@ export function computeScore(
     grade: gradeFromTotal(total),
     issueCounts,
     categories,
-    status: statusFromScore(total),
-    issueCount: issueCounts.error + issueCounts.review,
   };
 }
 
