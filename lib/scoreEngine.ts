@@ -1008,6 +1008,74 @@ function evaluateAts(
     );
   }
 
+  // --- UAE essentials (A12–A14, 4 pts) ---
+  //
+  // Visa status, notice period and UAE driving licence had ZERO score impact:
+  // they fed computeDerivedStats and the builder's UAE step UI only, so the
+  // engine rated a CV with all three filled identically to one with none. On a
+  // UAE-focused builder that is the wrong answer — these are the first things
+  // a Gulf recruiter looks for, and they are the cheapest points on the CV to
+  // earn. Scored in ATS Essentials because that is where the recruiter-facing
+  // contract fields already live (email, phone, dates, company names).
+  //
+  // Always applicable: a blank CV should be told these are missing, and the
+  // builder targets the UAE market by definition. Severity is "review", not
+  // "error" — an absent visa line doesn't break the parse, it costs ranking.
+
+  // A12 Visa status (2)
+  {
+    const pass = Boolean(p.visaStatus?.trim());
+    out.push(
+      sig("A12", "atsEssentials", 2, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Visa status stated"
+          : mode === "builder"
+            ? "Add your visa status"
+            : "No visa status detected",
+        description: pass
+          ? ""
+          : "UAE recruiters scan for visa status before reading your experience — an unstated status reads as an unknown sponsorship cost.",
+        actionable: pass
+          ? ""
+          : "Add your visa status (e.g. 'Employment visa — transferable', 'Golden visa', 'Visit visa').",
+      }),
+    );
+  }
+
+  // A13 Availability / notice period (1)
+  {
+    const pass = Boolean(p.availability?.trim());
+    out.push(
+      sig("A13", "atsEssentials", 1, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Availability stated"
+          : mode === "builder"
+            ? "Add your notice period"
+            : "No availability or notice period detected",
+        description: pass
+          ? ""
+          : "Gulf shortlists are built around start dates. Without a notice period the recruiter has to ask before they can rank you.",
+        actionable: pass ? "" : "Add your availability (e.g. 'Immediate', '30 days notice').",
+      }),
+    );
+  }
+
+  // A14 UAE driving licence (1)
+  {
+    const pass = Boolean(p.drivingLicense?.trim());
+    out.push(
+      sig("A14", "atsEssentials", 1, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Driving licence stated"
+          : "No UAE driving licence indicated",
+        description: pass
+          ? ""
+          : "Sales, logistics and site roles in the UAE filter on this outright. If you hold one, say so; if you don't, leave it blank.",
+        actionable: pass ? "" : "Add your licence if you hold one (e.g. 'UAE Light Vehicle').",
+      }),
+    );
+  }
+
   return out;
 }
 

@@ -359,21 +359,25 @@ if (process.env.DUMP === "1") {
 
 // grade thresholds the engine used when these were captured: >=85 excellent,
 // >=65 good, >=40 needs-work, else poor (gradeFromTotal).
-// Re-captured after the S3/A2 (phone) and S6/C1 (summary) duplicate-signal
-// removal: the builder-mode denominator dropped from 92 to 86 raw points, so
-// every fixture that isn't a 0 or a 100 shifted.
+// Re-captured twice, both consciously:
+//   * S3/A2 (phone) + S6/C1 (summary) duplicate-signal removal: -6 raw pts;
+//   * A12–A14 UAE essentials (visa 2, availability 1, licence 1): +4 raw pts.
+// Builder-mode denominator: 92 -> 86 -> 90. Checker: 102 -> 96 -> 100.
 const GOLDEN: Record<string, { total: number; grade: ScoreGrade }> = {
   EMPTY: { total: 0, grade: "poor" },
-  MINIMAL: { total: 22, grade: "poor" },
-  MID_WEAK: { total: 76, grade: "good" },
+  MINIMAL: { total: 21, grade: "poor" },
+  MID_WEAK: { total: 72, grade: "good" },
   STRONG_FINANCE: { total: 100, grade: "excellent" },
-  // Yes, 86/"excellent": today's engine only docks C4/C9/C10/D3/D6/D7 for
-  // verbosity (13 pts of 86), so an overstuffed CV still lands high. Locked
-  // in on purpose — if verbosity weighting is ever tightened, this golden
-  // should fail and be updated consciously.
-  OVERLONG: { total: 86, grade: "excellent" },
+  // 82/"good" now, down from 87/"excellent". Two independent reasons: the
+  // engine still only docks C4/C9/C10/D3/D6/D7 for verbosity (13 pts of 90),
+  // but OVERLONG also carries none of the UAE essentials, so it now forfeits
+  // all 4 of those points and falls under the 85 "excellent" line. Locked in
+  // on purpose — if verbosity weighting is ever tightened, this golden should
+  // fail and be updated consciously.
+  OVERLONG: { total: 82, grade: "good" },
   UAE_COMPLETE: { total: 100, grade: "excellent" },
-  UAE_MISSING: { total: 100, grade: "excellent" },
+  // 96, not 100 — the whole point of A12–A14. 4 raw points of 90.
+  UAE_MISSING: { total: 96, grade: "excellent" },
 };
 
 describe("golden scores (characterization)", () => {
@@ -391,12 +395,13 @@ describe("golden scores (characterization)", () => {
     assert.deepEqual(byId, {
       content: 48, // weak phrases, no metrics in summary, thin quantification
       sections: 100,
-      atsEssentials: 100,
+      atsEssentials: 82, // no visa / notice period / licence (A12–A14)
       design: 70, // < 10 skills, < 300 words
     });
-    // 28, not 30: MID_WEAK passed both of the removed duplicate signals
+    // good 28, not 30: MID_WEAK passed both of the removed duplicate signals
     // (S3 phone, S6 summary), so it loses two "good" rows and no fixes.
-    assert.deepEqual(r.issueCounts, { error: 2, review: 7, good: 28 });
+    // review 10, not 7: the three unfilled UAE essentials are new review rows.
+    assert.deepEqual(r.issueCounts, { error: 2, review: 10, good: 28 });
   });
 
   test("report shape: 4 categories in canonical order, weights sum to 1", () => {
@@ -427,7 +432,7 @@ describe("golden scores (characterization)", () => {
 // these tests pin the single-charge behaviour so a duplicate can't creep back.
 
 describe("duplicate signals are charged once", () => {
-  const RAW_MAX_BUILDER = 86; // sum of applicable sub-signal points, builder mode
+  const RAW_MAX_BUILDER = 90; // sum of applicable sub-signal points, builder mode
 
   const expectedAfterLosing = (points: number) =>
     Math.round(((RAW_MAX_BUILDER - points) / RAW_MAX_BUILDER) * 100);
@@ -435,7 +440,7 @@ describe("duplicate signals are charged once", () => {
   test("clearing ONLY the phone costs one 3-point signal, not two", () => {
     const noPhone = clone(STRONG_FINANCE);
     noPhone.personal.phone = "";
-    // 3 points of 86 => 97. Before the dedupe this was 6 of 92 => 93.
+    // 3 points of 90 => 97. Before the dedupe this was 6 of 92 => 93.
     assert.equal(computeScore(noPhone).total, expectedAfterLosing(3));
     assert.equal(computeScore(noPhone).total, 97);
   });
@@ -512,13 +517,45 @@ describe("monotonicity invariants", () => {
     assert.equal(computeDerivedStats(stillMissing).uaeFilledCount, 0);
   });
 
-  test("UAE-essentials fields do not move the 0-100 total (derived stats only)", () => {
-    // Characterizes current behavior: visa/availability/licence feed
-    // computeDerivedStats (and the builder's UAE step UI), not computeScore.
-    assert.equal(
-      computeScore(UAE_COMPLETE).total,
-      computeScore(UAE_MISSING).total,
-    );
+  test("UAE-essentials fields DO move the 0-100 total (A12–A14)", () => {
+    // Was the inverse assertion until A12–A14 were added: visa/availability/
+    // licence used to feed computeDerivedStats and the builder's UAE step UI
+    // only, so the engine scored a fully-filled UAE CV identically to one with
+    // none. On a UAE-focused builder that was simply wrong.
+    const complete = computeScore(UAE_COMPLETE).total;
+    const missing = computeScore(UAE_MISSING).total;
+    assert.ok(complete > missing, `${complete} should beat ${missing}`);
+    assert.equal(complete, 100);
+    assert.equal(missing, 96); // 4 raw points of the 90-point builder max
+  });
+
+  test("each UAE essential is worth its stated points, independently", () => {
+    const total = (mutate: (cv: CvData) => void) => {
+      const cv = clone(UAE_COMPLETE);
+      mutate(cv);
+      return computeScore(cv).total;
+    };
+    const full = computeScore(UAE_COMPLETE).total;
+    const RAW_MAX = 90;
+    const drop = (points: number) =>
+      full - Math.round(((RAW_MAX - points) / RAW_MAX) * 100);
+
+    // visa 2, availability 1, licence 1.
+    assert.equal(full - total((cv) => delete cv.personal.visaStatus), drop(2));
+    assert.equal(full - total((cv) => delete cv.personal.availability), drop(1));
+    assert.equal(full - total((cv) => delete cv.personal.drivingLicense), drop(1));
+  });
+
+  test("filling a UAE essential never lowers the total", () => {
+    const base = computeScore(UAE_MISSING).total;
+    for (const field of ["visaStatus", "availability", "drivingLicense"] as const) {
+      const cv = clone(UAE_MISSING);
+      cv.personal[field] = "Yes";
+      assert.ok(
+        computeScore(cv).total >= base,
+        `filling ${field} lowered the total ${base} -> ${computeScore(cv).total}`,
+      );
+    }
   });
 
   test("dirty parseSignals never beat clean ones (checker mode)", () => {
@@ -549,7 +586,9 @@ describe("monotonicity invariants", () => {
     assert.ok(dirty.total < clean.total);
     // Golden checker-mode totals (observed, then locked). The 10 conditional
     // points (C12 C13 A3 A4 A5) all pass on clean signals and all fail on
-    // dirty ones: 102/102 -> 100 vs 92/102 -> 90.
+    // dirty ones: 100/100 -> 100 vs 90/100 -> 90. (The checker max moved
+    // 102 -> 96 -> 100 across the dedupe and the UAE essentials; the two
+    // totals happen to land on the same numbers they had before.)
     assert.equal(clean.total, 100);
     assert.equal(dirty.total, 90);
   });
