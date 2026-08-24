@@ -281,5 +281,65 @@ const runText = (label, text) => {
   check(f, "'up to date' does not mark the role current", d.experience.every((e) => e.isCurrent !== true), d.experience);
 }
 
+/* ── (i) numeric date formats keep their month ───────────────────────────────
+   DATE_TOKEN_RE matched "Jan 2024" and a bare "2024" but no numeric form, so
+   "01/2024 - 12/2024" produced two indistinguishable "2024" tokens and the
+   month was lost. MM/YYYY, MM-YYYY and ISO YYYY-MM now parse as one token
+   each — without disturbing a plain year range. */
+{
+  const f = "numeric-slash-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Project Engineer | BuildCo LLC    01/2024 - 12/2024",
+    "• Delivered 4 fit-out packages",
+    "",
+  ].join("\n"));
+  check(f, "MM/YYYY start keeps the month", d.experience[0]?.startDate === "01/2024", d.experience[0]?.startDate);
+  check(f, "MM/YYYY end keeps the month", d.experience[0]?.endDate === "12/2024", d.experience[0]?.endDate);
+}
+{
+  const f = "numeric-dash-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Site Engineer | Gulf Contracting LLC",
+    "03-2019 to 07-2021",
+    "• Supervised 30 subcontractor staff",
+    "",
+  ].join("\n"));
+  check(f, "MM-YYYY start keeps the month", d.experience[0]?.startDate === "03-2019", d.experience[0]?.startDate);
+  check(f, "MM-YYYY end keeps the month", d.experience[0]?.endDate === "07-2021", d.experience[0]?.endDate);
+}
+{
+  const f = "iso-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Analyst | Emirates NBD    2021-03 – 2024-09",
+    "• Cut month-end close from 8 days to 5",
+    "",
+  ].join("\n"));
+  check(f, "ISO YYYY-MM start keeps the month", d.experience[0]?.startDate === "2021-03", d.experience[0]?.startDate);
+  check(f, "ISO YYYY-MM end keeps the month", d.experience[0]?.endDate === "2024-09", d.experience[0]?.endDate);
+}
+{
+  // Regression guard: a bare year RANGE must still parse as two years, not
+  // get half-consumed by the new numeric alternatives.
+  const f = "year-range-unchanged (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Buyer | Al Noor Trading    2018 - 2021",
+    "• Sourced 200+ SKUs",
+    "",
+  ].join("\n"));
+  check(f, "plain year range still yields two years", d.experience[0]?.startDate === "2018" && d.experience[0]?.endDate === "2021", [d.experience[0]?.startDate, d.experience[0]?.endDate]);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

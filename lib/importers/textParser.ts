@@ -48,8 +48,25 @@ const MONTH_NAMES =
 // matched inside "Marketing", so "Marketing Director" parsed as "keting
 // Director" and the phantom date stole the entry's startDate slot
 // (baseline bug exposed by __fixtures__/two-column-interleaved.txt).
+// Numeric month/year forms ("01/2024", "01-2024", ISO "2024-01") are as common
+// on real CVs as "Jan 2024", and matching only the bare year threw the month
+// away — "01/2024 - 12/2024" collapsed to two indistinguishable "2024" tokens.
+// ORDER IS LOAD-BEARING: alternation is first-match-wins at each position, so
+// both numeric forms must precede the bare-year alternative or "2024-01" would
+// match as the year "2024" and strand the month.
+//
+// A plain year RANGE is untouched by the numeric alternatives: "2019-2024"
+// can't start the MM form (neither `0?[1-9]` nor `1[0-2]` consumes "2019"
+// before a separator) and can't start the ISO form (nothing follows "2019"
+// but a separator and another 4-digit year), so it still yields two years.
+const ISO_MONTH = "\\b(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])\\b";
+const NUMERIC_MONTH_YEAR = "\\b(?:0?[1-9]|1[0-2])[/-](?:19|20)\\d{2}\\b";
 const DATE_TOKEN_RE = new RegExp(
-  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}|\\b(?:${MONTH_NAMES})\\b|\\b(?:19|20)\\d{2}\\b`,
+  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}` +
+    `|${ISO_MONTH}` +
+    `|${NUMERIC_MONTH_YEAR}` +
+    `|\\b(?:${MONTH_NAMES})\\b` +
+    `|\\b(?:19|20)\\d{2}\\b`,
   "gi",
 );
 // "to date" (two words) is how UAE CVs most often write an open-ended role —
