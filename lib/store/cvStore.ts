@@ -9,7 +9,7 @@ import type {
   SkillLevel,
 } from "../types/cv";
 import type { ParseSignals, ScoreGrade } from "../resumeChecker/types";
-import { computeScore } from "../scoreEngine";
+import { computeScore, SCORING_RUBRIC_VERSION } from "../scoreEngine";
 import {
   clearCvStorage,
   debounce,
@@ -35,7 +35,44 @@ export type ScoreBaseline = {
   total: number;
   grade: ScoreGrade;
   capturedAt: number;
+  /** Which scoring rubric produced `total`. A baseline from any other rubric
+   *  is not comparable to a live score and is discarded on load — see
+   *  SCORING_RUBRIC_VERSION in lib/scoreEngine.ts and parseStoredBaseline
+   *  below. */
+  rubric: number;
 };
+
+/**
+ * Validate a baseline read back from localStorage.
+ *
+ * Returns null for anything that cannot be compared to a score computed by
+ * TODAY's engine — malformed JSON, a missing total, or a baseline stamped with
+ * a different rubric version (including none at all, which means it predates
+ * versioning). The delta pill then simply doesn't render, which is the right
+ * outcome: the alternative is telling a user their untouched CV lost points
+ * because we changed how we count, and that reads as their mistake.
+ *
+ * Exported and pure so the rule is testable without a browser.
+ */
+export function parseStoredBaseline(raw: string | null): ScoreBaseline | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const b = parsed as Partial<ScoreBaseline>;
+  if (typeof b.total !== "number" || !Number.isFinite(b.total)) return null;
+  if (b.rubric !== SCORING_RUBRIC_VERSION) return null;
+  return {
+    total: b.total,
+    grade: b.grade as ScoreGrade,
+    capturedAt: typeof b.capturedAt === "number" ? b.capturedAt : 0,
+    rubric: b.rubric,
+  };
+}
 
 const createEmptyExperience = (): CvExperience => ({
   id: crypto.randomUUID(),
@@ -342,6 +379,9 @@ export const useCvStore = create<CvStore>((set, get) => ({
       total: report.total,
       grade: report.grade,
       capturedAt: Date.now(),
+      // Stamped so a later rubric change can tell this total is no longer
+      // comparable, instead of silently subtracting across two rubrics.
+      rubric: SCORING_RUBRIC_VERSION,
     };
     if (typeof window !== "undefined") {
       window.localStorage.setItem(
@@ -420,18 +460,17 @@ export const bindCvStorage = () => {
   // Hydrate the import-time score baseline (drives the TopBar delta pill).
   try {
     const rawBaseline = window.localStorage.getItem(SCORE_BASELINE_STORAGE_KEY);
-    if (rawBaseline) {
-      const parsed = JSON.parse(rawBaseline) as ScoreBaseline;
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        typeof parsed.total === "number"
-      ) {
-        useCvStore.setState({ scoreBaseline: parsed });
-      }
+    const baseline = parseStoredBaseline(rawBaseline);
+    if (baseline) {
+      useCvStore.setState({ scoreBaseline: baseline });
+    } else if (rawBaseline) {
+      // Stale rubric or malformed. Drop it rather than leaving a record that
+      // can never be used again — the next import writes a fresh, comparable
+      // one, and until then the pill correctly shows nothing.
+      window.localStorage.removeItem(SCORE_BASELINE_STORAGE_KEY);
     }
   } catch {
-    // Malformed — ignore, no delta is better than a wrong delta.
+    // Storage unavailable — ignore, no delta is better than a wrong delta.
   }
 
   useCvStore.getState().setHydrated(true);

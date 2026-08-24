@@ -33,6 +33,7 @@ import {
   hasQuantifiedMetric,
   GRADE_CHIP_LABELS,
   GRADE_LABELS,
+  SCORING_RUBRIC_VERSION,
 } from "./scoreEngine";
 import type { ParseSignals, ScoreGrade } from "./resumeChecker/types";
 import type { CvData, CvExperience } from "./types/cv";
@@ -422,6 +423,41 @@ describe("golden scores (characterization)", () => {
     assert.equal(s.uaeFilledCount, 3);
     assert.equal(s.expectedPages, 2); // 3 roles > 2-role single-page heuristic
     assert.equal(computeDerivedStats(MINIMAL).expectedPages, 1);
+  });
+});
+
+// --- 1z. Rubric version tripwire --------------------------------------------
+//
+// SCORING_RUBRIC_VERSION stamps every stored baseline so a stale one can be
+// discarded instead of producing a fabricated delta (lib/store/cvStore.ts).
+// That only works if the constant is actually bumped when the rubric moves, so
+// this pins the signal set. The golden totals above cover re-pointing; this
+// covers adding or removing a signal.
+
+describe("scoring rubric version", () => {
+  // Every non-conditional signal is applicable on a blank CV and none are
+  // trimmed (a blank CV has no "good" rows), so EMPTY surfaces the full set.
+  const RUBRIC_2_SIGNALS = [
+    "A1", "A10", "A12", "A13", "A14", "A2", "A7", "A8", "A9",
+    "C1", "C11", "C2", "C3", "C5", "C6", "C7", "C8", "C9",
+    "D1", "D2", "D4", "D5", "D8", "D9",
+    "S10", "S11", "S2", "S4", "S5", "S7", "S8", "S9",
+  ];
+
+  test("the builder-mode signal set matches the declared rubric version", () => {
+    const ids = computeScore(EMPTY)
+      .categories.flatMap((c) => c.issues)
+      .map((i) => i.signal)
+      .sort();
+    assert.deepEqual(
+      ids,
+      RUBRIC_2_SIGNALS,
+      "The sub-signal set changed. That makes every stored ScoreBaseline " +
+        "incomparable to a live score, so bump SCORING_RUBRIC_VERSION in " +
+        "lib/scoreEngine.ts (and update this list) — otherwise returning " +
+        "users see a delta pill for a CV they never touched.",
+    );
+    assert.equal(SCORING_RUBRIC_VERSION, 2, "bump me with the list above");
   });
 });
 

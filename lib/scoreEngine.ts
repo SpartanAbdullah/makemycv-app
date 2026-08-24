@@ -28,6 +28,28 @@ import type {
 
 export type ScoreMode = "builder" | "checker";
 
+/**
+ * Identifies the RUBRIC that produced a score — the set of sub-signals, their
+ * points, and the grade thresholds.
+ *
+ * A stored score is only comparable to a live one if both came from the same
+ * rubric. The TopBar delta pill compares an import-time baseline in
+ * localStorage against a freshly computed total, so when the rubric changes,
+ * every returning user's untouched CV appears to have moved: the 2026-08-24
+ * pass removed the duplicate phone/summary signals (-6 raw points) and added
+ * the UAE essentials (+4), and that alone would have shown a red "Down 4
+ * points since you imported this CV" to people who had not edited a word.
+ *
+ * BUMP THIS whenever you add, remove, or re-point a sub-signal, or move a
+ * grade threshold. Baselines carrying any other value are discarded on load
+ * (lib/store/cvStore.ts) — no delta is better than a fabricated one. A missing
+ * value means a pre-versioning baseline, which is likewise discarded.
+ *
+ * The characterization tests in scoreEngine.test.ts pin the signal set and the
+ * golden totals, so a rubric change that forgets to bump this fails there.
+ */
+export const SCORING_RUBRIC_VERSION = 2;
+
 export type ScoreOptions = {
   mode?: ScoreMode;
   parseSignals?: ParseSignals;
