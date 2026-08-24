@@ -364,14 +364,15 @@ if (process.env.DUMP === "1") {
 // Re-captured twice, both consciously:
 //   * S3/A2 (phone) + S6/C1 (summary) duplicate-signal removal: -6 raw pts;
 //   * A12–A14 UAE essentials (visa 2, availability 1, licence 1): +4 raw pts.
-// Builder-mode denominator: 92 -> 86 -> 90. Checker: 102 -> 96 -> 100.
+//   * S2/A1 (email) duplicate-signal removal: -3 raw pts.
+// Builder-mode denominator: 92 -> 86 -> 90 -> 87. Checker: 102 -> 96 -> 100 -> 97.
 const GOLDEN: Record<string, { total: number; grade: ScoreGrade }> = {
   EMPTY: { total: 0, grade: "poor" },
-  MINIMAL: { total: 21, grade: "poor" },
-  MID_WEAK: { total: 72, grade: "good" },
+  MINIMAL: { total: 18, grade: "poor" },
+  MID_WEAK: { total: 71, grade: "good" },
   STRONG_FINANCE: { total: 100, grade: "excellent" },
   // 82/"good" now, down from 87/"excellent". Two independent reasons: the
-  // engine still only docks C4/C9/C10/D3/D6/D7 for verbosity (13 pts of 90),
+  // engine still only docks C4/C9/C10/D3/D6/D7 for verbosity (13 pts of 87),
   // but OVERLONG also carries none of the UAE essentials, so it now forfeits
   // all 4 of those points and falls under the 85 "excellent" line. Locked in
   // on purpose — if verbosity weighting is ever tightened, this golden should
@@ -379,7 +380,7 @@ const GOLDEN: Record<string, { total: number; grade: ScoreGrade }> = {
   OVERLONG: { total: 82, grade: "good" },
   UAE_COMPLETE: { total: 100, grade: "excellent" },
   // 96, not 100 — the whole point of A12–A14. 4 raw points of 90.
-  UAE_MISSING: { total: 96, grade: "excellent" },
+  UAE_MISSING: { total: 95, grade: "excellent" },
 };
 
 describe("golden scores (characterization)", () => {
@@ -400,10 +401,10 @@ describe("golden scores (characterization)", () => {
       atsEssentials: 82, // no visa / notice period / licence (A12–A14)
       design: 70, // < 10 skills, < 300 words
     });
-    // good 28, not 30: MID_WEAK passed both of the removed duplicate signals
-    // (S3 phone, S6 summary), so it loses two "good" rows and no fixes.
-    // review 10, not 7: the three unfilled UAE essentials are new review rows.
-    assert.deepEqual(r.issueCounts, { error: 2, review: 10, good: 28 });
+    // good 27, not 30: MID_WEAK passed all three removed duplicate signals
+    // (S2 email, S3 phone, S6 summary), so it loses three "good" rows and no
+    // fixes. review 10, not 7: the three unfilled UAE essentials are new rows.
+    assert.deepEqual(r.issueCounts, { error: 2, review: 10, good: 27 });
   });
 
   test("report shape: 4 categories in canonical order, weights sum to 1", () => {
@@ -437,11 +438,13 @@ describe("golden scores (characterization)", () => {
 describe("scoring rubric version", () => {
   // Every non-conditional signal is applicable on a blank CV and none are
   // trimmed (a blank CV has no "good" rows), so EMPTY surfaces the full set.
-  const RUBRIC_2_SIGNALS = [
+  const RUBRIC_3_SIGNALS = [
     "A1", "A10", "A12", "A13", "A14", "A2", "A7", "A8", "A9",
     "C1", "C11", "C2", "C3", "C5", "C6", "C7", "C8", "C9",
     "D1", "D2", "D4", "D5", "D8", "D9",
-    "S10", "S11", "S2", "S4", "S5", "S7", "S8", "S9",
+    // No S2/S3/S6 — email, phone and summary presence are each scored once,
+    // in A1, A2 and C1 respectively.
+    "S10", "S11", "S4", "S5", "S7", "S8", "S9",
   ];
 
   test("the builder-mode signal set matches the declared rubric version", () => {
@@ -451,13 +454,13 @@ describe("scoring rubric version", () => {
       .sort();
     assert.deepEqual(
       ids,
-      RUBRIC_2_SIGNALS,
+      RUBRIC_3_SIGNALS,
       "The sub-signal set changed. That makes every stored ScoreBaseline " +
         "incomparable to a live score, so bump SCORING_RUBRIC_VERSION in " +
         "lib/scoreEngine.ts (and update this list) — otherwise returning " +
         "users see a delta pill for a CV they never touched.",
     );
-    assert.equal(SCORING_RUBRIC_VERSION, 2, "bump me with the list above");
+    assert.equal(SCORING_RUBRIC_VERSION, 3, "bump me with the list above");
   });
 });
 
@@ -578,7 +581,7 @@ describe("hasQuantifiedMetric", () => {
 // these tests pin the single-charge behaviour so a duplicate can't creep back.
 
 describe("duplicate signals are charged once", () => {
-  const RAW_MAX_BUILDER = 90; // sum of applicable sub-signal points, builder mode
+  const RAW_MAX_BUILDER = 87; // sum of applicable sub-signal points, builder mode
 
   const expectedAfterLosing = (points: number) =>
     Math.round(((RAW_MAX_BUILDER - points) / RAW_MAX_BUILDER) * 100);
@@ -586,7 +589,7 @@ describe("duplicate signals are charged once", () => {
   test("clearing ONLY the phone costs one 3-point signal, not two", () => {
     const noPhone = clone(STRONG_FINANCE);
     noPhone.personal.phone = "";
-    // 3 points of 90 => 97. Before the dedupe this was 6 of 92 => 93.
+    // 3 points of 87 => 97. Before the dedupe this was 6 of 92 => 93.
     assert.equal(computeScore(noPhone).total, expectedAfterLosing(3));
     assert.equal(computeScore(noPhone).total, 97);
   });
@@ -608,6 +611,38 @@ describe("duplicate signals are charged once", () => {
         .map((i) => `${i.signal}:${i.title}`)
         .join(" | ")}`,
     );
+  });
+
+  test("clearing ONLY the email costs one 3-point signal, not two", () => {
+    const noEmail = clone(STRONG_FINANCE);
+    noEmail.personal.email = "";
+    // Before the dedupe this was 6 of 92 => 93.
+    assert.equal(computeScore(noEmail).total, expectedAfterLosing(3));
+    assert.equal(computeScore(noEmail).total, 97);
+  });
+
+  test("a missing email raises exactly one issue row", () => {
+    const noEmail = clone(STRONG_FINANCE);
+    noEmail.personal.email = "";
+    const emailIssues = computeScore(noEmail)
+      .categories.flatMap((c) => c.issues)
+      .filter((i) => /email/i.test(i.title));
+    assert.equal(emailIssues.length, 1, "one empty field, one row");
+    assert.equal(emailIssues[0].signal, "A1", "ATS is the surviving home");
+  });
+
+  test("a malformed email is still caught, and still costs 3", () => {
+    // A1 is strictly more informative than the S2 it replaced: it also fails
+    // on a present-but-garbled address, which S2 passed.
+    const bad = clone(STRONG_FINANCE);
+    bad.personal.email = "imran.sheikh(at)example.com";
+    const r = computeScore(bad);
+    assert.equal(r.total, expectedAfterLosing(3));
+    const emailIssues = r.categories
+      .flatMap((c) => c.issues)
+      .filter((i) => /email/i.test(i.title));
+    assert.equal(emailIssues.length, 1);
+    assert.match(emailIssues[0].title, /looks invalid/);
   });
 
   test("a missing phone raises exactly one issue row", () => {
@@ -672,7 +707,7 @@ describe("monotonicity invariants", () => {
     const missing = computeScore(UAE_MISSING).total;
     assert.ok(complete > missing, `${complete} should beat ${missing}`);
     assert.equal(complete, 100);
-    assert.equal(missing, 96); // 4 raw points of the 90-point builder max
+    assert.equal(missing, 95); // 4 raw points of the 87-point builder max
   });
 
   test("each UAE essential is worth its stated points, independently", () => {
@@ -682,7 +717,7 @@ describe("monotonicity invariants", () => {
       return computeScore(cv).total;
     };
     const full = computeScore(UAE_COMPLETE).total;
-    const RAW_MAX = 90;
+    const RAW_MAX = 87;
     const drop = (points: number) =>
       full - Math.round(((RAW_MAX - points) / RAW_MAX) * 100);
 
@@ -749,9 +784,9 @@ describe("monotonicity invariants", () => {
     assert.ok(dirty.total < clean.total);
     // Golden checker-mode totals (observed, then locked). The 10 conditional
     // points (C12 C13 A3 A4 A5) all pass on clean signals and all fail on
-    // dirty ones: 100/100 -> 100 vs 90/100 -> 90. (The checker max moved
-    // 102 -> 96 -> 100 across the dedupe and the UAE essentials; the two
-    // totals happen to land on the same numbers they had before.)
+    // dirty ones: 97/97 -> 100 vs 87/97 -> 90. (The checker max moved
+    // 102 -> 96 -> 100 -> 97 across the three dedupes and the UAE essentials;
+    // the two totals happen to land on the same numbers they had before.)
     assert.equal(clean.total, 100);
     assert.equal(dirty.total, 90);
   });

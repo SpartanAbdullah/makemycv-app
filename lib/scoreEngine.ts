@@ -48,7 +48,7 @@ export type ScoreMode = "builder" | "checker";
  * The characterization tests in scoreEngine.test.ts pin the signal set and the
  * golden totals, so a rubric change that forgets to bump this fails there.
  */
-export const SCORING_RUBRIC_VERSION = 2;
+export const SCORING_RUBRIC_VERSION = 3;
 
 export type ScoreOptions = {
   mode?: ScoreMode;
@@ -724,7 +724,11 @@ function evaluateContent(
   return out;
 }
 
-function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
+// No `mode` parameter: every signal in this category is now mode-neutral.
+// S2/S3/S6 were the only ones that reworded for builder vs checker, and all
+// three were duplicates that now live in A1/A2/C1 — which still carry the
+// mode-specific copy.
+function evaluateSections(cv: CvData): SubSignal[] {
   const p = cv.personal;
   const hasName = Boolean(p.firstName.trim() || p.lastName.trim());
   const expEntries = cv.experience.filter((e) => e.company.trim() || e.role.trim());
@@ -732,21 +736,17 @@ function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
 
   const out: SubSignal[] = [];
 
-  // S2 Email present (3)
-  out.push(
-    sig(
-      "S2",
-      "sections",
-      3,
-      Boolean(p.email.trim()),
-      p.email.trim() ? "good" : "error",
-      {
-        title: p.email.trim() ? "Email present" : mode === "builder" ? "Add your email address" : "No email detected",
-        description: "UAE recruiters and ATS systems filter by email first.",
-        actionable: p.email.trim() ? "" : "Add a professional email in the contact section.",
-      },
-    ),
-  );
+  // S2 (Email present, 3) was REMOVED — the same duplicate-signal defect as S3
+  // below, one step subtler. A1 in ATS Essentials tests presence AND format
+  // (`Boolean(email) && EMAIL_REGEX.test(email)`), so it already fails on every
+  // CV S2 failed: a missing email cost 6 points and printed two rows saying the
+  // same thing ("Add your email address" / "No email address detected"). A1 is
+  // strictly more informative — it also catches a present-but-garbled address —
+  // so nothing is lost by folding S2 into it.
+  //
+  // This leaves both machine-readable contact fields, email and phone, scored
+  // once each in ATS Essentials, which is where the rest of the parser-facing
+  // contract already lives (dates, company names, headline).
 
   // S3 (Phone present, 3) was REMOVED — it was byte-identical to A2 in ATS
   // Essentials, so one empty phone field cost 6 points and produced two
@@ -901,13 +901,19 @@ function evaluateAts(
           ? "Email format is valid"
           : email
             ? "Email format looks invalid"
-            : "No email address detected",
+            : mode === "builder"
+              ? "Add your email address"
+              : "No email address detected",
         description: pass
           ? ""
           : email
             ? `"${email}" didn't match a standard email pattern — parser may have garbled it.`
-            : "Every UAE ATS filters by email. No email means no application.",
-        actionable: pass ? "" : email ? "Confirm the email reads cleanly (e.g. name@domain.com)." : "Add a professional email address.",
+            : "Every UAE ATS filters by email first. No email means no application.",
+        actionable: pass
+          ? ""
+          : email
+            ? "Confirm the email reads cleanly (e.g. name@domain.com)."
+            : "Add a professional email in the contact section.",
       }),
     );
   }
@@ -1467,7 +1473,7 @@ export function computeScore(
 
   const allSignals: SubSignal[] = [
     ...evaluateContent(cv, signals, mode),
-    ...evaluateSections(cv, mode),
+    ...evaluateSections(cv),
     ...evaluateAts(cv, signals, mode),
     ...evaluateDesign(cv),
   ];
