@@ -265,7 +265,9 @@ function evaluateContent(
 
   const out: SubSignal[] = [];
 
-  // C1 Summary present (3)
+  // C1 Summary present (3) — the ONLY summary-presence signal. The former S6
+  // in Sections ran the identical check and has been removed; its ATS-heading
+  // rationale is folded into the copy here.
   {
     const pass = summary.length > 0;
     out.push(
@@ -277,10 +279,10 @@ function evaluateContent(
             : "No summary section detected",
         description: pass
           ? "Your summary opens the CV with a positioning statement, not a job list."
-          : "Recruiters read the summary first. Without one, the CV opens cold.",
+          : "Recruiters read the summary first. Without one, the CV opens cold — and some ATS parsers rely on the 'Summary' heading to identify the professional profile at all.",
         actionable: pass
           ? ""
-          : "Add a 40–60 word summary at the top with years of experience, industry, and one quantified result.",
+          : "Add a section titled 'Summary' or 'Professional Profile' above your experience, with 40–60 words covering years of experience, industry, and one quantified result.",
       }),
     );
   }
@@ -597,21 +599,12 @@ function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
     ),
   );
 
-  // S3 Phone present (3)
-  out.push(
-    sig(
-      "S3",
-      "sections",
-      3,
-      Boolean(p.phone.trim()),
-      p.phone.trim() ? "good" : "error",
-      {
-        title: p.phone.trim() ? "Phone present" : mode === "builder" ? "Add your phone number" : "No phone number detected",
-        description: "UAE recruiters call first. A missing phone number is a hard blocker.",
-        actionable: p.phone.trim() ? "" : "Add a UAE-format phone number (+971 …) to the contact block.",
-      },
-    ),
-  );
+  // S3 (Phone present, 3) was REMOVED — it was byte-identical to A2 in ATS
+  // Essentials, so one empty phone field cost 6 points and produced two
+  // near-identical issue rows on the report. A2 is the surviving home for the
+  // signal and inherited S3's copy. IDs are deliberately NOT renumbered:
+  // ScoreIssue.signal is documented as a stable key for weight tuning and
+  // tests, so a gap is cheaper than a silent re-mapping.
 
   // S4 Location present (3)
   out.push(
@@ -643,19 +636,10 @@ function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
     );
   }
 
-  // S6 Summary populated (3)
-  {
-    const has = Boolean(p.summary.trim());
-    out.push(
-      sig("S6", "sections", 3, has, has ? "good" : "error", {
-        title: has ? "Summary section populated" : "No summary section",
-        description: has
-          ? "Your summary opens the CV with positioning, not a job list."
-          : "Some ATS parsers rely on the 'Summary' heading to identify the professional profile.",
-        actionable: has ? "" : "Add a section titled 'Summary' or 'Professional Profile' above your experience.",
-      }),
-    );
-  }
+  // S6 (Summary populated, 3) was REMOVED — same duplicate-signal problem as
+  // S3: it tested `p.summary.trim()`, exactly what C1 already tests in
+  // Content, so a missing summary was charged twice. C1 is the surviving home
+  // and absorbed the ATS-heading rationale from this signal's copy.
 
   // S7 ≥ 1 experience entry (3)
   {
@@ -779,14 +763,21 @@ function evaluateAts(
     );
   }
 
-  // A2 Phone present (3)
+  // A2 Phone present (3) — the ONLY phone signal. The former S3 in Sections
+  // ran the identical check and has been removed; its copy lives here now.
   {
     const pass = Boolean(p.phone.trim());
     out.push(
       sig("A2", "atsEssentials", 3, pass, pass ? "good" : "error", {
-        title: pass ? "Phone number present" : "No phone number",
-        description: pass ? "" : "ATS systems treat phone as a required contact channel.",
-        actionable: pass ? "" : "Add a UAE-format phone number (+971 …).",
+        title: pass
+          ? "Phone number present"
+          : mode === "builder"
+            ? "Add your phone number"
+            : "No phone number detected",
+        description: pass
+          ? ""
+          : "ATS systems treat phone as a required contact channel, and UAE recruiters call first — a missing number is a hard blocker.",
+        actionable: pass ? "" : "Add a UAE-format phone number (+971 …) to the contact block.",
       }),
     );
   }

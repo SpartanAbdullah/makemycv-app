@@ -359,16 +359,19 @@ if (process.env.DUMP === "1") {
 
 // grade thresholds the engine used when these were captured: >=85 excellent,
 // >=65 good, >=40 needs-work, else poor (gradeFromTotal).
+// Re-captured after the S3/A2 (phone) and S6/C1 (summary) duplicate-signal
+// removal: the builder-mode denominator dropped from 92 to 86 raw points, so
+// every fixture that isn't a 0 or a 100 shifted.
 const GOLDEN: Record<string, { total: number; grade: ScoreGrade }> = {
   EMPTY: { total: 0, grade: "poor" },
-  MINIMAL: { total: 24, grade: "poor" },
-  MID_WEAK: { total: 77, grade: "good" },
+  MINIMAL: { total: 22, grade: "poor" },
+  MID_WEAK: { total: 76, grade: "good" },
   STRONG_FINANCE: { total: 100, grade: "excellent" },
-  // Yes, 87/"excellent": today's engine only docks C4/C9/C10/D3/D6/D7 for
-  // verbosity (13 pts of 92), so an overstuffed CV still lands high. Locked
+  // Yes, 86/"excellent": today's engine only docks C4/C9/C10/D3/D6/D7 for
+  // verbosity (13 pts of 86), so an overstuffed CV still lands high. Locked
   // in on purpose — if verbosity weighting is ever tightened, this golden
   // should fail and be updated consciously.
-  OVERLONG: { total: 87, grade: "excellent" },
+  OVERLONG: { total: 86, grade: "excellent" },
   UAE_COMPLETE: { total: 100, grade: "excellent" },
   UAE_MISSING: { total: 100, grade: "excellent" },
 };
@@ -391,7 +394,9 @@ describe("golden scores (characterization)", () => {
       atsEssentials: 100,
       design: 70, // < 10 skills, < 300 words
     });
-    assert.deepEqual(r.issueCounts, { error: 2, review: 7, good: 30 });
+    // 28, not 30: MID_WEAK passed both of the removed duplicate signals
+    // (S3 phone, S6 summary), so it loses two "good" rows and no fixes.
+    assert.deepEqual(r.issueCounts, { error: 2, review: 7, good: 28 });
   });
 
   test("report shape: 4 categories in canonical order, weights sum to 1", () => {
@@ -411,6 +416,57 @@ describe("golden scores (characterization)", () => {
     assert.equal(s.uaeFilledCount, 3);
     assert.equal(s.expectedPages, 2); // 3 roles > 2-role single-page heuristic
     assert.equal(computeDerivedStats(MINIMAL).expectedPages, 1);
+  });
+});
+
+// --- 1b. No signal is charged twice -----------------------------------------
+//
+// Phone was checked identically by S3 (Sections) and A2 (ATS), and summary
+// presence by S6 (Sections) and C1 (Content). One empty field cost 6 points
+// and produced two near-identical rows on the report. S3 and S6 were removed;
+// these tests pin the single-charge behaviour so a duplicate can't creep back.
+
+describe("duplicate signals are charged once", () => {
+  const RAW_MAX_BUILDER = 86; // sum of applicable sub-signal points, builder mode
+
+  const expectedAfterLosing = (points: number) =>
+    Math.round(((RAW_MAX_BUILDER - points) / RAW_MAX_BUILDER) * 100);
+
+  test("clearing ONLY the phone costs one 3-point signal, not two", () => {
+    const noPhone = clone(STRONG_FINANCE);
+    noPhone.personal.phone = "";
+    // 3 points of 86 => 97. Before the dedupe this was 6 of 92 => 93.
+    assert.equal(computeScore(noPhone).total, expectedAfterLosing(3));
+    assert.equal(computeScore(noPhone).total, 97);
+  });
+
+  test("clearing ONLY the summary costs one 3-point presence signal", () => {
+    const noSummary = clone(STRONG_FINANCE);
+    noSummary.personal.summary = "";
+    // C1 (presence, 3) is the only presence charge now. C2/C3 also fail, and
+    // C4 goes not-applicable — so this asserts the phone-style single charge
+    // via the issue list rather than the total.
+    const r = computeScore(noSummary);
+    const summaryPresenceIssues = r.categories
+      .flatMap((c) => c.issues)
+      .filter((i) => /no summary section|add a professional summary/i.test(i.title));
+    assert.equal(
+      summaryPresenceIssues.length,
+      1,
+      `a missing summary should raise exactly one presence issue, got ${summaryPresenceIssues
+        .map((i) => `${i.signal}:${i.title}`)
+        .join(" | ")}`,
+    );
+  });
+
+  test("a missing phone raises exactly one issue row", () => {
+    const noPhone = clone(STRONG_FINANCE);
+    noPhone.personal.phone = "";
+    const phoneIssues = computeScore(noPhone)
+      .categories.flatMap((c) => c.issues)
+      .filter((i) => /phone/i.test(i.title));
+    assert.equal(phoneIssues.length, 1, "one empty field, one row");
+    assert.equal(phoneIssues[0].signal, "A2", "ATS is the surviving home");
   });
 });
 
