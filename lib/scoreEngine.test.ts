@@ -30,6 +30,7 @@ import { strict as assert } from "node:assert";
 import {
   computeDerivedStats,
   computeScore,
+  hasQuantifiedMetric,
   GRADE_CHIP_LABELS,
   GRADE_LABELS,
 } from "./scoreEngine";
@@ -421,6 +422,71 @@ describe("golden scores (characterization)", () => {
     assert.equal(s.uaeFilledCount, 3);
     assert.equal(s.expectedPages, 2); // 3 roles > 2-role single-page heuristic
     assert.equal(computeDerivedStats(MINIMAL).expectedPages, 1);
+  });
+});
+
+// --- 1a. Quantification means a metric, not merely a digit ------------------
+//
+// C3, C7, C8 and measurableBullets used to test `/\d/` — "is there a digit
+// anywhere" — which credited dates, version numbers, standards and phase
+// labels as quantified impact.
+
+describe("hasQuantifiedMetric", () => {
+  const yes = [
+    "Reduced procurement lead time by 40%",
+    "Managed a team of 25 engineers",
+    "Led a team of 5 engineers",
+    "Negotiated AED 12M in annual supplier contracts",
+    "Cut spend by $1.2M across the portfolio",
+    "Grew digital revenue 3x in two years",
+    "Coordinated 200+ monthly shipments across the GCC",
+    "Trained 4 junior associates on sampling methodology",
+    "Coordinated the annual external audit across 3 legal entities",
+    "Improved forecast accuracy by 18 percent",
+    "Lifted CSAT to 94% over two years",
+    "Handled 15 clients across banking and insurance",
+  ];
+
+  const no = [
+    "Responsible for the Phase 2 rollout",
+    "Joined in 2019",
+    "Migrated the estate to Windows 10",
+    "Audited the plant to ISO 9001",
+    "Prepared statements under IFRS 9",
+    "Delivered 2nd line support for the regional desk",
+    "Owned the Q3 planning cycle",
+    "Administered Odoo 17 across sales and purchase",
+    "Deployed version 2.1 of the internal portal",
+    "Worked from Office 5, Tier 1 building",
+    "Prepared audit working papers with zero review reopens",
+    "Responsible for managing key accounts and daily sales operations",
+  ];
+
+  for (const text of yes) {
+    test(`quantified: ${text}`, () => {
+      assert.equal(hasQuantifiedMetric(text), true);
+    });
+  }
+  for (const text of no) {
+    test(`NOT quantified: ${text}`, () => {
+      assert.equal(hasQuantifiedMetric(text), false);
+    });
+  }
+
+  test("empty and digit-free text are not quantified", () => {
+    assert.equal(hasQuantifiedMetric(""), false);
+    assert.equal(hasQuantifiedMetric("Led the regional operations team"), false);
+  });
+
+  test("a label and a real metric in one bullet still counts", () => {
+    assert.equal(
+      hasQuantifiedMetric("Delivered IFRS 9 impairment models that cut variance by 12%"),
+      true,
+    );
+    assert.equal(
+      hasQuantifiedMetric("Owned the Phase 2 rollout, cutting lead time 40%"),
+      true,
+    );
   });
 });
 

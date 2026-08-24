@@ -61,9 +61,10 @@ export const GRADE_CHIP_LABELS: Record<ScoreGrade, string> = {
 // --- Derived stats (audit §4) ---
 //
 // The Review step used to re-implement these with subtly different rules
-// (untrimmed bullets, its own /\d/ test), so "X of Y measurable bullets"
+// (untrimmed bullets, its own digit test), so "X of Y measurable bullets"
 // could disagree with what the engine actually scored. One implementation,
-// engine-consistent trimming.
+// engine-consistent trimming, and one shared definition of "measurable"
+// (hasQuantifiedMetric, below).
 
 export type ScoreDerivedStats = {
   totalBullets: number;
@@ -77,7 +78,7 @@ export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
   const bullets = cv.experience.flatMap((e) =>
     e.bullets.map((b) => b.trim()).filter(Boolean),
   );
-  const measurableBullets = bullets.filter((b) => /\d/.test(b)).length;
+  const measurableBullets = bullets.filter(hasQuantifiedMetric).length;
   const uaeFilledCount = [
     cv.personal.visaStatus,
     cv.personal.availability,
@@ -91,6 +92,82 @@ export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
     uaeFilledCount,
     expectedPages,
   };
+}
+
+// --- Quantification detection ---
+//
+// C3, C7, C8 and measurableBullets all used to ask `/\d/.test(text)` — "does
+// this string contain a digit anywhere". That counted a bullet as quantified
+// for a date ("Joined in 2019"), a version number ("migrated to Windows 10"),
+// a standard ("audited to ISO 9001"), a phase label ("owned the Phase 2
+// rollout") or a street address. None of those are performance metrics, so the
+// engine congratulated CVs that measure nothing and the "X of Y measurable
+// bullets" line on the Review step overstated the same way.
+//
+// Two stages: strip digit contexts that are LABELS, then look for digits that
+// carry a unit, a currency, a percentage, a multiplier or a magnitude.
+
+/**
+ * Digit contexts that are labels rather than measurements. Removed before the
+ * metric test so they can never satisfy it. Every rule is direction-sensitive:
+ * "Phase 2" is a label, "2 phases" is a count, and only the former matches.
+ */
+const NON_METRIC_CONTEXT_RE = new RegExp(
+  [
+    // Years — the single most common false positive.
+    "\\b(?:19|20)\\d{2}\\b",
+    // Standards and regulations: ISO 9001, IFRS 9, IAS 16.
+    "\\b(?:iso|iec|ias|ifrs|osha|ansi|astm|nfpa|sae|gdpr|pci\\s*dss)\\s*[-:]?\\s*\\d+(?:[-:.]\\d+)*",
+    // Product and version numbers: Windows 10, Odoo 17, SAP S/4, v2.1.
+    "\\b(?:v|ver|version|windows|office|odoo|sap|oracle|excel|word|powerpoint|outlook|ios|android|python|java|php|node|angular|react|autocad|revit|primavera|p6|sql\\s*server)\\s*\\.?\\s*\\d+(?:\\.\\d+)*",
+    // Ordinal position labels: Phase 2, Q3, Tier 1, Site 4, Level 2.
+    "\\b(?:phase|stage|tier|level|grade|band|q|quarter|round|batch|site|zone|block|plot|building|floor|room|wave|line|category)\\s*[-#]?\\s*\\d+\\b",
+    // Written ordinals: 3rd party, 2nd line support.
+    "\\b\\d+(?:st|nd|rd|th)\\b",
+  ].join("|"),
+  "gi",
+);
+
+/** Digits that DO carry a measurement. Checked after the label strip above. */
+const METRIC_PATTERNS: RegExp[] = [
+  // Percentages.
+  /\d+(?:\.\d+)?\s*%/,
+  /\d+(?:\.\d+)?\s*per\s?cent/i,
+  // Currency — symbol-first or code-first, with optional k/m/bn magnitude.
+  /(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dhs?|[$€£¥₹])\s*\d/i,
+  /\d+(?:[.,]\d+)?\s*(?:k|m|mn|bn|b)?\s*(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dirhams?|dollars?)\b/i,
+  // Multipliers: 3x, 2.5X, 5 times.
+  /\b\d+(?:\.\d+)?\s*[xX]\b/,
+  /\b\d+(?:\.\d+)?\s*times\b/i,
+  // Counted things — the scale of the work.
+  /\b\d+(?:\.\d+)?\s*\+?\s*(?:users?|clients?|projects?|teams?|staff|employees?|reports?|units?|orders?|leads?|deals?|accounts?|customers?|suppliers?|vendors?|stores?|sites?|branches|outlets?|countries|markets?|people|members?|tickets?|invoices?|shipments?|containers?|skus?|hours?|days?|weeks?|months?)\b/i,
+  // Generic count: a number followed by a plural noun, optionally with an
+  // adjective or two in between — "4 junior associates", "3 legal entities",
+  // "12 analyst hours". This is what makes the list above a shortcut rather
+  // than an exhaustive vocabulary. It is only safe BECAUSE the label contexts
+  // are stripped first: "Phase 2 deliverables" and "ISO 9001 standards" have
+  // no digit left by the time this runs.
+  /\b\d+(?:\.\d+)?\s*\+?\s+(?:[a-z-]+\s+){0,2}[a-z-]{3,}s\b/i,
+  // Headcount phrased the other way round: "a team of 5 engineers".
+  /\bteams?\s+of\s+\d+/i,
+  /\b\d+\s*(?:direct\s+reports?|fte|headcount)\b/i,
+  // Direction of change.
+  /\b\d+(?:\.\d+)?\s*\+?\s*(?:more|less|fewer|increase|decrease|reduction|growth|improvement|savings?)\b/i,
+  // Anything left with two or more digits is a magnitude worth crediting —
+  // the label contexts that used to dominate this class are already gone.
+  /\b\d{2,}\b/,
+];
+
+/**
+ * True when the text states a measurable outcome, rather than merely
+ * containing a digit. Exported so the check has exactly one definition and can
+ * be tested directly.
+ */
+export function hasQuantifiedMetric(text: string): boolean {
+  if (!text) return false;
+  const stripped = text.replace(NON_METRIC_CONTEXT_RE, " ");
+  if (!/\d/.test(stripped)) return false;
+  return METRIC_PATTERNS.some((re) => re.test(stripped));
 }
 
 // --- Word / text helpers ---
@@ -309,12 +386,12 @@ function evaluateContent(
 
   // C3 Summary contains number/metric (3)
   {
-    const pass = summary.length > 0 && /\d/.test(summary);
+    const pass = summary.length > 0 && hasQuantifiedMetric(summary);
     out.push(
       sig("C3", "content", 3, pass, pass ? "good" : "review", {
         title: pass
           ? "Summary includes a concrete number"
-          : "Summary has no numbers or metrics",
+          : "Summary has no measurable result",
         description: pass
           ? "Numbers signal outcomes. Recruiters read this first and it sets the tone."
           : "'Strong background in ops' is forgettable. 'Managed 25-person ops team, cut cost by 18%' is not.",
@@ -389,9 +466,9 @@ function evaluateContent(
     );
   }
 
-  // C7 ≥ 25% bullets contain a number (3)
+  // C7 ≥ 25% bullets state a measurable outcome (3)
   {
-    const numCount = allBullets.filter((b) => /\d/.test(b)).length;
+    const numCount = allBullets.filter(hasQuantifiedMetric).length;
     const ratio = allBullets.length > 0 ? numCount / allBullets.length : 0;
     const pass = allBullets.length > 0 && ratio >= 0.25;
     out.push(
@@ -400,7 +477,7 @@ function evaluateContent(
           ? `${numCount} of ${allBullets.length} bullets quantify impact`
           : allBullets.length === 0
             ? "No bullets to evaluate"
-            : `Only ${numCount} of ${allBullets.length} bullets contain numbers`,
+            : `Only ${numCount} of ${allBullets.length} bullets quantify impact`,
         description: pass
           ? "Numbers, percentages, and currency anchor your bullets in outcomes."
           : "Recruiters scan for measurable outcomes. Bullets without metrics are easy to skip.",
@@ -411,9 +488,9 @@ function evaluateContent(
     );
   }
 
-  // C8 ≥ 50% bullets contain a number (2) — stretch
+  // C8 ≥ 50% bullets state a measurable outcome (2) — stretch
   {
-    const numCount = allBullets.filter((b) => /\d/.test(b)).length;
+    const numCount = allBullets.filter(hasQuantifiedMetric).length;
     const ratio = allBullets.length > 0 ? numCount / allBullets.length : 0;
     const pass = allBullets.length > 0 && ratio >= 0.5;
     out.push(
