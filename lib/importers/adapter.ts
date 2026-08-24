@@ -2,6 +2,8 @@
 // Each adapter (PDF/DOCX/LinkedIn) returns a ParsedDocument which is then
 // reviewed by the user and mapped into CvData by fieldMapper.ts.
 
+import type { LanguageLevel } from "../types/cv";
+
 export type ParsedContact = {
   name?: string;
   /** Professional headline / tagline. Set either when the source already
@@ -53,6 +55,14 @@ export type ParsedProject = {
   bullets?: string[];
 };
 
+/** A language with the proficiency qualifier the CV actually stated, mapped to
+ *  the CvLanguage.level enum. `level` is absent when the CV listed the
+ *  language bare ("Urdu") — we never invent a proficiency. */
+export type ParsedLanguage = {
+  name: string;
+  level?: LanguageLevel;
+};
+
 /** UAE recruiter-signal fields harvested from labeled lines
  *  ("Visa Status: ...", "Nationality: ...", "Notice Period: ..."). */
 export type ParsedUaeFields = {
@@ -72,7 +82,15 @@ export type ParsedDocument = {
   experience?: ParsedExperience[];
   education?: ParsedEducation[];
   skills?: string[];
+  /** Language NAMES only. Stays the canonical list — MappingReview, the
+   *  resume-checker fallback and the fixtures all read it — so adding levels
+   *  never changes this field's shape. */
   languages?: string[];
+  /** Same languages, index-aligned with `languages`, carrying the proficiency
+   *  level the CV stated. Optional so adapters that don't produce levels (and
+   *  older persisted payloads) stay valid; fieldMapper falls back to
+   *  `languages` when it is absent. */
+  languageDetails?: ParsedLanguage[];
   certifications?: ParsedCertification[];
   /** Detected Projects section - was silently discarded before the 2026-06
    *  wave-3 parser work. */

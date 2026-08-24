@@ -25,9 +25,11 @@ import type {
   ParsedExperience,
   ParsedEducation,
   ParsedCertification,
+  ParsedLanguage,
   ParsedProject,
   ParsedUaeFields,
 } from "./adapter";
+import type { LanguageLevel } from "../types/cv";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
 
@@ -760,6 +762,51 @@ function flattenList(lines: string[]): string[] {
     .filter(Boolean);
 }
 
+// ── Language proficiency levels ──────────────────────────────────────────────
+//
+// CvLanguage.level has always existed; imports just never filled it, so every
+// imported CV lost the qualifier the candidate wrote. UAE recruiters screen on
+// Arabic proficiency specifically, so "Arabic (Native)" collapsing to "Arabic"
+// threw away the single most-screened signal in the section.
+//
+// ORDER IS LOAD-BEARING — first match wins, most specific first:
+//   * "full professional" must beat plain "professional";
+//   * "professional working" is LinkedIn's *lower* professional rung and maps
+//     to "professional", so it must be matched by the plain rule, not by the
+//     "full professional" one;
+//   * "native or bilingual" is one rung, so "bilingual" resolves to native.
+// CEFR bands are included because two-column exports often render only those.
+const LANGUAGE_LEVEL_PATTERNS: Array<{ re: RegExp; level: LanguageLevel }> = [
+  { re: /\b(?:mother\s*-?\s*tongue|mothertongue|native|bilingual)\b/i, level: "native" },
+  { re: /\bfull(?:y)?\s+professional\b/i, level: "full_professional" },
+  { re: /\b(?:fluent|fluency|proficient|proficiency\s+high|c2)\b/i, level: "fluent" },
+  { re: /\b(?:professional|business|working|c1)\b/i, level: "professional" },
+  { re: /\badvanced\b/i, level: "advanced" },
+  { re: /\b(?:conversational|conversation|b2)\b/i, level: "conversational" },
+  { re: /\b(?:intermediate|b1)\b/i, level: "intermediate" },
+  { re: /\b(?:elementary|basic|limited|a2|a1)\b/i, level: "elementary" },
+  { re: /\bbeginner\b/i, level: "beginner" },
+];
+
+/** The proficiency stated for a language entry, or undefined when the CV
+ *  listed it bare. Only the qualifier tail is scanned — the language name
+ *  itself is stripped first so a name can never be read as a level. */
+function detectLanguageLevel(entry: string, name: string): LanguageLevel | undefined {
+  const qualifier = name && entry.startsWith(name) ? entry.slice(name.length) : entry;
+  for (const { re, level } of LANGUAGE_LEVEL_PATTERNS) {
+    if (re.test(qualifier)) return level;
+  }
+  return undefined;
+}
+
+/** Split one raw languages-section entry into name + level. */
+function parseLanguageEntry(raw: string): ParsedLanguage {
+  const entry = raw.trim();
+  const name = stripLanguageLevel(entry);
+  const level = detectLanguageLevel(entry, name);
+  return level ? { name, level } : { name };
+}
+
 function stripLanguageLevel(name: string): string {
   // Drop trailing parenthetical or dash-separated level qualifier.
   // Examples:
@@ -874,6 +921,7 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
   if (!skills.some(isHeadingOnlyLine)) return;
 
   const languages = result.languages ?? [];
+  const languageDetails = result.languageDetails ?? [];
   const certifications = result.certifications ?? [];
   const langSeen = new Set(languages.map((l) => l.toLowerCase()));
   const certSeen = new Set(certifications.map((c) => certKey(c.name ?? "")));
@@ -890,6 +938,11 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
       const key = lang.toLowerCase();
       if (!langSeen.has(key)) {
         languages.push(lang);
+        // The rescue only fires on entries that CARRY a qualifier, so the
+        // level is the whole reason we recognised this as a language — keep it
+        // rather than re-flattening to a bare name.
+        const level = detectLanguageLevel(s, lang);
+        languageDetails.push(level ? { name: lang, level } : { name: lang });
         langSeen.add(key);
       }
       continue;
@@ -914,6 +967,7 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
 
   result.skills = kept;
   result.languages = languages;
+  result.languageDetails = languageDetails;
   result.certifications = certifications;
 }
 
@@ -1293,11 +1347,14 @@ export function parseTextToDocument(text: string): ParsedDocument {
 
   result.skills = flattenList(buffers.skills);
 
-  // Languages: keep just the language name (strip any "(Level)" qualifier);
-  // the field mapper currently only stores name.
-  result.languages = flattenList(buffers.languages)
-    .map(stripLanguageLevel)
-    .filter(Boolean);
+  // Languages: `languages` stays the plain name list (its consumers all read
+  // names), and `languageDetails` carries the same entries with the stated
+  // proficiency mapped to CvLanguage.level. The two are index-aligned.
+  const parsedLanguages = flattenList(buffers.languages)
+    .map(parseLanguageEntry)
+    .filter((l) => l.name);
+  result.languages = parsedLanguages.map((l) => l.name);
+  result.languageDetails = parsedLanguages;
 
   // Two-column PDFs merge section headers onto one line, so languages and
   // certifications can land in Skills — re-route them by content (see

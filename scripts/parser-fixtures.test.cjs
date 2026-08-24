@@ -425,5 +425,66 @@ const runText = (label, text) => {
   }
 }
 
+/* ── (l) language proficiency levels survive the import ─────────────────────
+   stripLanguageLevel threw the qualifier away, so CvLanguage.level — which
+   has always existed — was empty on every imported CV. UAE recruiters screen
+   on Arabic proficiency specifically, so this was the most-screened signal in
+   the section going missing. */
+{
+  const f = "language-levels (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Arabic - Native",
+    "English (Professional Working)",
+    "French — Conversational",
+    "Hindi (Elementary)",
+    "Urdu",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Arabic -> native", byName.Arabic === "native", d.languageDetails);
+  check(f, "English (Professional Working) -> professional", byName.English === "professional", d.languageDetails);
+  check(f, "French -> conversational", byName.French === "conversational", d.languageDetails);
+  check(f, "Hindi -> elementary", byName.Hindi === "elementary", d.languageDetails);
+  check(f, "bare 'Urdu' gets NO invented level", "Urdu" in byName && byName.Urdu === undefined, d.languageDetails);
+  check(f, "names list unchanged in shape", JSON.stringify(d.languages) === JSON.stringify(["Arabic", "English", "French", "Hindi", "Urdu"]), d.languages);
+  check(f, "languageDetails is index-aligned with languages", (d.languageDetails ?? []).map((l) => l.name).join("|") === (d.languages ?? []).join("|"), [d.languages, d.languageDetails]);
+}
+{
+  // "Mother tongue" and "Fluent" are the other two spellings UAE CVs use.
+  const f = "language-levels-variants (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Malayalam (Mother Tongue), English - Fluent, Arabic (Basic)",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Mother Tongue -> native", byName.Malayalam === "native", d.languageDetails);
+  check(f, "Fluent -> fluent", byName.English === "fluent", d.languageDetails);
+  check(f, "Basic -> elementary", byName.Arabic === "elementary", d.languageDetails);
+}
+{
+  // The two-column rescue path also has a level in hand — it only reclassifies
+  // entries that carry a qualifier — so it must keep it too.
+  const f = "two-column-merged-headers.txt";
+  const d = run(f);
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "rescued English keeps 'professional' (C1)", byName.English === "professional", d.languageDetails);
+  check(f, "rescued Arabic keeps 'elementary' (A1-A2)", byName.Arabic === "elementary", d.languageDetails);
+  check(f, "rescued Urdu keeps 'native' (Native / Bilingual)", byName.Urdu === "native", d.languageDetails);
+}
+{
+  const f = "clean-single-column.txt";
+  const d = run(f);
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "English (Fluent) -> fluent", byName.English === "fluent", d.languageDetails);
+  check(f, "Arabic (Native) -> native", byName.Arabic === "native", d.languageDetails);
+  check(f, "bare Urdu keeps no level", "Urdu" in byName && byName.Urdu === undefined, d.languageDetails);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
