@@ -54,6 +54,17 @@ const run = (name) => {
   return doc;
 };
 
+// Inline-text variant of `run` for targeted single-behaviour checks that don't
+// warrant a whole fixture file. Same parser, same reporting.
+const runText = (label, text) => {
+  const doc = parseTextToDocument(text);
+  if (process.env.DUMP) {
+    console.log(`\n===== ${label} (inline) =====`);
+    console.log(JSON.stringify(doc, null, 2));
+  }
+  return doc;
+};
+
 /* ── (a) clean single-column ATS-style ─────────────────────────────────── */
 {
   const f = "clean-single-column.txt";
@@ -209,6 +220,396 @@ const run = (name) => {
   check(f, "'Affiliate Program' stays a skill", has(d.skills, "Affiliate Program"), d.skills);
   check(f, "'Affiliate Program' not moved to certifications", !d.certifications.some((c) => /affiliate program/i.test(c.name)), d.certifications);
   check(f, "real skills intact (Salesforce, Customer Service)", has(d.skills, "Salesforce") && has(d.skills, "Customer Service"), d.skills);
+}
+
+/* ── (h) "to date" is a current-role marker ──────────────────────────────────
+   UAE CVs write open-ended roles as "Jan 2020 – to date" / "March 2022 to
+   date" as often as "Present". PRESENT_RE matched "todate" and "till date"
+   but not the two-word form, so those roles imported with isCurrent: false. */
+{
+  const f = "to-date (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Operations Manager | Acme LLC    March 2022 to date",
+    "• Led a team of 12 across 3 sites",
+    "",
+  ].join("\n"));
+  check(f, "'to date' marks the role current", d.experience[0]?.isCurrent === true, d.experience[0]);
+  check(f, "'to date' still yields the start date", (d.experience[0]?.startDate ?? "").includes("2022"), d.experience[0]?.startDate);
+  check(f, "role survives the 'to date' strip", d.experience[0]?.role === "Operations Manager", d.experience[0]?.role);
+}
+{
+  const f = "to-date-dash (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Procurement Lead | BuildCo LLC",
+    "Jan 2020 – to date",
+    "• Negotiated AED 12M in supplier contracts",
+    "",
+  ].join("\n"));
+  check(f, "'– to date' on its own date line marks current", d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+{
+  const f = "to-present (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Sales Manager | Gulf Retail LLC    Feb 2021 to present",
+    "• Grew regional revenue by 22%",
+    "",
+  ].join("\n"));
+  check(f, "'to present' still marks current", d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+{
+  // Guard on the lookbehind: "up to date" must NOT mark a role current. On
+  // two-column PDFs pdf.js drops bullet glyphs, so this line can reach the
+  // header path where isCurrent is decided.
+  const f = "up-to-date-guard (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Records Officer | Docs LLC    Jan 2018 - Dec 2019",
+    "Kept compliance records up to date",
+    "",
+  ].join("\n"));
+  check(f, "'up to date' does not mark the role current", d.experience.every((e) => e.isCurrent !== true), d.experience);
+}
+
+/* ── (i) numeric date formats keep their month ───────────────────────────────
+   DATE_TOKEN_RE matched "Jan 2024" and a bare "2024" but no numeric form, so
+   "01/2024 - 12/2024" produced two indistinguishable "2024" tokens and the
+   month was lost. MM/YYYY, MM-YYYY and ISO YYYY-MM now parse as one token
+   each — without disturbing a plain year range. */
+{
+  const f = "numeric-slash-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Project Engineer | BuildCo LLC    01/2024 - 12/2024",
+    "• Delivered 4 fit-out packages",
+    "",
+  ].join("\n"));
+  check(f, "MM/YYYY start keeps the month", d.experience[0]?.startDate === "01/2024", d.experience[0]?.startDate);
+  check(f, "MM/YYYY end keeps the month", d.experience[0]?.endDate === "12/2024", d.experience[0]?.endDate);
+}
+{
+  const f = "numeric-dash-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Site Engineer | Gulf Contracting LLC",
+    "03-2019 to 07-2021",
+    "• Supervised 30 subcontractor staff",
+    "",
+  ].join("\n"));
+  check(f, "MM-YYYY start keeps the month", d.experience[0]?.startDate === "03-2019", d.experience[0]?.startDate);
+  check(f, "MM-YYYY end keeps the month", d.experience[0]?.endDate === "07-2021", d.experience[0]?.endDate);
+}
+{
+  const f = "iso-dates (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Analyst | Emirates NBD    2021-03 – 2024-09",
+    "• Cut month-end close from 8 days to 5",
+    "",
+  ].join("\n"));
+  check(f, "ISO YYYY-MM start keeps the month", d.experience[0]?.startDate === "2021-03", d.experience[0]?.startDate);
+  check(f, "ISO YYYY-MM end keeps the month", d.experience[0]?.endDate === "2024-09", d.experience[0]?.endDate);
+}
+{
+  // Regression guard: a bare year RANGE must still parse as two years, not
+  // get half-consumed by the new numeric alternatives.
+  const f = "year-range-unchanged (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Buyer | Al Noor Trading    2018 - 2021",
+    "• Sourced 200+ SKUs",
+    "",
+  ].join("\n"));
+  check(f, "plain year range still yields two years", d.experience[0]?.startDate === "2018" && d.experience[0]?.endDate === "2021", [d.experience[0]?.startDate, d.experience[0]?.endDate]);
+}
+
+/* ── (j) "Personal Details" is a section, not skills overflow ────────────────
+   The heading matched no SECTION_PATTERN, so currentSection stayed on
+   whatever came before it (usually Skills) and every line underneath became
+   a phantom skill: "Nationality: Indian", "Visa Status: Employment Visa". */
+{
+  const f = "personal-details (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "fatima.noor@example.com | +971 50 222 3344",
+    "",
+    "Skills",
+    "Sourcing, Cost Control, SAP MM",
+    "",
+    "Personal Details",
+    "Nationality: Indian",
+    "Visa Status: Employment Visa",
+    "Marital Status: Married",
+    "",
+  ].join("\n"));
+  const skillsLc = d.skills.map((s) => s.toLowerCase());
+  check(f, "3 real skills only", d.skills.length === 3, d.skills);
+  check(f, "nationality is not a skill", !skillsLc.some((s) => s.includes("nationality")), d.skills);
+  check(f, "visa status is not a skill", !skillsLc.some((s) => s.includes("visa")), d.skills);
+  check(f, "marital status is not a skill", !skillsLc.some((s) => s.includes("marital")), d.skills);
+  check(f, "nothing leaked into experience", d.experience.length === 0, d.experience);
+  check(f, "nationality harvested to uae fields", d.uae?.nationality === "Indian", d.uae);
+  check(f, "visa status harvested to uae fields", d.uae?.visaStatus === "Employment Visa", d.uae);
+  check(f, "unrecognised personal line preserved in unplaced", (d.unplaced ?? []).includes("Marital Status: Married"), d.unplaced);
+}
+{
+  // "Personal Information" / "Personal Data" are the same block under
+  // different names, and the block often sits directly under the name — the
+  // contact sweep must not stop at it.
+  const f = "personal-information-top (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "Procurement Specialist",
+    "",
+    "Personal Information",
+    "Email: fatima.noor@example.com",
+    "Phone: +971 50 222 3344",
+    "Nationality: Indian",
+    "",
+    "Skills",
+    "Sourcing, Cost Control",
+    "",
+  ].join("\n"));
+  check(f, "name still harvested above the block", d.contact.name === "Fatima Noor", d.contact.name);
+  check(f, "headline still harvested above the block", d.contact.headline === "Procurement Specialist", d.contact.headline);
+  check(f, "email harvested from under the block", d.contact.email === "fatima.noor@example.com", d.contact.email);
+  check(f, "phone harvested from under the block", (d.contact.phone ?? "").includes("971 50 222 3344"), d.contact.phone);
+  check(f, "the heading itself is never the name", d.contact.name !== "Personal Information", d.contact.name);
+  check(f, "skills unaffected", d.skills.length === 2, d.skills);
+}
+
+/* ── (k) date of birth is harvested, not left to pollute a section ──────────
+   UAE_LABEL_PATTERNS had no DOB entry, so "DOB: 15 Mar 1990" was never
+   consumed and fell through into whatever section was open. */
+{
+  const cases = [
+    ["Date of Birth: 15 March 1990", "15 March 1990"],
+    ["DOB: 15 Mar 1990", "15 Mar 1990"],
+    ["D.O.B.: 15/03/1990", "15/03/1990"],
+    ["Date of Birth - 15/03/1990", "15/03/1990"],
+    ["Birth Date: 15-03-1990", "15-03-1990"],
+  ];
+  for (const [line, expected] of cases) {
+    const f = `dob (inline: ${line})`;
+    const d = runText(f, [
+      "Fatima Noor",
+      "fatima.noor@example.com",
+      "",
+      "Skills",
+      "Sourcing, Cost Control",
+      "",
+      "Personal Details",
+      line,
+      "",
+    ].join("\n"));
+    check(f, `dateOfBirth = ${expected}`, d.uae?.dateOfBirth === expected, d.uae);
+    check(f, "DOB line is not a skill", d.skills.length === 2, d.skills);
+  }
+}
+
+/* ── (l) language proficiency levels survive the import ─────────────────────
+   stripLanguageLevel threw the qualifier away, so CvLanguage.level — which
+   has always existed — was empty on every imported CV. UAE recruiters screen
+   on Arabic proficiency specifically, so this was the most-screened signal in
+   the section going missing. */
+{
+  const f = "language-levels (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Arabic - Native",
+    "English (Professional Working)",
+    "French — Conversational",
+    "Hindi (Elementary)",
+    "Urdu",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Arabic -> native", byName.Arabic === "native", d.languageDetails);
+  check(f, "English (Professional Working) -> professional", byName.English === "professional", d.languageDetails);
+  check(f, "French -> conversational", byName.French === "conversational", d.languageDetails);
+  check(f, "Hindi -> elementary", byName.Hindi === "elementary", d.languageDetails);
+  check(f, "bare 'Urdu' gets NO invented level", "Urdu" in byName && byName.Urdu === undefined, d.languageDetails);
+  check(f, "names list unchanged in shape", JSON.stringify(d.languages) === JSON.stringify(["Arabic", "English", "French", "Hindi", "Urdu"]), d.languages);
+  check(f, "languageDetails is index-aligned with languages", (d.languageDetails ?? []).map((l) => l.name).join("|") === (d.languages ?? []).join("|"), [d.languages, d.languageDetails]);
+}
+{
+  // "Mother tongue" and "Fluent" are the other two spellings UAE CVs use.
+  const f = "language-levels-variants (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Malayalam (Mother Tongue), English - Fluent, Arabic (Basic)",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Mother Tongue -> native", byName.Malayalam === "native", d.languageDetails);
+  check(f, "Fluent -> professional (canonical set has no \"fluent\")", byName.English === "professional", d.languageDetails);
+  check(f, "Basic -> elementary", byName.Arabic === "elementary", d.languageDetails);
+}
+{
+  // The two-column rescue path also has a level in hand — it only reclassifies
+  // entries that carry a qualifier — so it must keep it too.
+  const f = "two-column-merged-headers.txt";
+  const d = run(f);
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "rescued English keeps 'professional' (C1)", byName.English === "professional", d.languageDetails);
+  check(f, "rescued Arabic keeps 'elementary' (A1-A2)", byName.Arabic === "elementary", d.languageDetails);
+  check(f, "rescued Urdu keeps 'native' (Native / Bilingual)", byName.Urdu === "native", d.languageDetails);
+}
+{
+  const f = "clean-single-column.txt";
+  const d = run(f);
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "English (Fluent) -> professional (canonical set has no \"fluent\")", byName.English === "professional", d.languageDetails);
+  check(f, "Arabic (Native) -> native", byName.Arabic === "native", d.languageDetails);
+  check(f, "bare Urdu keeps no level", "Urdu" in byName && byName.Urdu === undefined, d.languageDetails);
+}
+
+/* ── (m) adversarial-review regressions (2026-08-24) ─────────────────────────
+   Each of these was found by an adversarial pass over the ten accuracy fixes
+   and reproduced against the shipped build before being fixed. */
+
+// (m1) A short label plus a numeric range must not be classed as a date-only
+// line — that DELETED the employer, folded its bullets into the previous role
+// and pushed its dates onto the NEXT one.
+{
+  const f = "short-label-numeric-range (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Senior Analyst | HSBC | 2015 - 2018",
+    "• Built the risk model",
+    "FAB 09/2019 - 05/2021",
+    "• Led the migration programme",
+    "Head of Data",
+    "• Owned the warehouse",
+    "",
+  ].join("\n"));
+  check(f, "3 entries — the FAB role is not deleted", d.experience.length === 3, d.experience.map((e) => e.role));
+  const fab = d.experience.find((e) => `${e.role ?? ""}${e.company ?? ""}`.includes("FAB"));
+  check(f, "FAB entry exists", Boolean(fab), d.experience);
+  check(f, "FAB keeps its own dates", (fab?.startDate ?? "") === "09/2019" && (fab?.endDate ?? "") === "05/2021", [fab?.startDate, fab?.endDate]);
+  const head = d.experience.find((e) => (e.role ?? "").includes("Head of Data"));
+  check(f, "the NEXT role did not inherit FAB's dates", !head?.startDate, head);
+}
+{
+  // Guard the other direction: a genuine date-only line still is one.
+  const f = "date-only-still-detected (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Procurement Lead | BuildCo LLC",
+    "03-2019 to 07-2021",
+    "• Negotiated AED 12M in supplier contracts",
+    "",
+  ].join("\n"));
+  check(f, "'03-2019 to 07-2021' is still a date-only line", d.experience.length === 1 && d.experience[0]?.startDate === "03-2019" && d.experience[0]?.endDate === "07-2021", d.experience);
+}
+
+// (m2) Stripping a trailing "to date" left the separator glued to the company.
+{
+  const cases = [
+    ["Senior Accountant – Al Futtaim Group – Jan 2020 to date", "Al Futtaim Group"],
+    ["Accountant - ADNOC - 2018 to date", "ADNOC"],
+    ["Nurse at NMC Royal Hospital at Jan 2020 to date", "NMC Royal Hospital"],
+  ];
+  for (const [line, company] of cases) {
+    const f = `to-date-separator (inline: ${company})`;
+    const d = runText(f, ["Fatima Noor", "", "Experience", line, "• Delivered the handover", ""].join("\n"));
+    check(f, `company === "${company}" (no dangling separator)`, d.experience[0]?.company === company, d.experience[0]);
+    check(f, "still marked current", d.experience[0]?.isCurrent === true, d.experience[0]?.isCurrent);
+  }
+}
+
+// (m3) Only the five canonical CvLanguage levels may be emitted — lib/language.ts:
+// "A level that cannot be selected here must never be stored".
+{
+  const f = "canonical-language-levels (inline)";
+  const CANONICAL = ["elementary", "conversational", "professional", "full_professional", "native"];
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "English (Fluent)",
+    "Spanish - Advanced",
+    "German (Beginner)",
+    "Italian (Intermediate)",
+    "Arabic (Full Professional)",
+    "Urdu (Native)",
+    "",
+  ].join("\n"));
+  const details = d.languageDetails ?? [];
+  const byName = Object.fromEntries(details.map((l) => [l.name, l.level]));
+  check(f, "every emitted level is canonical", details.every((l) => l.level === undefined || CANONICAL.includes(l.level)), details);
+  check(f, "Fluent -> professional", byName.English === "professional", details);
+  check(f, "Advanced -> professional", byName.Spanish === "professional", details);
+  check(f, "Beginner -> elementary", byName.German === "elementary", details);
+  check(f, "Intermediate -> conversational", byName.Italian === "conversational", details);
+  check(f, "Full Professional -> full_professional", byName.Arabic === "full_professional", details);
+  check(f, "Native -> native", byName.Urdu === "native", details);
+}
+
+// (m4) LinkedIn's "Limited Working" is the rung BELOW professional. Reading the
+// bare word "working" as professional inflated it two rungs on a submitted CV.
+{
+  const f = "limited-working (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Hindi (Limited Working)",
+    "Tagalog (Limited Working Proficiency)",
+    "English (Professional Working)",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Limited Working -> conversational, NOT professional", byName.Hindi === "conversational", d.languageDetails);
+  check(f, "Limited Working Proficiency -> conversational", byName.Tagalog === "conversational", d.languageDetails);
+  check(f, "Professional Working is still professional", byName.English === "professional", d.languageDetails);
+}
+
+// (m5) "Personal Profile" / "Personal Summary" are summary headings. They
+// matched no pattern at all, so the summary fell into the previous section.
+{
+  for (const heading of ["Personal Profile", "Personal Summary", "Personal Statement"]) {
+    const f = `summary-heading (inline: ${heading})`;
+    const d = runText(f, [
+      "Fatima Noor",
+      "fatima.noor@example.com",
+      "",
+      heading,
+      "Procurement specialist with 6 years in construction materials sourcing across the UAE.",
+      "",
+      "Skills",
+      "Sourcing, Cost Control",
+      "",
+    ].join("\n"));
+    check(f, "summary captured", (d.summary ?? "").includes("6 years"), d.summary);
+    check(f, "summary did not leak into skills", d.skills.length === 2, d.skills);
+  }
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

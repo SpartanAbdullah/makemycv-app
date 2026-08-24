@@ -28,6 +28,28 @@ import type {
 
 export type ScoreMode = "builder" | "checker";
 
+/**
+ * Identifies the RUBRIC that produced a score — the set of sub-signals, their
+ * points, and the grade thresholds.
+ *
+ * A stored score is only comparable to a live one if both came from the same
+ * rubric. The TopBar delta pill compares an import-time baseline in
+ * localStorage against a freshly computed total, so when the rubric changes,
+ * every returning user's untouched CV appears to have moved: the 2026-08-24
+ * pass removed the duplicate phone/summary signals (-6 raw points) and added
+ * the UAE essentials (+4), and that alone would have shown a red "Down 4
+ * points since you imported this CV" to people who had not edited a word.
+ *
+ * BUMP THIS whenever you add, remove, or re-point a sub-signal, or move a
+ * grade threshold. Baselines carrying any other value are discarded on load
+ * (lib/store/cvStore.ts) — no delta is better than a fabricated one. A missing
+ * value means a pre-versioning baseline, which is likewise discarded.
+ *
+ * The characterization tests in scoreEngine.test.ts pin the signal set and the
+ * golden totals, so a rubric change that forgets to bump this fails there.
+ */
+export const SCORING_RUBRIC_VERSION = 3;
+
 export type ScoreOptions = {
   mode?: ScoreMode;
   parseSignals?: ParseSignals;
@@ -61,9 +83,10 @@ export const GRADE_CHIP_LABELS: Record<ScoreGrade, string> = {
 // --- Derived stats (audit §4) ---
 //
 // The Review step used to re-implement these with subtly different rules
-// (untrimmed bullets, its own /\d/ test), so "X of Y measurable bullets"
+// (untrimmed bullets, its own digit test), so "X of Y measurable bullets"
 // could disagree with what the engine actually scored. One implementation,
-// engine-consistent trimming.
+// engine-consistent trimming, and one shared definition of "measurable"
+// (hasQuantifiedMetric, below).
 
 export type ScoreDerivedStats = {
   totalBullets: number;
@@ -77,7 +100,7 @@ export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
   const bullets = cv.experience.flatMap((e) =>
     e.bullets.map((b) => b.trim()).filter(Boolean),
   );
-  const measurableBullets = bullets.filter((b) => /\d/.test(b)).length;
+  const measurableBullets = bullets.filter(hasQuantifiedMetric).length;
   const uaeFilledCount = [
     cv.personal.visaStatus,
     cv.personal.availability,
@@ -91,6 +114,132 @@ export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
     uaeFilledCount,
     expectedPages,
   };
+}
+
+// --- Quantification detection ---
+//
+// C3, C7, C8 and measurableBullets all used to ask `/\d/.test(text)` — "does
+// this string contain a digit anywhere". That counted a bullet as quantified
+// for a date ("Joined in 2019"), a version number ("migrated to Windows 10"),
+// a standard ("audited to ISO 9001"), a phase label ("owned the Phase 2
+// rollout") or a street address. None of those are performance metrics, so the
+// engine congratulated CVs that measure nothing and the "X of Y measurable
+// bullets" line on the Review step overstated the same way.
+//
+// Two stages, and the ORDER of the stages matters as much as the patterns:
+//
+//   1. STRONG patterns run on the RAW text. A percentage, a currency amount, a
+//      multiplier or an explicit counted unit is unambiguous — nothing about a
+//      date or a version number can fake one — so these must never be exposed
+//      to the label strip. Running them second was a real regression: the year
+//      rule deleted the digits of "Saved AED 2000 per month" and "Processed
+//      2000 invoices" before the currency and unit patterns ever saw them, and
+//      the "level"/"line" rule ate the number in "service level 98%".
+//   2. WEAK heuristics — a bare magnitude, or a number followed by a plural
+//      noun — run on the label-STRIPPED text, because those are exactly the
+//      shapes a year, a standard or a phase label can imitate.
+
+/**
+ * Digit contexts that are labels rather than measurements. Removed before the
+ * metric test so they can never satisfy it. Every rule is direction-sensitive:
+ * "Phase 2" is a label, "2 phases" is a count, and only the former matches.
+ */
+const MONTH_WORDS =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+/** Things a CV counts. Shared by the strong unit pattern and the year rule. */
+const COUNTED_UNITS =
+  "users?|clients?|projects?|teams?|staff|employees?|reports?|units?|orders?|leads?|deals?|accounts?|customers?|suppliers?|vendors?|stores?|sites?|branches|outlets?|countries|markets?|people|members?|tickets?|invoices?|shipments?|containers?|skus?|calls?|cases?|queries|visits?|audits?|inspections?|hours?|days?|weeks?|months?";
+
+const NON_METRIC_CONTEXT_RE = new RegExp(
+  [
+    // Years — the single most common false positive. The lookahead keeps a
+    // year-SHAPED magnitude that is actually counting something: "a portfolio
+    // of 1980 active clients" is a scale, not a date, and stripping it left the
+    // bullet reading as if it had no number at all. Restricted to the counted
+    // vocabulary so an ordinary "the 2019 results" is still treated as a date.
+    `\\b(?:19|20)\\d{2}\\b(?!\\s*\\+?\\s+(?:[a-z-]+\\s+){0,2}(?:${COUNTED_UNITS})\\b)`,
+    // Standards and regulations: ISO 9001, IFRS 9, IAS 16.
+    "\\b(?:iso|iec|ias|ifrs|osha|ansi|astm|nfpa|sae|gdpr|pci\\s*dss)\\s*[-:]?\\s*\\d+(?:[-:.]\\d+)*",
+    // Product and version numbers: Windows 10, Odoo 17, SAP S/4, v2.1.
+    "\\b(?:v|ver|version|windows|office|odoo|sap|oracle|excel|word|powerpoint|outlook|ios|android|python|java|php|node|angular|react|autocad|revit|primavera|p6|sql\\s*server)\\s*\\.?\\s*\\d+(?:\\.\\d+)*",
+    // Ordinal position labels: Phase 2, Q3, Tier 1, Site 4, Level 2.
+    "\\b(?:phase|stage|tier|level|grade|band|q|quarter|round|batch|site|zone|block|plot|building|floor|room|wave|line|category)\\s*[-#]?\\s*\\d+\\b",
+    // Written ordinals: 3rd party, 2nd line support.
+    "\\b\\d+(?:st|nd|rd|th)\\b",
+    // Calendar dates in any of the forms a CV writes them. The year rule above
+    // only removes the year, which left the DAY behind for the bare-magnitude
+    // heuristic to credit — "Joined 15 March 2019" scored as quantified.
+    //
+    // The month alternation must be CLOSED (each name followed by \b), not a
+    // "jan[a-z]*" prefix: "jun[a-z]*" happily ate the "4 junior" in "Trained 4
+    // junior associates", turning a real headcount metric into a date.
+    `\\b\\d{1,2}\\s+(?:${MONTH_WORDS})\\b\\.?`,
+    `\\b(?:${MONTH_WORDS})\\b\\.?\\s+\\d{1,2}\\b`,
+    "\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b",
+  ].join("|"),
+  "gi",
+);
+
+/** Spelled-out and abbreviated magnitudes, shared by the currency patterns. */
+const MAGNITUDE = "(?:k|m|mn|bn|b|thousand|million|billion|lakh|crore)";
+const CURRENCY_CODE =
+  "(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dhs?|dirhams?|dollars?|riyals?|rupees?)";
+
+/**
+ * Unambiguous measurements. Run on the RAW text — a date or a version number
+ * cannot imitate any of these, so they must not be exposed to the label strip.
+ */
+const STRONG_METRIC_PATTERNS: RegExp[] = [
+  // Percentages.
+  /\d+(?:\.\d+)?\s*%/,
+  /\d+(?:\.\d+)?\s*per\s?cent/i,
+  // Currency, symbol/code first — "AED 120M", "$1.2m", "₹40,000".
+  new RegExp(`(?:${CURRENCY_CODE}|[$€£¥₹])\\s*\\d`, "i"),
+  // Currency, code last — "5 million AED", "60m USD", "8 million dirhams".
+  // This ordering is how a UAE candidate most often writes a contract value.
+  new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*${MAGNITUDE}?\\s*${CURRENCY_CODE}\\b`, "i"),
+  // A spelled-out magnitude is quantitative on its own: "grew to 5 million users".
+  /\b\d+(?:[.,]\d+)?\s*(?:thousand|million|billion|lakh|crore)\b/i,
+  // Multipliers: 3x, 2.5X, 5 times.
+  /\b\d+(?:\.\d+)?\s*[xX]\b/,
+  /\b\d+(?:\.\d+)?\s*times\b/i,
+  // Counted things — the scale of the work.
+  new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*\\+?\\s*(?:${COUNTED_UNITS})\\b`, "i"),
+  // Physical quantities.
+  /\b\d+(?:[.,]\d+)?\s*(?:kg|kgs|tons?|tonnes?|km|kms|m2|sqm|sqft|sq\s?ft|litres?|liters?|mw|kw|kwh)\b/i,
+  // Headcount phrased the other way round: "a team of 5 engineers".
+  /\bteams?\s+of\s+\d+/i,
+  /\b\d+\s*(?:direct\s+reports?|fte|headcount)\b/i,
+  // Direction of change.
+  /\b\d+(?:\.\d+)?\s*\+?\s*(?:more|less|fewer|increase|decrease|reduction|growth|improvement|savings?)\b/i,
+];
+
+/**
+ * Shapes a label can imitate. Run only on the label-STRIPPED text.
+ */
+const WEAK_METRIC_PATTERNS: RegExp[] = [
+  // Generic count: a number followed by a plural noun, optionally with an
+  // adjective or two in between — "4 junior associates", "3 legal entities".
+  // This is what makes the explicit vocabulary above a shortcut rather than an
+  // exhaustive list, and it is only safe here because the label contexts are
+  // already gone: "Phase 2 deliverables" has no digit left by now.
+  /\b\d+(?:\.\d+)?\s*\+?\s+(?:[a-z-]+\s+){0,2}[a-z-]{3,}s\b/i,
+  // Anything left with two or more digits is a magnitude worth crediting.
+  /\b\d{2,}\b/,
+];
+
+/**
+ * True when the text states a measurable outcome, rather than merely
+ * containing a digit. Exported so the check has exactly one definition and can
+ * be tested directly.
+ */
+export function hasQuantifiedMetric(text: string): boolean {
+  if (!text || !/\d/.test(text)) return false;
+  if (STRONG_METRIC_PATTERNS.some((re) => re.test(text))) return true;
+  const stripped = text.replace(NON_METRIC_CONTEXT_RE, " ");
+  if (!/\d/.test(stripped)) return false;
+  return WEAK_METRIC_PATTERNS.some((re) => re.test(stripped));
 }
 
 // --- Word / text helpers ---
@@ -265,7 +414,9 @@ function evaluateContent(
 
   const out: SubSignal[] = [];
 
-  // C1 Summary present (3)
+  // C1 Summary present (3) — the ONLY summary-presence signal. The former S6
+  // in Sections ran the identical check and has been removed; its ATS-heading
+  // rationale is folded into the copy here.
   {
     const pass = summary.length > 0;
     out.push(
@@ -277,10 +428,10 @@ function evaluateContent(
             : "No summary section detected",
         description: pass
           ? "Your summary opens the CV with a positioning statement, not a job list."
-          : "Recruiters read the summary first. Without one, the CV opens cold.",
+          : "Recruiters read the summary first. Without one, the CV opens cold — and some ATS parsers rely on the 'Summary' heading to identify the professional profile at all.",
         actionable: pass
           ? ""
-          : "Add a 40–60 word summary at the top with years of experience, industry, and one quantified result.",
+          : "Add a section titled 'Summary' or 'Professional Profile' above your experience, with 40–60 words covering years of experience, industry, and one quantified result.",
       }),
     );
   }
@@ -307,12 +458,12 @@ function evaluateContent(
 
   // C3 Summary contains number/metric (3)
   {
-    const pass = summary.length > 0 && /\d/.test(summary);
+    const pass = summary.length > 0 && hasQuantifiedMetric(summary);
     out.push(
       sig("C3", "content", 3, pass, pass ? "good" : "review", {
         title: pass
           ? "Summary includes a concrete number"
-          : "Summary has no numbers or metrics",
+          : "Summary has no measurable result",
         description: pass
           ? "Numbers signal outcomes. Recruiters read this first and it sets the tone."
           : "'Strong background in ops' is forgettable. 'Managed 25-person ops team, cut cost by 18%' is not.",
@@ -387,9 +538,9 @@ function evaluateContent(
     );
   }
 
-  // C7 ≥ 25% bullets contain a number (3)
+  // C7 ≥ 25% bullets state a measurable outcome (3)
   {
-    const numCount = allBullets.filter((b) => /\d/.test(b)).length;
+    const numCount = allBullets.filter(hasQuantifiedMetric).length;
     const ratio = allBullets.length > 0 ? numCount / allBullets.length : 0;
     const pass = allBullets.length > 0 && ratio >= 0.25;
     out.push(
@@ -398,7 +549,7 @@ function evaluateContent(
           ? `${numCount} of ${allBullets.length} bullets quantify impact`
           : allBullets.length === 0
             ? "No bullets to evaluate"
-            : `Only ${numCount} of ${allBullets.length} bullets contain numbers`,
+            : `Only ${numCount} of ${allBullets.length} bullets quantify impact`,
         description: pass
           ? "Numbers, percentages, and currency anchor your bullets in outcomes."
           : "Recruiters scan for measurable outcomes. Bullets without metrics are easy to skip.",
@@ -409,9 +560,9 @@ function evaluateContent(
     );
   }
 
-  // C8 ≥ 50% bullets contain a number (2) — stretch
+  // C8 ≥ 50% bullets state a measurable outcome (2) — stretch
   {
-    const numCount = allBullets.filter((b) => /\d/.test(b)).length;
+    const numCount = allBullets.filter(hasQuantifiedMetric).length;
     const ratio = allBullets.length > 0 ? numCount / allBullets.length : 0;
     const pass = allBullets.length > 0 && ratio >= 0.5;
     out.push(
@@ -573,7 +724,11 @@ function evaluateContent(
   return out;
 }
 
-function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
+// No `mode` parameter: every signal in this category is now mode-neutral.
+// S2/S3/S6 were the only ones that reworded for builder vs checker, and all
+// three were duplicates that now live in A1/A2/C1 — which still carry the
+// mode-specific copy.
+function evaluateSections(cv: CvData): SubSignal[] {
   const p = cv.personal;
   const hasName = Boolean(p.firstName.trim() || p.lastName.trim());
   const expEntries = cv.experience.filter((e) => e.company.trim() || e.role.trim());
@@ -581,37 +736,24 @@ function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
 
   const out: SubSignal[] = [];
 
-  // S2 Email present (3)
-  out.push(
-    sig(
-      "S2",
-      "sections",
-      3,
-      Boolean(p.email.trim()),
-      p.email.trim() ? "good" : "error",
-      {
-        title: p.email.trim() ? "Email present" : mode === "builder" ? "Add your email address" : "No email detected",
-        description: "UAE recruiters and ATS systems filter by email first.",
-        actionable: p.email.trim() ? "" : "Add a professional email in the contact section.",
-      },
-    ),
-  );
+  // S2 (Email present, 3) was REMOVED — the same duplicate-signal defect as S3
+  // below, one step subtler. A1 in ATS Essentials tests presence AND format
+  // (`Boolean(email) && EMAIL_REGEX.test(email)`), so it already fails on every
+  // CV S2 failed: a missing email cost 6 points and printed two rows saying the
+  // same thing ("Add your email address" / "No email address detected"). A1 is
+  // strictly more informative — it also catches a present-but-garbled address —
+  // so nothing is lost by folding S2 into it.
+  //
+  // This leaves both machine-readable contact fields, email and phone, scored
+  // once each in ATS Essentials, which is where the rest of the parser-facing
+  // contract already lives (dates, company names, headline).
 
-  // S3 Phone present (3)
-  out.push(
-    sig(
-      "S3",
-      "sections",
-      3,
-      Boolean(p.phone.trim()),
-      p.phone.trim() ? "good" : "error",
-      {
-        title: p.phone.trim() ? "Phone present" : mode === "builder" ? "Add your phone number" : "No phone number detected",
-        description: "UAE recruiters call first. A missing phone number is a hard blocker.",
-        actionable: p.phone.trim() ? "" : "Add a UAE-format phone number (+971 …) to the contact block.",
-      },
-    ),
-  );
+  // S3 (Phone present, 3) was REMOVED — it was byte-identical to A2 in ATS
+  // Essentials, so one empty phone field cost 6 points and produced two
+  // near-identical issue rows on the report. A2 is the surviving home for the
+  // signal and inherited S3's copy. IDs are deliberately NOT renumbered:
+  // ScoreIssue.signal is documented as a stable key for weight tuning and
+  // tests, so a gap is cheaper than a silent re-mapping.
 
   // S4 Location present (3)
   out.push(
@@ -643,19 +785,10 @@ function evaluateSections(cv: CvData, mode: ScoreMode): SubSignal[] {
     );
   }
 
-  // S6 Summary populated (3)
-  {
-    const has = Boolean(p.summary.trim());
-    out.push(
-      sig("S6", "sections", 3, has, has ? "good" : "error", {
-        title: has ? "Summary section populated" : "No summary section",
-        description: has
-          ? "Your summary opens the CV with positioning, not a job list."
-          : "Some ATS parsers rely on the 'Summary' heading to identify the professional profile.",
-        actionable: has ? "" : "Add a section titled 'Summary' or 'Professional Profile' above your experience.",
-      }),
-    );
-  }
+  // S6 (Summary populated, 3) was REMOVED — same duplicate-signal problem as
+  // S3: it tested `p.summary.trim()`, exactly what C1 already tests in
+  // Content, so a missing summary was charged twice. C1 is the surviving home
+  // and absorbed the ATS-heading rationale from this signal's copy.
 
   // S7 ≥ 1 experience entry (3)
   {
@@ -768,25 +901,38 @@ function evaluateAts(
           ? "Email format is valid"
           : email
             ? "Email format looks invalid"
-            : "No email address detected",
+            : mode === "builder"
+              ? "Add your email address"
+              : "No email address detected",
         description: pass
           ? ""
           : email
             ? `"${email}" didn't match a standard email pattern — parser may have garbled it.`
-            : "Every UAE ATS filters by email. No email means no application.",
-        actionable: pass ? "" : email ? "Confirm the email reads cleanly (e.g. name@domain.com)." : "Add a professional email address.",
+            : "Every UAE ATS filters by email first. No email means no application.",
+        actionable: pass
+          ? ""
+          : email
+            ? "Confirm the email reads cleanly (e.g. name@domain.com)."
+            : "Add a professional email in the contact section.",
       }),
     );
   }
 
-  // A2 Phone present (3)
+  // A2 Phone present (3) — the ONLY phone signal. The former S3 in Sections
+  // ran the identical check and has been removed; its copy lives here now.
   {
     const pass = Boolean(p.phone.trim());
     out.push(
       sig("A2", "atsEssentials", 3, pass, pass ? "good" : "error", {
-        title: pass ? "Phone number present" : "No phone number",
-        description: pass ? "" : "ATS systems treat phone as a required contact channel.",
-        actionable: pass ? "" : "Add a UAE-format phone number (+971 …).",
+        title: pass
+          ? "Phone number present"
+          : mode === "builder"
+            ? "Add your phone number"
+            : "No phone number detected",
+        description: pass
+          ? ""
+          : "ATS systems treat phone as a required contact channel, and UAE recruiters call first — a missing number is a hard blocker.",
+        actionable: pass ? "" : "Add a UAE-format phone number (+971 …) to the contact block.",
       }),
     );
   }
@@ -1014,6 +1160,82 @@ function evaluateAts(
         false,
         hasExperienceContent,
       ),
+    );
+  }
+
+  // --- UAE essentials (A12–A14, 4 pts) ---
+  //
+  // Visa status, notice period and UAE driving licence had ZERO score impact:
+  // they fed computeDerivedStats and the builder's UAE step UI only, so the
+  // engine rated a CV with all three filled identically to one with none. On a
+  // UAE-focused builder that is the wrong answer — these are the first things
+  // a Gulf recruiter looks for, and they are the cheapest points on the CV to
+  // earn. Scored in ATS Essentials because that is where the recruiter-facing
+  // contract fields already live (email, phone, dates, company names).
+  //
+  // Always applicable: a blank CV should be told these are missing, and the
+  // builder targets the UAE market by definition. Severity is "review", not
+  // "error" — an absent visa line doesn't break the parse, it costs ranking.
+
+  // A12 Visa status (2)
+  {
+    const pass = Boolean(p.visaStatus?.trim());
+    out.push(
+      sig("A12", "atsEssentials", 2, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Visa status stated"
+          : mode === "builder"
+            ? "Add your visa status"
+            : "No visa status detected",
+        description: pass
+          ? ""
+          : "UAE recruiters scan for visa status before reading your experience — an unstated status reads as an unknown sponsorship cost.",
+        actionable: pass
+          ? ""
+          : "Add your visa status (e.g. 'Employment visa — transferable', 'Golden visa', 'Visit visa').",
+      }),
+    );
+  }
+
+  // A13 Availability / notice period (1)
+  {
+    const pass = Boolean(p.availability?.trim());
+    out.push(
+      sig("A13", "atsEssentials", 1, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Availability stated"
+          : mode === "builder"
+            ? "Add your notice period"
+            : "No availability or notice period detected",
+        description: pass
+          ? ""
+          : "Gulf shortlists are built around start dates. Without a notice period the recruiter has to ask before they can rank you.",
+        actionable: pass ? "" : "Add your availability (e.g. 'Immediate', '30 days notice').",
+      }),
+    );
+  }
+
+  // A14 UAE driving licence (1)
+  //
+  // "None" is an option in the builder's dropdown, and lib/utils/essentials.ts
+  // deliberately drops the licence chip for that value — so a CV set to "None"
+  // renders EXACTLY like one left blank. Scoring it as "stated" therefore
+  // awarded a point for something that appears nowhere on the document. The
+  // signal is "does the printed CV answer this", so it has to agree with what
+  // getEssentialChips actually renders.
+  {
+    const value = p.drivingLicense?.trim() ?? "";
+    const pass = Boolean(value) && !/^(?:none|n\/?a|no)$/i.test(value);
+    out.push(
+      sig("A14", "atsEssentials", 1, pass, pass ? "good" : "review", {
+        title: pass
+          ? "Driving licence stated"
+          : "No UAE driving licence indicated",
+        description: pass
+          ? ""
+          : "Sales, logistics and site roles in the UAE filter on this outright, so a licence shown on the CV is worth listing.",
+        actionable: pass ? "" : "Add your licence if you hold one (e.g. 'UAE Light Vehicle').",
+      }),
     );
   }
 
@@ -1251,7 +1473,7 @@ export function computeScore(
 
   const allSignals: SubSignal[] = [
     ...evaluateContent(cv, signals, mode),
-    ...evaluateSections(cv, mode),
+    ...evaluateSections(cv),
     ...evaluateAts(cv, signals, mode),
     ...evaluateDesign(cv),
   ];

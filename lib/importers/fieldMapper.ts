@@ -67,6 +67,7 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       visaStatus: parsed.uae?.visaStatus ?? "",
       availability: parsed.uae?.availability ?? "",
       drivingLicense: parsed.uae?.drivingLicense ?? "",
+      dateOfBirth: parsed.uae?.dateOfBirth ?? "",
     };
   }
 
@@ -107,7 +108,18 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       .map((name) => ({ id: createId(), name }));
   }
 
-  if (parsed.languages?.length) {
+  // Prefer languageDetails when the adapter produced it — same names, plus the
+  // proficiency the CV stated. Adapters that don't (and older payloads) still
+  // fall through to the plain name list, so nothing regresses.
+  if (parsed.languageDetails?.length) {
+    result.languages = parsed.languageDetails
+      .filter((l) => (l.name ?? "").trim())
+      .map((l) => ({
+        id: createId(),
+        name: l.name,
+        ...(l.level ? { level: l.level } : {}),
+      }));
+  } else if (parsed.languages?.length) {
     result.languages = parsed.languages
       .filter(Boolean)
       .map((name) => ({ id: createId(), name }));
@@ -146,9 +158,10 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
  * Inverse mapping: CvData → ParsedDocument. Used by the report→builder
  * handoff so the AI-parsed CV flows through the SAME MappingReview screen
  * as the heuristic import, instead of landing in the store unreviewed
- * (audit UX-8). Skill/language levels aren't representable in
- * ParsedDocument, but the checker's CVs never carry them anyway — they
- * were produced by mapParsedToCv in the first place.
+ * (audit UX-8). Language levels round-trip via `languageDetails`; skill
+ * levels still aren't representable in ParsedDocument, but the checker's
+ * CVs never carry them anyway — they were produced by mapParsedToCv in the
+ * first place.
  */
 export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
   contact: {
@@ -186,6 +199,9 @@ export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
   })),
   skills: cv.skills.map((s) => s.name).filter(Boolean),
   languages: cv.languages.map((l) => l.name).filter(Boolean),
+  languageDetails: cv.languages
+    .filter((l) => (l.name ?? "").trim())
+    .map((l) => (l.level ? { name: l.name, level: l.level } : { name: l.name })),
   certifications: cv.certifications.map((c) => ({
     name: c.name,
     issuer: c.issuer,
@@ -201,5 +217,6 @@ export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
     visaStatus: cv.personal.visaStatus || undefined,
     availability: cv.personal.availability || undefined,
     drivingLicense: cv.personal.drivingLicense || undefined,
+    dateOfBirth: cv.personal.dateOfBirth || undefined,
   },
 });

@@ -275,6 +275,9 @@ async function callClaude(rawText: string): Promise<{
       certifications: Array.isArray(loose.certifications)
         ? (loose.certifications as ParsedDocument["certifications"])
         : heuristic.certifications,
+      // Never present in the Claude payload — always the heuristic's.
+      uae: heuristic.uae,
+      projects: heuristic.projects,
     };
     return {
       parsed,
@@ -284,6 +287,15 @@ async function callClaude(rawText: string): Promise<{
   }
 
   const v = validated.data;
+  // The Claude tool schema has no `uae` / `projects` keys, so those were
+  // dropped on this path even though the heuristic parser reliably harvests
+  // them from labeled lines ("Visa Status: …", "Notice Period: …"). Once the
+  // scoring engine started reading visa/availability/licence (A12–A14), that
+  // omission made every checker report state "No visa status detected" on CVs
+  // that say it in plain text. Backfill from the heuristic parse rather than
+  // widening the Claude schema — these are regex-harvestable facts, and the
+  // heuristic pass has already run for the fallback branches above.
+  const heuristicForUae = parseTextToDocument(rawText);
   const parsed: ParsedDocument = {
     contact: v.contact,
     summary: v.summary,
@@ -292,6 +304,8 @@ async function callClaude(rawText: string): Promise<{
     skills: v.skills,
     languages: v.languages,
     certifications: v.certifications,
+    uae: heuristicForUae.uae,
+    projects: heuristicForUae.projects,
   };
   const signals: ParseSignals = v._parseSignals ?? emptySignals("medium");
 

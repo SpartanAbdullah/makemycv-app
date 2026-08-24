@@ -9,7 +9,7 @@
  * measures *overlap* with one JD. Different metric, separate module.
  */
 import type { CvData } from "../types/cv";
-import { extractCvCorpus, normalizeText } from "./extractCvText";
+import { extractCvCorpus, normalizeText, PHRASE_BOUNDARY } from "./extractCvText";
 import {
   type JdCategory,
   type JdCategoryResult,
@@ -82,6 +82,35 @@ const CATEGORY_MEMBERS: Record<string, string[]> = {
   sql: ["mysql", "postgresql", "t sql", "pl sql"],
 };
 
+/**
+ * Alias forms that are ALSO ordinary English words. "React.js" expands to the
+ * bare form "react", and a bullet reading "ability to react quickly to
+ * changing conditions" then satisfied a JD asking for React — a false "your CV
+ * covers this" on a technology the candidate has never touched.
+ *
+ * These forms are therefore looked up ONLY in the CV's DISCRETE named phrases
+ * (skills, certifications, role titles, headline) — places where a word is a
+ * claim, not prose. The unambiguous spellings ("react.js", "reactjs",
+ * "node.js") still match anywhere in the CV, so a bullet that genuinely names
+ * the technology is not lost.
+ *
+ * The trade-off is deliberate: "Built microservices in Go" no longer covers a
+ * Go requirement unless Go is also listed as a skill. A missed match costs the
+ * user one chip to add; a false match costs them the interview.
+ */
+const AMBIGUOUS_TECH_FORMS = new Set([
+  "react",
+  "node",
+  "go",
+  "rust",
+  "swift",
+  "ruby",
+  "spring",
+  "dart",
+  "scratch",
+  "processing",
+]);
+
 function aliasForms(term: string): string[] {
   const t = normalizeText(term);
   const forms = new Set<string>([t]);
@@ -100,21 +129,91 @@ function aliasForms(term: string): string[] {
   return [...forms].filter(Boolean);
 }
 
-/**
- * Whole-token / phrase containment. Builds a space-padded corpus so single
- * tokens match on word boundaries (avoids "java" matching "javascript"),
- * while multi-word phrases use plain substring containment.
- */
-function corpusHas(paddedCorpus: string, form: string): boolean {
-  if (!form) return false;
-  if (form.includes(" ")) {
-    return paddedCorpus.includes(form);
-  }
-  return paddedCorpus.includes(` ${form} `);
+/** Collapse phrase boundaries back to spaces — the plain word sequence. */
+function flattenBoundaries(form: string): string {
+  return form.split(PHRASE_BOUNDARY).join(" ").replace(/\s+/g, " ").trim();
 }
 
-function isMatched(paddedCorpus: string, term: string): boolean {
-  return aliasForms(term).some((f) => corpusHas(paddedCorpus, f));
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Build the phrase matcher for a multi-word requirement.
+ *
+ * The rule is per-GAP, not per-string, and the asymmetry is deliberate:
+ *
+ *   * where the REQUIREMENT has no boundary, the corpus may not have one
+ *     either. "machine learning" is two adjacent words, so it must not match
+ *     "washing machine ⟂ learning curve" — the original bug.
+ *   * where the REQUIREMENT does have a boundary, the corpus may have one or
+ *     not. "Six Sigma (Green Belt)" must still match a CV listing "Six Sigma
+ *     Green Belt", and "Health, Safety and Environment" must match a bullet
+ *     that writes it with the comma.
+ *
+ * Flattening the whole requirement (the first attempt at this) got the second
+ * case right and broke the symmetric one: a requirement whose own punctuation
+ * sits between its words could never line up with a corpus that kept the
+ * boundary, so "Health, Safety and Environment" stopped matching a bullet
+ * containing it character-for-character.
+ */
+function phrasePattern(form: string): RegExp | null {
+  const units = form.split(" ").filter(Boolean);
+  const out: string[] = [];
+  let pendingBoundary = false;
+  for (const unit of units) {
+    if (unit === PHRASE_BOUNDARY) {
+      pendingBoundary = true;
+      continue;
+    }
+    if (out.length > 0) {
+      // A corpus gap is " " or " ⟂ ". Optional only if the requirement had one.
+      out.push(pendingBoundary ? `(?: ${PHRASE_BOUNDARY})? ` : " ");
+    }
+    out.push(escapeRegex(unit));
+    pendingBoundary = false;
+  }
+  if (out.length === 0) return null;
+  try {
+    return new RegExp(out.join(""));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whole-token / phrase containment. The corpus is space-padded so single
+ * tokens match on word boundaries (avoids "java" matching "javascript"), while
+ * multi-word phrases go through phrasePattern above.
+ *
+ * The corpus keeps its PHRASE_BOUNDARY sentinels, so a phrase can no longer
+ * bridge punctuation the normalizer used to flatten away — the false-positive
+ * class recorded in docs/jd-match-evidence-pass.md.
+ */
+function corpusHas(paddedCorpus: string, form: string): boolean {
+  const flat = flattenBoundaries(form);
+  if (!flat) return false;
+  if (!flat.includes(" ")) {
+    return paddedCorpus.includes(` ${flat} `);
+  }
+  const re = phrasePattern(form);
+  return re ? re.test(paddedCorpus) : false;
+}
+
+/**
+ * `paddedPhraseCorpus` is the narrow corpus (skills / certs / role titles /
+ * headline). Only common-English alias forms are routed to it — see
+ * AMBIGUOUS_TECH_FORMS.
+ */
+function isMatched(
+  paddedCorpus: string,
+  paddedPhraseCorpus: string,
+  term: string,
+): boolean {
+  return aliasForms(term).some((f) =>
+    corpusHas(
+      AMBIGUOUS_TECH_FORMS.has(flattenBoundaries(f)) ? paddedPhraseCorpus : paddedCorpus,
+      f,
+    ),
+  );
 }
 
 // ── Variant / abbreviation matching ──────────────────────────────────────────
@@ -173,6 +272,11 @@ function tokenize(s: string): TokenSets {
   const raw = new Set<string>();
   for (const piece of expanded.split(/\s+/)) {
     const t = piece.trim();
+    // The boundary sentinel is punctuation, not a word — variant matching
+    // compares meaning, so it never participates. (The length guard below
+    // would drop it too; this is explicit so lowering that guard can't
+    // silently turn every comma into a shared "token".)
+    if (t === PHRASE_BOUNDARY) continue;
     if (t.length < 2 || TOKEN_STOPWORDS.has(t)) continue;
     raw.add(t);
   }
@@ -234,16 +338,25 @@ export function matchRequirementsToCv(
 ): JdMatchResult {
   const paddedCorpus = ` ${extractCvCorpus(cv)} `;
 
-  // Discrete CV phrases for variant matching (skills, certs, role titles,
-  // headline) — pre-tokenised once so the per-term check is cheap.
-  const cvPhraseTokens = [
+  // Discrete CV phrases — skills, certs, role titles, headline. Places where a
+  // word is a CLAIM rather than prose. Used twice: tokenised for variant
+  // matching, and as the narrow corpus for common-English alias forms.
+  const cvPhrases = [
     ...cv.skills.map((s) => s.name),
     ...cv.certifications.map((c) => c.name),
     ...cv.experience.map((e) => e.role),
     cv.personal.headline,
   ]
     .map((x) => (x ?? "").trim())
+    .filter(Boolean);
+
+  const paddedPhraseCorpus = ` ${cvPhrases
+    .map((phrase) => normalizeText(phrase))
     .filter(Boolean)
+    .join(` ${PHRASE_BOUNDARY} `)} `;
+
+  // Pre-tokenised once so the per-term check is cheap.
+  const cvPhraseTokens = cvPhrases
     .map(tokenize)
     .filter((ts) => ts.stem.size > 0);
 
@@ -256,7 +369,8 @@ export function matchRequirementsToCv(
   const terms: JdTerm[] = [];
   for (const category of CATEGORY_ORDER) {
     for (const term of cleanList(requirements[category])) {
-      const matched = isMatched(paddedCorpus, term) || variantMatches(term);
+      const matched =
+        isMatched(paddedCorpus, paddedPhraseCorpus, term) || variantMatches(term);
       terms.push({ term, category, matched });
     }
   }

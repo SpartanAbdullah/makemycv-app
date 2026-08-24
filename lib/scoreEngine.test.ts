@@ -30,8 +30,10 @@ import { strict as assert } from "node:assert";
 import {
   computeDerivedStats,
   computeScore,
+  hasQuantifiedMetric,
   GRADE_CHIP_LABELS,
   GRADE_LABELS,
+  SCORING_RUBRIC_VERSION,
 } from "./scoreEngine";
 import type { ParseSignals, ScoreGrade } from "./resumeChecker/types";
 import type { CvData, CvExperience } from "./types/cv";
@@ -359,18 +361,26 @@ if (process.env.DUMP === "1") {
 
 // grade thresholds the engine used when these were captured: >=85 excellent,
 // >=65 good, >=40 needs-work, else poor (gradeFromTotal).
+// Re-captured twice, both consciously:
+//   * S3/A2 (phone) + S6/C1 (summary) duplicate-signal removal: -6 raw pts;
+//   * A12–A14 UAE essentials (visa 2, availability 1, licence 1): +4 raw pts.
+//   * S2/A1 (email) duplicate-signal removal: -3 raw pts.
+// Builder-mode denominator: 92 -> 86 -> 90 -> 87. Checker: 102 -> 96 -> 100 -> 97.
 const GOLDEN: Record<string, { total: number; grade: ScoreGrade }> = {
   EMPTY: { total: 0, grade: "poor" },
-  MINIMAL: { total: 24, grade: "poor" },
-  MID_WEAK: { total: 77, grade: "good" },
+  MINIMAL: { total: 18, grade: "poor" },
+  MID_WEAK: { total: 71, grade: "good" },
   STRONG_FINANCE: { total: 100, grade: "excellent" },
-  // Yes, 87/"excellent": today's engine only docks C4/C9/C10/D3/D6/D7 for
-  // verbosity (13 pts of 92), so an overstuffed CV still lands high. Locked
-  // in on purpose — if verbosity weighting is ever tightened, this golden
-  // should fail and be updated consciously.
-  OVERLONG: { total: 87, grade: "excellent" },
+  // 82/"good" now, down from 87/"excellent". Two independent reasons: the
+  // engine still only docks C4/C9/C10/D3/D6/D7 for verbosity (13 pts of 87),
+  // but OVERLONG also carries none of the UAE essentials, so it now forfeits
+  // all 4 of those points and falls under the 85 "excellent" line. Locked in
+  // on purpose — if verbosity weighting is ever tightened, this golden should
+  // fail and be updated consciously.
+  OVERLONG: { total: 82, grade: "good" },
   UAE_COMPLETE: { total: 100, grade: "excellent" },
-  UAE_MISSING: { total: 100, grade: "excellent" },
+  // 96, not 100 — the whole point of A12–A14. 4 raw points of 90.
+  UAE_MISSING: { total: 95, grade: "excellent" },
 };
 
 describe("golden scores (characterization)", () => {
@@ -388,10 +398,13 @@ describe("golden scores (characterization)", () => {
     assert.deepEqual(byId, {
       content: 48, // weak phrases, no metrics in summary, thin quantification
       sections: 100,
-      atsEssentials: 100,
+      atsEssentials: 82, // no visa / notice period / licence (A12–A14)
       design: 70, // < 10 skills, < 300 words
     });
-    assert.deepEqual(r.issueCounts, { error: 2, review: 7, good: 30 });
+    // good 27, not 30: MID_WEAK passed all three removed duplicate signals
+    // (S2 email, S3 phone, S6 summary), so it loses three "good" rows and no
+    // fixes. review 10, not 7: the three unfilled UAE essentials are new rows.
+    assert.deepEqual(r.issueCounts, { error: 2, review: 10, good: 27 });
   });
 
   test("report shape: 4 categories in canonical order, weights sum to 1", () => {
@@ -411,6 +424,235 @@ describe("golden scores (characterization)", () => {
     assert.equal(s.uaeFilledCount, 3);
     assert.equal(s.expectedPages, 2); // 3 roles > 2-role single-page heuristic
     assert.equal(computeDerivedStats(MINIMAL).expectedPages, 1);
+  });
+});
+
+// --- 1z. Rubric version tripwire --------------------------------------------
+//
+// SCORING_RUBRIC_VERSION stamps every stored baseline so a stale one can be
+// discarded instead of producing a fabricated delta (lib/store/cvStore.ts).
+// That only works if the constant is actually bumped when the rubric moves, so
+// this pins the signal set. The golden totals above cover re-pointing; this
+// covers adding or removing a signal.
+
+describe("scoring rubric version", () => {
+  // Every non-conditional signal is applicable on a blank CV and none are
+  // trimmed (a blank CV has no "good" rows), so EMPTY surfaces the full set.
+  const RUBRIC_3_SIGNALS = [
+    "A1", "A10", "A12", "A13", "A14", "A2", "A7", "A8", "A9",
+    "C1", "C11", "C2", "C3", "C5", "C6", "C7", "C8", "C9",
+    "D1", "D2", "D4", "D5", "D8", "D9",
+    // No S2/S3/S6 — email, phone and summary presence are each scored once,
+    // in A1, A2 and C1 respectively.
+    "S10", "S11", "S4", "S5", "S7", "S8", "S9",
+  ];
+
+  test("the builder-mode signal set matches the declared rubric version", () => {
+    const ids = computeScore(EMPTY)
+      .categories.flatMap((c) => c.issues)
+      .map((i) => i.signal)
+      .sort();
+    assert.deepEqual(
+      ids,
+      RUBRIC_3_SIGNALS,
+      "The sub-signal set changed. That makes every stored ScoreBaseline " +
+        "incomparable to a live score, so bump SCORING_RUBRIC_VERSION in " +
+        "lib/scoreEngine.ts (and update this list) — otherwise returning " +
+        "users see a delta pill for a CV they never touched.",
+    );
+    assert.equal(SCORING_RUBRIC_VERSION, 3, "bump me with the list above");
+  });
+});
+
+// --- 1a. Quantification means a metric, not merely a digit ------------------
+//
+// C3, C7, C8 and measurableBullets used to test `/\d/` — "is there a digit
+// anywhere" — which credited dates, version numbers, standards and phase
+// labels as quantified impact.
+
+describe("hasQuantifiedMetric", () => {
+  const yes = [
+    "Reduced procurement lead time by 40%",
+    "Managed a team of 25 engineers",
+    "Led a team of 5 engineers",
+    "Negotiated AED 12M in annual supplier contracts",
+    "Cut spend by $1.2M across the portfolio",
+    "Grew digital revenue 3x in two years",
+    "Coordinated 200+ monthly shipments across the GCC",
+    "Trained 4 junior associates on sampling methodology",
+    "Coordinated the annual external audit across 3 legal entities",
+    "Improved forecast accuracy by 18 percent",
+    "Lifted CSAT to 94% over two years",
+    "Handled 15 clients across banking and insurance",
+  ];
+
+  const no = [
+    "Responsible for the Phase 2 rollout",
+    "Joined in 2019",
+    "Migrated the estate to Windows 10",
+    "Audited the plant to ISO 9001",
+    "Prepared statements under IFRS 9",
+    "Delivered 2nd line support for the regional desk",
+    "Owned the Q3 planning cycle",
+    "Administered Odoo 17 across sales and purchase",
+    "Deployed version 2.1 of the internal portal",
+    "Worked from Office 5, Tier 1 building",
+    "Prepared audit working papers with zero review reopens",
+    "Responsible for managing key accounts and daily sales operations",
+  ];
+
+  for (const text of yes) {
+    test(`quantified: ${text}`, () => {
+      assert.equal(hasQuantifiedMetric(text), true);
+    });
+  }
+  for (const text of no) {
+    test(`NOT quantified: ${text}`, () => {
+      assert.equal(hasQuantifiedMetric(text), false);
+    });
+  }
+
+  // Regressions found by the adversarial pass over this fix and reproduced
+  // against the shipped build. All of these counted under the old /\d/ test,
+  // so rejecting them was a straight loss, not a tightening.
+  test("the label strip never destroys an unambiguous metric", () => {
+    const cases = [
+      // Year-shaped magnitudes — the round figures a UAE candidate writes.
+      "Saved AED 2000 per month on courier costs",
+      "Processed 2000 invoices per month for the Dubai branch",
+      "Trained 2000 employees on the new ERP",
+      "Handled 2000+ calls per month for the service desk",
+      "Cut waste by 1975 kg per shift",
+      "Managed a portfolio of 1980 active clients",
+      // "level" / "line" labels sitting right before the percentage.
+      "Achieved service level 98% on supplier deliveries",
+      "Reduced stock level 30% below target",
+      "Grew top line 12% while holding headcount flat",
+    ];
+    for (const text of cases) {
+      assert.equal(hasQuantifiedMetric(text), true, text);
+    }
+  });
+
+  test("currency written code-last is a metric", () => {
+    for (const text of [
+      "Managed a budget of 5 million AED",
+      "Saved 3 million AED annually through renegotiation",
+      "Negotiated 2 million SAR of supplier contracts",
+      "Negotiated contracts worth 8 million dirhams",
+      "Delivered a 5 million AED fit-out project",
+    ]) {
+      assert.equal(hasQuantifiedMetric(text), true, text);
+    }
+  });
+
+  test("a calendar date is still not a metric, day included", () => {
+    for (const text of [
+      "Joined 15 March 2019 as a graduate trainee",
+      "Joined on March 15 2019 as a graduate trainee",
+      "Started the role on 15/03/2019",
+    ]) {
+      assert.equal(hasQuantifiedMetric(text), false, text);
+    }
+  });
+
+  test("empty and digit-free text are not quantified", () => {
+    assert.equal(hasQuantifiedMetric(""), false);
+    assert.equal(hasQuantifiedMetric("Led the regional operations team"), false);
+  });
+
+  test("a label and a real metric in one bullet still counts", () => {
+    assert.equal(
+      hasQuantifiedMetric("Delivered IFRS 9 impairment models that cut variance by 12%"),
+      true,
+    );
+    assert.equal(
+      hasQuantifiedMetric("Owned the Phase 2 rollout, cutting lead time 40%"),
+      true,
+    );
+  });
+});
+
+// --- 1b. No signal is charged twice -----------------------------------------
+//
+// Phone was checked identically by S3 (Sections) and A2 (ATS), and summary
+// presence by S6 (Sections) and C1 (Content). One empty field cost 6 points
+// and produced two near-identical rows on the report. S3 and S6 were removed;
+// these tests pin the single-charge behaviour so a duplicate can't creep back.
+
+describe("duplicate signals are charged once", () => {
+  const RAW_MAX_BUILDER = 87; // sum of applicable sub-signal points, builder mode
+
+  const expectedAfterLosing = (points: number) =>
+    Math.round(((RAW_MAX_BUILDER - points) / RAW_MAX_BUILDER) * 100);
+
+  test("clearing ONLY the phone costs one 3-point signal, not two", () => {
+    const noPhone = clone(STRONG_FINANCE);
+    noPhone.personal.phone = "";
+    // 3 points of 87 => 97. Before the dedupe this was 6 of 92 => 93.
+    assert.equal(computeScore(noPhone).total, expectedAfterLosing(3));
+    assert.equal(computeScore(noPhone).total, 97);
+  });
+
+  test("clearing ONLY the summary costs one 3-point presence signal", () => {
+    const noSummary = clone(STRONG_FINANCE);
+    noSummary.personal.summary = "";
+    // C1 (presence, 3) is the only presence charge now. C2/C3 also fail, and
+    // C4 goes not-applicable — so this asserts the phone-style single charge
+    // via the issue list rather than the total.
+    const r = computeScore(noSummary);
+    const summaryPresenceIssues = r.categories
+      .flatMap((c) => c.issues)
+      .filter((i) => /no summary section|add a professional summary/i.test(i.title));
+    assert.equal(
+      summaryPresenceIssues.length,
+      1,
+      `a missing summary should raise exactly one presence issue, got ${summaryPresenceIssues
+        .map((i) => `${i.signal}:${i.title}`)
+        .join(" | ")}`,
+    );
+  });
+
+  test("clearing ONLY the email costs one 3-point signal, not two", () => {
+    const noEmail = clone(STRONG_FINANCE);
+    noEmail.personal.email = "";
+    // Before the dedupe this was 6 of 92 => 93.
+    assert.equal(computeScore(noEmail).total, expectedAfterLosing(3));
+    assert.equal(computeScore(noEmail).total, 97);
+  });
+
+  test("a missing email raises exactly one issue row", () => {
+    const noEmail = clone(STRONG_FINANCE);
+    noEmail.personal.email = "";
+    const emailIssues = computeScore(noEmail)
+      .categories.flatMap((c) => c.issues)
+      .filter((i) => /email/i.test(i.title));
+    assert.equal(emailIssues.length, 1, "one empty field, one row");
+    assert.equal(emailIssues[0].signal, "A1", "ATS is the surviving home");
+  });
+
+  test("a malformed email is still caught, and still costs 3", () => {
+    // A1 is strictly more informative than the S2 it replaced: it also fails
+    // on a present-but-garbled address, which S2 passed.
+    const bad = clone(STRONG_FINANCE);
+    bad.personal.email = "imran.sheikh(at)example.com";
+    const r = computeScore(bad);
+    assert.equal(r.total, expectedAfterLosing(3));
+    const emailIssues = r.categories
+      .flatMap((c) => c.issues)
+      .filter((i) => /email/i.test(i.title));
+    assert.equal(emailIssues.length, 1);
+    assert.match(emailIssues[0].title, /looks invalid/);
+  });
+
+  test("a missing phone raises exactly one issue row", () => {
+    const noPhone = clone(STRONG_FINANCE);
+    noPhone.personal.phone = "";
+    const phoneIssues = computeScore(noPhone)
+      .categories.flatMap((c) => c.issues)
+      .filter((i) => /phone/i.test(i.title));
+    assert.equal(phoneIssues.length, 1, "one empty field, one row");
+    assert.equal(phoneIssues[0].signal, "A2", "ATS is the surviving home");
   });
 });
 
@@ -456,13 +698,62 @@ describe("monotonicity invariants", () => {
     assert.equal(computeDerivedStats(stillMissing).uaeFilledCount, 0);
   });
 
-  test("UAE-essentials fields do not move the 0-100 total (derived stats only)", () => {
-    // Characterizes current behavior: visa/availability/licence feed
-    // computeDerivedStats (and the builder's UAE step UI), not computeScore.
+  test("UAE-essentials fields DO move the 0-100 total (A12–A14)", () => {
+    // Was the inverse assertion until A12–A14 were added: visa/availability/
+    // licence used to feed computeDerivedStats and the builder's UAE step UI
+    // only, so the engine scored a fully-filled UAE CV identically to one with
+    // none. On a UAE-focused builder that was simply wrong.
+    const complete = computeScore(UAE_COMPLETE).total;
+    const missing = computeScore(UAE_MISSING).total;
+    assert.ok(complete > missing, `${complete} should beat ${missing}`);
+    assert.equal(complete, 100);
+    assert.equal(missing, 95); // 4 raw points of the 87-point builder max
+  });
+
+  test("each UAE essential is worth its stated points, independently", () => {
+    const total = (mutate: (cv: CvData) => void) => {
+      const cv = clone(UAE_COMPLETE);
+      mutate(cv);
+      return computeScore(cv).total;
+    };
+    const full = computeScore(UAE_COMPLETE).total;
+    const RAW_MAX = 87;
+    const drop = (points: number) =>
+      full - Math.round(((RAW_MAX - points) / RAW_MAX) * 100);
+
+    // visa 2, availability 1, licence 1.
+    assert.equal(full - total((cv) => delete cv.personal.visaStatus), drop(2));
+    assert.equal(full - total((cv) => delete cv.personal.availability), drop(1));
+    assert.equal(full - total((cv) => delete cv.personal.drivingLicense), drop(1));
+  });
+
+  test("a driving licence of 'None' scores as not stated", () => {
+    // lib/utils/essentials.ts drops the licence chip for the literal "None",
+    // so that CV renders identically to a blank one. Scoring it as stated
+    // awarded a point for something printed nowhere on the document.
+    const none = clone(UAE_COMPLETE);
+    none.personal.drivingLicense = "None";
+    const blank = clone(UAE_COMPLETE);
+    delete blank.personal.drivingLicense;
     assert.equal(
-      computeScore(UAE_COMPLETE).total,
-      computeScore(UAE_MISSING).total,
+      computeScore(none).total,
+      computeScore(blank).total,
+      "'None' and blank render the same CV, so they must score the same",
     );
+    const held = computeScore(UAE_COMPLETE).total;
+    assert.ok(held > computeScore(none).total, "an actual licence still scores");
+  });
+
+  test("filling a UAE essential never lowers the total", () => {
+    const base = computeScore(UAE_MISSING).total;
+    for (const field of ["visaStatus", "availability", "drivingLicense"] as const) {
+      const cv = clone(UAE_MISSING);
+      cv.personal[field] = "Yes";
+      assert.ok(
+        computeScore(cv).total >= base,
+        `filling ${field} lowered the total ${base} -> ${computeScore(cv).total}`,
+      );
+    }
   });
 
   test("dirty parseSignals never beat clean ones (checker mode)", () => {
@@ -493,7 +784,9 @@ describe("monotonicity invariants", () => {
     assert.ok(dirty.total < clean.total);
     // Golden checker-mode totals (observed, then locked). The 10 conditional
     // points (C12 C13 A3 A4 A5) all pass on clean signals and all fail on
-    // dirty ones: 102/102 -> 100 vs 92/102 -> 90.
+    // dirty ones: 97/97 -> 100 vs 87/97 -> 90. (The checker max moved
+    // 102 -> 96 -> 100 -> 97 across the three dedupes and the UAE essentials;
+    // the two totals happen to land on the same numbers they had before.)
     assert.equal(clean.total, 100);
     assert.equal(dirty.total, 90);
   });

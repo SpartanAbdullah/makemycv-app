@@ -166,6 +166,227 @@ describe("variant / abbreviation matching", () => {
   });
 });
 
+/* ── Punctuation must not glue unrelated words into a phrase ─────────────────
+ *
+ * normalizeText used to flatten every punctuation mark to a space, so the
+ * substring check in corpusHas bridged clause boundaries: "washing machine;
+ * learning curve" became "washing machine learning curve", which literally
+ * contains "machine learning". Recorded as a known bug in
+ * docs/jd-match-evidence-pass.md — a false "your CV already covers this" is
+ * the costliest error this feature can make. */
+describe("phrase boundaries (punctuation cannot be bridged)", () => {
+  const mlReq = (cvOpts: { bullets: string[]; skills: string[] }) => {
+    const r = matchRequirementsToCv(
+      {
+        jobTitle: "",
+        hardSkills: ["Machine Learning"],
+        tools: [],
+        certifications: [],
+        softSkills: [],
+        keywords: [],
+      },
+      makeCv(cvOpts),
+    );
+    return r.terms.find((t) => t.term === "Machine Learning")?.matched;
+  };
+
+  test("a semicolon between the words is NOT a match", () => {
+    assert.equal(
+      mlReq({
+        bullets: ["Operated the washing machine; learning new procedures took two weeks."],
+        skills: [],
+      }),
+      false,
+      "'washing machine; learning new procedures' must not cover machine learning",
+    );
+  });
+
+  test("a comma between the words is NOT a match", () => {
+    assert.equal(
+      mlReq({ bullets: ["Serviced each machine, learning the fault codes as I went."], skills: [] }),
+      false,
+    );
+  });
+
+  test("a field seam between the words is NOT a match", () => {
+    // Two separate bullets. Joined with a plain space these read as one
+    // sentence and produced a literal hit.
+    assert.equal(
+      mlReq({
+        bullets: ["Maintained the washing machine", "Learning new procedures took two weeks"],
+        skills: [],
+      }),
+      false,
+      "a phrase must not bridge two separate CV entries",
+    );
+  });
+
+  test("the genuine phrase still matches", () => {
+    assert.equal(
+      mlReq({ bullets: ["Delivered experience in machine learning forecasting models."], skills: [] }),
+      true,
+    );
+  });
+
+  test("the genuine phrase still matches as a skill", () => {
+    assert.equal(mlReq({ bullets: ["Ran the ops desk."], skills: ["Machine Learning"] }), true);
+  });
+
+  test("hyphens still JOIN — 'Six-Sigma' covers a 'Six Sigma' requirement", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", hardSkills: ["Six Sigma"], tools: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Six-Sigma"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Six Sigma")?.matched, true);
+  });
+
+  test("a requirement that appears VERBATIM in a bullet still matches", () => {
+    // The regression the first cut of this fix introduced: flattening the
+    // requirement's own boundaries meant a requirement whose punctuation sits
+    // BETWEEN its words could never line up with a corpus that kept it.
+    const cases: Array<[string, string]> = [
+      ["Health, Safety and Environment", "Implemented Health, Safety and Environment policies across three sites."],
+      ["Enterprise Resource Planning (ERP)", "Owned the Enterprise Resource Planning (ERP) rollout."],
+      ["Key Performance Indicators (KPIs)", "Reported Key Performance Indicators (KPIs) to the board monthly."],
+      ["Profit and Loss (P&L)", "Held full Profit and Loss (P&L) accountability for the region."],
+      ["Planning, Budgeting and Forecasting", "Led Planning, Budgeting and Forecasting for four business lines."],
+      ["Anti-Money Laundering (AML)", "Ran Anti-Money Laundering (AML) checks on every new account."],
+    ];
+    for (const [term, bullet] of cases) {
+      const r = matchRequirementsToCv(
+        { jobTitle: "", hardSkills: [term], tools: [], certifications: [], softSkills: [], keywords: [] },
+        makeCv({ bullets: [bullet], skills: [] }),
+      );
+      assert.equal(
+        r.terms.find((t) => t.term === term)?.matched,
+        true,
+        `"${term}" occurs verbatim in the bullet and must match`,
+      );
+    }
+  });
+
+  test("punctuation INSIDE a requirement does not block it", () => {
+    // Asymmetry check: the JD's own brackets are formatting, not evidence
+    // that the CV's words were separated.
+    const r = matchRequirementsToCv(
+      {
+        jobTitle: "",
+        hardSkills: ["Six Sigma (Green Belt)"],
+        tools: [],
+        certifications: [],
+        softSkills: [],
+        keywords: [],
+      },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Six Sigma Green Belt"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Six Sigma (Green Belt)")?.matched, true);
+  });
+
+  test("a sentence period is a boundary too", () => {
+    assert.equal(
+      mlReq({ bullets: ["Serviced the machine. Learning the fault codes took a week."], skills: [] }),
+      false,
+    );
+  });
+
+  test("an intra-word dot is NOT a boundary (node.js survives)", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", tools: ["Node.js"], hardSkills: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Node.js"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Node.js")?.matched, true);
+  });
+
+  test("single tokens still match across a boundary (the token IS there)", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", tools: ["SAP"], hardSkills: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Rolled out SAP; trained 40 users."], skills: [] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "SAP")?.matched, true);
+  });
+});
+
+/* ── Common-English alias forms must not match free prose ────────────────────
+ *
+ * "React.js" expands to the bare alias "react", and a bullet reading "ability
+ * to react quickly to changing conditions" then satisfied a React requirement.
+ * Those forms are now looked up only in the CV's discrete named phrases —
+ * skills, certifications, role titles, headline — where a word is a claim. */
+describe("ambiguous tech aliases (skills-only lookup)", () => {
+  const askFor = (
+    term: string,
+    cvOpts: { bullets: string[]; skills: string[] },
+  ) => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", hardSkills: [term], tools: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv(cvOpts),
+    );
+    return r.terms.find((t) => t.term === term)?.matched;
+  };
+
+  const proseCv = {
+    bullets: [
+      "Ability to react quickly to changing conditions on site.",
+      "Configured each node in the warehouse scanner cluster.",
+      "Drove the go to market plan for two new categories.",
+    ],
+    skills: ["Excel", "Stakeholder Management"],
+  };
+
+  test("'React.js' does NOT match a bullet that merely uses the verb 'react'", () => {
+    assert.equal(askFor("React.js", proseCv), false);
+  });
+
+  test("bare 'React' does NOT match prose either", () => {
+    assert.equal(askFor("React", proseCv), false);
+  });
+
+  test("'Node.js' does NOT match a bullet about a cluster 'node'", () => {
+    assert.equal(askFor("Node.js", proseCv), false);
+  });
+
+  test("'Go' does NOT match 'go to market'", () => {
+    assert.equal(askFor("Go", proseCv), false);
+  });
+
+  test("'React.js' DOES match when React.js is a listed skill", () => {
+    assert.equal(
+      askFor("React.js", { bullets: ["Ran the ops desk."], skills: ["React.js", "Excel"] }),
+      true,
+    );
+  });
+
+  test("'React.js' DOES match when the skill is spelled bare 'React'", () => {
+    assert.equal(
+      askFor("React.js", { bullets: ["Ran the ops desk."], skills: ["React", "Excel"] }),
+      true,
+    );
+  });
+
+  test("'Node.js' DOES match when Node.js is a listed skill", () => {
+    assert.equal(
+      askFor("Node.js", { bullets: ["Ran the ops desk."], skills: ["Node.js"] }),
+      true,
+    );
+  });
+
+  test("the unambiguous spelling still matches anywhere in the CV", () => {
+    // A bullet that genuinely names the technology is not lost — only the
+    // common-English spelling is restricted.
+    assert.equal(
+      askFor("React.js", { bullets: ["Built the admin console in React.js."], skills: ["Excel"] }),
+      true,
+    );
+  });
+
+  test("unaffected technologies still match from a bullet", () => {
+    assert.equal(
+      askFor("Kubernetes", { bullets: ["Ran workloads on Kubernetes across 3 clusters."], skills: [] }),
+      true,
+    );
+  });
+});
+
 /* ── Category hypernyms are one-directional (review 2026-06) ────────────────── */
 //
 // A JD requirement for a broad CATEGORY (CRM, ERP, SQL, project management) is

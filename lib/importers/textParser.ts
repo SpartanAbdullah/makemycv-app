@@ -25,9 +25,11 @@ import type {
   ParsedExperience,
   ParsedEducation,
   ParsedCertification,
+  ParsedLanguage,
   ParsedProject,
   ParsedUaeFields,
 } from "./adapter";
+import type { CanonicalLanguageLevel } from "../store/migrate";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
 
@@ -48,11 +50,35 @@ const MONTH_NAMES =
 // matched inside "Marketing", so "Marketing Director" parsed as "keting
 // Director" and the phantom date stole the entry's startDate slot
 // (baseline bug exposed by __fixtures__/two-column-interleaved.txt).
+// Numeric month/year forms ("01/2024", "01-2024", ISO "2024-01") are as common
+// on real CVs as "Jan 2024", and matching only the bare year threw the month
+// away — "01/2024 - 12/2024" collapsed to two indistinguishable "2024" tokens.
+// ORDER IS LOAD-BEARING: alternation is first-match-wins at each position, so
+// both numeric forms must precede the bare-year alternative or "2024-01" would
+// match as the year "2024" and strand the month.
+//
+// A plain year RANGE is untouched by the numeric alternatives: "2019-2024"
+// can't start the MM form (neither `0?[1-9]` nor `1[0-2]` consumes "2019"
+// before a separator) and can't start the ISO form (nothing follows "2019"
+// but a separator and another 4-digit year), so it still yields two years.
+const ISO_MONTH = "\\b(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])\\b";
+const NUMERIC_MONTH_YEAR = "\\b(?:0?[1-9]|1[0-2])[/-](?:19|20)\\d{2}\\b";
 const DATE_TOKEN_RE = new RegExp(
-  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}|\\b(?:${MONTH_NAMES})\\b|\\b(?:19|20)\\d{2}\\b`,
+  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}` +
+    `|${ISO_MONTH}` +
+    `|${NUMERIC_MONTH_YEAR}` +
+    `|\\b(?:${MONTH_NAMES})\\b` +
+    `|\\b(?:19|20)\\d{2}\\b`,
   "gi",
 );
-const PRESENT_RE = /\b(?:present|current|now|ongoing|till\s+date|todate)\b/i;
+// "to date" (two words) is how UAE CVs most often write an open-ended role —
+// "Jan 2020 – to date", "March 2022 to date" — and it was the one spelling this
+// pattern missed, so those entries imported with isCurrent: false. The
+// negative lookbehind keeps "up to date" out: an unmarked bullet like "Kept
+// inventory records up to date" can reach the header path on two-column PDFs
+// (where pdf.js drops the bullet glyph), and must not mark the role current.
+const PRESENT_RE =
+  /\b(?:present|current|now|ongoing|till\s+date|(?<!\bup\s)to\s+date|todate)\b/i;
 
 const BULLET_PREFIX_RE = /^[\s]*[•·●◦▪■*\-–—›▸▶►★▎]\s+/;
 const NUMBERED_BULLET_RE = /^\s*\d+[.)]\s+/;
@@ -138,7 +164,12 @@ const CITY_HINTS = [
 const SECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
   {
     key: "summary",
-    re: /^(?:professional\s+)?(?:summary|profile|objective|about(?:\s*me)?|personal\s+statement|career\s+(?:summary|objective|profile))$/i,
+    // "Personal Profile" / "Personal Summary" are summary headings, and until
+    // now they matched NOTHING — only "personal statement" was listed — so the
+    // summary underneath fell into the previous section (or, at the top of a
+    // CV, into unplaced). Listed here so the summary pattern claims them
+    // BEFORE the "personal" pattern below is reached.
+    re: /^(?:professional\s+)?(?:summary|profile|objective|about(?:\s*me)?|personal\s+(?:statement|profile|summary)|career\s+(?:summary|objective|profile))$/i,
   },
   {
     key: "experience",
@@ -161,7 +192,28 @@ const SECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
     key: "projects",
     re: /^(?:projects?|portfolio|side\s+projects?|key\s+projects?|notable\s+projects?)$/i,
   },
+  // UAE / South Asian CVs almost always carry this block (DOB, nationality,
+  // marital status, visa, licence). It matched no pattern, so `currentSection`
+  // stayed on whatever came before it — usually Skills — and every line under
+  // it became a phantom skill ("Nationality: Indian"). Labeled lines are
+  // consumed by harvestUaeFields; the rest goes to `unplaced` for the review
+  // screen rather than polluting a content section.
+  //
+  // Deliberately NOT "personal profile"/"personal statement"/"personal
+  // summary": those are summary headings, claimed by the summary pattern
+  // above (which is matched first).
+  {
+    key: "personal",
+    re: /^(?:additional\s+)?personal\s+(?:details?|information|info|data|particulars)$/i,
+  },
 ];
+
+/** Section keys whose heading does NOT end the contact block. "Personal
+ *  Details" often sits directly under the name with the email/phone lines
+ *  beneath it, so treating it as a hard stop would truncate contact
+ *  harvesting — the exact behaviour that existed before it became a section
+ *  at all. Every other heading still ends the header block. */
+const CONTACT_TRANSPARENT_SECTIONS = new Set(["personal"]);
 
 function normalizeHeader(line: string): string {
   return line.trim().replace(/[:\-_=*•·]+$/, "").trim();
@@ -235,6 +287,10 @@ function looksLikeLocation(line: string): boolean {
   return false;
 }
 
+// Words that only ever JOIN two dates in a range. Stripped from the residue so
+// "03-2019 to 07-2021" still reads as a date-only line.
+const RANGE_CONNECTOR_RE = /\b(?:to|till|until|thru|through|and)\b/gi;
+
 function isDateOnlyLine(line: string): boolean {
   const dates = extractDates(line);
   if (dates.length === 0 && !PRESENT_RE.test(line)) return false;
@@ -243,9 +299,32 @@ function isDateOnlyLine(line: string): boolean {
   const residue = line
     .replace(DATE_TOKEN_RE, " ")
     .replace(PRESENT_RE, " ")
+    .replace(RANGE_CONNECTOR_RE, " ")
     .replace(/[\s.,()\-–—|/]+/g, " ")
     .trim();
+  // The length test alone is not enough once numeric dates are consumed whole.
+  // "FAB 09/2019 - 05/2021" leaves the residue "FAB" — 3 chars — and would be
+  // classed as a pure date line, which DELETES the employer: the header is
+  // dropped, its bullets fold into the previous role, and its dates land on
+  // the NEXT one via pendingDates. Short company and role abbreviations are
+  // everywhere in UAE CVs (FAB, du, GE, PwC, IBM, HR, IT), so any surviving
+  // word is proof the line carries more than a date.
+  if (/[A-Za-zÀ-ɏ؀-ۿ]{2,}/.test(residue)) return false;
   return residue.length <= 3;
+}
+
+/**
+ * Remove a separator left dangling at the end of a header line once the date
+ * tail has been stripped out.
+ *
+ * "Senior Accountant – Al Futtaim Group – Jan 2020 to date" loses everything
+ * after the final dash, and splitHeaderParts' SPACED_SEP needs whitespace on
+ * BOTH sides of a dash — so the orphaned separator can no longer be split off
+ * and rides into the company name as "Al Futtaim Group –". Same for a trailing
+ * "at" ("Nurse at NMC Royal Hospital at Jan 2020 to date").
+ */
+function trimTrailingSeparator(text: string): string {
+  return text.replace(/[\s]*(?:[|·•—–]+|-{1,2}|\bat\b)[\s]*$/i, "").trim();
 }
 
 // Pipe / middot / bullet are pure separators — they never appear inside a real
@@ -356,7 +435,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       .replace(PRESENT_RE, " ")
       .replace(/[ \t]{3,}/g, "  ")
       .trim();
-    const parts = splitHeaderParts(cleaned);
+    const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
 
     let role: string | undefined;
     let company: string | undefined;
@@ -616,7 +695,7 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
         .replace(PRESENT_RE, " ")
         .replace(/[ \t]{3,}/g, "  ")
         .trim();
-      const parts = splitHeaderParts(cleaned);
+      const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
 
       let school: string | undefined;
       let degree: string | undefined;
@@ -714,6 +793,65 @@ function flattenList(lines: string[]): string[] {
         .trim(),
     )
     .filter(Boolean);
+}
+
+// ── Language proficiency levels ──────────────────────────────────────────────
+//
+// CvLanguage.level has always existed; imports just never filled it, so every
+// imported CV lost the qualifier the candidate wrote. UAE recruiters screen on
+// Arabic proficiency specifically, so "Arabic (Native)" collapsing to "Arabic"
+// threw away the single most-screened signal in the section.
+//
+// Only the FIVE canonical values may be emitted. lib/language.ts is explicit:
+// "A level that cannot be selected here must never be stored, or it renders as
+// a raw token on the CV" — and LANGUAGE_LEVELS / CANONICAL_LANGUAGE_LEVELS are
+// elementary | conversational | professional | full_professional | native. The
+// legacy words (fluent, advanced, intermediate, beginner) are INPUT spellings
+// we recognise, mapped through the app's own equivalence table in
+// lib/store/migrate.ts: beginner = elementary, intermediate = conversational,
+// advanced = fluent = professional. The type annotation enforces this.
+//
+// ORDER IS LOAD-BEARING — first match wins, most specific first:
+//   * "full professional" (C2) must beat plain "professional";
+//   * "limited working" is LinkedIn's rung BELOW professional, so it has to be
+//     tested before anything that could match the word "working" — otherwise
+//     the candidate's second-lowest rung inflates two rungs to "Professional
+//     Working (C1)" on a CV they submit;
+//   * bare "working" is deliberately NOT a professional token for that reason;
+//     only "professional"/"business"/C1 are.
+//   * "native or bilingual" is one rung, so "bilingual" resolves to native.
+// CEFR bands are included because two-column exports often render only those.
+const LANGUAGE_LEVEL_PATTERNS: Array<{
+  re: RegExp;
+  level: CanonicalLanguageLevel;
+}> = [
+  { re: /\b(?:mother\s*-?\s*tongue|mothertongue|native|bilingual)\b/i, level: "native" },
+  { re: /\bfull(?:y)?\s+professional\b|\bc2\b/i, level: "full_professional" },
+  { re: /\b(?:elementary|basic|beginner|a1|a2)\b/i, level: "elementary" },
+  { re: /\b(?:limited|conversational|conversation|intermediate|b1|b2)\b/i, level: "conversational" },
+  { re: /\b(?:professional|business|fluent|fluency|proficient|advanced|c1)\b/i, level: "professional" },
+];
+
+/** The proficiency stated for a language entry, or undefined when the CV
+ *  listed it bare. Only the qualifier tail is scanned — the language name
+ *  itself is stripped first so a name can never be read as a level. */
+function detectLanguageLevel(
+  entry: string,
+  name: string,
+): CanonicalLanguageLevel | undefined {
+  const qualifier = name && entry.startsWith(name) ? entry.slice(name.length) : entry;
+  for (const { re, level } of LANGUAGE_LEVEL_PATTERNS) {
+    if (re.test(qualifier)) return level;
+  }
+  return undefined;
+}
+
+/** Split one raw languages-section entry into name + level. */
+function parseLanguageEntry(raw: string): ParsedLanguage {
+  const entry = raw.trim();
+  const name = stripLanguageLevel(entry);
+  const level = detectLanguageLevel(entry, name);
+  return level ? { name, level } : { name };
 }
 
 function stripLanguageLevel(name: string): string {
@@ -830,6 +968,7 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
   if (!skills.some(isHeadingOnlyLine)) return;
 
   const languages = result.languages ?? [];
+  const languageDetails = result.languageDetails ?? [];
   const certifications = result.certifications ?? [];
   const langSeen = new Set(languages.map((l) => l.toLowerCase()));
   const certSeen = new Set(certifications.map((c) => certKey(c.name ?? "")));
@@ -846,6 +985,11 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
       const key = lang.toLowerCase();
       if (!langSeen.has(key)) {
         languages.push(lang);
+        // The rescue only fires on entries that CARRY a qualifier, so the
+        // level is the whole reason we recognised this as a language — keep it
+        // rather than re-flattening to a bare name.
+        const level = detectLanguageLevel(s, lang);
+        languageDetails.push(level ? { name: lang, level } : { name: lang });
         langSeen.add(key);
       }
       continue;
@@ -870,6 +1014,7 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
 
   result.skills = kept;
   result.languages = languages;
+  result.languageDetails = languageDetails;
   result.certifications = certifications;
 }
 
@@ -885,6 +1030,14 @@ const UAE_LABEL_PATTERNS: Array<{
   re: RegExp;
 }> = [
   { key: "nationality", re: /^nationality\s*[:\-–]\s*(.+)$/i },
+  // DOB sits in the same labeled block as nationality/visa on UAE and South
+  // Asian CVs and was never consumed, so the line fell through to whatever
+  // section was open. Kept as free text — CvPersonal.dateOfBirth is an
+  // unparsed string, and CVs write it every way ("15 Mar 1990", "15/03/1990").
+  {
+    key: "dateOfBirth",
+    re: /^(?:d\.?\s*o\.?\s*b\.?|date\s+of\s+birth|birth\s*date|born)\s*[:\-–]\s*(.+)$/i,
+  },
   { key: "visaStatus", re: /^(?:visa\s*status|visa|residency\s*status)\s*[:\-–]\s*(.+)$/i },
   {
     key: "availability",
@@ -1003,7 +1156,9 @@ function harvestContact(lines: string[]): {
   for (let i = 0; i < depth; i++) {
     const line = lines[i];
     if (!line) continue;
-    if (detectSection(line)) break;
+    const sec = detectSection(line);
+    if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+    if (sec) break;
 
     let matchedSomething = false;
 
@@ -1081,7 +1236,11 @@ function harvestContact(lines: string[]): {
     if (consumed.has(i)) continue;
     const line = lines[i]?.trim();
     if (!line) continue;
-    if (detectSection(line)) break;
+    const sec = detectSection(line);
+    // Skip (never adopt as the name) a contact-transparent heading; any other
+    // heading means the header block is over.
+    if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+    if (sec) break;
     if (line.length > 70) continue;
     if (line.match(EMAIL_RE) || line.match(GENERIC_URL_RE) || line.match(PHONE_RE)) continue;
     // Must contain at least one alphabetic char and not look like a headline / sentence.
@@ -1109,7 +1268,9 @@ function harvestContact(lines: string[]): {
       if (consumed.has(i)) continue;
       const line = lines[i]?.trim();
       if (!line) continue;
-      if (detectSection(line)) break;
+      const sec = detectSection(line);
+      if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+      if (sec) break;
       if (line.length > 90) continue;
       // Skip contact-value lines — those aren't the headline.
       if (
@@ -1173,6 +1334,12 @@ export function parseTextToDocument(text: string): ParsedDocument {
     languages: [],
     certifications: [],
     projects: [],
+    // "Personal Details" has no content parser of its own — harvestUaeFields
+    // already took the labeled lines document-wide, so this buffer only ever
+    // holds the leftovers (marital status, gender, religion, father's name).
+    // They land in `unplaced`; before this section existed they were appended
+    // to whatever section preceded them.
+    personal: [],
   };
 
   // Find the first section header — everything before it is the contact /
@@ -1211,6 +1378,12 @@ export function parseTextToDocument(text: string): ParsedDocument {
     }
   }
 
+  // Personal-details leftovers surface as "we couldn't place this" rather than
+  // being dropped — same contract as the header block above.
+  if (buffers.personal.length > 0) {
+    result.unplaced = [...unplaced, ...buffers.personal];
+  }
+
   result.summary = buffers.summary.join(" ").replace(/\s{2,}/g, " ").trim();
   result.experience = parseExperienceBlock(buffers.experience);
   result.education = parseEducationBlock(buffers.education);
@@ -1221,11 +1394,14 @@ export function parseTextToDocument(text: string): ParsedDocument {
 
   result.skills = flattenList(buffers.skills);
 
-  // Languages: keep just the language name (strip any "(Level)" qualifier);
-  // the field mapper currently only stores name.
-  result.languages = flattenList(buffers.languages)
-    .map(stripLanguageLevel)
-    .filter(Boolean);
+  // Languages: `languages` stays the plain name list (its consumers all read
+  // names), and `languageDetails` carries the same entries with the stated
+  // proficiency mapped to CvLanguage.level. The two are index-aligned.
+  const parsedLanguages = flattenList(buffers.languages)
+    .map(parseLanguageEntry)
+    .filter((l) => l.name);
+  result.languages = parsedLanguages.map((l) => l.name);
+  result.languageDetails = parsedLanguages;
 
   // Two-column PDFs merge section headers onto one line, so languages and
   // certifications can land in Skills — re-route them by content (see
