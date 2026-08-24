@@ -29,6 +29,15 @@ export const PHRASE_BOUNDARY = "\u0001";
 const PHRASE_BREAK_RE = /[,;:!?()[\]{}|"“”«»•·]+/g;
 
 /**
+ * A period that is NOT followed by an alphanumeric — i.e. a SENTENCE period,
+ * not the one inside "node.js" / ".net" / "3.5". It ends a clause like any
+ * other, and leaving it glued to the preceding token also broke whole-token
+ * matching outright: "Built the admin console in React.js." produced the token
+ * "react.js." which no requirement for "react.js" could ever equal.
+ */
+const SENTENCE_PERIOD_RE = /\.(?![a-z0-9])/g;
+
+/**
  * Everything else outside the kept set collapses to a space, as before. These
  * are word JOINERS — hyphen, slash, apostrophe, ampersand — and flattening
  * them is what makes "Six-Sigma" match a requirement for "Six Sigma". `+ # .`
@@ -44,6 +53,7 @@ export function normalizeText(input: string): string {
   return input
     .toLowerCase()
     .replace(PHRASE_BREAK_RE, ` ${PHRASE_BOUNDARY} `)
+    .replace(SENTENCE_PERIOD_RE, ` ${PHRASE_BOUNDARY} `)
     .replace(WORD_JOIN_RE, " ")
     .replace(/\s+/g, " ")
     .trim();

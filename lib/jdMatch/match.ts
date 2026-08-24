@@ -82,6 +82,35 @@ const CATEGORY_MEMBERS: Record<string, string[]> = {
   sql: ["mysql", "postgresql", "t sql", "pl sql"],
 };
 
+/**
+ * Alias forms that are ALSO ordinary English words. "React.js" expands to the
+ * bare form "react", and a bullet reading "ability to react quickly to
+ * changing conditions" then satisfied a JD asking for React — a false "your CV
+ * covers this" on a technology the candidate has never touched.
+ *
+ * These forms are therefore looked up ONLY in the CV's DISCRETE named phrases
+ * (skills, certifications, role titles, headline) — places where a word is a
+ * claim, not prose. The unambiguous spellings ("react.js", "reactjs",
+ * "node.js") still match anywhere in the CV, so a bullet that genuinely names
+ * the technology is not lost.
+ *
+ * The trade-off is deliberate: "Built microservices in Go" no longer covers a
+ * Go requirement unless Go is also listed as a skill. A missed match costs the
+ * user one chip to add; a false match costs them the interview.
+ */
+const AMBIGUOUS_TECH_FORMS = new Set([
+  "react",
+  "node",
+  "go",
+  "rust",
+  "swift",
+  "ruby",
+  "spring",
+  "dart",
+  "scratch",
+  "processing",
+]);
+
 function aliasForms(term: string): string[] {
   const t = normalizeText(term);
   const forms = new Set<string>([t]);
@@ -130,8 +159,22 @@ function corpusHas(paddedCorpus: string, form: string): boolean {
   return paddedCorpus.includes(` ${f} `);
 }
 
-function isMatched(paddedCorpus: string, term: string): boolean {
-  return aliasForms(term).some((f) => corpusHas(paddedCorpus, f));
+/**
+ * `paddedPhraseCorpus` is the narrow corpus (skills / certs / role titles /
+ * headline). Only common-English alias forms are routed to it — see
+ * AMBIGUOUS_TECH_FORMS.
+ */
+function isMatched(
+  paddedCorpus: string,
+  paddedPhraseCorpus: string,
+  term: string,
+): boolean {
+  return aliasForms(term).some((f) =>
+    corpusHas(
+      AMBIGUOUS_TECH_FORMS.has(flattenBoundaries(f)) ? paddedPhraseCorpus : paddedCorpus,
+      f,
+    ),
+  );
 }
 
 // ── Variant / abbreviation matching ──────────────────────────────────────────
@@ -256,16 +299,25 @@ export function matchRequirementsToCv(
 ): JdMatchResult {
   const paddedCorpus = ` ${extractCvCorpus(cv)} `;
 
-  // Discrete CV phrases for variant matching (skills, certs, role titles,
-  // headline) — pre-tokenised once so the per-term check is cheap.
-  const cvPhraseTokens = [
+  // Discrete CV phrases — skills, certs, role titles, headline. Places where a
+  // word is a CLAIM rather than prose. Used twice: tokenised for variant
+  // matching, and as the narrow corpus for common-English alias forms.
+  const cvPhrases = [
     ...cv.skills.map((s) => s.name),
     ...cv.certifications.map((c) => c.name),
     ...cv.experience.map((e) => e.role),
     cv.personal.headline,
   ]
     .map((x) => (x ?? "").trim())
+    .filter(Boolean);
+
+  const paddedPhraseCorpus = ` ${cvPhrases
+    .map((phrase) => normalizeText(phrase))
     .filter(Boolean)
+    .join(` ${PHRASE_BOUNDARY} `)} `;
+
+  // Pre-tokenised once so the per-term check is cheap.
+  const cvPhraseTokens = cvPhrases
     .map(tokenize)
     .filter((ts) => ts.stem.size > 0);
 
@@ -278,7 +330,8 @@ export function matchRequirementsToCv(
   const terms: JdTerm[] = [];
   for (const category of CATEGORY_ORDER) {
     for (const term of cleanList(requirements[category])) {
-      const matched = isMatched(paddedCorpus, term) || variantMatches(term);
+      const matched =
+        isMatched(paddedCorpus, paddedPhraseCorpus, term) || variantMatches(term);
       terms.push({ term, category, matched });
     }
   }

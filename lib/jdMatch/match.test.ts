@@ -257,12 +257,108 @@ describe("phrase boundaries (punctuation cannot be bridged)", () => {
     assert.equal(r.terms.find((t) => t.term === "Six Sigma (Green Belt)")?.matched, true);
   });
 
+  test("a sentence period is a boundary too", () => {
+    assert.equal(
+      mlReq({ bullets: ["Serviced the machine. Learning the fault codes took a week."], skills: [] }),
+      false,
+    );
+  });
+
+  test("an intra-word dot is NOT a boundary (node.js survives)", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", tools: ["Node.js"], hardSkills: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Node.js"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Node.js")?.matched, true);
+  });
+
   test("single tokens still match across a boundary (the token IS there)", () => {
     const r = matchRequirementsToCv(
       { jobTitle: "", tools: ["SAP"], hardSkills: [], certifications: [], softSkills: [], keywords: [] },
       makeCv({ bullets: ["Rolled out SAP; trained 40 users."], skills: [] }),
     );
     assert.equal(r.terms.find((t) => t.term === "SAP")?.matched, true);
+  });
+});
+
+/* ── Common-English alias forms must not match free prose ────────────────────
+ *
+ * "React.js" expands to the bare alias "react", and a bullet reading "ability
+ * to react quickly to changing conditions" then satisfied a React requirement.
+ * Those forms are now looked up only in the CV's discrete named phrases —
+ * skills, certifications, role titles, headline — where a word is a claim. */
+describe("ambiguous tech aliases (skills-only lookup)", () => {
+  const askFor = (
+    term: string,
+    cvOpts: { bullets: string[]; skills: string[] },
+  ) => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", hardSkills: [term], tools: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv(cvOpts),
+    );
+    return r.terms.find((t) => t.term === term)?.matched;
+  };
+
+  const proseCv = {
+    bullets: [
+      "Ability to react quickly to changing conditions on site.",
+      "Configured each node in the warehouse scanner cluster.",
+      "Drove the go to market plan for two new categories.",
+    ],
+    skills: ["Excel", "Stakeholder Management"],
+  };
+
+  test("'React.js' does NOT match a bullet that merely uses the verb 'react'", () => {
+    assert.equal(askFor("React.js", proseCv), false);
+  });
+
+  test("bare 'React' does NOT match prose either", () => {
+    assert.equal(askFor("React", proseCv), false);
+  });
+
+  test("'Node.js' does NOT match a bullet about a cluster 'node'", () => {
+    assert.equal(askFor("Node.js", proseCv), false);
+  });
+
+  test("'Go' does NOT match 'go to market'", () => {
+    assert.equal(askFor("Go", proseCv), false);
+  });
+
+  test("'React.js' DOES match when React.js is a listed skill", () => {
+    assert.equal(
+      askFor("React.js", { bullets: ["Ran the ops desk."], skills: ["React.js", "Excel"] }),
+      true,
+    );
+  });
+
+  test("'React.js' DOES match when the skill is spelled bare 'React'", () => {
+    assert.equal(
+      askFor("React.js", { bullets: ["Ran the ops desk."], skills: ["React", "Excel"] }),
+      true,
+    );
+  });
+
+  test("'Node.js' DOES match when Node.js is a listed skill", () => {
+    assert.equal(
+      askFor("Node.js", { bullets: ["Ran the ops desk."], skills: ["Node.js"] }),
+      true,
+    );
+  });
+
+  test("the unambiguous spelling still matches anywhere in the CV", () => {
+    // A bullet that genuinely names the technology is not lost — only the
+    // common-English spelling is restricted.
+    assert.equal(
+      askFor("React.js", { bullets: ["Built the admin console in React.js."], skills: ["Excel"] }),
+      true,
+    );
+  });
+
+  test("unaffected technologies still match from a bullet", () => {
+    assert.equal(
+      askFor("Kubernetes", { bullets: ["Ran workloads on Kubernetes across 3 clusters."], skills: [] }),
+      true,
+    );
   });
 });
 
