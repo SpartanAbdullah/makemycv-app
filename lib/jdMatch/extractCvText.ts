@@ -44,7 +44,6 @@ const SENTENCE_PERIOD_RE = /\.(?![a-z0-9])/g;
  * stay literal (c++, c#, node.js, ga4), and the sentinel is excluded so it
  * survives this pass.
  */
-// eslint-disable-next-line no-control-regex
 const WORD_JOIN_RE = /[^a-z0-9+#.\s\u0001]/g;
 
 /** Lowercase, mark clause boundaries, flatten word-joining punctuation to
