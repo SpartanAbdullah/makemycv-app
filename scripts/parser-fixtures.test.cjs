@@ -464,7 +464,7 @@ const runText = (label, text) => {
   ].join("\n"));
   const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
   check(f, "Mother Tongue -> native", byName.Malayalam === "native", d.languageDetails);
-  check(f, "Fluent -> fluent", byName.English === "fluent", d.languageDetails);
+  check(f, "Fluent -> professional (canonical set has no \"fluent\")", byName.English === "professional", d.languageDetails);
   check(f, "Basic -> elementary", byName.Arabic === "elementary", d.languageDetails);
 }
 {
@@ -481,9 +481,135 @@ const runText = (label, text) => {
   const f = "clean-single-column.txt";
   const d = run(f);
   const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
-  check(f, "English (Fluent) -> fluent", byName.English === "fluent", d.languageDetails);
+  check(f, "English (Fluent) -> professional (canonical set has no \"fluent\")", byName.English === "professional", d.languageDetails);
   check(f, "Arabic (Native) -> native", byName.Arabic === "native", d.languageDetails);
   check(f, "bare Urdu keeps no level", "Urdu" in byName && byName.Urdu === undefined, d.languageDetails);
+}
+
+/* ── (m) adversarial-review regressions (2026-08-24) ─────────────────────────
+   Each of these was found by an adversarial pass over the ten accuracy fixes
+   and reproduced against the shipped build before being fixed. */
+
+// (m1) A short label plus a numeric range must not be classed as a date-only
+// line — that DELETED the employer, folded its bullets into the previous role
+// and pushed its dates onto the NEXT one.
+{
+  const f = "short-label-numeric-range (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Senior Analyst | HSBC | 2015 - 2018",
+    "• Built the risk model",
+    "FAB 09/2019 - 05/2021",
+    "• Led the migration programme",
+    "Head of Data",
+    "• Owned the warehouse",
+    "",
+  ].join("\n"));
+  check(f, "3 entries — the FAB role is not deleted", d.experience.length === 3, d.experience.map((e) => e.role));
+  const fab = d.experience.find((e) => `${e.role ?? ""}${e.company ?? ""}`.includes("FAB"));
+  check(f, "FAB entry exists", Boolean(fab), d.experience);
+  check(f, "FAB keeps its own dates", (fab?.startDate ?? "") === "09/2019" && (fab?.endDate ?? "") === "05/2021", [fab?.startDate, fab?.endDate]);
+  const head = d.experience.find((e) => (e.role ?? "").includes("Head of Data"));
+  check(f, "the NEXT role did not inherit FAB's dates", !head?.startDate, head);
+}
+{
+  // Guard the other direction: a genuine date-only line still is one.
+  const f = "date-only-still-detected (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Procurement Lead | BuildCo LLC",
+    "03-2019 to 07-2021",
+    "• Negotiated AED 12M in supplier contracts",
+    "",
+  ].join("\n"));
+  check(f, "'03-2019 to 07-2021' is still a date-only line", d.experience.length === 1 && d.experience[0]?.startDate === "03-2019" && d.experience[0]?.endDate === "07-2021", d.experience);
+}
+
+// (m2) Stripping a trailing "to date" left the separator glued to the company.
+{
+  const cases = [
+    ["Senior Accountant – Al Futtaim Group – Jan 2020 to date", "Al Futtaim Group"],
+    ["Accountant - ADNOC - 2018 to date", "ADNOC"],
+    ["Nurse at NMC Royal Hospital at Jan 2020 to date", "NMC Royal Hospital"],
+  ];
+  for (const [line, company] of cases) {
+    const f = `to-date-separator (inline: ${company})`;
+    const d = runText(f, ["Fatima Noor", "", "Experience", line, "• Delivered the handover", ""].join("\n"));
+    check(f, `company === "${company}" (no dangling separator)`, d.experience[0]?.company === company, d.experience[0]);
+    check(f, "still marked current", d.experience[0]?.isCurrent === true, d.experience[0]?.isCurrent);
+  }
+}
+
+// (m3) Only the five canonical CvLanguage levels may be emitted — lib/language.ts:
+// "A level that cannot be selected here must never be stored".
+{
+  const f = "canonical-language-levels (inline)";
+  const CANONICAL = ["elementary", "conversational", "professional", "full_professional", "native"];
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "English (Fluent)",
+    "Spanish - Advanced",
+    "German (Beginner)",
+    "Italian (Intermediate)",
+    "Arabic (Full Professional)",
+    "Urdu (Native)",
+    "",
+  ].join("\n"));
+  const details = d.languageDetails ?? [];
+  const byName = Object.fromEntries(details.map((l) => [l.name, l.level]));
+  check(f, "every emitted level is canonical", details.every((l) => l.level === undefined || CANONICAL.includes(l.level)), details);
+  check(f, "Fluent -> professional", byName.English === "professional", details);
+  check(f, "Advanced -> professional", byName.Spanish === "professional", details);
+  check(f, "Beginner -> elementary", byName.German === "elementary", details);
+  check(f, "Intermediate -> conversational", byName.Italian === "conversational", details);
+  check(f, "Full Professional -> full_professional", byName.Arabic === "full_professional", details);
+  check(f, "Native -> native", byName.Urdu === "native", details);
+}
+
+// (m4) LinkedIn's "Limited Working" is the rung BELOW professional. Reading the
+// bare word "working" as professional inflated it two rungs on a submitted CV.
+{
+  const f = "limited-working (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Languages",
+    "Hindi (Limited Working)",
+    "Tagalog (Limited Working Proficiency)",
+    "English (Professional Working)",
+    "",
+  ].join("\n"));
+  const byName = Object.fromEntries((d.languageDetails ?? []).map((l) => [l.name, l.level]));
+  check(f, "Limited Working -> conversational, NOT professional", byName.Hindi === "conversational", d.languageDetails);
+  check(f, "Limited Working Proficiency -> conversational", byName.Tagalog === "conversational", d.languageDetails);
+  check(f, "Professional Working is still professional", byName.English === "professional", d.languageDetails);
+}
+
+// (m5) "Personal Profile" / "Personal Summary" are summary headings. They
+// matched no pattern at all, so the summary fell into the previous section.
+{
+  for (const heading of ["Personal Profile", "Personal Summary", "Personal Statement"]) {
+    const f = `summary-heading (inline: ${heading})`;
+    const d = runText(f, [
+      "Fatima Noor",
+      "fatima.noor@example.com",
+      "",
+      heading,
+      "Procurement specialist with 6 years in construction materials sourcing across the UAE.",
+      "",
+      "Skills",
+      "Sourcing, Cost Control",
+      "",
+    ].join("\n"));
+    check(f, "summary captured", (d.summary ?? "").includes("6 years"), d.summary);
+    check(f, "summary did not leak into skills", d.skills.length === 2, d.skills);
+  }
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

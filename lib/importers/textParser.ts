@@ -29,7 +29,7 @@ import type {
   ParsedProject,
   ParsedUaeFields,
 } from "./adapter";
-import type { LanguageLevel } from "../types/cv";
+import type { CanonicalLanguageLevel } from "../store/migrate";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
 
@@ -164,7 +164,12 @@ const CITY_HINTS = [
 const SECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
   {
     key: "summary",
-    re: /^(?:professional\s+)?(?:summary|profile|objective|about(?:\s*me)?|personal\s+statement|career\s+(?:summary|objective|profile))$/i,
+    // "Personal Profile" / "Personal Summary" are summary headings, and until
+    // now they matched NOTHING — only "personal statement" was listed — so the
+    // summary underneath fell into the previous section (or, at the top of a
+    // CV, into unplaced). Listed here so the summary pattern claims them
+    // BEFORE the "personal" pattern below is reached.
+    re: /^(?:professional\s+)?(?:summary|profile|objective|about(?:\s*me)?|personal\s+(?:statement|profile|summary)|career\s+(?:summary|objective|profile))$/i,
   },
   {
     key: "experience",
@@ -194,8 +199,9 @@ const SECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
   // consumed by harvestUaeFields; the rest goes to `unplaced` for the review
   // screen rather than polluting a content section.
   //
-  // Deliberately NOT "personal profile"/"personal statement": those are
-  // summary headings and already belong to the summary pattern above.
+  // Deliberately NOT "personal profile"/"personal statement"/"personal
+  // summary": those are summary headings, claimed by the summary pattern
+  // above (which is matched first).
   {
     key: "personal",
     re: /^(?:additional\s+)?personal\s+(?:details?|information|info|data|particulars)$/i,
@@ -281,6 +287,10 @@ function looksLikeLocation(line: string): boolean {
   return false;
 }
 
+// Words that only ever JOIN two dates in a range. Stripped from the residue so
+// "03-2019 to 07-2021" still reads as a date-only line.
+const RANGE_CONNECTOR_RE = /\b(?:to|till|until|thru|through|and)\b/gi;
+
 function isDateOnlyLine(line: string): boolean {
   const dates = extractDates(line);
   if (dates.length === 0 && !PRESENT_RE.test(line)) return false;
@@ -289,9 +299,32 @@ function isDateOnlyLine(line: string): boolean {
   const residue = line
     .replace(DATE_TOKEN_RE, " ")
     .replace(PRESENT_RE, " ")
+    .replace(RANGE_CONNECTOR_RE, " ")
     .replace(/[\s.,()\-–—|/]+/g, " ")
     .trim();
+  // The length test alone is not enough once numeric dates are consumed whole.
+  // "FAB 09/2019 - 05/2021" leaves the residue "FAB" — 3 chars — and would be
+  // classed as a pure date line, which DELETES the employer: the header is
+  // dropped, its bullets fold into the previous role, and its dates land on
+  // the NEXT one via pendingDates. Short company and role abbreviations are
+  // everywhere in UAE CVs (FAB, du, GE, PwC, IBM, HR, IT), so any surviving
+  // word is proof the line carries more than a date.
+  if (/[A-Za-zÀ-ɏ؀-ۿ]{2,}/.test(residue)) return false;
   return residue.length <= 3;
+}
+
+/**
+ * Remove a separator left dangling at the end of a header line once the date
+ * tail has been stripped out.
+ *
+ * "Senior Accountant – Al Futtaim Group – Jan 2020 to date" loses everything
+ * after the final dash, and splitHeaderParts' SPACED_SEP needs whitespace on
+ * BOTH sides of a dash — so the orphaned separator can no longer be split off
+ * and rides into the company name as "Al Futtaim Group –". Same for a trailing
+ * "at" ("Nurse at NMC Royal Hospital at Jan 2020 to date").
+ */
+function trimTrailingSeparator(text: string): string {
+  return text.replace(/[\s]*(?:[|·•—–]+|-{1,2}|\bat\b)[\s]*$/i, "").trim();
 }
 
 // Pipe / middot / bullet are pure separators — they never appear inside a real
@@ -402,7 +435,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       .replace(PRESENT_RE, " ")
       .replace(/[ \t]{3,}/g, "  ")
       .trim();
-    const parts = splitHeaderParts(cleaned);
+    const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
 
     let role: string | undefined;
     let company: string | undefined;
@@ -662,7 +695,7 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
         .replace(PRESENT_RE, " ")
         .replace(/[ \t]{3,}/g, "  ")
         .trim();
-      const parts = splitHeaderParts(cleaned);
+      const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
 
       let school: string | undefined;
       let degree: string | undefined;
@@ -769,29 +802,43 @@ function flattenList(lines: string[]): string[] {
 // Arabic proficiency specifically, so "Arabic (Native)" collapsing to "Arabic"
 // threw away the single most-screened signal in the section.
 //
+// Only the FIVE canonical values may be emitted. lib/language.ts is explicit:
+// "A level that cannot be selected here must never be stored, or it renders as
+// a raw token on the CV" — and LANGUAGE_LEVELS / CANONICAL_LANGUAGE_LEVELS are
+// elementary | conversational | professional | full_professional | native. The
+// legacy words (fluent, advanced, intermediate, beginner) are INPUT spellings
+// we recognise, mapped through the app's own equivalence table in
+// lib/store/migrate.ts: beginner = elementary, intermediate = conversational,
+// advanced = fluent = professional. The type annotation enforces this.
+//
 // ORDER IS LOAD-BEARING — first match wins, most specific first:
-//   * "full professional" must beat plain "professional";
-//   * "professional working" is LinkedIn's *lower* professional rung and maps
-//     to "professional", so it must be matched by the plain rule, not by the
-//     "full professional" one;
+//   * "full professional" (C2) must beat plain "professional";
+//   * "limited working" is LinkedIn's rung BELOW professional, so it has to be
+//     tested before anything that could match the word "working" — otherwise
+//     the candidate's second-lowest rung inflates two rungs to "Professional
+//     Working (C1)" on a CV they submit;
+//   * bare "working" is deliberately NOT a professional token for that reason;
+//     only "professional"/"business"/C1 are.
 //   * "native or bilingual" is one rung, so "bilingual" resolves to native.
 // CEFR bands are included because two-column exports often render only those.
-const LANGUAGE_LEVEL_PATTERNS: Array<{ re: RegExp; level: LanguageLevel }> = [
+const LANGUAGE_LEVEL_PATTERNS: Array<{
+  re: RegExp;
+  level: CanonicalLanguageLevel;
+}> = [
   { re: /\b(?:mother\s*-?\s*tongue|mothertongue|native|bilingual)\b/i, level: "native" },
-  { re: /\bfull(?:y)?\s+professional\b/i, level: "full_professional" },
-  { re: /\b(?:fluent|fluency|proficient|proficiency\s+high|c2)\b/i, level: "fluent" },
-  { re: /\b(?:professional|business|working|c1)\b/i, level: "professional" },
-  { re: /\badvanced\b/i, level: "advanced" },
-  { re: /\b(?:conversational|conversation|b2)\b/i, level: "conversational" },
-  { re: /\b(?:intermediate|b1)\b/i, level: "intermediate" },
-  { re: /\b(?:elementary|basic|limited|a2|a1)\b/i, level: "elementary" },
-  { re: /\bbeginner\b/i, level: "beginner" },
+  { re: /\bfull(?:y)?\s+professional\b|\bc2\b/i, level: "full_professional" },
+  { re: /\b(?:elementary|basic|beginner|a1|a2)\b/i, level: "elementary" },
+  { re: /\b(?:limited|conversational|conversation|intermediate|b1|b2)\b/i, level: "conversational" },
+  { re: /\b(?:professional|business|fluent|fluency|proficient|advanced|c1)\b/i, level: "professional" },
 ];
 
 /** The proficiency stated for a language entry, or undefined when the CV
  *  listed it bare. Only the qualifier tail is scanned — the language name
  *  itself is stripped first so a name can never be read as a level. */
-function detectLanguageLevel(entry: string, name: string): LanguageLevel | undefined {
+function detectLanguageLevel(
+  entry: string,
+  name: string,
+): CanonicalLanguageLevel | undefined {
   const qualifier = name && entry.startsWith(name) ? entry.slice(name.length) : entry;
   for (const { re, level } of LANGUAGE_LEVEL_PATTERNS) {
     if (re.test(qualifier)) return level;

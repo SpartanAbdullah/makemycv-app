@@ -104,18 +104,39 @@ export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
 // engine congratulated CVs that measure nothing and the "X of Y measurable
 // bullets" line on the Review step overstated the same way.
 //
-// Two stages: strip digit contexts that are LABELS, then look for digits that
-// carry a unit, a currency, a percentage, a multiplier or a magnitude.
+// Two stages, and the ORDER of the stages matters as much as the patterns:
+//
+//   1. STRONG patterns run on the RAW text. A percentage, a currency amount, a
+//      multiplier or an explicit counted unit is unambiguous — nothing about a
+//      date or a version number can fake one — so these must never be exposed
+//      to the label strip. Running them second was a real regression: the year
+//      rule deleted the digits of "Saved AED 2000 per month" and "Processed
+//      2000 invoices" before the currency and unit patterns ever saw them, and
+//      the "level"/"line" rule ate the number in "service level 98%".
+//   2. WEAK heuristics — a bare magnitude, or a number followed by a plural
+//      noun — run on the label-STRIPPED text, because those are exactly the
+//      shapes a year, a standard or a phase label can imitate.
 
 /**
  * Digit contexts that are labels rather than measurements. Removed before the
  * metric test so they can never satisfy it. Every rule is direction-sensitive:
  * "Phase 2" is a label, "2 phases" is a count, and only the former matches.
  */
+const MONTH_WORDS =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+/** Things a CV counts. Shared by the strong unit pattern and the year rule. */
+const COUNTED_UNITS =
+  "users?|clients?|projects?|teams?|staff|employees?|reports?|units?|orders?|leads?|deals?|accounts?|customers?|suppliers?|vendors?|stores?|sites?|branches|outlets?|countries|markets?|people|members?|tickets?|invoices?|shipments?|containers?|skus?|calls?|cases?|queries|visits?|audits?|inspections?|hours?|days?|weeks?|months?";
+
 const NON_METRIC_CONTEXT_RE = new RegExp(
   [
-    // Years — the single most common false positive.
-    "\\b(?:19|20)\\d{2}\\b",
+    // Years — the single most common false positive. The lookahead keeps a
+    // year-SHAPED magnitude that is actually counting something: "a portfolio
+    // of 1980 active clients" is a scale, not a date, and stripping it left the
+    // bullet reading as if it had no number at all. Restricted to the counted
+    // vocabulary so an ordinary "the 2019 results" is still treated as a date.
+    `\\b(?:19|20)\\d{2}\\b(?!\\s*\\+?\\s+(?:[a-z-]+\\s+){0,2}(?:${COUNTED_UNITS})\\b)`,
     // Standards and regulations: ISO 9001, IFRS 9, IAS 16.
     "\\b(?:iso|iec|ias|ifrs|osha|ansi|astm|nfpa|sae|gdpr|pci\\s*dss)\\s*[-:]?\\s*\\d+(?:[-:.]\\d+)*",
     // Product and version numbers: Windows 10, Odoo 17, SAP S/4, v2.1.
@@ -124,37 +145,65 @@ const NON_METRIC_CONTEXT_RE = new RegExp(
     "\\b(?:phase|stage|tier|level|grade|band|q|quarter|round|batch|site|zone|block|plot|building|floor|room|wave|line|category)\\s*[-#]?\\s*\\d+\\b",
     // Written ordinals: 3rd party, 2nd line support.
     "\\b\\d+(?:st|nd|rd|th)\\b",
+    // Calendar dates in any of the forms a CV writes them. The year rule above
+    // only removes the year, which left the DAY behind for the bare-magnitude
+    // heuristic to credit — "Joined 15 March 2019" scored as quantified.
+    //
+    // The month alternation must be CLOSED (each name followed by \b), not a
+    // "jan[a-z]*" prefix: "jun[a-z]*" happily ate the "4 junior" in "Trained 4
+    // junior associates", turning a real headcount metric into a date.
+    `\\b\\d{1,2}\\s+(?:${MONTH_WORDS})\\b\\.?`,
+    `\\b(?:${MONTH_WORDS})\\b\\.?\\s+\\d{1,2}\\b`,
+    "\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b",
   ].join("|"),
   "gi",
 );
 
-/** Digits that DO carry a measurement. Checked after the label strip above. */
-const METRIC_PATTERNS: RegExp[] = [
+/** Spelled-out and abbreviated magnitudes, shared by the currency patterns. */
+const MAGNITUDE = "(?:k|m|mn|bn|b|thousand|million|billion|lakh|crore)";
+const CURRENCY_CODE =
+  "(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dhs?|dirhams?|dollars?|riyals?|rupees?)";
+
+/**
+ * Unambiguous measurements. Run on the RAW text — a date or a version number
+ * cannot imitate any of these, so they must not be exposed to the label strip.
+ */
+const STRONG_METRIC_PATTERNS: RegExp[] = [
   // Percentages.
   /\d+(?:\.\d+)?\s*%/,
   /\d+(?:\.\d+)?\s*per\s?cent/i,
-  // Currency — symbol-first or code-first, with optional k/m/bn magnitude.
-  /(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dhs?|[$€£¥₹])\s*\d/i,
-  /\d+(?:[.,]\d+)?\s*(?:k|m|mn|bn|b)?\s*(?:aed|usd|eur|gbp|sar|qar|omr|bhd|kwd|inr|pkr|dirhams?|dollars?)\b/i,
+  // Currency, symbol/code first — "AED 120M", "$1.2m", "₹40,000".
+  new RegExp(`(?:${CURRENCY_CODE}|[$€£¥₹])\\s*\\d`, "i"),
+  // Currency, code last — "5 million AED", "60m USD", "8 million dirhams".
+  // This ordering is how a UAE candidate most often writes a contract value.
+  new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*${MAGNITUDE}?\\s*${CURRENCY_CODE}\\b`, "i"),
+  // A spelled-out magnitude is quantitative on its own: "grew to 5 million users".
+  /\b\d+(?:[.,]\d+)?\s*(?:thousand|million|billion|lakh|crore)\b/i,
   // Multipliers: 3x, 2.5X, 5 times.
   /\b\d+(?:\.\d+)?\s*[xX]\b/,
   /\b\d+(?:\.\d+)?\s*times\b/i,
   // Counted things — the scale of the work.
-  /\b\d+(?:\.\d+)?\s*\+?\s*(?:users?|clients?|projects?|teams?|staff|employees?|reports?|units?|orders?|leads?|deals?|accounts?|customers?|suppliers?|vendors?|stores?|sites?|branches|outlets?|countries|markets?|people|members?|tickets?|invoices?|shipments?|containers?|skus?|hours?|days?|weeks?|months?)\b/i,
-  // Generic count: a number followed by a plural noun, optionally with an
-  // adjective or two in between — "4 junior associates", "3 legal entities",
-  // "12 analyst hours". This is what makes the list above a shortcut rather
-  // than an exhaustive vocabulary. It is only safe BECAUSE the label contexts
-  // are stripped first: "Phase 2 deliverables" and "ISO 9001 standards" have
-  // no digit left by the time this runs.
-  /\b\d+(?:\.\d+)?\s*\+?\s+(?:[a-z-]+\s+){0,2}[a-z-]{3,}s\b/i,
+  new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*\\+?\\s*(?:${COUNTED_UNITS})\\b`, "i"),
+  // Physical quantities.
+  /\b\d+(?:[.,]\d+)?\s*(?:kg|kgs|tons?|tonnes?|km|kms|m2|sqm|sqft|sq\s?ft|litres?|liters?|mw|kw|kwh)\b/i,
   // Headcount phrased the other way round: "a team of 5 engineers".
   /\bteams?\s+of\s+\d+/i,
   /\b\d+\s*(?:direct\s+reports?|fte|headcount)\b/i,
   // Direction of change.
   /\b\d+(?:\.\d+)?\s*\+?\s*(?:more|less|fewer|increase|decrease|reduction|growth|improvement|savings?)\b/i,
-  // Anything left with two or more digits is a magnitude worth crediting —
-  // the label contexts that used to dominate this class are already gone.
+];
+
+/**
+ * Shapes a label can imitate. Run only on the label-STRIPPED text.
+ */
+const WEAK_METRIC_PATTERNS: RegExp[] = [
+  // Generic count: a number followed by a plural noun, optionally with an
+  // adjective or two in between — "4 junior associates", "3 legal entities".
+  // This is what makes the explicit vocabulary above a shortcut rather than an
+  // exhaustive list, and it is only safe here because the label contexts are
+  // already gone: "Phase 2 deliverables" has no digit left by now.
+  /\b\d+(?:\.\d+)?\s*\+?\s+(?:[a-z-]+\s+){0,2}[a-z-]{3,}s\b/i,
+  // Anything left with two or more digits is a magnitude worth crediting.
   /\b\d{2,}\b/,
 ];
 
@@ -164,10 +213,11 @@ const METRIC_PATTERNS: RegExp[] = [
  * be tested directly.
  */
 export function hasQuantifiedMetric(text: string): boolean {
-  if (!text) return false;
+  if (!text || !/\d/.test(text)) return false;
+  if (STRONG_METRIC_PATTERNS.some((re) => re.test(text))) return true;
   const stripped = text.replace(NON_METRIC_CONTEXT_RE, " ");
   if (!/\d/.test(stripped)) return false;
-  return METRIC_PATTERNS.some((re) => re.test(stripped));
+  return WEAK_METRIC_PATTERNS.some((re) => re.test(stripped));
 }
 
 // --- Word / text helpers ---
@@ -1138,8 +1188,16 @@ function evaluateAts(
   }
 
   // A14 UAE driving licence (1)
+  //
+  // "None" is an option in the builder's dropdown, and lib/utils/essentials.ts
+  // deliberately drops the licence chip for that value — so a CV set to "None"
+  // renders EXACTLY like one left blank. Scoring it as "stated" therefore
+  // awarded a point for something that appears nowhere on the document. The
+  // signal is "does the printed CV answer this", so it has to agree with what
+  // getEssentialChips actually renders.
   {
-    const pass = Boolean(p.drivingLicense?.trim());
+    const value = p.drivingLicense?.trim() ?? "";
+    const pass = Boolean(value) && !/^(?:none|n\/?a|no)$/i.test(value);
     out.push(
       sig("A14", "atsEssentials", 1, pass, pass ? "good" : "review", {
         title: pass
@@ -1147,7 +1205,7 @@ function evaluateAts(
           : "No UAE driving licence indicated",
         description: pass
           ? ""
-          : "Sales, logistics and site roles in the UAE filter on this outright. If you hold one, say so; if you don't, leave it blank.",
+          : "Sales, logistics and site roles in the UAE filter on this outright, so a licence shown on the CV is worth listing.",
         actionable: pass ? "" : "Add your licence if you hold one (e.g. 'UAE Light Vehicle').",
       }),
     );

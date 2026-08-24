@@ -129,34 +129,73 @@ function aliasForms(term: string): string[] {
   return [...forms].filter(Boolean);
 }
 
-/**
- * Collapse phrase boundaries back to spaces. Applied to the REQUIREMENT side
- * only — asymmetry is the point. Punctuation in the CV means the words really
- * were separated ("washing machine; learning curve" is not machine learning),
- * but punctuation inside a requirement is just how the JD wrote it, and must
- * not stop it matching a CV that says the same thing without the brackets
- * ("Six Sigma (Green Belt)" ⟷ a CV listing "Six Sigma Green Belt").
- */
+/** Collapse phrase boundaries back to spaces — the plain word sequence. */
 function flattenBoundaries(form: string): string {
   return form.split(PHRASE_BOUNDARY).join(" ").replace(/\s+/g, " ").trim();
 }
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
- * Whole-token / phrase containment. Builds a space-padded corpus so single
- * tokens match on word boundaries (avoids "java" matching "javascript"),
- * while multi-word phrases use plain substring containment.
+ * Build the phrase matcher for a multi-word requirement.
  *
- * The corpus keeps its PHRASE_BOUNDARY sentinels, so the substring check can
- * no longer bridge punctuation the normalizer used to flatten away — the
- * false-positive class recorded in docs/jd-match-evidence-pass.md.
+ * The rule is per-GAP, not per-string, and the asymmetry is deliberate:
+ *
+ *   * where the REQUIREMENT has no boundary, the corpus may not have one
+ *     either. "machine learning" is two adjacent words, so it must not match
+ *     "washing machine ⟂ learning curve" — the original bug.
+ *   * where the REQUIREMENT does have a boundary, the corpus may have one or
+ *     not. "Six Sigma (Green Belt)" must still match a CV listing "Six Sigma
+ *     Green Belt", and "Health, Safety and Environment" must match a bullet
+ *     that writes it with the comma.
+ *
+ * Flattening the whole requirement (the first attempt at this) got the second
+ * case right and broke the symmetric one: a requirement whose own punctuation
+ * sits between its words could never line up with a corpus that kept the
+ * boundary, so "Health, Safety and Environment" stopped matching a bullet
+ * containing it character-for-character.
+ */
+function phrasePattern(form: string): RegExp | null {
+  const units = form.split(" ").filter(Boolean);
+  const out: string[] = [];
+  let pendingBoundary = false;
+  for (const unit of units) {
+    if (unit === PHRASE_BOUNDARY) {
+      pendingBoundary = true;
+      continue;
+    }
+    if (out.length > 0) {
+      // A corpus gap is " " or " ⟂ ". Optional only if the requirement had one.
+      out.push(pendingBoundary ? `(?: ${PHRASE_BOUNDARY})? ` : " ");
+    }
+    out.push(escapeRegex(unit));
+    pendingBoundary = false;
+  }
+  if (out.length === 0) return null;
+  try {
+    return new RegExp(out.join(""));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whole-token / phrase containment. The corpus is space-padded so single
+ * tokens match on word boundaries (avoids "java" matching "javascript"), while
+ * multi-word phrases go through phrasePattern above.
+ *
+ * The corpus keeps its PHRASE_BOUNDARY sentinels, so a phrase can no longer
+ * bridge punctuation the normalizer used to flatten away — the false-positive
+ * class recorded in docs/jd-match-evidence-pass.md.
  */
 function corpusHas(paddedCorpus: string, form: string): boolean {
-  const f = flattenBoundaries(form);
-  if (!f) return false;
-  if (f.includes(" ")) {
-    return paddedCorpus.includes(f);
+  const flat = flattenBoundaries(form);
+  if (!flat) return false;
+  if (!flat.includes(" ")) {
+    return paddedCorpus.includes(` ${flat} `);
   }
-  return paddedCorpus.includes(` ${f} `);
+  const re = phrasePattern(form);
+  return re ? re.test(paddedCorpus) : false;
 }
 
 /**

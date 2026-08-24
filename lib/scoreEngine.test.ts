@@ -473,6 +473,50 @@ describe("hasQuantifiedMetric", () => {
     });
   }
 
+  // Regressions found by the adversarial pass over this fix and reproduced
+  // against the shipped build. All of these counted under the old /\d/ test,
+  // so rejecting them was a straight loss, not a tightening.
+  test("the label strip never destroys an unambiguous metric", () => {
+    const cases = [
+      // Year-shaped magnitudes — the round figures a UAE candidate writes.
+      "Saved AED 2000 per month on courier costs",
+      "Processed 2000 invoices per month for the Dubai branch",
+      "Trained 2000 employees on the new ERP",
+      "Handled 2000+ calls per month for the service desk",
+      "Cut waste by 1975 kg per shift",
+      "Managed a portfolio of 1980 active clients",
+      // "level" / "line" labels sitting right before the percentage.
+      "Achieved service level 98% on supplier deliveries",
+      "Reduced stock level 30% below target",
+      "Grew top line 12% while holding headcount flat",
+    ];
+    for (const text of cases) {
+      assert.equal(hasQuantifiedMetric(text), true, text);
+    }
+  });
+
+  test("currency written code-last is a metric", () => {
+    for (const text of [
+      "Managed a budget of 5 million AED",
+      "Saved 3 million AED annually through renegotiation",
+      "Negotiated 2 million SAR of supplier contracts",
+      "Negotiated contracts worth 8 million dirhams",
+      "Delivered a 5 million AED fit-out project",
+    ]) {
+      assert.equal(hasQuantifiedMetric(text), true, text);
+    }
+  });
+
+  test("a calendar date is still not a metric, day included", () => {
+    for (const text of [
+      "Joined 15 March 2019 as a graduate trainee",
+      "Joined on March 15 2019 as a graduate trainee",
+      "Started the role on 15/03/2019",
+    ]) {
+      assert.equal(hasQuantifiedMetric(text), false, text);
+    }
+  });
+
   test("empty and digit-free text are not quantified", () => {
     assert.equal(hasQuantifiedMetric(""), false);
     assert.equal(hasQuantifiedMetric("Led the regional operations team"), false);
@@ -610,6 +654,23 @@ describe("monotonicity invariants", () => {
     assert.equal(full - total((cv) => delete cv.personal.visaStatus), drop(2));
     assert.equal(full - total((cv) => delete cv.personal.availability), drop(1));
     assert.equal(full - total((cv) => delete cv.personal.drivingLicense), drop(1));
+  });
+
+  test("a driving licence of 'None' scores as not stated", () => {
+    // lib/utils/essentials.ts drops the licence chip for the literal "None",
+    // so that CV renders identically to a blank one. Scoring it as stated
+    // awarded a point for something printed nowhere on the document.
+    const none = clone(UAE_COMPLETE);
+    none.personal.drivingLicense = "None";
+    const blank = clone(UAE_COMPLETE);
+    delete blank.personal.drivingLicense;
+    assert.equal(
+      computeScore(none).total,
+      computeScore(blank).total,
+      "'None' and blank render the same CV, so they must score the same",
+    );
+    const held = computeScore(UAE_COMPLETE).total;
+    assert.ok(held > computeScore(none).total, "an actual licence still scores");
   });
 
   test("filling a UAE essential never lowers the total", () => {

@@ -240,6 +240,31 @@ describe("phrase boundaries (punctuation cannot be bridged)", () => {
     assert.equal(r.terms.find((t) => t.term === "Six Sigma")?.matched, true);
   });
 
+  test("a requirement that appears VERBATIM in a bullet still matches", () => {
+    // The regression the first cut of this fix introduced: flattening the
+    // requirement's own boundaries meant a requirement whose punctuation sits
+    // BETWEEN its words could never line up with a corpus that kept it.
+    const cases: Array<[string, string]> = [
+      ["Health, Safety and Environment", "Implemented Health, Safety and Environment policies across three sites."],
+      ["Enterprise Resource Planning (ERP)", "Owned the Enterprise Resource Planning (ERP) rollout."],
+      ["Key Performance Indicators (KPIs)", "Reported Key Performance Indicators (KPIs) to the board monthly."],
+      ["Profit and Loss (P&L)", "Held full Profit and Loss (P&L) accountability for the region."],
+      ["Planning, Budgeting and Forecasting", "Led Planning, Budgeting and Forecasting for four business lines."],
+      ["Anti-Money Laundering (AML)", "Ran Anti-Money Laundering (AML) checks on every new account."],
+    ];
+    for (const [term, bullet] of cases) {
+      const r = matchRequirementsToCv(
+        { jobTitle: "", hardSkills: [term], tools: [], certifications: [], softSkills: [], keywords: [] },
+        makeCv({ bullets: [bullet], skills: [] }),
+      );
+      assert.equal(
+        r.terms.find((t) => t.term === term)?.matched,
+        true,
+        `"${term}" occurs verbatim in the bullet and must match`,
+      );
+    }
+  });
+
   test("punctuation INSIDE a requirement does not block it", () => {
     // Asymmetry check: the JD's own brackets are formatting, not evidence
     // that the CV's words were separated.
