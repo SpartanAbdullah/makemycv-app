@@ -341,5 +341,60 @@ const runText = (label, text) => {
   check(f, "plain year range still yields two years", d.experience[0]?.startDate === "2018" && d.experience[0]?.endDate === "2021", [d.experience[0]?.startDate, d.experience[0]?.endDate]);
 }
 
+/* ── (j) "Personal Details" is a section, not skills overflow ────────────────
+   The heading matched no SECTION_PATTERN, so currentSection stayed on
+   whatever came before it (usually Skills) and every line underneath became
+   a phantom skill: "Nationality: Indian", "Visa Status: Employment Visa". */
+{
+  const f = "personal-details (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "fatima.noor@example.com | +971 50 222 3344",
+    "",
+    "Skills",
+    "Sourcing, Cost Control, SAP MM",
+    "",
+    "Personal Details",
+    "Nationality: Indian",
+    "Visa Status: Employment Visa",
+    "Marital Status: Married",
+    "",
+  ].join("\n"));
+  const skillsLc = d.skills.map((s) => s.toLowerCase());
+  check(f, "3 real skills only", d.skills.length === 3, d.skills);
+  check(f, "nationality is not a skill", !skillsLc.some((s) => s.includes("nationality")), d.skills);
+  check(f, "visa status is not a skill", !skillsLc.some((s) => s.includes("visa")), d.skills);
+  check(f, "marital status is not a skill", !skillsLc.some((s) => s.includes("marital")), d.skills);
+  check(f, "nothing leaked into experience", d.experience.length === 0, d.experience);
+  check(f, "nationality harvested to uae fields", d.uae?.nationality === "Indian", d.uae);
+  check(f, "visa status harvested to uae fields", d.uae?.visaStatus === "Employment Visa", d.uae);
+  check(f, "unrecognised personal line preserved in unplaced", (d.unplaced ?? []).includes("Marital Status: Married"), d.unplaced);
+}
+{
+  // "Personal Information" / "Personal Data" are the same block under
+  // different names, and the block often sits directly under the name — the
+  // contact sweep must not stop at it.
+  const f = "personal-information-top (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "Procurement Specialist",
+    "",
+    "Personal Information",
+    "Email: fatima.noor@example.com",
+    "Phone: +971 50 222 3344",
+    "Nationality: Indian",
+    "",
+    "Skills",
+    "Sourcing, Cost Control",
+    "",
+  ].join("\n"));
+  check(f, "name still harvested above the block", d.contact.name === "Fatima Noor", d.contact.name);
+  check(f, "headline still harvested above the block", d.contact.headline === "Procurement Specialist", d.contact.headline);
+  check(f, "email harvested from under the block", d.contact.email === "fatima.noor@example.com", d.contact.email);
+  check(f, "phone harvested from under the block", (d.contact.phone ?? "").includes("971 50 222 3344"), d.contact.phone);
+  check(f, "the heading itself is never the name", d.contact.name !== "Personal Information", d.contact.name);
+  check(f, "skills unaffected", d.skills.length === 2, d.skills);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

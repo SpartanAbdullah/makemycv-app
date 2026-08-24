@@ -185,7 +185,27 @@ const SECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
     key: "projects",
     re: /^(?:projects?|portfolio|side\s+projects?|key\s+projects?|notable\s+projects?)$/i,
   },
+  // UAE / South Asian CVs almost always carry this block (DOB, nationality,
+  // marital status, visa, licence). It matched no pattern, so `currentSection`
+  // stayed on whatever came before it — usually Skills — and every line under
+  // it became a phantom skill ("Nationality: Indian"). Labeled lines are
+  // consumed by harvestUaeFields; the rest goes to `unplaced` for the review
+  // screen rather than polluting a content section.
+  //
+  // Deliberately NOT "personal profile"/"personal statement": those are
+  // summary headings and already belong to the summary pattern above.
+  {
+    key: "personal",
+    re: /^(?:additional\s+)?personal\s+(?:details?|information|info|data|particulars)$/i,
+  },
 ];
+
+/** Section keys whose heading does NOT end the contact block. "Personal
+ *  Details" often sits directly under the name with the email/phone lines
+ *  beneath it, so treating it as a hard stop would truncate contact
+ *  harvesting — the exact behaviour that existed before it became a section
+ *  at all. Every other heading still ends the header block. */
+const CONTACT_TRANSPARENT_SECTIONS = new Set(["personal"]);
 
 function normalizeHeader(line: string): string {
   return line.trim().replace(/[:\-_=*•·]+$/, "").trim();
@@ -1027,7 +1047,9 @@ function harvestContact(lines: string[]): {
   for (let i = 0; i < depth; i++) {
     const line = lines[i];
     if (!line) continue;
-    if (detectSection(line)) break;
+    const sec = detectSection(line);
+    if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+    if (sec) break;
 
     let matchedSomething = false;
 
@@ -1105,7 +1127,11 @@ function harvestContact(lines: string[]): {
     if (consumed.has(i)) continue;
     const line = lines[i]?.trim();
     if (!line) continue;
-    if (detectSection(line)) break;
+    const sec = detectSection(line);
+    // Skip (never adopt as the name) a contact-transparent heading; any other
+    // heading means the header block is over.
+    if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+    if (sec) break;
     if (line.length > 70) continue;
     if (line.match(EMAIL_RE) || line.match(GENERIC_URL_RE) || line.match(PHONE_RE)) continue;
     // Must contain at least one alphabetic char and not look like a headline / sentence.
@@ -1133,7 +1159,9 @@ function harvestContact(lines: string[]): {
       if (consumed.has(i)) continue;
       const line = lines[i]?.trim();
       if (!line) continue;
-      if (detectSection(line)) break;
+      const sec = detectSection(line);
+      if (sec && CONTACT_TRANSPARENT_SECTIONS.has(sec)) continue;
+      if (sec) break;
       if (line.length > 90) continue;
       // Skip contact-value lines — those aren't the headline.
       if (
@@ -1197,6 +1225,12 @@ export function parseTextToDocument(text: string): ParsedDocument {
     languages: [],
     certifications: [],
     projects: [],
+    // "Personal Details" has no content parser of its own — harvestUaeFields
+    // already took the labeled lines document-wide, so this buffer only ever
+    // holds the leftovers (marital status, gender, religion, father's name).
+    // They land in `unplaced`; before this section existed they were appended
+    // to whatever section preceded them.
+    personal: [],
   };
 
   // Find the first section header — everything before it is the contact /
@@ -1233,6 +1267,12 @@ export function parseTextToDocument(text: string): ParsedDocument {
     if (currentSection && buffers[currentSection] !== undefined) {
       buffers[currentSection].push(line);
     }
+  }
+
+  // Personal-details leftovers surface as "we couldn't place this" rather than
+  // being dropped — same contract as the header block above.
+  if (buffers.personal.length > 0) {
+    result.unplaced = [...unplaced, ...buffers.personal];
   }
 
   result.summary = buffers.summary.join(" ").replace(/\s{2,}/g, " ").trim();
