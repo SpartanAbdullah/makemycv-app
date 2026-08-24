@@ -929,6 +929,14 @@ const UAE_LABEL_PATTERNS: Array<{
   re: RegExp;
 }> = [
   { key: "nationality", re: /^nationality\s*[:\-–]\s*(.+)$/i },
+  // DOB sits in the same labeled block as nationality/visa on UAE and South
+  // Asian CVs and was never consumed, so the line fell through to whatever
+  // section was open. Kept as free text — CvPersonal.dateOfBirth is an
+  // unparsed string, and CVs write it every way ("15 Mar 1990", "15/03/1990").
+  {
+    key: "dateOfBirth",
+    re: /^(?:d\.?\s*o\.?\s*b\.?|date\s+of\s+birth|birth\s*date|born)\s*[:\-–]\s*(.+)$/i,
+  },
   { key: "visaStatus", re: /^(?:visa\s*status|visa|residency\s*status)\s*[:\-–]\s*(.+)$/i },
   {
     key: "availability",

@@ -60,6 +60,10 @@ export type ParsedUaeFields = {
   visaStatus?: string;
   availability?: string;
   drivingLicense?: string;
+  /** Free-text as written on the CV ("15 March 1990", "15/03/1990") — mapped
+   *  to CvPersonal.dateOfBirth, which is likewise an unparsed string. Common
+   *  in the "Personal Details" block on UAE / South Asian CVs. */
+  dateOfBirth?: string;
 };
 
 export type ParsedDocument = {

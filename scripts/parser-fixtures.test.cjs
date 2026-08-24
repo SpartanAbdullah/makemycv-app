@@ -396,5 +396,34 @@ const runText = (label, text) => {
   check(f, "skills unaffected", d.skills.length === 2, d.skills);
 }
 
+/* ── (k) date of birth is harvested, not left to pollute a section ──────────
+   UAE_LABEL_PATTERNS had no DOB entry, so "DOB: 15 Mar 1990" was never
+   consumed and fell through into whatever section was open. */
+{
+  const cases = [
+    ["Date of Birth: 15 March 1990", "15 March 1990"],
+    ["DOB: 15 Mar 1990", "15 Mar 1990"],
+    ["D.O.B.: 15/03/1990", "15/03/1990"],
+    ["Date of Birth - 15/03/1990", "15/03/1990"],
+    ["Birth Date: 15-03-1990", "15-03-1990"],
+  ];
+  for (const [line, expected] of cases) {
+    const f = `dob (inline: ${line})`;
+    const d = runText(f, [
+      "Fatima Noor",
+      "fatima.noor@example.com",
+      "",
+      "Skills",
+      "Sourcing, Cost Control",
+      "",
+      "Personal Details",
+      line,
+      "",
+    ].join("\n"));
+    check(f, `dateOfBirth = ${expected}`, d.uae?.dateOfBirth === expected, d.uae);
+    check(f, "DOB line is not a skill", d.skills.length === 2, d.skills);
+  }
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

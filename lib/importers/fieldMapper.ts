@@ -67,6 +67,7 @@ export const mapParsedToCv = (parsed: ParsedDocument): Partial<CvData> => {
       visaStatus: parsed.uae?.visaStatus ?? "",
       availability: parsed.uae?.availability ?? "",
       drivingLicense: parsed.uae?.drivingLicense ?? "",
+      dateOfBirth: parsed.uae?.dateOfBirth ?? "",
     };
   }
 
@@ -201,5 +202,6 @@ export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
     visaStatus: cv.personal.visaStatus || undefined,
     availability: cv.personal.availability || undefined,
     drivingLicense: cv.personal.drivingLicense || undefined,
+    dateOfBirth: cv.personal.dateOfBirth || undefined,
   },
 });
