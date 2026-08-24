@@ -52,7 +52,14 @@ const DATE_TOKEN_RE = new RegExp(
   `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}|\\b(?:${MONTH_NAMES})\\b|\\b(?:19|20)\\d{2}\\b`,
   "gi",
 );
-const PRESENT_RE = /\b(?:present|current|now|ongoing|till\s+date|todate)\b/i;
+// "to date" (two words) is how UAE CVs most often write an open-ended role —
+// "Jan 2020 – to date", "March 2022 to date" — and it was the one spelling this
+// pattern missed, so those entries imported with isCurrent: false. The
+// negative lookbehind keeps "up to date" out: an unmarked bullet like "Kept
+// inventory records up to date" can reach the header path on two-column PDFs
+// (where pdf.js drops the bullet glyph), and must not mark the role current.
+const PRESENT_RE =
+  /\b(?:present|current|now|ongoing|till\s+date|(?<!\bup\s)to\s+date|todate)\b/i;
 
 const BULLET_PREFIX_RE = /^[\s]*[•·●◦▪■*\-–—›▸▶►★▎]\s+/;
 const NUMBERED_BULLET_RE = /^\s*\d+[.)]\s+/;

@@ -54,6 +54,17 @@ const run = (name) => {
   return doc;
 };
 
+// Inline-text variant of `run` for targeted single-behaviour checks that don't
+// warrant a whole fixture file. Same parser, same reporting.
+const runText = (label, text) => {
+  const doc = parseTextToDocument(text);
+  if (process.env.DUMP) {
+    console.log(`\n===== ${label} (inline) =====`);
+    console.log(JSON.stringify(doc, null, 2));
+  }
+  return doc;
+};
+
 /* ── (a) clean single-column ATS-style ─────────────────────────────────── */
 {
   const f = "clean-single-column.txt";
@@ -209,6 +220,65 @@ const run = (name) => {
   check(f, "'Affiliate Program' stays a skill", has(d.skills, "Affiliate Program"), d.skills);
   check(f, "'Affiliate Program' not moved to certifications", !d.certifications.some((c) => /affiliate program/i.test(c.name)), d.certifications);
   check(f, "real skills intact (Salesforce, Customer Service)", has(d.skills, "Salesforce") && has(d.skills, "Customer Service"), d.skills);
+}
+
+/* ── (h) "to date" is a current-role marker ──────────────────────────────────
+   UAE CVs write open-ended roles as "Jan 2020 – to date" / "March 2022 to
+   date" as often as "Present". PRESENT_RE matched "todate" and "till date"
+   but not the two-word form, so those roles imported with isCurrent: false. */
+{
+  const f = "to-date (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Operations Manager | Acme LLC    March 2022 to date",
+    "• Led a team of 12 across 3 sites",
+    "",
+  ].join("\n"));
+  check(f, "'to date' marks the role current", d.experience[0]?.isCurrent === true, d.experience[0]);
+  check(f, "'to date' still yields the start date", (d.experience[0]?.startDate ?? "").includes("2022"), d.experience[0]?.startDate);
+  check(f, "role survives the 'to date' strip", d.experience[0]?.role === "Operations Manager", d.experience[0]?.role);
+}
+{
+  const f = "to-date-dash (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Procurement Lead | BuildCo LLC",
+    "Jan 2020 – to date",
+    "• Negotiated AED 12M in supplier contracts",
+    "",
+  ].join("\n"));
+  check(f, "'– to date' on its own date line marks current", d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+{
+  const f = "to-present (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Sales Manager | Gulf Retail LLC    Feb 2021 to present",
+    "• Grew regional revenue by 22%",
+    "",
+  ].join("\n"));
+  check(f, "'to present' still marks current", d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+{
+  // Guard on the lookbehind: "up to date" must NOT mark a role current. On
+  // two-column PDFs pdf.js drops bullet glyphs, so this line can reach the
+  // header path where isCurrent is decided.
+  const f = "up-to-date-guard (inline)";
+  const d = runText(f, [
+    "Fatima Noor",
+    "",
+    "Experience",
+    "Records Officer | Docs LLC    Jan 2018 - Dec 2019",
+    "Kept compliance records up to date",
+    "",
+  ].join("\n"));
+  check(f, "'up to date' does not mark the role current", d.experience.every((e) => e.isCurrent !== true), d.experience);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);
