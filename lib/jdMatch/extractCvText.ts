@@ -4,11 +4,47 @@
  */
 import type { CvData } from "../types/cv";
 
-/** Lowercase, strip punctuation to spaces, collapse whitespace. */
+/**
+ * Marks a hard phrase boundary the source text actually had — a clause
+ * punctuation mark, or the seam between two separate CV fields. A multi-word
+ * requirement must never match ACROSS one.
+ *
+ * Flattening every punctuation mark to a space (what this used to do) let the
+ * substring check in `corpusHas` bridge unrelated words: "washing machine;
+ * learning curve" became "washing machine learning curve", which literally
+ * contains "machine learning". Recorded as a known bug in
+ * docs/jd-match-evidence-pass.md — a false "your CV covers this" is the one
+ * error this feature must not make.
+ *
+ * U+0001 is used because it cannot occur in CV or JD text and survives the
+ * whitespace collapse below. It is always space-padded, so `tokenize()` sees
+ * it as a standalone 1-char token and drops it with its existing length guard.
+ */
+export const PHRASE_BOUNDARY = "\u0001";
+
+/**
+ * Punctuation that ENDS a clause — the source text put a real gap here, so a
+ * phrase may not span it.
+ */
+const PHRASE_BREAK_RE = /[,;:!?()[\]{}|"“”«»•·]+/g;
+
+/**
+ * Everything else outside the kept set collapses to a space, as before. These
+ * are word JOINERS — hyphen, slash, apostrophe, ampersand — and flattening
+ * them is what makes "Six-Sigma" match a requirement for "Six Sigma". `+ # .`
+ * stay literal (c++, c#, node.js, ga4), and the sentinel is excluded so it
+ * survives this pass.
+ */
+// eslint-disable-next-line no-control-regex
+const WORD_JOIN_RE = /[^a-z0-9+#.\s\u0001]/g;
+
+/** Lowercase, mark clause boundaries, flatten word-joining punctuation to
+ *  spaces, collapse whitespace. */
 export function normalizeText(input: string): string {
   return input
     .toLowerCase()
-    .replace(/[^a-z0-9+#.\s]/g, " ") // keep + # . (c++, c#, node.js, ga4)
+    .replace(PHRASE_BREAK_RE, ` ${PHRASE_BOUNDARY} `)
+    .replace(WORD_JOIN_RE, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -42,5 +78,13 @@ export function extractCvCorpus(cv: CvData): string {
     parts.push(...proj.bullets);
   }
 
-  return normalizeText(parts.filter(Boolean).join(" "));
+  // Each part is normalized on its own and joined with the boundary sentinel:
+  // the seam between two CV fields is as hard a break as a semicolon. Joining
+  // with a plain space let a phrase bridge two unrelated entries — a bullet
+  // ending "…the washing machine" followed by one starting "Learning new
+  // procedures…" read as a literal "machine learning" hit.
+  return parts
+    .map((part) => normalizeText(part))
+    .filter(Boolean)
+    .join(` ${PHRASE_BOUNDARY} `);
 }

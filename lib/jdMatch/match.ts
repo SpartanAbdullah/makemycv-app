@@ -9,7 +9,7 @@
  * measures *overlap* with one JD. Different metric, separate module.
  */
 import type { CvData } from "../types/cv";
-import { extractCvCorpus, normalizeText } from "./extractCvText";
+import { extractCvCorpus, normalizeText, PHRASE_BOUNDARY } from "./extractCvText";
 import {
   type JdCategory,
   type JdCategoryResult,
@@ -101,16 +101,33 @@ function aliasForms(term: string): string[] {
 }
 
 /**
+ * Collapse phrase boundaries back to spaces. Applied to the REQUIREMENT side
+ * only — asymmetry is the point. Punctuation in the CV means the words really
+ * were separated ("washing machine; learning curve" is not machine learning),
+ * but punctuation inside a requirement is just how the JD wrote it, and must
+ * not stop it matching a CV that says the same thing without the brackets
+ * ("Six Sigma (Green Belt)" ⟷ a CV listing "Six Sigma Green Belt").
+ */
+function flattenBoundaries(form: string): string {
+  return form.split(PHRASE_BOUNDARY).join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
  * Whole-token / phrase containment. Builds a space-padded corpus so single
  * tokens match on word boundaries (avoids "java" matching "javascript"),
  * while multi-word phrases use plain substring containment.
+ *
+ * The corpus keeps its PHRASE_BOUNDARY sentinels, so the substring check can
+ * no longer bridge punctuation the normalizer used to flatten away — the
+ * false-positive class recorded in docs/jd-match-evidence-pass.md.
  */
 function corpusHas(paddedCorpus: string, form: string): boolean {
-  if (!form) return false;
-  if (form.includes(" ")) {
-    return paddedCorpus.includes(form);
+  const f = flattenBoundaries(form);
+  if (!f) return false;
+  if (f.includes(" ")) {
+    return paddedCorpus.includes(f);
   }
-  return paddedCorpus.includes(` ${form} `);
+  return paddedCorpus.includes(` ${f} `);
 }
 
 function isMatched(paddedCorpus: string, term: string): boolean {
@@ -173,6 +190,11 @@ function tokenize(s: string): TokenSets {
   const raw = new Set<string>();
   for (const piece of expanded.split(/\s+/)) {
     const t = piece.trim();
+    // The boundary sentinel is punctuation, not a word — variant matching
+    // compares meaning, so it never participates. (The length guard below
+    // would drop it too; this is explicit so lowering that guard can't
+    // silently turn every comma into a shared "token".)
+    if (t === PHRASE_BOUNDARY) continue;
     if (t.length < 2 || TOKEN_STOPWORDS.has(t)) continue;
     raw.add(t);
   }

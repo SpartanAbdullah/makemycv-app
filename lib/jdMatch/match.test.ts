@@ -166,6 +166,106 @@ describe("variant / abbreviation matching", () => {
   });
 });
 
+/* ── Punctuation must not glue unrelated words into a phrase ─────────────────
+ *
+ * normalizeText used to flatten every punctuation mark to a space, so the
+ * substring check in corpusHas bridged clause boundaries: "washing machine;
+ * learning curve" became "washing machine learning curve", which literally
+ * contains "machine learning". Recorded as a known bug in
+ * docs/jd-match-evidence-pass.md — a false "your CV already covers this" is
+ * the costliest error this feature can make. */
+describe("phrase boundaries (punctuation cannot be bridged)", () => {
+  const mlReq = (cvOpts: { bullets: string[]; skills: string[] }) => {
+    const r = matchRequirementsToCv(
+      {
+        jobTitle: "",
+        hardSkills: ["Machine Learning"],
+        tools: [],
+        certifications: [],
+        softSkills: [],
+        keywords: [],
+      },
+      makeCv(cvOpts),
+    );
+    return r.terms.find((t) => t.term === "Machine Learning")?.matched;
+  };
+
+  test("a semicolon between the words is NOT a match", () => {
+    assert.equal(
+      mlReq({
+        bullets: ["Operated the washing machine; learning new procedures took two weeks."],
+        skills: [],
+      }),
+      false,
+      "'washing machine; learning new procedures' must not cover machine learning",
+    );
+  });
+
+  test("a comma between the words is NOT a match", () => {
+    assert.equal(
+      mlReq({ bullets: ["Serviced each machine, learning the fault codes as I went."], skills: [] }),
+      false,
+    );
+  });
+
+  test("a field seam between the words is NOT a match", () => {
+    // Two separate bullets. Joined with a plain space these read as one
+    // sentence and produced a literal hit.
+    assert.equal(
+      mlReq({
+        bullets: ["Maintained the washing machine", "Learning new procedures took two weeks"],
+        skills: [],
+      }),
+      false,
+      "a phrase must not bridge two separate CV entries",
+    );
+  });
+
+  test("the genuine phrase still matches", () => {
+    assert.equal(
+      mlReq({ bullets: ["Delivered experience in machine learning forecasting models."], skills: [] }),
+      true,
+    );
+  });
+
+  test("the genuine phrase still matches as a skill", () => {
+    assert.equal(mlReq({ bullets: ["Ran the ops desk."], skills: ["Machine Learning"] }), true);
+  });
+
+  test("hyphens still JOIN — 'Six-Sigma' covers a 'Six Sigma' requirement", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", hardSkills: ["Six Sigma"], tools: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Six-Sigma"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Six Sigma")?.matched, true);
+  });
+
+  test("punctuation INSIDE a requirement does not block it", () => {
+    // Asymmetry check: the JD's own brackets are formatting, not evidence
+    // that the CV's words were separated.
+    const r = matchRequirementsToCv(
+      {
+        jobTitle: "",
+        hardSkills: ["Six Sigma (Green Belt)"],
+        tools: [],
+        certifications: [],
+        softSkills: [],
+        keywords: [],
+      },
+      makeCv({ bullets: ["Ran the ops desk."], skills: ["Six Sigma Green Belt"] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "Six Sigma (Green Belt)")?.matched, true);
+  });
+
+  test("single tokens still match across a boundary (the token IS there)", () => {
+    const r = matchRequirementsToCv(
+      { jobTitle: "", tools: ["SAP"], hardSkills: [], certifications: [], softSkills: [], keywords: [] },
+      makeCv({ bullets: ["Rolled out SAP; trained 40 users."], skills: [] }),
+    );
+    assert.equal(r.terms.find((t) => t.term === "SAP")?.matched, true);
+  });
+});
+
 /* ── Category hypernyms are one-directional (review 2026-06) ────────────────── */
 //
 // A JD requirement for a broad CATEGORY (CRM, ERP, SQL, project management) is
