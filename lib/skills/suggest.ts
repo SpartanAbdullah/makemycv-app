@@ -15,6 +15,7 @@
  */
 import type { CvData } from "../types/cv";
 import type { RoleFamily } from "../data/roleFamily";
+import type { JdRequirements } from "../jdMatch/types";
 import {
   allDomainSkills,
   domainSkillEntries,
@@ -30,6 +31,8 @@ import {
 } from "./evidence";
 import { matchingPhrase, phraseMatches } from "./searchPhrases";
 
+const norm = (s: string) => s.toLowerCase().trim();
+
 export type SuggestionSource = "bank" | "soft" | "freetext";
 
 export type Suggestion = {
@@ -41,7 +44,49 @@ export type Suggestion = {
   kind?: DomainSkill["kind"];
   /** The colloquial phrase that surfaced this result, for "the usual term for …". */
   viaPhrase?: string;
+  /** True when the job the user is targeting asks for this by name. */
+  inJd?: boolean;
 };
+
+/**
+ * The terms a targeted job actually asks for, flattened and normalised.
+ *
+ * Relevance can only be resolved against a SPECIFIC posting — every source in
+ * the research agrees a domain can get you to a plausible set but never to the
+ * selection. So when the user has analysed a job, its own words outrank our
+ * curation: "this job asks for it" is a stronger claim than "usually asked for
+ * in Logistics", and it is the user's evidence rather than ours.
+ */
+export type JdTerms = Set<string>;
+
+export function jdTermSet(requirements: JdRequirements | null | undefined): JdTerms {
+  const out = new Set<string>();
+  if (!requirements) return out;
+  for (const list of [
+    requirements.hardSkills,
+    requirements.tools,
+    requirements.certifications,
+    requirements.softSkills,
+    requirements.keywords,
+  ]) {
+    for (const term of list ?? []) {
+      const t = norm(term);
+      if (t) out.add(t);
+    }
+  }
+  return out;
+}
+
+/**
+ * True when the job asks for this entry, by canonical name or by any strict
+ * alias. weakAliases are excluded for the usual reason — a JD containing the
+ * word "go" is not asking for Go.
+ */
+function askedForByJd(entry: DomainSkill, jd: JdTerms): boolean {
+  if (jd.size === 0) return false;
+  if (jd.has(norm(entry.name))) return true;
+  return (entry.aliases ?? []).some((a) => jd.has(norm(a)));
+}
 
 /**
  * Below this many pieces of CV text, evidence-based UI is suppressed.
@@ -56,8 +101,6 @@ export const MIN_UNITS_FOR_EVIDENCE_UI = 3;
 export function hasEnoughCvForEvidence(index: EvidenceIndex): boolean {
   return index.units.length >= MIN_UNITS_FOR_EVIDENCE_UI;
 }
-
-const norm = (s: string) => s.toLowerCase().trim();
 
 function listedNames(cv: CvData): string[] {
   return cv.skills.map((s) => s.name).filter(Boolean);
@@ -98,9 +141,16 @@ export type ArrivalSuggestions = {
 export function arrivalSuggestions(
   cv: CvData,
   domain: RoleFamily | undefined,
-  opts: { maxAlreadyShown?: number; maxUsuallyAsked?: number; maxAlsoCommon?: number } = {},
+  opts: {
+    maxAlreadyShown?: number;
+    maxUsuallyAsked?: number;
+    maxAlsoCommon?: number;
+    /** Requirements of the job being targeted, when the user has analysed one. */
+    jd?: JdRequirements | null;
+  } = {},
 ): ArrivalSuggestions {
   const { maxAlreadyShown = 5, maxUsuallyAsked = 8, maxAlsoCommon = 10 } = opts;
+  const jd = jdTermSet(opts.jd);
   const index = buildEvidenceIndex(cv);
   const evidenceUsable = hasEnoughCvForEvidence(index);
   const have = new Set(listedNames(cv).map(norm));
@@ -120,6 +170,7 @@ export function arrivalSuggestions(
   for (const entry of bankPool(domain)) {
     if (have.has(norm(entry.name))) continue;
     const a = assessSkill(cv, toSearchable(entry), index);
+    const inJd = askedForByJd(entry, jd);
     const s: Suggestion = {
       name: entry.name,
       source: "bank",
@@ -127,11 +178,14 @@ export function arrivalSuggestions(
       evidence: a.evidence,
       tier: entry.tier,
       kind: entry.kind,
+      ...(inJd ? { inJd: true } : {}),
     };
     // "unlisted" = the CV proves it and the list is missing it. Always leads,
     // regardless of tier: the user's own proof outranks our curation.
     if (s.status === "unlisted" && evidenceUsable) alreadyShown.push(s);
-    else if (entry.tier === "must") usuallyAsked.push(s);
+    // A term the targeted job names is promoted regardless of our own tier —
+    // the posting outranks the curation on relevance.
+    else if (inJd || entry.tier === "must") usuallyAsked.push(s);
     else alsoCommon.push(s);
   }
 
@@ -143,9 +197,13 @@ export function arrivalSuggestions(
     alsoCommon.push({ name, source: "soft", status: "absent", evidence: null });
   }
 
+  // Within the promoted band, the job the user is actually applying to leads.
+  const jdFirst = (a: Suggestion, b: Suggestion) =>
+    Number(Boolean(b.inJd)) - Number(Boolean(a.inJd));
+
   return {
     alreadyShown: alreadyShown.slice(0, maxAlreadyShown),
-    usuallyAsked: usuallyAsked.slice(0, maxUsuallyAsked),
+    usuallyAsked: [...usuallyAsked].sort(jdFirst).slice(0, maxUsuallyAsked),
     alsoCommon: alsoCommon.slice(0, maxAlsoCommon),
     listed,
     evidenceUsable,
@@ -194,10 +252,12 @@ export function searchSkills(
   cv: CvData,
   domain: RoleFamily | undefined,
   limit = 8,
+  jdRequirements: JdRequirements | null = null,
 ): SearchResult[] {
   const q = norm(query);
   if (q.length < 2) return [];
 
+  const jd = jdTermSet(jdRequirements);
   const index = buildEvidenceIndex(cv);
   const evidenceUsable = hasEnoughCvForEvidence(index);
   const have = new Set(listedNames(cv).map(norm));
@@ -213,9 +273,12 @@ export function searchSkills(
     const a = assessSkill(cv, toSearchable(entry), index);
     const alreadyHave = have.has(norm(entry.name));
 
+    const inJd = askedForByJd(entry, jd);
     let rank = strScore;
     if (phraseHit) rank += 55; // the naming gap is the point of this feature
     if (a.status === "unlisted" && evidenceUsable) rank += 70;
+    // The posting the user is applying to beats our curated tier.
+    if (inJd) rank += 40;
     if (entry.tier === "must" && domain && domain !== "generic") rank += 15;
     if (alreadyHave) rank -= 500; // keep it, but never above a real option
 
@@ -229,6 +292,7 @@ export function searchSkills(
         tier: entry.tier,
         kind: entry.kind,
         viaPhrase: phraseHit ? (matchingPhrase(entry.name, query) ?? undefined) : undefined,
+        ...(inJd ? { inJd: true } : {}),
         alreadyHave,
       },
     });

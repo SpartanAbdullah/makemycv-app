@@ -163,6 +163,20 @@ export const JdMatchPanel = () => {
     [requirements, workingCv],
   );
 
+  /**
+   * Remember the job being targeted so the rest of the builder can rank
+   * against it — the Skills step uses it to promote what THIS posting asks
+   * for above what is merely common in the domain.
+   *
+   * An effect rather than a call inside onAnalyze because run() is async:
+   * requirements only exist once the server has extracted them. Updating an
+   * external store from an effect is the sanctioned use of one.
+   */
+  const setJdTarget = useCvStore((s) => s.setJdTarget);
+  useEffect(() => {
+    if (requirements) setJdTarget(requirements);
+  }, [requirements, setJdTarget]);
+
   // Heatmap of the analysed JD (terms located in the text). Recomputes with the
   // result, so spans flip green as fixes stage.
   const heatmap = useMemo(

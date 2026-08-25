@@ -9,6 +9,7 @@ import type {
   SkillLevel,
 } from "../types/cv";
 import type { ParseSignals, ScoreGrade } from "../resumeChecker/types";
+import type { JdRequirements } from "../jdMatch/types";
 import { computeScore, SCORING_RUBRIC_VERSION } from "../scoreEngine";
 import { clearSetAside } from "../skills/setAside";
 import {
@@ -22,6 +23,66 @@ import { createId } from "../utils/id";
 
 const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
 const SCORE_BASELINE_STORAGE_KEY = "makemycv:scoreBaseline";
+const JD_TARGET_STORAGE_KEY = "makemycv:jdTarget";
+
+/** Bumped if JdTarget's shape changes; a mismatch is discarded, not guessed at. */
+const JD_TARGET_VERSION = 1;
+
+/**
+ * The job the user last analysed in JD Match, kept so the rest of the builder
+ * can rank against it.
+ *
+ * Stores the EXTRACTED REQUIREMENTS, not the pasted job text. Three reasons:
+ * the requirements are what a consumer actually needs (a list of terms), a
+ * pasted JD can be several KB where this is a handful of short arrays, and a
+ * raw posting carries a company's own wording where the extracted skill list
+ * is generic. It is also already computed — nothing new runs to produce it.
+ *
+ * Local only, like the CV itself: this never leaves the browser.
+ */
+export type JdTarget = {
+  jobTitle?: string;
+  requirements: JdRequirements;
+  capturedAt: number;
+  v: number;
+};
+
+/**
+ * Validate a JD target read back from localStorage.
+ *
+ * Null for anything today's code cannot use — malformed JSON, a missing
+ * requirements object, or a different shape version. Exported and pure so the
+ * rule is testable without a browser.
+ */
+export function parseStoredJdTarget(raw: string | null): JdTarget | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const t = parsed as Partial<JdTarget>;
+  if (t.v !== JD_TARGET_VERSION) return null;
+  const r = t.requirements;
+  if (!r || typeof r !== "object") return null;
+  const list = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  return {
+    jobTitle: typeof t.jobTitle === "string" ? t.jobTitle : undefined,
+    capturedAt: typeof t.capturedAt === "number" ? t.capturedAt : 0,
+    v: JD_TARGET_VERSION,
+    requirements: {
+      jobTitle: typeof r.jobTitle === "string" ? r.jobTitle : undefined,
+      hardSkills: list(r.hardSkills),
+      tools: list(r.tools),
+      certifications: list(r.certifications),
+      softSkills: list(r.softSkills),
+      keywords: list(r.keywords),
+    },
+  };
+}
 
 /**
  * The score of the CV at the moment it was IMPORTED — the honest "before" for
@@ -223,6 +284,8 @@ type CvStore = {
   parseSignals: ParseSignals | null;
   /** Score at import time. null for hand-typed CVs — see ScoreBaseline. */
   scoreBaseline: ScoreBaseline | null;
+  /** The job last analysed in JD Match, so other steps can rank against it. */
+  jdTarget: JdTarget | null;
   setHydrated: (value: boolean) => void;
   setData: (data: CvData) => void;
   updateSection: <K extends keyof CvData>(key: K, value: CvData[K]) => void;
@@ -255,6 +318,8 @@ type CvStore = {
    * Call this last, once data and signals are both settled.
    */
   captureScoreBaseline: () => void;
+  /** Remember (or clear with null) the job being targeted. Persists locally. */
+  setJdTarget: (requirements: JdRequirements | null) => void;
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
@@ -309,6 +374,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
   proAccessSource: "free",
   parseSignals: null,
   scoreBaseline: null,
+  jdTarget: null,
   setHydrated: (value) => set({ hydrated: value }),
   setData: (data) => set({ data }),
   updateSection: (key, value) =>
@@ -351,7 +417,15 @@ export const useCvStore = create<CvStore>((set, get) => ({
     // lib/skills/setAside.ts). "Start over" has to clear them too, or the next
     // CV inherits a park list belonging to a CV that no longer exists.
     clearSetAside();
-    set({ data: defaultCvData, parseSignals: null, scoreBaseline: null });
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(JD_TARGET_STORAGE_KEY);
+    }
+    set({
+      data: defaultCvData,
+      parseSignals: null,
+      scoreBaseline: null,
+      jdTarget: null,
+    });
   },
   importJson: (data) => set({ data }),
   setParseSignals: (signals) => {
@@ -366,6 +440,29 @@ export const useCvStore = create<CvStore>((set, get) => ({
       }
     }
     set({ parseSignals: signals });
+  },
+  setJdTarget: (requirements) => {
+    const target: JdTarget | null = requirements
+      ? {
+          jobTitle: requirements.jobTitle?.trim() || undefined,
+          requirements,
+          capturedAt: Date.now(),
+          v: JD_TARGET_VERSION,
+        }
+      : null;
+    if (typeof window !== "undefined") {
+      try {
+        if (target) {
+          window.localStorage.setItem(JD_TARGET_STORAGE_KEY, JSON.stringify(target));
+        } else {
+          window.localStorage.removeItem(JD_TARGET_STORAGE_KEY);
+        }
+      } catch {
+        // Quota or private mode. The target is a convenience for ranking, not
+        // CV content — losing it costs a re-analyse, not work.
+      }
+    }
+    set({ jdTarget: target });
   },
   captureScoreBaseline: () => {
     const { data, parseSignals } = get();
@@ -476,6 +573,21 @@ export const bindCvStorage = () => {
     }
   } catch {
     // Storage unavailable — ignore, no delta is better than a wrong delta.
+  }
+
+  // Hydrate the JD target (drives relevance ranking on the Skills step).
+  try {
+    const rawTarget = window.localStorage.getItem(JD_TARGET_STORAGE_KEY);
+    const target = parseStoredJdTarget(rawTarget);
+    if (target) {
+      useCvStore.setState({ jdTarget: target });
+    } else if (rawTarget) {
+      // Different shape version or malformed — drop it rather than leave a
+      // record that can never be used.
+      window.localStorage.removeItem(JD_TARGET_STORAGE_KEY);
+    }
+  } catch {
+    // Storage unavailable — rank against the domain bank alone.
   }
 
   useCvStore.getState().setHydrated(true);

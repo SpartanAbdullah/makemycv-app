@@ -139,6 +139,8 @@ export const SkillsStep = ({
   const data = useCvStore((state) => state.data);
   const domain = useCvStore((state) => state.data.settings.domain);
   const updateSection = useCvStore((state) => state.updateSection);
+  const jdTarget = useCvStore((state) => state.jdTarget);
+  const setJdTarget = useCvStore((state) => state.setJdTarget);
 
   const [query, setQuery] = useState("");
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
@@ -197,13 +199,16 @@ export const SkillsStep = ({
   );
 
   const arrival = useMemo(
-    () => arrivalSuggestions(liveCv, domain),
-    [liveCv, domain],
+    () => arrivalSuggestions(liveCv, domain, { jd: jdTarget?.requirements ?? null }),
+    [liveCv, domain, jdTarget],
   );
 
   const results = useMemo(
-    () => (query.trim().length >= 2 ? searchSkills(query, liveCv, domain, 8) : []),
-    [query, liveCv, domain],
+    () =>
+      query.trim().length >= 2
+        ? searchSkills(query, liveCv, domain, 8, jdTarget?.requirements ?? null)
+        : [],
+    [query, liveCv, domain, jdTarget],
   );
 
   /* ── Writes ──
@@ -351,7 +356,7 @@ export const SkillsStep = ({
         cursor: "pointer",
       }}
     >
-      <Icon name={s.tier === "must" ? "star" : "plus"} size={11} />
+      <Icon name={s.inJd || s.tier === "must" ? "star" : "plus"} size={11} />
       {s.name}
     </button>
   );
@@ -587,6 +592,48 @@ export const SkillsStep = ({
           </div>
         )}
 
+        {/* ── What we are ranking against ───────────────────────────────────
+            Never rank silently against a job the user analysed weeks ago. The
+            label names it and offers one tap to stop — the alternative is
+            suggestions quietly shaped by something invisible. */}
+        {jdTarget && (
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+              fontSize: 12,
+              color: "var(--ff-muted)",
+            }}
+          >
+            <span>
+              Ranked against{" "}
+              <strong style={{ color: "var(--ff-ink-2)", fontWeight: 600 }}>
+                {jdTarget.jobTitle || "the job you analysed"}
+              </strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setJdTarget(null)}
+              className="ff-hit-target"
+              style={{
+                background: "none",
+                border: "none",
+                padding: "6px 0",
+                font: "inherit",
+                fontSize: 12,
+                color: "var(--ff-muted)",
+                textDecoration: "underline",
+                cursor: "pointer",
+              }}
+            >
+              Stop using it
+            </button>
+          </div>
+        )}
+
         {/* ── Arrival: what the CV already proves ───────────────────────────
             The app speaks first. Highest-value thing we can show — the user
             already wrote the proof and only lacked the word. */}
@@ -791,7 +838,9 @@ export const SkillsStep = ({
         {arrival.usuallyAsked.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <p style={SECTION_LABEL}>
-              {domainLabel ? `Usually asked for in ${domainLabel}` : "Commonly asked for"} · tap to add
+              {jdTarget
+                ? "What this job asks for · tap to add"
+                : `${domainLabel ? `Usually asked for in ${domainLabel}` : "Commonly asked for"} · tap to add`}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {arrival.usuallyAsked.map((s) => (
