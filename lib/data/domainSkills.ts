@@ -52,8 +52,33 @@ export type DomainSkill = {
   name: string;
   tier: SkillTier;
   kind?: SkillKind;
-  /** Alternate spellings, acronyms and legacy names. Detection only. */
+  /**
+   * Alternate spellings, acronyms and legacy names. Never rendered.
+   *
+   * Held to a STRICT bar, because this list does two jobs and the harder one
+   * sets the standard: it suppresses an already-held suggestion (where a loose
+   * alias is merely unhelpful) AND it is what lib/skills/evidence.ts searches
+   * the user's own bullets for (where a loose alias makes the product claim
+   * they have proven something they have not).
+   *
+   * So an alias must be specific enough that its presence in prose genuinely
+   * implies the skill. "FTA Portal" was removed from EmaraTax for exactly this
+   * reason — a bullet reading "filed through the FTA portal" is evidence of
+   * VAT work, not of the EmaraTax system. Bare common-English words ("Lean",
+   * "Epic") belong in `weakAliases` instead.
+   */
   aliases?: string[];
+  /**
+   * Spellings that are ALSO ordinary English words — "React", "Node", "Go".
+   *
+   * Recognised when they appear as a discrete entry on the skills list (so we
+   * don't re-suggest something the user already typed), but NEVER searched for
+   * in prose: "the ability to react quickly" and "each node in the cluster"
+   * are not evidence of React or Node.js. Same distinction the JD matcher
+   * draws with AMBIGUOUS_TECH_FORMS in lib/jdMatch/match.ts — a word is a
+   * claim in a skills list and merely a word in a sentence.
+   */
+  weakAliases?: string[];
 };
 
 const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
@@ -89,7 +114,7 @@ const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
     // still screened for and is what most candidates have on their CV.
     { name: "UAE Corporate Tax", tier: "must", aliases: ["Corporate Tax", "CT", "UAE CT", "Corporate Tax Registration"] },
     { name: "UAE VAT / FTA", tier: "must", aliases: ["VAT", "UAE VAT", "FTA", "Federal Tax Authority", "VAT Filing", "VAT Return"] },
-    { name: "EmaraTax", tier: "nice", kind: "system", aliases: ["Emara Tax", "FTA Portal"] },
+    { name: "EmaraTax", tier: "nice", kind: "system", aliases: ["Emara Tax"] },
     { name: "Financial Modelling", tier: "must", aliases: ["Financial Modeling", "Financial Models"] },
     { name: "Budgeting & Forecasting", tier: "must", aliases: ["Budgeting and Forecasting", "Budgeting", "Forecasting", "FP&A"] },
     { name: "SAP FICO", tier: "nice", kind: "tool", aliases: ["SAP FI", "SAP CO", "SAP Finance"] },
@@ -113,7 +138,7 @@ const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
   ],
   operations: [
     { name: "Process Improvement", tier: "must", aliases: ["Process Optimisation", "Continuous Improvement"] },
-    { name: "Lean Six Sigma", tier: "must", kind: "credential", aliases: ["Six Sigma", "Lean", "Green Belt", "Black Belt"] },
+    { name: "Lean Six Sigma", tier: "must", kind: "credential", aliases: ["Six Sigma", "Lean Manufacturing", "Green Belt", "Black Belt"] },
     { name: "P&L Management", tier: "must", aliases: ["P&L", "Profit and Loss", "PnL"] },
     { name: "KPI Reporting", tier: "must", aliases: ["KPIs", "Performance Reporting"] },
     { name: "ERP (SAP / Oracle)", tier: "must", kind: "tool", aliases: ["ERP", "SAP", "Oracle ERP", "S/4HANA", "Oracle Fusion"] },
@@ -178,8 +203,8 @@ const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
     { name: "Python", tier: "must", kind: "tool" },
     { name: "JavaScript", tier: "must", kind: "tool", aliases: ["JS", "ES6", "TypeScript"] },
     { name: "SQL", tier: "must", kind: "tool", aliases: ["MySQL", "PostgreSQL", "T-SQL", "PL/SQL"] },
-    { name: "React", tier: "must", kind: "tool", aliases: ["React.js", "ReactJS"] },
-    { name: "Node.js", tier: "must", kind: "tool", aliases: ["NodeJS", "Node"] },
+    { name: "React.js", tier: "must", kind: "tool", aliases: ["ReactJS"], weakAliases: ["React"] },
+    { name: "Node.js", tier: "must", kind: "tool", aliases: ["NodeJS"], weakAliases: ["Node"] },
     { name: "AWS", tier: "must", kind: "tool", aliases: ["Amazon Web Services", "EC2", "S3"] },
     { name: "Docker", tier: "nice", kind: "tool", aliases: ["Containers"] },
     { name: "Kubernetes", tier: "nice", kind: "tool", aliases: ["K8s"] },
@@ -238,7 +263,7 @@ const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
     { name: "DataFlow (PSV)", tier: "must", kind: "credential", aliases: ["DataFlow", "Primary Source Verification", "PSV"] },
     { name: "BLS", tier: "must", kind: "credential", aliases: ["Basic Life Support"] },
     { name: "ACLS", tier: "nice", kind: "credential", aliases: ["Advanced Cardiac Life Support"] },
-    { name: "Electronic Medical Records (EMR)", tier: "nice", kind: "tool", aliases: ["EMR", "EHR", "Cerner", "Epic", "Malaffi"] },
+    { name: "Electronic Medical Records (EMR)", tier: "nice", kind: "tool", aliases: ["EMR", "EHR", "Cerner", "Malaffi"] },
     { name: "Patient Care", tier: "nice", aliases: ["Patient Management"] },
     { name: "Infection Control", tier: "nice", aliases: ["IPC"] },
   ],
@@ -263,7 +288,7 @@ const DOMAIN_HARD_SKILLS: Partial<Record<RoleFamily, DomainSkill[]>> = {
 
 /** Every string that should suppress this entry as a suggestion. */
 function matchTokens(entry: DomainSkill): string[] {
-  return [entry.name, ...(entry.aliases ?? [])];
+  return [entry.name, ...(entry.aliases ?? []), ...(entry.weakAliases ?? [])];
 }
 
 const norm = (s: string) => s.toLowerCase().trim();

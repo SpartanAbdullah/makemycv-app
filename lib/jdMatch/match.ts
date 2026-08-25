@@ -203,6 +203,23 @@ function corpusHas(paddedCorpus: string, form: string): boolean {
  * headline). Only common-English alias forms are routed to it — see
  * AMBIGUOUS_TECH_FORMS.
  */
+/**
+ * True when `term` occurs literally in `text` as a whole token or phrase,
+ * respecting phrase boundaries — so a comma, semicolon or sentence end between
+ * the words is NOT a match.
+ *
+ * Public because the skills evidence detector (lib/skills/evidence.ts) needs
+ * exactly this rule and must not grow a second, subtly different copy of the
+ * boundary logic. No alias expansion, no stemming, no variant matching: the
+ * caller supplies whichever spellings it wants tested.
+ */
+export function termAppearsIn(text: string, term: string): boolean {
+  if (!text || !term) return false;
+  const normalizedTerm = normalizeText(term);
+  if (!normalizedTerm) return false;
+  return corpusHas(` ${normalizeText(text)} `, normalizedTerm);
+}
+
 function isMatched(
   paddedCorpus: string,
   paddedPhraseCorpus: string,

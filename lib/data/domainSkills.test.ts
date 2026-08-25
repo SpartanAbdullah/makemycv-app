@@ -219,6 +219,39 @@ describe("bank hygiene", () => {
     }
   });
 
+  // Aliases are searched against the user's own bullets by
+  // lib/skills/evidence.ts, so a loose one does not just over-suppress a chip —
+  // it makes the product claim someone proved a skill they did not. Every one
+  // of these was caught by running the detector over a realistic CV.
+  test("no alias is a bare common-English word", () => {
+    const banned = new Set([
+      "lean", "epic", "agile", "office", "word", "excel", "access", "project",
+      "spring", "react", "node", "go", "rust", "swift", "ruby", "dart", "scratch",
+      "advanced", "basic", "support", "service", "systems", "portal", "cloud",
+    ]);
+    for (const e of all) {
+      for (const alias of e.aliases ?? []) {
+        assert.equal(
+          banned.has(alias.toLowerCase().trim()),
+          false,
+          `"${e.name}" lists the common word "${alias}" as an alias — it would ` +
+            `evidence the skill from ordinary prose`,
+        );
+      }
+    }
+  });
+
+  test("aliases tightened after live testing stay tightened", () => {
+    const byName = (n: string) => all.find((e) => e.name === n);
+    const lower = (e?: DomainSkill) => (e?.aliases ?? []).map((a) => a.toLowerCase());
+    // "filed through the FTA portal" is VAT evidence, not EmaraTax evidence.
+    assert.equal(lower(byName("EmaraTax")).includes("fta portal"), false);
+    // "Ran a lean team of 4" is not Six Sigma.
+    assert.equal(lower(byName("Lean Six Sigma")).includes("lean"), false);
+    // "an epic launch" is not an electronic medical record system.
+    assert.equal(lower(byName("Electronic Medical Records (EMR)")).includes("epic"), false);
+  });
+
   test("names are chip-sized (long labels wrap badly and read as sentences)", () => {
     for (const e of all) {
       assert.ok(e.name.length <= 40, `"${e.name}" is ${e.name.length} chars`);
