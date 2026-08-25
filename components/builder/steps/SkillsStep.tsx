@@ -40,7 +40,7 @@
  *     recruiter's two seconds actually contains.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { skillsSchema } from "../../../lib/schemas/cvSchemas";
@@ -61,6 +61,13 @@ import {
   type Suggestion,
 } from "../../../lib/skills/suggest";
 import { describeEvidence, type SkillStatus } from "../../../lib/skills/evidence";
+import {
+  getSetAsideServerSnapshot,
+  getSetAsideSnapshot,
+  parkSkill,
+  restoreSkill,
+  subscribeSetAside,
+} from "../../../lib/skills/setAside";
 import { Icon } from "../Icon";
 import { AiDisclosure } from "../AiDisclosure";
 import type { CvSkill } from "../../../lib/types/cv";
@@ -132,8 +139,6 @@ export const SkillsStep = ({
   const data = useCvStore((state) => state.data);
   const domain = useCvStore((state) => state.data.settings.domain);
   const updateSection = useCvStore((state) => state.updateSection);
-  const lastSerializedRef = useRef<string>(JSON.stringify(data.skills));
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [query, setQuery] = useState("");
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
@@ -141,11 +146,20 @@ export const SkillsStep = ({
   const [pendingCredential, setPendingCredential] = useState<Suggestion | null>(null);
   const [alsoCommonOpen, setAlsoCommonOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [setAsideOpen, setSetAsideOpen] = useState(false);
+  // localStorage is not reactive. useSyncExternalStore is the supported way to
+  // read it: no setState inside an effect (which cascades renders), no manual
+  // refresh after each mutation, and the server snapshot is empty so hydration
+  // matches.
+  const setAside = useSyncExternalStore(
+    subscribeSetAside,
+    getSetAsideSnapshot,
+    getSetAsideServerSnapshot,
+  );
 
   const {
     handleSubmit,
     control,
-    watch,
     reset,
     formState: { errors, isDirty },
   } = useForm<SkillsForm>({
@@ -159,36 +173,18 @@ export const SkillsStep = ({
     keyName: "fieldKey",
   });
 
-  /* ── Form ↔ store sync (unchanged mechanics) ── */
+  /* ── Form ← store ──
+   * Only the inbound direction needs an effect. The old step ALSO ran a
+   * debounced watch() subscription to push form changes back to the store,
+   * because skill names used to be editable in place. Nothing on this step
+   * edits the array except our own handlers now, so writeSkills() writes both
+   * sides directly and the subscription is gone — which removes the debounce,
+   * the serialized-snapshot guard, and the React Compiler bailout that
+   * watch() forces on the whole component.
+   */
   useEffect(() => {
     if (!isDirty) reset({ skills: data.skills });
   }, [data.skills, reset, isDirty]);
-
-  useEffect(() => {
-    lastSerializedRef.current = JSON.stringify(data.skills);
-  }, [data.skills]);
-
-  useEffect(() => {
-    const subscription = watch((value) => {
-      if (!value.skills) return;
-      const next = (value.skills ?? []).filter(
-        (skill): skill is CvSkill => Boolean(skill && skill.id),
-      );
-      const nextSerialized = JSON.stringify(next);
-      if (nextSerialized === lastSerializedRef.current) return;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        if (nextSerialized !== lastSerializedRef.current) {
-          lastSerializedRef.current = nextSerialized;
-          updateSection("skills", next);
-        }
-      }, 250);
-    });
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      subscription.unsubscribe();
-    };
-  }, [watch, updateSection]);
 
   /* ── Suggestions ──────────────────────────────────────────────────────────
    * Computed against a LIVE CV: the store's data with the form's current skill
@@ -210,8 +206,14 @@ export const SkillsStep = ({
     [query, liveCv, domain],
   );
 
-  /* ── Writes ── */
-  const writeSkills = (next: CvSkill[]) => replace(next);
+  /* ── Writes ──
+   * Every mutation goes through here, and it updates BOTH the form (so the
+   * UI re-renders) and the store (so the live preview and the score follow).
+   */
+  const writeSkills = (next: CvSkill[]) => {
+    replace(next);
+    updateSection("skills", next);
+  };
 
   const addSkill = (
     name: string,
@@ -250,6 +252,23 @@ export const SkillsStep = ({
   const removeSkill = (id: string) => {
     writeSkills(fields.filter((f) => f.id !== id).map(toCvSkill));
     if (openChipId === id) setOpenChipId(null);
+  };
+
+  /**
+   * Park a skill: take it OUT of the document, remember the name.
+   *
+   * Removing rather than flagging is what makes "not printed" a guarantee
+   * instead of a filter someone has to remember in a dozen render paths —
+   * see the header of lib/skills/setAside.ts.
+   */
+  const setAsideSkill = (id: string, name: string) => {
+    parkSkill(name);
+    removeSkill(id);
+  };
+
+  const putBack = (name: string) => {
+    restoreSkill(name);
+    addSkill(name);
   };
 
   const moveSkill = (index: number, dir: -1 | 1) => {
@@ -299,6 +318,14 @@ export const SkillsStep = ({
 
   const domainLabel = domain && domain !== "generic" ? ROLE_FAMILY_LABELS[domain] : null;
   const firstThree = fields.slice(0, 3).map((f) => f.name);
+
+  /** The chip whose detail panel is open, with everything that panel needs. */
+  const openChip = useMemo(() => {
+    if (!openChipId) return null;
+    const index = fields.findIndex((f) => f.id === openChipId);
+    if (index < 0) return null;
+    return { field: fields[index], index, state: arrival.listed.get(openChipId) };
+  }, [openChipId, fields, arrival.listed]);
 
   /* ── Suggestion chip ── */
   const SuggestionChip = ({ s }: { s: Suggestion }) => (
@@ -677,52 +704,85 @@ export const SkillsStep = ({
                     >
                       {"×"}
                     </button>
-                    {open && (
-                      <span
-                        style={{
-                          flexBasis: "100%",
-                          display: "block",
-                          marginTop: 6,
-                          paddingTop: 6,
-                          borderTop: "1px solid var(--ff-line)",
-                          fontSize: 12,
-                          fontWeight: 400,
-                          color: "var(--ff-muted)",
-                        }}
-                      >
-                        {/* Copy describes the DOCUMENT, never the person. */}
-                        {state?.evidence
-                          ? `Shown in ${describeEvidence(state.evidence)}.`
-                          : arrival.evidenceUsable
-                            ? "This word doesn't appear anywhere else in your CV."
-                            : ""}
-                        <span style={{ display: "inline-flex", gap: 4, marginLeft: 8 }}>
-                          <button
-                            type="button"
-                            onClick={() => moveSkill(i, -1)}
-                            disabled={i === 0}
-                            className="cv-skill-chip-remove"
-                            aria-label={`Move ${field.name} earlier`}
-                            style={{ opacity: i === 0 ? 0.35 : 1 }}
-                          >
-                            {"‹"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveSkill(i, 1)}
-                            disabled={i === fields.length - 1}
-                            className="cv-skill-chip-remove"
-                            aria-label={`Move ${field.name} later`}
-                            style={{ opacity: i === fields.length - 1 ? 0.35 : 1 }}
-                          >
-                            {"›"}
-                          </button>
-                        </span>
-                      </span>
-                    )}
                   </span>
                 );
               })}
+            </div>
+          )}
+
+          {/* Detail for the open chip, rendered BELOW the cluster rather than
+              inside the chip: .cv-skill-chip is inline-flex, so a full-width
+              child squeezed the skill name onto two lines. */}
+          {openChip && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "var(--ff-sunken)",
+                fontSize: 12,
+                color: "var(--ff-muted)",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <strong style={{ color: "var(--ff-ink-2)", fontWeight: 600 }}>
+                  {openChip.field.name}
+                </strong>
+                {" — "}
+                {/* Copy describes the DOCUMENT, never the person. True
+                    regardless of how much the literal matcher happens to
+                    catch; "you haven't shown this" would not be. */}
+                {openChip.state?.evidence
+                  ? `shown in ${describeEvidence(openChip.state.evidence)}.`
+                  : arrival.evidenceUsable
+                    ? "this word doesn't appear anywhere else in your CV."
+                    : "on your list."}
+              </span>
+              {/* The doubt gets somewhere to go that is neither a claim nor a
+                  deletion. Equal weight to the other actions. */}
+              <button
+                type="button"
+                onClick={() => setAsideSkill(openChip.field.id, openChip.field.name)}
+                className="ff-hit-target"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "6px 0",
+                  font: "inherit",
+                  fontSize: 12,
+                  color: "var(--ff-muted)",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                }}
+              >
+                Set aside
+              </button>
+              <span style={{ display: "inline-flex", gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => moveSkill(openChip.index, -1)}
+                  disabled={openChip.index === 0}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${openChip.field.name} earlier`}
+                  style={{ opacity: openChip.index === 0 ? 0.35 : 1 }}
+                >
+                  {"‹"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSkill(openChip.index, 1)}
+                  disabled={openChip.index === fields.length - 1}
+                  className="cv-skill-chip-remove"
+                  aria-label={`Move ${openChip.field.name} later`}
+                  style={{ opacity: openChip.index === fields.length - 1 ? 0.35 : 1 }}
+                >
+                  {"›"}
+                </button>
+              </span>
             </div>
           )}
         </div>
@@ -769,6 +829,65 @@ export const SkillsStep = ({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
                 {arrival.alsoCommon.map((s) => (
                   <SuggestionChip key={`${s.source}-${s.name}`} s={s} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Set aside ─────────────────────────────────────────────────────
+            Kept in the builder, absent from the document. The label says so
+            plainly — a park the user cannot see the consequences of is just a
+            delete with extra steps. */}
+        {setAside.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => setSetAsideOpen((v) => !v)}
+              aria-expanded={setAsideOpen}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                minHeight: 44,
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 12,
+                color: "var(--ff-muted)",
+                cursor: "pointer",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              <Icon name={setAsideOpen ? "chevron-down" : "chevron-right"} size={12} />
+              Set aside · {setAside.length} — kept here, not printed on your CV
+            </button>
+            {setAsideOpen && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                {setAside.map((entry) => (
+                  <button
+                    key={entry.name}
+                    type="button"
+                    onClick={() => putBack(entry.name)}
+                    className="ff-hit-target"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      background: "var(--ff-sunken)",
+                      border: "1px dashed var(--ff-line-strong)",
+                      color: "var(--ff-muted)",
+                      fontSize: 13,
+                      fontFamily: "var(--font-body)",
+                      cursor: "pointer",
+                    }}
+                    aria-label={`Put ${entry.name} back on your CV`}
+                  >
+                    <Icon name="plus" size={11} />
+                    {entry.name}
+                  </button>
                 ))}
               </div>
             )}

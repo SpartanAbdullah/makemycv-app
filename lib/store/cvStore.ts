@@ -10,6 +10,7 @@ import type {
 } from "../types/cv";
 import type { ParseSignals, ScoreGrade } from "../resumeChecker/types";
 import { computeScore, SCORING_RUBRIC_VERSION } from "../scoreEngine";
+import { clearSetAside } from "../skills/setAside";
 import {
   clearCvStorage,
   debounce,
@@ -346,6 +347,10 @@ export const useCvStore = create<CvStore>((set, get) => ({
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SCORE_BASELINE_STORAGE_KEY);
     }
+    // Skills the user set aside are remembered outside the document (see
+    // lib/skills/setAside.ts). "Start over" has to clear them too, or the next
+    // CV inherits a park list belonging to a CV that no longer exists.
+    clearSetAside();
     set({ data: defaultCvData, parseSignals: null, scoreBaseline: null });
   },
   importJson: (data) => set({ data }),
