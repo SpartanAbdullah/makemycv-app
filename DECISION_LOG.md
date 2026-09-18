@@ -240,3 +240,53 @@ caveat that the in-memory bound is per lambda instance and therefore unbounded i
   request. See Audit A open question A1 — this is the single highest-value thing left to settle.
 - Whether existing `mmcv_*:events:*` keys should be purged from KV. They contain historical IPs
   and are no longer written to, but they do not expire on their own.
+
+---
+
+## 2026-09-18 — Post-export tip surface: modal → inline card, shown every export
+
+### What changed
+`DownloadTipModal` is deleted. `components/builder/DownloadSupportCard.tsx` takes its
+place: a full-width, in-flow strip in the builder's header stack, mounted between the
+download-error bar and the main area in `BuilderShell.tsx`.
+
+### Why
+The trigger was never the problem — post-download, non-JSON, after the await — and it is
+unchanged. The *presentation* was. A `zIndex: 200` overlay with a backdrop and a body
+scroll lock is the most interruptive surface in the product, and it fired at the one
+moment the user had just succeeded. The card makes the same ask with no overlay, no
+scroll lock, and no possibility of covering the Download button (which lives in the
+sticky TopBar above this slot).
+
+Not bottom-anchored: below `xl` that band is already owned by the fixed Edit|Preview pill
+(`bottom: 20`) and the Toaster (`bottom: 96`).
+
+### This reverses two earlier decisions — deliberately, by Abdullah, 2026-09-18
+1. **Frequency.** The modal was suppressed by `mmcv_tipped_at` (90 days) plus a
+   module-level `dismissedThisSession`. The card has **no suppression at all** and
+   re-arms on every `runDownload` call, so it appears on *every* successful PDF/DOCX
+   export, including for someone who has already tipped. The trade accepted: the card is
+   so much cheaper than the modal that showing it more often is still a net reduction in
+   interruption. Revisit if anyone reports it as nagging.
+2. **Link target.** The modal fired Ko-fi and PayPal directly. The card sends people to
+   `SUPPORT_URL` (`www.makemycv.ae/support`), which presents both properly via
+   `<TipJar variant="full">`. One link keeps the mobile row to one line and one control,
+   and keeps the card from matching the Download button's visual weight.
+
+### Deliberate losses
+- The post-tip "thanks / share with a friend" phase is gone. It only ever appeared after
+  someone clicked a tip link; with the card linking out, the thank-you belongs on
+  `/support`.
+- The card does **not** write `mmcv_tipped_at`. A click-through is not proof of a tip, and
+  that key also suppresses `TipJarModal` on the resume-checker for 90 days — writing it
+  here would silently disable an unrelated surface.
+
+### Not touched
+`track("cv_export", …)`, the try/catch and awaits in `runDownload`, `downloadCV`,
+`exportToDocx`, `downloadCvBackup`, any template, `components/pdf/CVDocument.tsx`, or the
+resume-checker tip surfaces (`TipJar`, `TipJarModal`, `PostReportTipJar`), which keep
+their own suppression.
+
+### Incidental fix
+The old `window.setTimeout(… , 1500)` that opened the modal was never cleared and leaked
+if the shell unmounted inside the window. The card opens synchronously; the timer is gone.

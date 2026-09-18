@@ -82,8 +82,10 @@ export const TipJar = ({
       <div className="flex items-baseline justify-between gap-3">
         <h3
           className={`font-display font-bold text-slate-900 ${
-            /* 22px matches DownloadTipModal's picking-phase heading — the
-               two tip surfaces share one shell spec (audit o4). */
+            /* 22px was set to match DownloadTipModal's picking-phase heading
+               (audit o4). That modal was replaced by the inline
+               DownloadSupportCard on 2026-09-18, so this is now just the
+               compact-variant size — no longer a cross-surface constraint. */
             isCompact ? "text-[22px]" : "text-2xl md:text-3xl"
           }`}
         >

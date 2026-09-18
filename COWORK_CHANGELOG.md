@@ -16,6 +16,154 @@ Format:
 
 ---
 
+## [2026-09-18] Skills step: paste a list, get separate skills
+
+**Goal:** Fix a real defect. The Skills search box strips commas and line breaks as you type
+(`sanitizeSkillLive`), so pasting "Excel, SAP, Negotiation" from an old CV or LinkedIn added
+ONE skill named "Excel SAP Negotiation", and it printed on the CV that way.
+
+**Files:**
+- created: `lib/skills/paste.ts`, which does the splitting and planning. Pure, with no network
+  and no AI. It splits on `, ; | tab newline` and bullet glyphs, but never on `/` (CI/CD) or
+  on commas inside parentheses, which become `/`. It strips bullets, numbering, `Label:`
+  prefixes and "etc.". It keeps the user's wording and never rewrites an alias to our
+  canonical name. Duplicates are caught by name and by bank alias ("SFDC" when "Salesforce"
+  is held). **Licences are never added directly**: they come back for the existing "I hold
+  it" guard. Lines over 50 chars or 6 words are reported as too long, not added. At most
+  30 skills are added per paste, and the rest are listed.
+- created: `lib/skills/paste.test.ts`, 19 tests, including negative tests for guard bypass
+  and sentences.
+- edited: `components/builder/steps/SkillsStep.tsx`. It adds an `onPaste` on the search box,
+  and a single-term paste behaves as before. The whole batch is added in one write. A
+  dismissible `role="status"` summary accounts for every piece: added, already listed,
+  too long, over limit, and licences with a tap-to-confirm button each. The hint line now
+  mentions pasting.
+
+**Verified** against a production build in a browser. "Excel, SAP, Negotiation" became 3
+skills. A single term was not intercepted. A messy CV paste (heading, bullets, duplicate
+"excel", "Microsoft Office (Word, Excel)", CFA, a sentence, "etc.") added exactly 3, with
+categories. It reported the duplicate and the skipped line, and held CFA back. Tapping CFA
+opened the guard, and "I hold it" added it and removed the button. The live preview
+updated. No render loop: 60fps while idle. tsc clean · lint 11/11 · tests green ·
+`smoke:pdf` ok · build green.
+
+**Notes / risks / follow-up:**
+- Not checked visually at 375px. The summary is a wrapping block with no fixed widths.
+- No analytics event for paste. Add `skills_paste {added, skipped}` later if the funnel
+  shows Skills is where people drop.
+
+**Suggested commit:** feat(skills): paste a list and get separate skills
+
+---
+
+## [2026-09-18] Mid-funnel analytics: builder_start, builder_step, cv_import, cv_import_failed
+
+**Goal:** Prompt 3 of the 18 Sep handover. `cv_export` was the only event in the app, so
+~1,500-2,000 visitors vs 10 exporters in 28 days had no visible drop-off point. These four
+events give a start → step → export funnel and show whether CV import works.
+
+**Files:**
+- edited: `lib/analytics.ts` — new `trackOncePerSession(key, event, params)`: sessionStorage
+  flag (survives reloads) + module-level Set (covers blocked storage and Strict Mode
+  double effects). Keys are namespaced `mmcv_evt_*`.
+- edited: `components/builder/BuilderShell.tsx` —
+  `builder_step {step_number 1-10, step_id}`: effect on `stepId`, once per step per session
+  (furthest-reached). Keyed on `stepId`, not `onStepChange`, because browser Back/Forward
+  changes the URL step without calling `goToStep`.
+  `builder_start` (no params): first `data` reference change after hydration, once per
+  session. Opening the builder without editing does not count.
+  `cv_import {file_type pdf|docx, merge_mode replace|merge, sections_filled 0-7}` in
+  `handleImportConfirm`: confirmed imports only, not parses the user cancels.
+  `cv_import_failed {file_type, error_reason corrupt-file|empty-text|unknown}` in the
+  `handleImport` catch.
+- edited: `components/builder/ImportFromReportBanner.tsx` — same two events for the
+  ATS-report path, `file_type: "ats_report"`; failure reasons `report-expired` |
+  `fetch-failed` | `no-cv-data` | `network`.
+- edited: `lib/importers/fieldMapper.ts` — `countSectionsFilled()` extracted from
+  `handleImportConfirm` so the toast and both import paths count sections the same way.
+
+**Verified** against a production build (`next start`) in a real browser, reading
+`window.dataLayer`: step 1 fires on mount; `builder_start` fires once after the first
+keystroke and not on later keystrokes or after a reload; steps 2 and 3 fire once each;
+Back ×2 / Forward fire nothing; reload on step 3 fires nothing; moving to step 4 after the
+reload fires only step 4. Broken `.pdf` → `cv_import_failed {pdf, corrupt-file}`.
+Generated text PDF → no event at the parse/review stage, then `cv_import {pdf, replace, 4}`
+on confirm, which matches the "Imported 4 sections" toast. Unknown report ID →
+`cv_import_failed {ats_report, report-expired}`. `tsc --noEmit` clean · lint 11/11
+(unchanged) · 170 tests passed · `smoke:pdf` exit 0 · build green.
+
+**Notes / risks / follow-up:**
+- All four events are silent no-ops until GTM has matching Custom Event triggers and GA4
+  Event tags **published**. Register the GA4 custom definitions first; GA4 does not backfill.
+- Not verified: a successful ATS-report import (it needs a real report in KV) and the DOCX
+  path. Both use the same `track()` calls as the verified paths.
+- Switching template mutates `data.settings` and so counts as a `builder_start`.
+- A deep link straight to `?step=review` records step 10 without steps 1-9. That is accurate
+  but shows up as a gap in the funnel.
+- `form_start` (GA4 enhanced measurement) fires once per step form (9 forms), so it is
+  not a start count. Use `builder_start`.
+
+**Suggested commit:** feat(analytics): mid-funnel builder and import events
+
+---
+
+## [2026-09-18] Post-export tip modal replaced by an inline support card
+
+**Goal:** Prompt 2 of the 18 Sep handover. The handover asked for a new post-export
+support card; Step 0 found one already shipped as `DownloadTipModal`, so the real work
+was converting it from a full-screen modal to an inline card rather than adding a second
+ask on the same trigger (which would have made three prompts off one export: success
+toast + modal + card).
+
+**Files:**
+- created: `components/builder/DownloadSupportCard.tsx` — in-flow strip, `role="status"`,
+  ff-accent tokens, one `SUPPORT_URL` text link, 48px dismiss target. No localStorage, no
+  timers, no suppression; frequency is the parent's business.
+- deleted: `components/DownloadTipModal.tsx` — `BuilderShell.tsx` was its only code
+  consumer.
+- edited: `components/builder/BuilderShell.tsx` — import swap; `downloadTipOpen` →
+  `supportCardOpen`; `runDownload` re-arms the card at entry and opens it synchronously in
+  the existing `kind !== "json"` success block; card mounted after the error bar; modal
+  mount removed.
+- edited: `components/TipJar.tsx` — comment at :85 referenced the deleted modal as a
+  cross-surface size constraint; corrected, no code change.
+- edited: `DECISION_LOG.md` — records the two reversals (no suppression; link to
+  `/support` instead of Ko-fi/PayPal direct).
+
+**Notes / risks / follow-up:**
+- **`cv_export` is untouched.** Still fires once, after the await, non-JSON only,
+  `BuilderShell.tsx` success block. Not moved, not duplicated.
+- **The card now shows on EVERY successful export** — no 90-day window, no session flag.
+  This reverses DECISION_LOG 2026-05-31 and the handover's own "once per browser, ever".
+  Abdullah's explicit call on 2026-09-18. Watch for nag complaints.
+- Verified: `npx tsc --noEmit` clean; `npm run lint` still **exactly 11 warnings, 0
+  errors** (cap is 11, zero headroom); `npm run build` green; `npm test` 170 passed, 0
+  failed; `npm run smoke:pdf` exit 0. The "Incomplete or corrupt PNG file" lines in the
+  smoke output are **pre-existing** — 18 of them on a stashed clean baseline too — and the
+  smoke script imports only `components/pdf/CVDocument` and `lib/types/cv`, neither of
+  which this change touches.
+- **Verified in a browser against the production build** (`next start`, not dev): card
+  appears after export on both the TopBar and ReviewStep paths and on the "Export anyway"
+  route; dismiss hides it; a second export brings it back; a JSON backup produces neither
+  the card nor a `cv_export` event; `cv_export` fired exactly once per PDF export with
+  `{format:"pdf", template:"classic"}`.
+- **Card height measured, not estimated:** 59.3px at 320 / 360 / 375 / 414px, link visible
+  at all four. The first draft opened with "Downloaded." and spilled to 3 lines (78.6px) at
+  320 and 360px — both real Android widths — so the prefix was cut. The copy length is
+  therefore load-bearing; re-measure before lengthening it. There is a comment in the
+  component saying so.
+- **Still unverified:** (a) the export-failure path — the card sits after the `await` inside
+  the existing `try`, so a throw skips it exactly as it already skips `track()`, but I did
+  not force a real failure; (b) a byte-level PDF comparison against pre-change output.
+  Nothing in this change touches the PDF path (`smoke:pdf` imports only
+  `components/pdf/CVDocument` and `lib/types/cv`), but the comparison is still worth doing.
+- `docs/ux-audit-2026-06.md` still names `DownloadTipModal.tsx` in ENG-13 / ENG-18 / UI-1.
+  Left as-is: it is a dated audit record, not live documentation.
+
+**Suggested commit:** feat(builder): replace post-export tip modal with an inline support card
+
+---
+
 ## [2026-08-20 10:30] Dead-weight removal + ROADMAP rebuilt from git history
 
 **Goal:** close the four ROADMAP cleanup items, delete code and tokens with zero

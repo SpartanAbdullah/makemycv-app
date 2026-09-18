@@ -5,12 +5,55 @@
 > moves (named-vs-demonstrated dot, refusal trust card, tiered batch,
 > per-application versions) build on this and are scoped in their own follow-ups.
 
-## ⚠️ Status — deterministic version built, reviewed, and REVERTED (2026-06-13)
+## ⚠️ Status — read this before acting on anything below (updated 2026-08-26)
 
-The **deterministic** (client-side, lexical) bullet-evidence detector below was
+Two different things are described by this document, and they have opposite
+outcomes. Do not read the revert below as "evidence detection was tried and
+doesn't work" — a safe evidence detector **shipped** in 2026-08. It answers a
+different question, in a different place, under constraints that make it safe.
+
+### What shipped: `lib/skills/evidence.ts` (2026-08, live)
+
+The Skills step now labels each skill `evidenced` / `claimed` / `unlisted` /
+`absent` by detecting where a skill is already proven in the user's own CV
+prose. It is **not** a rebuild of the dead end below, for three reasons:
+
+- **Literal only** — no token proximity, no stemming, no subset matching. The
+  proximity rule that produced the false positives below is not used.
+- **Boundary-safe** — matching goes through `termAppearsIn()`
+  (`lib/jdMatch/match.ts`), which respects the `PHRASE_BOUNDARY` sentinel from
+  the 2026-08-24 accuracy pass. **This closes the punctuation-gluing hazard
+  flagged as "worth a separate look" below** — "washing machine; learning
+  curve" can no longer glue into "machine learning". The exact false positive
+  that killed the first attempt is now impossible.
+- **Closed vocabulary** — it is only ever asked about terms we hold a canonical
+  spelling and alias list for (`lib/data/domainSkills.ts`), never arbitrary
+  reworded JD requirements. Literal matching is the correct answer to that
+  narrower question, not a degraded approximation of a semantic one.
+
+The recall cost is accepted knowingly: *"managing the company's IT
+infrastructure"* will not evidence "Infrastructure Management". Closing that
+still needs an LLM and the privacy decision described further down.
+
+### What is still NOT built: the `evidenced` chip in JD Match
+
+Everything from "## Problem" onward specifies a **third `evidenced` state on JD
+requirements**, which remains unbuilt. `JdTerm` still carries
+`matched: boolean` (`lib/jdMatch/types.ts:39`) — there is no `JdTermStatus`.
+The plan below is still the plan, with one part now settled and one still open:
+
+- **Settled:** the punctuation hazard is fixed (above), and `termAppearsIn()`
+  already exists as the shared boundary-safe primitive, so a future
+  implementation must reuse it rather than grow a second copy of the rule.
+- **Still open:** the semantic-detection privacy decision (below) is untouched.
+  The JD matcher remains 100% client-side; only `{ jobText }` leaves the
+  browser.
+
+### The original revert (2026-06-13) — kept so we don't rebuild it
+
+The **deterministic, proximity-based** bullet-evidence detector for JD Match was
 built, unit-tested, live-verified, then **reverted after adversarial review
-proved it cannot be both safe and useful**. Recorded here so we don't rebuild
-the same dead end.
+proved it cannot be both safe and useful.**
 
 - **What broke:** the matcher located a requirement in a bullet by token
   proximity (all significant stems within a small window). With no order /
@@ -25,12 +68,10 @@ the same dead end.
   Distinguishing "managing … infrastructure" (real) from "washing machine …
   learning" (coincidence) is a **semantic** judgment; lexical proximity is
   either unsafe (loose) or near-useless (strict, ~redundant with literal match).
-- **Also surfaced (pre-existing, not introduced):** `corpusHas` does plain
-  substring containment for multi-word phrases, so punctuation that
-  `normalizeText` strips can glue unrelated words ("washing machine; learning
-  curve" → "machine learning" literal match). Worth a separate look.
+- All three named false positives are now pinned as negative tests in
+  `lib/skills/evidence.test.ts`.
 
-### The evidenced state needs SEMANTIC detection (LLM) — a founder decision
+### The evidenced state needs SEMANTIC detection (LLM) — still a founder decision
 
 The honest, safe version asks an LLM, for each missing requirement: *"does any
 of these bullets unambiguously demonstrate this? default to NO."* (refuse-first,
@@ -47,7 +88,13 @@ detector would send **experience bullets** to the server on analysis. Options:
    Heatmap) on the solid matched/missing data we already have; or
 3. Drop the evidenced state entirely.
 
-Everything below is the original deterministic plan, kept for reference only.
+Note that option 2 is partly realised already — the shipped Skills detector
+gives the user a truthful "you already show this" signal without sending
+anything, just scoped to our own skill vocabulary rather than to a JD's wording.
+
+Everything below is the original deterministic plan for JD Match, unbuilt.
+Its data model, UI and test sections still stand; its **matcher** section
+(the proximity rule) is the reverted dead end — do not implement it as written.
 
 ---
 

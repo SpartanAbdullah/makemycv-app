@@ -220,3 +220,21 @@ export const mapCvToParsed = (cv: CvData): ParsedDocument => ({
     dateOfBirth: cv.personal.dateOfBirth || undefined,
   },
 });
+
+/**
+ * How many of the seven importable sections a confirmed import populated
+ * (0-7). Drives the "Imported N sections" toast and the cv_import analytics
+ * param — one definition so both import entry points count alike. A count,
+ * never content: safe to send to analytics.
+ */
+export function countSectionsFilled(partial: Partial<CvData>): number {
+  return [
+    partial.personal?.firstName || partial.personal?.email ? 1 : 0,
+    partial.experience?.length ? 1 : 0,
+    partial.education?.length ? 1 : 0,
+    partial.skills?.length ? 1 : 0,
+    partial.languages?.length ? 1 : 0,
+    partial.certifications?.length ? 1 : 0,
+    partial.projects?.length ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
+}
