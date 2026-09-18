@@ -16,6 +16,57 @@ Format:
 
 ---
 
+## [2026-09-18] Mid-funnel analytics: builder_start, builder_step, cv_import, cv_import_failed
+
+**Goal:** Prompt 3 of the 18 Sep handover. `cv_export` was the only event in the app, so
+~1,500-2,000 visitors vs 10 exporters in 28 days had no visible drop-off point. These four
+events give a start → step → export funnel and show whether CV import works.
+
+**Files:**
+- edited: `lib/analytics.ts` — new `trackOncePerSession(key, event, params)`: sessionStorage
+  flag (survives reloads) + module-level Set (covers blocked storage and Strict Mode
+  double effects). Keys are namespaced `mmcv_evt_*`.
+- edited: `components/builder/BuilderShell.tsx` —
+  `builder_step {step_number 1-10, step_id}`: effect on `stepId`, once per step per session
+  (furthest-reached). Keyed on `stepId`, not `onStepChange`, because browser Back/Forward
+  changes the URL step without calling `goToStep`.
+  `builder_start` (no params): first `data` reference change after hydration, once per
+  session. Opening the builder without editing does not count.
+  `cv_import {file_type pdf|docx, merge_mode replace|merge, sections_filled 0-7}` in
+  `handleImportConfirm`: confirmed imports only, not parses the user cancels.
+  `cv_import_failed {file_type, error_reason corrupt-file|empty-text|unknown}` in the
+  `handleImport` catch.
+- edited: `components/builder/ImportFromReportBanner.tsx` — same two events for the
+  ATS-report path, `file_type: "ats_report"`; failure reasons `report-expired` |
+  `fetch-failed` | `no-cv-data` | `network`.
+- edited: `lib/importers/fieldMapper.ts` — `countSectionsFilled()` extracted from
+  `handleImportConfirm` so the toast and both import paths count sections the same way.
+
+**Verified** against a production build (`next start`) in a real browser, reading
+`window.dataLayer`: step 1 fires on mount; `builder_start` fires once after the first
+keystroke and not on later keystrokes or after a reload; steps 2 and 3 fire once each;
+Back ×2 / Forward fire nothing; reload on step 3 fires nothing; moving to step 4 after the
+reload fires only step 4. Broken `.pdf` → `cv_import_failed {pdf, corrupt-file}`.
+Generated text PDF → no event at the parse/review stage, then `cv_import {pdf, replace, 4}`
+on confirm, which matches the "Imported 4 sections" toast. Unknown report ID →
+`cv_import_failed {ats_report, report-expired}`. `tsc --noEmit` clean · lint 11/11
+(unchanged) · 170 tests passed · `smoke:pdf` exit 0 · build green.
+
+**Notes / risks / follow-up:**
+- All four events are silent no-ops until GTM has matching Custom Event triggers and GA4
+  Event tags **published**. Register the GA4 custom definitions first; GA4 does not backfill.
+- Not verified: a successful ATS-report import (it needs a real report in KV) and the DOCX
+  path. Both use the same `track()` calls as the verified paths.
+- Switching template mutates `data.settings` and so counts as a `builder_start`.
+- A deep link straight to `?step=review` records step 10 without steps 1-9. That is accurate
+  but shows up as a gap in the funnel.
+- `form_start` (GA4 enhanced measurement) fires once per step form (9 forms), so it is
+  not a start count. Use `builder_start`.
+
+**Suggested commit:** feat(analytics): mid-funnel builder and import events
+
+---
+
 ## [2026-09-18] Post-export tip modal replaced by an inline support card
 
 **Goal:** Prompt 2 of the 18 Sep handover. The handover asked for a new post-export

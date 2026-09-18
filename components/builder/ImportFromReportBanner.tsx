@@ -4,9 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useCvStore } from "@/lib/store/cvStore";
-import { mapCvToParsed } from "@/lib/importers/fieldMapper";
+import {
+  countSectionsFilled,
+  mapCvToParsed,
+} from "@/lib/importers/fieldMapper";
 import type { CvData } from "@/lib/types/cv";
 import type { ParseSignals } from "@/lib/resumeChecker/types";
+import { track } from "@/lib/analytics";
 
 // Same dynamic split as BuilderShell — the review screen loads only when an
 // import is actually in flight.
@@ -65,6 +69,10 @@ export default function ImportFromReportBanner() {
         });
         if (!res.ok) {
           if (cancelled) return;
+          track("cv_import_failed", {
+            file_type: "ats_report",
+            error_reason: res.status === 404 ? "report-expired" : "fetch-failed",
+          });
           setPhase({
             kind: "error",
             message:
@@ -81,6 +89,10 @@ export default function ImportFromReportBanner() {
         };
         if (!payload.cv) {
           if (cancelled) return;
+          track("cv_import_failed", {
+            file_type: "ats_report",
+            error_reason: "no-cv-data",
+          });
           setPhase({ kind: "error", message: "Report returned no CV data." });
           stripParam();
           return;
@@ -100,6 +112,10 @@ export default function ImportFromReportBanner() {
         });
       } catch {
         if (cancelled) return;
+        track("cv_import_failed", {
+          file_type: "ats_report",
+          error_reason: "network",
+        });
         setPhase({
           kind: "error",
           message: "Network error while importing the report.",
@@ -143,6 +159,13 @@ export default function ImportFromReportBanner() {
           // the same signals the live score uses, or the delta measures the
           // signals arriving rather than the user improving anything.
           captureScoreBaseline();
+          // Same event and params as the file import in BuilderShell, so
+          // both entry points land in one GA4 report. No CV content.
+          track("cv_import", {
+            file_type: "ats_report",
+            merge_mode: mode,
+            sections_filled: countSectionsFilled(partial),
+          });
           setPhase({ kind: "imported", replaced: mode === "replace" });
           stripParam();
         }}

@@ -27,7 +27,17 @@
       "Bash(git rm *)",
       "mcp__Claude_Preview__preview_start",
       "Bash(git commit *)",
-      "Bash(sed -n '/Clicking ..Clear.. with pending/,/dimension/p' \"C:\\\\Users\\\\MUHAMM~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-MuhammadAbdullah-Desktop-Makemycv-makemycv-app\\\\eb6ab0db-be5b-4d57-9061-b97e5df30b59\\\\tasks\\\\wbetxpaez.output\" | head -40)"
+      "Bash(sed -n '/Clicking ..Clear.. with pending/,/dimension/p' \"C:\\\\Users\\\\MUHAMM~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-MuhammadAbdullah-Desktop-Makemycv-makemycv-app\\\\eb6ab0db-be5b-4d57-9061-b97e5df30b59\\\\tasks\\\\wbetxpaez.output\" | head -40)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" status --porcelain=v1 -b)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" branch -vv --all)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" stash list)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" log --oneline -8)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" diff --stat)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/makemycv-app\" diff -- .claude/settings.local.json)",
+      "Bash(git checkout *)",
+      "Bash(git status *)",
+      "Bash(git rev-list *)",
+      "Bash(git -C \"C:/Users/MuhammadAbdullah/Desktop/Makemycv/mmc-polish-wt\" status -sb)"
     ]
   }
 }

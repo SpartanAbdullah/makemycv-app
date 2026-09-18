@@ -45,3 +45,33 @@ export function track(
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ event, ...params });
 }
+
+// Keys already claimed in this page lifetime. Backs up sessionStorage when it
+// is unavailable (private mode, blocked storage) and absorbs React Strict
+// Mode's double-run of effects in dev.
+const claimedThisPage = new Set<string>();
+
+/**
+ * Push an event at most once per browser session (tab), keyed by `key`.
+ *
+ * sessionStorage makes it survive reloads and leaving/re-entering the builder;
+ * the module-level Set covers the case where storage throws. Funnel events
+ * (builder_start, builder_step) rely on this — a reload on step 3 must not
+ * count step 3 twice.
+ */
+export function trackOncePerSession(
+  key: string,
+  event: string,
+  params: Record<string, unknown> = {},
+): void {
+  if (typeof window === "undefined") return;
+  if (claimedThisPage.has(key)) return;
+  claimedThisPage.add(key);
+  try {
+    if (window.sessionStorage.getItem(key)) return;
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    /* sessionStorage unavailable — the Set still dedupes within this page */
+  }
+  track(event, params);
+}
