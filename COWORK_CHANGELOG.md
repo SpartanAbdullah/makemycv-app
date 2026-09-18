@@ -16,6 +16,46 @@ Format:
 
 ---
 
+## [2026-09-18] Skills step: paste a list, get separate skills
+
+**Goal:** Fix a real defect. The Skills search box strips commas and line breaks as you type
+(`sanitizeSkillLive`), so pasting "Excel, SAP, Negotiation" from an old CV or LinkedIn added
+ONE skill named "Excel SAP Negotiation", and it printed on the CV that way.
+
+**Files:**
+- created: `lib/skills/paste.ts`, which does the splitting and planning. Pure, with no network
+  and no AI. It splits on `, ; | tab newline` and bullet glyphs, but never on `/` (CI/CD) or
+  on commas inside parentheses, which become `/`. It strips bullets, numbering, `Label:`
+  prefixes and "etc.". It keeps the user's wording and never rewrites an alias to our
+  canonical name. Duplicates are caught by name and by bank alias ("SFDC" when "Salesforce"
+  is held). **Licences are never added directly**: they come back for the existing "I hold
+  it" guard. Lines over 50 chars or 6 words are reported as too long, not added. At most
+  30 skills are added per paste, and the rest are listed.
+- created: `lib/skills/paste.test.ts`, 19 tests, including negative tests for guard bypass
+  and sentences.
+- edited: `components/builder/steps/SkillsStep.tsx`. It adds an `onPaste` on the search box,
+  and a single-term paste behaves as before. The whole batch is added in one write. A
+  dismissible `role="status"` summary accounts for every piece: added, already listed,
+  too long, over limit, and licences with a tap-to-confirm button each. The hint line now
+  mentions pasting.
+
+**Verified** against a production build in a browser. "Excel, SAP, Negotiation" became 3
+skills. A single term was not intercepted. A messy CV paste (heading, bullets, duplicate
+"excel", "Microsoft Office (Word, Excel)", CFA, a sentence, "etc.") added exactly 3, with
+categories. It reported the duplicate and the skipped line, and held CFA back. Tapping CFA
+opened the guard, and "I hold it" added it and removed the button. The live preview
+updated. No render loop: 60fps while idle. tsc clean · lint 11/11 · tests green ·
+`smoke:pdf` ok · build green.
+
+**Notes / risks / follow-up:**
+- Not checked visually at 375px. The summary is a wrapping block with no fixed widths.
+- No analytics event for paste. Add `skills_paste {added, skipped}` later if the funnel
+  shows Skills is where people drop.
+
+**Suggested commit:** feat(skills): paste a list and get separate skills
+
+---
+
 ## [2026-09-18] Mid-funnel analytics: builder_start, builder_step, cv_import, cv_import_failed
 
 **Goal:** Prompt 3 of the 18 Sep handover. `cv_export` was the only event in the app, so

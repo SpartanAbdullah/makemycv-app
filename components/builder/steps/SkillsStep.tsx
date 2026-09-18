@@ -61,6 +61,7 @@ import {
   type Suggestion,
 } from "../../../lib/skills/suggest";
 import { describeEvidence, type SkillStatus } from "../../../lib/skills/evidence";
+import { planPastedSkills, type PastePlan } from "../../../lib/skills/paste";
 import {
   getSetAsideServerSnapshot,
   getSetAsideSnapshot,
@@ -146,6 +147,7 @@ export const SkillsStep = ({
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [openChipId, setOpenChipId] = useState<string | null>(null);
   const [pendingCredential, setPendingCredential] = useState<Suggestion | null>(null);
+  const [pasteReport, setPasteReport] = useState<PastePlan | null>(null);
   const [alsoCommonOpen, setAlsoCommonOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [setAsideOpen, setSetAsideOpen] = useState(false);
@@ -237,6 +239,38 @@ export const SkillsStep = ({
     setDuplicateOf(null);
     return true;
   };
+
+  /**
+   * Paste a LIST ("Excel, SAP, Negotiation", or lines from an old CV) and get
+   * separate skills. Without this the box strips the commas and line breaks
+   * and adds one skill named "Excel SAP Negotiation". A single term is left to
+   * paste normally. One write for the whole batch — addSkill per piece would
+   * read a stale `fields` after the first.
+   */
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const plan = planPastedSkills(
+      e.clipboardData.getData("text"),
+      fields.map((f) => f.name),
+    );
+    if (!plan) return;
+    e.preventDefault();
+    if (plan.add.length > 0) {
+      writeSkills([
+        ...fields.map(toCvSkill),
+        ...plan.add.map((s) => ({ id: createId(), ...s })),
+      ]);
+    }
+    setDuplicateOf(null);
+    setQuery("");
+    setPasteReport(plan);
+  };
+
+  /** Pasted licences still on offer — one drops off once it is confirmed. */
+  const pastedCredentialsLeft = pasteReport
+    ? pasteReport.credentials.filter(
+        (c) => !fields.some((f) => norm(f.name) === norm(c.name)),
+      )
+    : [];
 
   /** Route an add through the licence guard when the entry is a credential. */
   const addSuggestion = (s: Suggestion) => {
@@ -399,6 +433,7 @@ export const SkillsStep = ({
                   setQuery(sanitizeSkillLive(e.target.value));
                   setDuplicateOf(null);
                 }}
+                onPaste={handlePaste}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -424,13 +459,104 @@ export const SkillsStep = ({
 
           <p style={{ marginTop: 6, fontSize: 11.5, color: "var(--ff-faint)" }}>
             Not sure of the word? Try what you actually do — &ldquo;visa paperwork&rdquo;,
-            &ldquo;angry customers&rdquo;, &ldquo;filling shelves&rdquo;.
+            &ldquo;angry customers&rdquo;, &ldquo;filling shelves&rdquo;. Or paste the
+            skills list from your old CV — each one is added separately.
           </p>
 
           {duplicateOf && (
             <p style={{ marginTop: 8, fontSize: 12, color: "var(--ff-warn)", fontWeight: 500 }}>
               {duplicateOf} is already on your list.
             </p>
+          )}
+
+          {/* What a pasted list did — every piece is accounted for, nothing
+              dropped silently. Licences wait for their own "I hold it". */}
+          {pasteReport && (
+            <div
+              role="status"
+              style={{
+                marginTop: 10,
+                padding: "10px 12px",
+                borderRadius: 12,
+                background: "var(--ff-sunken)",
+                fontSize: 12.5,
+                color: "var(--ff-ink-2)",
+                position: "relative",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPasteReport(null)}
+                aria-label="Dismiss"
+                className="ff-hit-target"
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  background: "none",
+                  border: "none",
+                  padding: 4,
+                  color: "var(--ff-muted)",
+                  cursor: "pointer",
+                  lineHeight: 0,
+                }}
+              >
+                <Icon name="x" size={12} />
+              </button>
+              <p style={{ margin: 0, paddingRight: 24, fontWeight: 600, color: "var(--ff-ink)" }}>
+                {pasteReport.add.length > 0
+                  ? `Added ${pasteReport.add.length} skill${pasteReport.add.length === 1 ? "" : "s"} from your paste.`
+                  : "Nothing new to add from your paste."}
+              </p>
+              {pasteReport.duplicates.length > 0 && (
+                <p style={{ margin: "4px 0 0" }}>
+                  Already on your list:{" "}
+                  {pasteReport.duplicates
+                    .map((d) => (d.as ? `${d.name} (as ${d.as})` : d.name))
+                    .join(", ")}
+                </p>
+              )}
+              {pasteReport.tooLong.length > 0 && (
+                <p style={{ margin: "4px 0 0" }}>
+                  Skipped {pasteReport.tooLong.length} line
+                  {pasteReport.tooLong.length === 1 ? "" : "s"} too long to be a skill name
+                  — search for the skill instead.
+                </p>
+              )}
+              {pasteReport.overLimit.length > 0 && (
+                <p style={{ margin: "4px 0 0" }}>
+                  {pasteReport.overLimit.length} more not added — paste them in a
+                  second batch: {pasteReport.overLimit.join(", ")}
+                </p>
+              )}
+              {pastedCredentialsLeft.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <p style={{ margin: "0 0 6px" }}>
+                    Licences need a yes first — tap to confirm each:
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {pastedCredentialsLeft.map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() =>
+                          addSuggestion({
+                            name: c.name,
+                            source: "bank",
+                            kind: "credential",
+                            status: "absent",
+                            evidence: null,
+                          })
+                        }
+                        className="cv-btn-secondary cv-btn--sm"
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Results */}
