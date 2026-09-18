@@ -49,7 +49,7 @@ import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
-import { DownloadTipModal, shouldShowDownloadTip } from "../DownloadTipModal";
+import { DownloadSupportCard } from "./DownloadSupportCard";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
   /** Opens a PDF/DOCX picker; format is routed by file extension. */
@@ -878,7 +878,7 @@ export const BuilderShell = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloadTipOpen, setDownloadTipOpen] = useState(false);
+  const [supportCardOpen, setSupportCardOpen] = useState(false);
   const [downloadGuardOpen, setDownloadGuardOpen] = useState(false);
 
   // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
@@ -1060,14 +1060,15 @@ export const BuilderShell = ({
   };
 
   // ---- Download (TopBar + ReviewStep + TemplatePreviewModal) ----
-  // The download runs IMMEDIATELY on click — no modal in the way. On
-  // success, the post-download tip jar is scheduled to appear ~1500ms
-  // later, but only if the user is eligible (no recent tip + not
-  // dismissed this session). Errors do NOT open the modal; the existing
-  // downloadError bar handles them.
+  // The download runs IMMEDIATELY on click — nothing in the way. On
+  // success, the inline support card opens in the header stack below.
+  // Errors do NOT open it; the existing downloadError bar handles them.
   const runDownload = async (kind: ExportKind = "pdf") => {
     setIsDownloading(true);
     setDownloadError(null);
+    // Re-arm: a card dismissed after the last export must come back for
+    // this one. "Every successful export" is the agreed frequency.
+    setSupportCardOpen(false);
     try {
       if (kind === "json") {
         downloadCvBackup(data);
@@ -1100,8 +1101,13 @@ export const BuilderShell = ({
       }
       // A backup is housekeeping, not a finished-CV moment — don't ask for a
       // tip for it.
-      if (kind !== "json" && shouldShowDownloadTip()) {
-        window.setTimeout(() => setDownloadTipOpen(true), 1500);
+      //
+      // Opens immediately rather than on a 1500ms timer: the card is in-flow,
+      // so there is nothing to wait for it to stop covering. The old timer was
+      // also never cleared, which leaked if the shell unmounted inside the
+      // window.
+      if (kind !== "json") {
+        setSupportCardOpen(true);
       }
     } catch {
       setDownloadError(EXPORT_COPY[kind].error);
@@ -1349,6 +1355,14 @@ export const BuilderShell = ({
           </div>
         )}
 
+        {/* Post-export support ask. Sits here, with the other full-width
+            flexShrink:0 strips, so it pushes content down instead of
+            covering anything — the Download button is in the TopBar above. */}
+        <DownloadSupportCard
+          open={supportCardOpen}
+          onDismiss={() => setSupportCardOpen(false)}
+        />
+
         {/* ── MAIN AREA ─────────────────────────────────────── */}
         <div
           style={{
@@ -1557,12 +1571,6 @@ export const BuilderShell = ({
             onCancel={() => setImportState({ phase: "idle" })}
           />
         )}
-
-        <DownloadTipModal
-          open={downloadTipOpen}
-          onClose={() => setDownloadTipOpen(false)}
-          userName={data.personal.firstName?.trim() || undefined}
-        />
 
         {/* Guided-feedback toasts (section leave/done) — aria-live polite. */}
         <Toaster />

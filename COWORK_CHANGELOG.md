@@ -16,6 +16,63 @@ Format:
 
 ---
 
+## [2026-09-18] Post-export tip modal replaced by an inline support card
+
+**Goal:** Prompt 2 of the 18 Sep handover. The handover asked for a new post-export
+support card; Step 0 found one already shipped as `DownloadTipModal`, so the real work
+was converting it from a full-screen modal to an inline card rather than adding a second
+ask on the same trigger (which would have made three prompts off one export: success
+toast + modal + card).
+
+**Files:**
+- created: `components/builder/DownloadSupportCard.tsx` — in-flow strip, `role="status"`,
+  ff-accent tokens, one `SUPPORT_URL` text link, 48px dismiss target. No localStorage, no
+  timers, no suppression; frequency is the parent's business.
+- deleted: `components/DownloadTipModal.tsx` — `BuilderShell.tsx` was its only code
+  consumer.
+- edited: `components/builder/BuilderShell.tsx` — import swap; `downloadTipOpen` →
+  `supportCardOpen`; `runDownload` re-arms the card at entry and opens it synchronously in
+  the existing `kind !== "json"` success block; card mounted after the error bar; modal
+  mount removed.
+- edited: `components/TipJar.tsx` — comment at :85 referenced the deleted modal as a
+  cross-surface size constraint; corrected, no code change.
+- edited: `DECISION_LOG.md` — records the two reversals (no suppression; link to
+  `/support` instead of Ko-fi/PayPal direct).
+
+**Notes / risks / follow-up:**
+- **`cv_export` is untouched.** Still fires once, after the await, non-JSON only,
+  `BuilderShell.tsx` success block. Not moved, not duplicated.
+- **The card now shows on EVERY successful export** — no 90-day window, no session flag.
+  This reverses DECISION_LOG 2026-05-31 and the handover's own "once per browser, ever".
+  Abdullah's explicit call on 2026-09-18. Watch for nag complaints.
+- Verified: `npx tsc --noEmit` clean; `npm run lint` still **exactly 11 warnings, 0
+  errors** (cap is 11, zero headroom); `npm run build` green; `npm test` 170 passed, 0
+  failed; `npm run smoke:pdf` exit 0. The "Incomplete or corrupt PNG file" lines in the
+  smoke output are **pre-existing** — 18 of them on a stashed clean baseline too — and the
+  smoke script imports only `components/pdf/CVDocument` and `lib/types/cv`, neither of
+  which this change touches.
+- **Verified in a browser against the production build** (`next start`, not dev): card
+  appears after export on both the TopBar and ReviewStep paths and on the "Export anyway"
+  route; dismiss hides it; a second export brings it back; a JSON backup produces neither
+  the card nor a `cv_export` event; `cv_export` fired exactly once per PDF export with
+  `{format:"pdf", template:"classic"}`.
+- **Card height measured, not estimated:** 59.3px at 320 / 360 / 375 / 414px, link visible
+  at all four. The first draft opened with "Downloaded." and spilled to 3 lines (78.6px) at
+  320 and 360px — both real Android widths — so the prefix was cut. The copy length is
+  therefore load-bearing; re-measure before lengthening it. There is a comment in the
+  component saying so.
+- **Still unverified:** (a) the export-failure path — the card sits after the `await` inside
+  the existing `try`, so a throw skips it exactly as it already skips `track()`, but I did
+  not force a real failure; (b) a byte-level PDF comparison against pre-change output.
+  Nothing in this change touches the PDF path (`smoke:pdf` imports only
+  `components/pdf/CVDocument` and `lib/types/cv`), but the comparison is still worth doing.
+- `docs/ux-audit-2026-06.md` still names `DownloadTipModal.tsx` in ENG-13 / ENG-18 / UI-1.
+  Left as-is: it is a dated audit record, not live documentation.
+
+**Suggested commit:** feat(builder): replace post-export tip modal with an inline support card
+
+---
+
 ## [2026-08-20 10:30] Dead-weight removal + ROADMAP rebuilt from git history
 
 **Goal:** close the four ROADMAP cleanup items, delete code and tokens with zero
