@@ -13,6 +13,7 @@
 // the Next.js Turbopack + pdfjs worker incompatibility.
 
 import { z } from "zod";
+import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "../server/anthropic";
 import type { CvData } from "../types/cv";
 import type { ParsedDocument } from "../importers/adapter";
 import { mapParsedToCv } from "../importers/fieldMapper";
@@ -223,8 +224,9 @@ async function callClaude(rawText: string): Promise<{
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
+      model: CLAUDE_MODEL,
+      max_tokens: 8192,
+      output_config: { effort: CLAUDE_EFFORT },
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUserPrompt(rawText) }],
     }),
@@ -236,7 +238,7 @@ async function callClaude(rawText: string): Promise<{
   }
 
   const data = await res.json();
-  const rawResponse: string = data?.content?.[0]?.text ?? "";
+  const rawResponse = responseText(data);
 
   let jsonObj: unknown;
   try {

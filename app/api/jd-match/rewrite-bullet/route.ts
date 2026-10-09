@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
+import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "@/lib/server/anthropic";
 import {
   checkRateLimit,
   getClientIp,
@@ -157,8 +158,9 @@ async function callHaiku(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      output_config: { effort: CLAUDE_EFFORT },
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUser(bullet, keyword, roleTitle) }],
     }),
@@ -168,7 +170,7 @@ async function callHaiku(
     throw new Error(`Anthropic API error: ${res.status} — ${errText}`);
   }
   const data = await res.json();
-  return (data?.content?.[0]?.text as string) ?? "";
+  return responseText(data);
 }
 
 export async function POST(request: Request) {
@@ -214,7 +216,7 @@ export async function POST(request: Request) {
     }
 
     // Global daily spend cap — after the per-IP windows (per-IP 429s win) and
-    // after validation. 1 unit: single-bullet rewrite, max_tokens 512.
+    // after validation. 1 unit: single-bullet rewrite, max_tokens 1024.
     const spend = await takeSpendUnits(1);
     if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 

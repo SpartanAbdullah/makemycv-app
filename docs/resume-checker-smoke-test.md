@@ -61,9 +61,12 @@ Trust the `ex: 86400` TTL on KV. Do not test live.
 
 ## Cost accounting
 
-Per parse, Claude Haiku 4.5:
-- Input: ~2000 tokens (system + example + raw CV text)
-- Output: ~1500–2500 tokens (ParsedDocument + _parseSignals)
-- At published Haiku 4.5 pricing (~$1/M input, $5/M output): **~$0.01–0.015 per parse**.
+Per parse, Claude Haiku 5.5 (`claude-haiku-5-5`, since 2026-10-10; was Haiku 4.5):
+- Input: ~2600 tokens (system + example + raw CV text). Haiku 5.5's tokenizer counts the
+  same text as ~30% more tokens than Haiku 4.5's ~2000.
+- Output: ~2000–3300 tokens (ParsedDocument + _parseSignals), plus any thinking at effort `low`
+- At published Haiku 5.5 pricing for prompts under 100K tokens ($0.10/M input, $0.50/M
+  output): **~$0.002 per parse**, against ~$0.01–0.015 on Haiku 4.5.
 
-Budget 1.5 cents per upload when projecting volume.
+Budget 0.5 cents per upload when projecting volume. That leaves headroom for thinking and
+for estimate error until real `usage` numbers are in.

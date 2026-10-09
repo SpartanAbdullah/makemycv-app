@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 Conventions and constraints for `makemycv-app` that are **not** derivable from
 the code, the git history, or `README.md` (which is still create-next-app
 boilerplate). Read this before changing anything.
@@ -39,6 +41,26 @@ should be introduced. Tone is a peer offering help, never an upsell interstitial
   content-free merge commits from a `stagingmmc → main → stagingmmc` round
   trip; merge them down rather than force-pushing over them.
 - `.claude/settings.local.json` is machine-local. Do not commit it.
+- **Every change gets a `COWORK_CHANGELOG.md` entry before the task is done.**
+  Newest on top, using the Goal / Files / Notes-risks / Suggested-commit format
+  shown at the head of that file. It is the shared handoff record between
+  Cowork, Claude Code and the founder.
+
+---
+
+## Sibling repo and route map
+
+`../makemycv-site` is the marketing/content site (makemycv.ae, branch
+`staging`, its own CLAUDE.md). It links into this app via `APP_URL` in its
+`lib/seo.ts`, and it is the **design source of truth**: the 2026-08-20 reskin
+copied CSS and font files byte-identical from it. Copy from it again for
+brand-level UI changes rather than re-deriving them.
+
+This app (app.makemycv.ae): `/builder` (the CV builder, entry
+`components/builder/BuilderShell.tsx`), `/jd-match`, `/resume-checker`,
+`/preview`. Server routes live in `app/api/` (`ai-improve`, `jd-match`,
+`resume-checker`, `coupons`, `health`), rate-limited and spend-capped through
+`lib/server/`. Everything CV-shaped stays client-side (see privacy below).
 
 ---
 
@@ -167,6 +189,8 @@ These are product invariants, repeatedly re-derived; do not relax them casually.
 ## Checks before shipping
 
 ```bash
+npm run dev       # next dev on :3000 (also .claude/launch.json)
+npx tsc --noEmit  # fast typecheck; first CI step
 npm test          # aggregate runner; discovers every test:* script
 npm run test:unit # tsc -p tsconfig.test.json + node --test
 npm run test:parser
@@ -175,6 +199,16 @@ npm run lint      # --max-warnings=11
 npm run build
 ```
 
+- **Unit tests** are `lib/**/*.test.ts`, compiled together by
+  `tsconfig.test.json` (`rootDir: lib`) into `.test-build/`. To run one file:
+  `npx tsc -p tsconfig.test.json && node --test .test-build/skills/paste.test.js`
+  (note: no `lib/` in the output path). `lib/` must not import `components/`
+  or `.tsx`, or this config breaks.
+- **A new suite is just a `test:*` script** in `package.json`;
+  `scripts/run-all-tests.mjs` picks it up automatically.
+- CI (`.github/workflows/ci.yml`, pushes to `main`/`stagingmmc` and PRs) runs
+  typecheck → lint → test on Node 22. It does **not** run `next build`; Vercel
+  does that on deploy.
 - `npm test` **does not fail fast** (changed 2026-08-02, audit A-W5-016) — it
   runs every suite and reports at the end, so one broken suite cannot hide the
   rest.

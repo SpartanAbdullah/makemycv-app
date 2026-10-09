@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
+import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "@/lib/server/anthropic";
 import {
   checkRateLimit,
   getClientIp,
@@ -220,7 +221,7 @@ export async function POST(request: Request) {
 
     // Global daily spend cap — checked AFTER the per-IP windows (so hammering
     // users still see the friendlier 429) and after validation (so malformed
-    // requests never burn budget). 1 unit: small prompt, max_tokens 1024.
+    // requests never burn budget). 1 unit: small prompt, max_tokens 2048.
     const spend = await takeSpendUnits(1);
     if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
@@ -234,8 +235,9 @@ export async function POST(request: Request) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        model: CLAUDE_MODEL,
+        max_tokens: 2048,
+        output_config: { effort: CLAUDE_EFFORT },
         system,
         messages: [{ role: "user", content: user }],
       }),
@@ -250,7 +252,7 @@ export async function POST(request: Request) {
     }
 
     const data = await res.json();
-    const rawText: string = data?.content?.[0]?.text ?? "";
+    const rawText = responseText(data);
     const results = extractJSON(rawText);
 
     if (!Array.isArray(results) || results.length === 0) {

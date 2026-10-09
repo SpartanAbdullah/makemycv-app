@@ -16,6 +16,57 @@ Format:
 
 ---
 
+## [2026-10-10] Claude model: Haiku 4.5 → Haiku 5.5 on all four AI routes
+
+**Goal:** Move the AI features (ai-improve, JD match, bullet rewrite, resume-checker parse)
+to Claude Haiku 5.5 (`claude-haiku-5-5`, released 2026-10-07). List price is about 10x lower
+than `claude-haiku-4-5-20251001` ($0.10/$0.50 vs $1/$5 per MTok, for prompts under 100K tokens).
+**Files:**
+- created: `lib/server/anthropic.ts`. It holds `CLAUDE_MODEL`, `CLAUDE_EFFORT` and
+  `responseText()`, so the next model bump is a one-line change.
+- created: `lib/server/anthropic.test.ts`, 5 tests.
+- edited: `app/api/ai-improve/route.ts`, `app/api/jd-match/route.ts`,
+  `app/api/jd-match/rewrite-bullet/route.ts` and `lib/resumeChecker/parse.ts`. Each one
+  now uses the shared model ID, sends `output_config: { effort: "low" }`, reads text blocks
+  by type and not `content[0]`, and doubles `max_tokens`
+  (1024→2048, 1024→2048, 512→1024, 4096→8192).
+- edited: the stale max_tokens comments in the routes and `lib/server/spendGuard.ts`, the
+  `.env.example` comment, and the cost section of `docs/resume-checker-smoke-test.md`.
+**Notes / risks / follow-up:**
+- **Why it is not just an ID swap.** Haiku 5.5 thinks by default, so a response can start
+  with a `thinking` block that has empty text. With the old `content[0].text` read, every
+  route would have quietly dropped to its fallback: the heuristic parser, a "couldn't read"
+  error, or an empty rewrite. Thinking tokens also count toward `max_tokens`, and the new
+  tokenizer counts ~30% more tokens. That is why `max_tokens` was raised and effort set to `low`.
+- `temperature`/`top_p`/`top_k` and assistant prefill now return a 400. None of the routes
+  send them, so don't add them.
+- A refusal (`stop_reason: "refusal"`) comes back as empty text. The existing "unparseable"
+  paths handle it, and Haiku 5.5 has no server-side fallback.
+- **Not live-tested from here.** Typecheck, lint (11/11) and `test:unit` (405/405) pass.
+  Exercise all four features on the stagingmmc preview before merging to main. Watch Sentry
+  and the parse `usedFallback` rate for a rise.
+- The spend-guard units are unchanged. Real cost per unit drops roughly 5x, so
+  `AI_DAILY_GLOBAL_CAP` could be raised once real usage numbers are in.
+**Suggested commit:** feat(ai): migrate Claude routes to claude-haiku-5-5
+
+---
+
+## [2026-10-10] CLAUDE.md: changelog rule, commands, route map
+
+**Goal:** Close gaps that made new Claude Code sessions rediscover things: the changelog rule
+was not written down anywhere in CLAUDE.md, and nothing said how to run a single test file.
+**Files:**
+- edited: `CLAUDE.md`. It adds the standard header line and the COWORK_CHANGELOG rule under
+  the branch workflow. A new "Sibling repo and route map" section names `../makemycv-site` as
+  the design source of truth and lists the app's routes and APIs. The Checks section gains
+  `dev`, `tsc --noEmit`, how to run one unit test file, how test suites are discovered, and
+  what CI does.
+**Notes / risks / follow-up:** Docs only. The header comment in `scripts/run-all-tests.mjs`
+still says "failing fast", which contradicts its own no-fail-fast code below it.
+**Suggested commit:** docs(claude): changelog rule, single-test command, route map
+
+---
+
 ## [2026-09-18] Skills step: paste a list, get separate skills
 
 **Goal:** Fix a real defect. The Skills search box strips commas and line breaks as you type
