@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  AVAILABILITY_OPTIONS,
+  DRIVING_LICENCE_OPTIONS,
+  VISA_STATUS_OPTIONS,
+} from "../../../lib/data/uaeOptions";
 import { useForm } from "react-hook-form";
 import { useCvStore } from "../../../lib/store/cvStore";
 import { Field } from "../../forms/Field";
@@ -77,6 +82,11 @@ export const UAEEssentialsStep = ({
     serializeOwned(personal as unknown as Record<string, unknown>),
   );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string | null>
   >({});
@@ -131,7 +141,7 @@ export const UAEEssentialsStep = ({
       const nextSerialized = serializeOwned(value as Record<string, unknown>);
       if (nextSerialized === lastSerializedRef.current) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
+      const commit = () => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
           // Merge only this step's fields over the live store — never replace
@@ -142,10 +152,20 @@ export const UAEEssentialsStep = ({
             ...pickOwned(value as Record<string, unknown>),
           } as CvPersonal);
         }
+      };
+      flushRef.current = commit;
+      debounceRef.current = setTimeout(() => {
+        flushRef.current = null;
+        commit();
       }, 250);
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);
@@ -210,42 +230,36 @@ export const UAEEssentialsStep = ({
           className="ff-uae-grid"
         >
           <Field label="Visa status">
+            {/* Options come from lib/data/uaeOptions.ts — the import parser
+                maps file values onto the SAME list, so a stored value is
+                always one this select can show (audit F24). */}
             <select className="cv-select" {...register("visaStatus")}>
               <option value="">Select status…</option>
-              <option value="UAE National">UAE National</option>
-              <option value="GCC National">GCC National</option>
-              <option value="Family sponsorship">Family sponsorship</option>
-              <option value="Employment visa">Employment visa</option>
-              <option value="Golden Visa">Golden Visa</option>
-              <option value="Green Visa">Green Visa</option>
-              <option value="Freelance permit">Freelance permit</option>
-              <option value="Investor visa">Investor visa</option>
-              <option value="Visit visa">Visit visa</option>
-              <option value="Cancelled / transferable">
-                Cancelled / transferable
-              </option>
+              {VISA_STATUS_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Availability / notice period">
             <select className="cv-select" {...register("availability")}>
               <option value="">Select availability…</option>
-              <option value="Immediate">Immediate</option>
-              <option value="2 weeks notice">2 weeks notice</option>
-              <option value="30 days notice">30 days notice</option>
-              <option value="60 days notice">60 days notice</option>
-              <option value="90 days notice">90 days notice</option>
+              {AVAILABILITY_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="UAE driving licence">
             <select className="cv-select" {...register("drivingLicense")}>
               <option value="">Select…</option>
-              <option value="Light Vehicle">Light Vehicle</option>
-              <option value="Heavy Vehicle">Heavy Vehicle</option>
-              <option value="Motorcycle">Motorcycle</option>
-              <option value="International licence">
-                International licence
-              </option>
-              <option value="None">None</option>
+              {DRIVING_LICENCE_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
             </select>
           </Field>
           {/* Promoted from "Extras" (audit UX-9): nationality is a hard

@@ -204,6 +204,10 @@ export function PhotoUpload({
                 padding: 0,
                 cursor: isProcessing ? "wait" : "pointer",
                 fontWeight: 600,
+                // 24px target floor (audit F07: this read 77×19px).
+                minHeight: 24,
+                display: "inline-flex",
+                alignItems: "center",
               }}
             >
               {photo ? "Change photo" : "Upload photo"}

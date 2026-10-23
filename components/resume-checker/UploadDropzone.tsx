@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractPdfTextInBrowser } from "@/lib/importers/pdfAdapter";
+import { extractDocxTextInBrowser } from "@/lib/importers/docxAdapter";
 
 type Phase =
   | "idle"
@@ -15,7 +16,7 @@ type Phase =
 
 const PHASE_COPY: Record<Phase, string> = {
   idle: "",
-  extracting: "Reading PDF in browser…",
+  extracting: "Reading your file in browser…",
   reading: "Reading your CV…",
   checking: "Checking against ATS rules…",
   scoring: "Scoring…",
@@ -24,6 +25,8 @@ const PHASE_COPY: Record<Phase, string> = {
 };
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export default function UploadDropzone() {
   const router = useRouter();
@@ -38,9 +41,12 @@ export default function UploadDropzone() {
   // Phase animation timers (visual progress, not tied to server)
   useEffect(() => {
     if (phase !== "reading") return;
-    const t1 = setTimeout(() => setPhase((p) => (p === "reading" ? "checking" : p)), 2500);
-    const t2 = setTimeout(() => setPhase((p) => (p === "checking" ? "scoring" : p)), 6000);
-    const t3 = setTimeout(() => setPhase((p) => (p === "scoring" ? "long" : p)), 12000);
+    // Measured 2026-10 (audit F18): a one-page CV takes ~35–40 s end to end
+    // on Haiku 5.5, so the "taking a moment" phase must not fire at 12 s or
+    // every user sees the slow-path copy on every run.
+    const t1 = setTimeout(() => setPhase((p) => (p === "reading" ? "checking" : p)), 4000);
+    const t2 = setTimeout(() => setPhase((p) => (p === "checking" ? "scoring" : p)), 14000);
+    const t3 = setTimeout(() => setPhase((p) => (p === "scoring" ? "long" : p)), 45000);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -49,11 +55,23 @@ export default function UploadDropzone() {
   }, [phase]);
 
   const validate = useCallback((file: File): string | null => {
-    if (file.type && file.type !== "application/pdf") {
-      return "Only PDF files are supported.";
+    // PDF or DOCX (WP-2). Extension decides; MIME is only a cross-check
+    // because browsers report Word files inconsistently.
+    const name = file.name.toLowerCase();
+    const isPdf = name.endsWith(".pdf");
+    const isDocx = name.endsWith(".docx");
+    if (!isPdf && !isDocx) {
+      return name.endsWith(".doc")
+        ? "Old .doc format isn't supported — save it as .docx (or PDF) and try again."
+        : "Only PDF and DOCX files are supported.";
     }
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      return "File doesn't look like a PDF. Check the extension.";
+    if (
+      file.type &&
+      file.type !== "application/pdf" &&
+      file.type !== DOCX_MIME &&
+      file.type !== "application/octet-stream"
+    ) {
+      return "File doesn't look like a PDF or DOCX. Check the extension.";
     }
     if (file.size === 0) {
       return "This file is empty.";
@@ -77,12 +95,17 @@ export default function UploadDropzone() {
       setFileName(file.name);
       setPhase("extracting");
 
+      const isDocx = file.name.toLowerCase().endsWith(".docx");
       let rawText: string;
       try {
-        rawText = await extractPdfTextInBrowser(file);
+        rawText = isDocx
+          ? await extractDocxTextInBrowser(file)
+          : await extractPdfTextInBrowser(file);
       } catch {
         setError(
-          "We couldn't read this PDF. Try re-saving it from the original source.",
+          isDocx
+            ? "We couldn't open this Word file. Save it again as .docx (or export a PDF) and try again."
+            : "We couldn't read this PDF. Try re-saving it from the original source.",
         );
         setPhase("error");
         return;
@@ -90,7 +113,9 @@ export default function UploadDropzone() {
 
       if (rawText.trim().length < 200) {
         setError(
-          "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
+          isDocx
+            ? "This document has almost no readable text. Check the file and try again."
+            : "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
         );
         setPhase("error");
         return;
@@ -194,7 +219,7 @@ export default function UploadDropzone() {
             ref={inputRef}
             id="resume-checker-file"
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="sr-only"
             onChange={(e) => onFilesSelected(e.target.files)}
             disabled={isBusy}
@@ -220,10 +245,10 @@ export default function UploadDropzone() {
               <div className="text-lg font-semibold text-slate-900">
                 Drop your CV here, or click to upload
               </div>
-              <div className="text-sm text-slate-500">
-                PDF only · max 5MB · no sign-up
+              <div className="text-sm text-slate-600">
+                PDF or DOCX · max 5MB · no sign-up
               </div>
-              <div className="mt-1 text-xs text-slate-400">
+              <div className="mt-1 text-xs text-slate-600">
                 Your file is read in this browser — only the extracted text
                 is sent to build your report.
               </div>
@@ -244,7 +269,7 @@ export default function UploadDropzone() {
                 {PHASE_COPY[phase]}
               </div>
               {fileName && (
-                <div className="text-sm text-slate-500">{fileName}</div>
+                <div className="text-sm text-slate-600">{fileName}</div>
               )}
             </div>
           )}

@@ -9,6 +9,7 @@ import { formatDateRange, normalizeHref } from "./format";
 import { meaningfulProjects } from "./projects";
 import { meaningfulExperience } from "./experience";
 import { meaningfulEducation } from "./education";
+import { getEssentialChips } from "./essentials";
 
 export async function exportToDocx(data: CvData): Promise<void> {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, ExternalHyperlink } =
@@ -90,6 +91,27 @@ export async function exportToDocx(data: CvData): Promise<void> {
   if (personal.website && websiteHref) addContact(makeLink(personal.website, websiteHref));
   if (contactChildren.length) {
     children.push(new Paragraph({ children: contactChildren, spacing: { after: 40 } }));
+  }
+  // UAE essentials — the same chips every on-screen template and the PDF
+  // print (lib/utils/essentials.ts). Until 2026-10-24 the Word export dropped
+  // them entirely, so a DOCX sent to a recruiter lost visa status, notice
+  // period, licence and nationality, and the ATS checker found none of them
+  // (audit WP-2 round-trip test). Labels match the templates so the checker's
+  // parser reads the line back.
+  const essentials = getEssentialChips(personal);
+  if (essentials.length) {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: essentials.map((c) => `${c.label}: ${c.value}`).join("  ·  "),
+            size: 20,
+            color: "555555",
+          }),
+        ],
+        spacing: { after: 40 },
+      })
+    );
   }
 
   // Summary

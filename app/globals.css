@@ -22,7 +22,11 @@
   /* #646C61 (not the old #6B7368): 4.90:1 on --ff-sunken, the darkest
      light surface — muted text is AA everywhere with no visible shift. */
   --ff-muted:        #646C61;
-  --ff-faint:        #A6ADA4;
+  /* #697067 (was #A6ADA4, 2.2:1): the lightest grey-green that clears 4.5:1
+     on every light surface — paper 4.89, sunken 4.55, white 5.10, card tint
+     4.60 — because this token IS used for 10–12px text (import helper line,
+     "optional", the footer privacy line; audit F28), not only for icons. */
+  --ff-faint:        #656C63;
   /* Placeholders only — lighter than body (affordance) but ≥3:1 on white;
      --ff-faint (2.3:1) made example text illegible. */
   --ff-placeholder:  #8A9188;
@@ -119,6 +123,9 @@
   --brand-navy:    #1B2A4A;
   --brand-gold:    #C49A48;
   --brand-gold-lt: #D4A95A;
+  /* Text-only gold: 3.2:1 on white, so a bold ≥19px wordmark passes AA
+     large-text contrast. Fills and the logo mark keep --brand-gold. */
+  --brand-gold-text: #B38A3C;
   --brand-cream:   #F4EEE0;
 
   /* Transitions */
@@ -1239,4 +1246,26 @@ body {
   [data-context^="post-"] {
     display: none !important;
   }
+}
+
+/* Skip link (audit F06). Visually hidden until it receives keyboard focus,
+   then pinned top-left above the top bar. */
+.ff-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 200;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--ff-accent);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ff-skip-link:focus-visible {
+  left: 12px;
+  outline: 2px solid var(--ff-ink);
+  outline-offset: 2px;
 }

@@ -126,9 +126,12 @@ const runText = (label, text) => {
   check(f, "location without the 'Location:' label", d.contact.location === "Sharjah, UAE", d.contact.location);
   // UAE labeled fields (new in the wave-3 parser work)
   check(f, "uae nationality", d.uae?.nationality === "Indian", d.uae);
-  check(f, "uae visa status", d.uae?.visaStatus === "Employment visa (transferable)", d.uae?.visaStatus);
-  check(f, "uae notice period", d.uae?.availability === "30 days", d.uae?.availability);
-  check(f, "uae driving licence", d.uae?.drivingLicense === "UAE Light Vehicle", d.uae?.drivingLicense);
+  // Values are mapped onto the builder's select options (WP-2): the raw
+  // "Employment visa (transferable)" / "30 days" / "UAE Light Vehicle" used to
+  // be stored verbatim, which the UAE Essentials selects could not display.
+  check(f, "uae visa status → option", d.uae?.visaStatus === "Employment visa", d.uae?.visaStatus);
+  check(f, "uae notice period → option", d.uae?.availability === "30 days notice", d.uae?.availability);
+  check(f, "uae driving licence → option", d.uae?.drivingLicense === "Light Vehicle", d.uae?.drivingLicense);
   check(f, "summary", (d.summary ?? "").includes("6 years"), d.summary);
   check(f, "2 experience entries", d.experience.length === 2, d.experience.length);
   check(f, "exp1 role/company split on double-space", d.experience[0]?.role === "Procurement Specialist" && d.experience[0]?.company === "BuildCo Contracting LLC", [d.experience[0]?.role, d.experience[0]?.company]);
@@ -367,7 +370,7 @@ const runText = (label, text) => {
   check(f, "marital status is not a skill", !skillsLc.some((s) => s.includes("marital")), d.skills);
   check(f, "nothing leaked into experience", d.experience.length === 0, d.experience);
   check(f, "nationality harvested to uae fields", d.uae?.nationality === "Indian", d.uae);
-  check(f, "visa status harvested to uae fields", d.uae?.visaStatus === "Employment Visa", d.uae);
+  check(f, "visa status harvested to uae fields", d.uae?.visaStatus === "Employment visa", d.uae);
   check(f, "unrecognised personal line preserved in unplaced", (d.unplaced ?? []).includes("Marital Status: Married"), d.unplaced);
 }
 {
@@ -610,6 +613,81 @@ const runText = (label, text) => {
     check(f, "summary captured", (d.summary ?? "").includes("6 years"), d.summary);
     check(f, "summary did not leak into skills", d.skills.length === 2, d.skills);
   }
+}
+
+/* ── (r) ROUND TRIP: the builder's own Classic export (WP-2, audit F17/F24) ──
+   __fixtures__/builder-classic-export.txt is the pdf.js line reconstruction of
+   a PDF the builder produced. The checker must read every UAE essential the
+   builder printed, and the values must be the exact select options so a
+   "Fix in Builder" import lands cleanly. */
+{
+  const f = "builder-classic-export.txt";
+  const d = run(f);
+  check(f, "name", d.contact.name === "Test Candidate", d.contact.name);
+  check(f, "email", d.contact.email === "test.candidate@example.com", d.contact.email);
+  check(f, "visa from compound line", d.uae?.visaStatus === "Employment visa", d.uae);
+  check(f, "availability from 'Available:' alias", d.uae?.availability === "30 days notice", d.uae);
+  check(f, "licence from 'DL:' alias", d.uae?.drivingLicense === "Light Vehicle", d.uae);
+  check(f, "nationality from compound line", d.uae?.nationality === "Pakistani", d.uae);
+  check(f, "compound UAE line is not in unplaced", !(d.unplaced ?? []).some((l) => /Available:/.test(l)), d.unplaced);
+  check(f, "experience role", d.experience[0]?.role === "Operations Manager", d.experience[0]);
+  check(f, "experience bullets", (d.experience[0]?.bullets ?? []).length === 2, d.experience[0]?.bullets);
+  check(f, "skills", d.skills.includes("Fleet management"), d.skills);
+}
+
+// (r2) Spaced colons (what some PDF extractors emit) and " | " separators.
+{
+  const f = "uae-compound (inline: spaced colons, pipes)";
+  const d = runText(f, [
+    "Sara Ali",
+    "sara.ali@example.com",
+    "Visa : Employment visa | Available : Immediately | DL : Valid UAE LMV licence | Nationality : Egyptian",
+    "",
+    "Summary",
+    "Accountant with 5 years in Dubai.",
+  ].join("\n"));
+  check(f, "visa", d.uae?.visaStatus === "Employment visa", d.uae);
+  check(f, "availability Immediately → Immediate", d.uae?.availability === "Immediate", d.uae);
+  check(f, "licence LMV → Light Vehicle", d.uae?.drivingLicense === "Light Vehicle", d.uae);
+  check(f, "nationality", d.uae?.nationality === "Egyptian", d.uae);
+}
+
+// (r3) Unmappable labelled values are NOT stored in the enum field — they go
+// to unplaced so the review screen shows them (detect, never assert).
+{
+  const f = "uae-unmappable (inline)";
+  const d = runText(f, [
+    "Omar Khan",
+    "omar.khan@example.com",
+    "Visa Status: Residence visa",
+    "Notice Period: Negotiable",
+    "Driving Licence: Valid",
+    "",
+    "Summary",
+    "Engineer with 4 years on UAE sites.",
+  ].join("\n"));
+  check(f, "unmappable visa not stored", d.uae?.visaStatus === undefined, d.uae);
+  check(f, "unmappable notice not stored", d.uae?.availability === undefined, d.uae);
+  check(f, "bare 'Valid' licence not stored", d.uae?.drivingLicense === undefined, d.uae);
+  check(f, "all three surface in unplaced", ["Visa Status: Residence visa", "Notice Period: Negotiable", "Driving Licence: Valid"].every((l) => (d.unplaced ?? []).includes(l)), d.unplaced);
+}
+
+// (r4) Common phrasings map to the options.
+{
+  const f = "uae-phrasings (inline)";
+  const d = runText(f, [
+    "Noor Hassan",
+    "noor.hassan@example.com",
+    "Visa: Husband's sponsorship",
+    "Notice: 1 month",
+    "Driving License: Heavy vehicle",
+    "",
+    "Summary",
+    "Nurse with 6 years in Abu Dhabi hospitals.",
+  ].join("\n"));
+  check(f, "husband's sponsorship → Family sponsorship", d.uae?.visaStatus === "Family sponsorship", d.uae);
+  check(f, "1 month → 30 days notice", d.uae?.availability === "30 days notice", d.uae);
+  check(f, "heavy vehicle", d.uae?.drivingLicense === "Heavy Vehicle", d.uae);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

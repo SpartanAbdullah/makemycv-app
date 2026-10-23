@@ -53,5 +53,31 @@ if (dsn) {
   });
 }
 
+// CSP violations are otherwise invisible: the browser refuses the request,
+// logs to a console nobody is watching, and the product keeps "working" —
+// which is exactly how GA4 collection stayed blocked for ten weeks (audit
+// F23, 2026-10-24). Report the first few per page to Sentry. The event
+// carries only the blocked host and the directive — never request bodies,
+// never CV content. Capped per page so a blocked third-party tag cannot
+// flood the error quota.
+if (typeof window !== "undefined" && dsn) {
+  let reported = 0;
+  window.addEventListener("securitypolicyviolation", (e) => {
+    if (reported >= 3) return;
+    reported += 1;
+    let host = e.blockedURI;
+    try {
+      host = new URL(e.blockedURI).host || e.blockedURI;
+    } catch {
+      /* "inline", "eval", "data" and friends have no host */
+    }
+    Sentry.captureMessage(`CSP violation: ${e.violatedDirective} blocked ${host}`, {
+      level: "warning",
+      tags: { csp_directive: e.violatedDirective, csp_host: host },
+      fingerprint: ["csp", e.violatedDirective, host],
+    });
+  });
+}
+
 // Instruments client-side navigation errors in the App Router.
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

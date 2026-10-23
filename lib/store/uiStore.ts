@@ -62,23 +62,35 @@ export const useUiStore = create<UiState>((set) => ({
 
   toasts: [],
   pushToast: (text, opts) =>
-    set((s) => ({
-      toasts: [
-        ...s.toasts,
-        {
-          id: ++toastSeq,
-          text,
-          tone: opts?.tone ?? "notice",
-          // Action toasts (e.g. Undo) must stay reachable — never shorter
-          // than the 6s default, even if a caller passes a short duration.
-          duration: opts?.onAction
-            ? Math.max(opts?.duration ?? 6000, 6000)
-            : (opts?.duration ?? 6000),
-          actionLabel: opts?.actionLabel,
-          onAction: opts?.onAction,
-        },
-      ],
-    })),
+    set((s) => {
+      const next = {
+        id: ++toastSeq,
+        text,
+        tone: opts?.tone ?? "notice",
+        // Action toasts (e.g. Undo) must stay reachable — never shorter
+        // than the 6s default, even if a caller passes a short duration.
+        duration: opts?.onAction
+          ? Math.max(opts?.duration ?? 6000, 6000)
+          : (opts?.duration ?? 6000),
+        actionLabel: opts?.actionLabel,
+        onAction: opts?.onAction,
+      };
+      // Replace, don't stack (audit F03): four "… section done ✓" toasts
+      // piled up and covered the skills chips and the drawer footer. A new
+      // action-less toast replaces any visible action-less toast of the same
+      // tone; action toasts (Undo) are never displaced by a plain one. The
+      // queue is then capped at two visible cards, oldest plain toast first.
+      let toasts = next.onAction
+        ? s.toasts
+        : s.toasts.filter((t) => t.onAction || t.tone !== next.tone);
+      toasts = [...toasts, next];
+      while (toasts.length > 2) {
+        const idx = toasts.findIndex((t) => !t.onAction && t.id !== next.id);
+        if (idx === -1) break;
+        toasts = toasts.filter((_, i) => i !== idx);
+      }
+      return { toasts };
+    }),
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 

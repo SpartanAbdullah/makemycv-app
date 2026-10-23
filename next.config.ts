@@ -41,15 +41,27 @@ const nextConfig: NextConfig = {
               // Getting this wrong fails silently: the browser blocks the
               // request and errors simply never arrive.
               //
-              // The three google-analytics/analytics.google.com entries are
-              // where GA4 POSTs its hits. The wildcards are not cosmetic: GA4
-              // routes collection through REGIONAL endpoints
-              // (region1.google-analytics.com and similar), so allowing only
-              // the bare www host drops hits for some users and not others —
-              // the worst failure mode, because the data looks present.
+              // GA4 collection hosts (2026-10-24, audit F23). A CSP wildcard
+              // such as https://*.analytics.google.com matches ONLY subdomains
+              // — never the apex host. GA4 posts its hits to the APEX
+              // https://analytics.google.com/g/collect (plus regional
+              // region1.google-analytics.com and similar), and with Google
+              // signals on it also calls https://www.google.com/g/collect and
+              // https://stats.g.doubleclick.net/g/collect. From 10 Aug to
+              // 24 Oct 2026 every one of those was refused by this header, so
+              // gtm.js and gtag.js loaded (Tag Assistant looked healthy) while
+              // not a single collect request left the app: cv_export,
+              // builder_start and builder_step never reached GA4. Both the
+              // apex hosts and the wildcards are listed on purpose; removing
+              // either reintroduces a silent, data-looks-present failure.
+              // `data:` in connect-src: @react-pdf's layout engine (yoga-layout)
+              // loads its WebAssembly from an inline data: URL via fetch. Without
+              // this every PDF export logged a CSP violation and took the slower
+              // JS fallback (audit F08). A data: URL cannot reach a network host,
+              // so it widens nothing.
               // No frame-src entry is needed: unlike the marketing site, this
               // app deliberately ships no GTM <noscript> iframe.
-              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com",
+              "connect-src 'self' data: https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://*.google.com https://www.google.ae https://stats.g.doubleclick.net https://*.doubleclick.net",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -94,7 +106,12 @@ export default withSentryConfig(nextConfig, {
 
   // The React component-name annotation adds a data attribute to every element.
   // Off: it bloats the DOM and the builder already has large render trees.
-  reactComponentAnnotation: { enabled: false },
+  // Moved under `webpack` (the un-namespaced keys are deprecated in
+  // @sentry/nextjs 10 and only apply to webpack builds; Turbopack ignores
+  // them either way).
+  webpack: {
+    reactComponentAnnotation: { enabled: false },
+    treeshake: { removeDebugLogging: true },
+  },
 
-  disableLogger: true,
 });

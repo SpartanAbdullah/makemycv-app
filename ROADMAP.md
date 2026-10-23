@@ -1,14 +1,21 @@
 # MakeMyCV Roadmap
 
-Last updated: 2026-08-20
+Last updated: 2026-10-24
 Source of truth for shipped features, active work, and backlog. Update on every completed task.
 
 ---
 
 ## 🔴 Must do next (blocking)
 
-- [ ] Merge `stagingmmc` → `main` and deploy — the 2026-08 premium reskin is on staging only
-- [ ] Store schema versioning — bump a `storeVersion` number; on app load, wipe CV state when the stored version is older than current. Prevents stale-localStorage-after-refactor bugs. (Still not implemented — no `storeVersion` in `lib/store/cvStore.ts`; versioning is timestamp-only.)
+- [ ] Store migration: tell the user when a saved CV could not be migrated. `lib/store/migrate.ts` already
+  versions the payload (`version: 3`, sequential v1→v2→v3, failures hand back the original) — the old
+  "wipe on older storeVersion" idea is superseded by converting instead of wiping. What is still missing
+  is (a) a visible notice when `outcome.status === "failed"` (today only a console.warn) with a
+  "download backup / start over" choice, and (b) a fixture test that a v1 payload with every legacy
+  field round-trips. (Audit 2026-10, U2.)
+- [ ] After the 2026-10-24 CSP fix (WP-1): confirm from production that `/builder` sends GA4
+  `collect` requests and that `cv_export` reaches GA4 Realtime; then check every `track()` name has a
+  published GTM trigger + tag.
 
 ---
 
@@ -46,6 +53,18 @@ These cannot start until auth exists; auth itself is unscheduled.
 ---
 
 ## ✅ Shipped
+
+### 2026-10 — Audit fixes (WP-1…WP-9, PR #22 from `stagingmmc`)
+- [x] 2026-10-24 — Cover letter v1 at `/cover-letter`: written from a disclosed CV excerpt, `{{number}}` placeholders, copy / .docx, entry points on Review and under the JD Match score
+- [x] 2026-10-24 — PDF export embeds Inter / Bricolage / Instrument Serif, carries title + author, no CSP violation
+- [x] 2026-10-24 — Accessibility: Headline labelled, skip link, roving step beads, AA contrast for faint text and the wordmark, template cards un-nested; axe-core runs in `smoke:builder`
+- [x] 2026-10-24 — Housekeeping: roadmap drift, Sentry webpack options, stray OG note
+- [x] 2026-10-24 — GA4 collection hosts allowed in the CSP (no app event had reached GA4 since 2026-08-10); CSP violations reported to Sentry
+- [x] 2026-10-24 — Builder: single click on Continue always works (no blur-time layout shift); last keystrokes flushed on step change; toasts replace instead of stack; `npm run smoke:builder`
+- [x] 2026-10-24 — AI suggestions never invent figures: `{{number}}` placeholders the user must fill
+- [x] 2026-10-24 — Parser reads the builder's own UAE-essentials line; values map to the select options; checker accepts DOCX; DOCX export prints the UAE line
+- [x] 2026-10-24 — Review step warns only about required sections; checker timing copy matches reality
+- [x] 2026-10-09 — `stagingmmc` → `main` merged and deployed (PR #21), including the Haiku 5.5 migration
 
 ### 2026-08 — Premium reskin & instrumentation
 - [x] 2026-08-20 — Premium design reskin: Outfit UI face, 3D-glass pill CTAs, floating-paper cards, glass logo lockup, mono retired from labels. CV output deliberately untouched via `--cv-font-*` decoupling.

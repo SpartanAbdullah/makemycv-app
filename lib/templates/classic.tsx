@@ -159,6 +159,10 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
             {/* Left block: Name + Headline + Contact */}
             <div className="flex flex-col gap-1 flex-1 min-w-0 pr-24">
               <h1
+                // The CV name is the page's h1 only in the PDF/preview sense;
+                // inside the builder the step title is the h1, so expose this
+                // as level 2 to assistive tech (audit F07: two h1s per step).
+                aria-level={2}
                 className="text-[calc(28px*var(--fs))] font-bold leading-[calc(1.25*var(--lh))] tracking-tight text-slate-900"
                 style={{ lineHeight: 1.1 * theme.lineScale }}
               >

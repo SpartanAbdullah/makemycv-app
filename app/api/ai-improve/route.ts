@@ -8,6 +8,7 @@ import {
   makeLimiter,
 } from "@/lib/server/rateLimit";
 import type { RoleFamily } from "@/lib/data/roleFamily";
+import { normalizePlaceholders } from "@/lib/ai/placeholders";
 
 type AIType = "bullets" | "skills" | "summary";
 
@@ -108,22 +109,40 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
   switch (body.type) {
     case "bullets": {
       const existing = (body.existingBullets ?? []).filter(Boolean).join("\n");
+      // Truthfulness contract (2026-10-24, audit F31). The previous prompt said
+      // "use realistic estimates if not provided" and the model obliged with a
+      // 22% saving, an AED 4.5M budget and a 91→98% accuracy gain the candidate
+      // never entered. Figures now come from the user: the model writes the
+      // literal {{number}} token and the UI refuses to insert text that still
+      // carries one (lib/ai/placeholders.ts, components/ai/PlaceholderText).
       return {
         system:
-          "You are an expert CV writer specialising in the UAE job market. " +
-          "You write ATS-optimised, impact-focused bullet points using the " +
-          "CAR framework (Context, Action, Result). Use strong action verbs. " +
-          "Always quantify achievements where possible. Never use first person. " +
+          "You are an expert CV editor for the UAE job market. You write " +
+          "ATS-optimised, impact-focused bullet points using the CAR framework " +
+          "(Context, Action, Result): strong action verb, one sentence, never " +
+          "first person.\n\n" +
+          "TRUTHFULNESS OVERRIDES EVERYTHING. The ONLY facts you may state are " +
+          "the job title, the company and the existing bullets you are given. " +
+          "You must NEVER invent numbers, percentages, amounts, headcounts, " +
+          "durations, named tools or systems, certifications, clients, " +
+          "projects or outcomes. A plausible-sounding figure the candidate " +
+          "never stated is a failure, not a success.\n\n" +
+          "Wherever a figure would strengthen a bullet, write the literal " +
+          "placeholder {{number}} in its place - e.g. \"Reduced delivery lead " +
+          "time by {{number}}% across {{number}} warehouses\". The user " +
+          "replaces it with the real value. Never write a real number that is " +
+          "not in the input.\n\n" +
           "Respond ONLY with a JSON array of strings. No explanation. No markdown.",
         user:
-          `Generate 4 strong CV bullet points for this role:\n` +
+          `Suggest 4 CV bullet points for this role, within the candidate's own scope:\n` +
           `Job Title: ${body.jobTitle ?? ""}\n` +
           `Company: ${body.company ?? ""}\n` +
-          `Existing bullets for context (if any): ${existing}\n\n` +
-          `Return exactly 4 bullet points as a JSON array of strings.\n` +
-          `Each bullet must start with a strong action verb.\n` +
-          `Each bullet must be one sentence, max 20 words.\n` +
-          `At least 2 bullets must contain a metric or number (use realistic estimates if not provided).\n` +
+          `Existing bullets (the ONLY source of facts beyond the title): ${existing || "(none)"}\n\n` +
+          `Rules:\n` +
+          `- Each bullet starts with a strong action verb, one sentence, max 20 words.\n` +
+          `- Describe responsibilities and outcomes typical for this title only in terms the candidate can confirm - no named tools, clients or metrics unless they appear above.\n` +
+          `- Use {{number}} wherever a metric, amount, headcount or duration belongs. Never a real number that is not in the input.\n` +
+          `- Do not repeat an existing bullet.\n` +
           `Format: ["bullet 1", "bullet 2", "bullet 3", "bullet 4"]`,
       };
     }
@@ -135,8 +154,9 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
       return {
         system:
           "You are a UAE job market expert and ATS optimisation specialist. " +
-          "You suggest relevant, specific skills that match a candidate's " +
-          "experience profile. Respond ONLY with a JSON array of strings. " +
+          "You suggest skills a candidate's OWN headline and experience make " +
+          "plausible - you do not assert skills, tools or credentials they " +
+          "never mentioned. Respond ONLY with a JSON array of strings. " +
           "No explanation. No markdown. No duplicates from existing skills.",
         user:
           `Suggest 8-10 relevant professional skills for this candidate:\n` +
@@ -144,8 +164,9 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
           `Experience:\n${roles}\n\n` +
           `Already has these skills (do NOT repeat): ${existing}\n\n` +
           `Return 8-10 skill strings as a JSON array.\n` +
-          `Skills should be specific (e.g. 'Odoo ERP' not just 'ERP').\n` +
-          `Mix: technical skills, tools, and soft skills relevant to UAE market.\n` +
+          `Name a specific product or system ONLY if it appears in the experience above; otherwise use the general skill (e.g. 'ERP systems', not 'Odoo ERP').\n` +
+          `Never suggest certifications, licences or qualifications - employers verify those.\n` +
+          `Mix: technical skills and soft skills relevant to the UAE market.\n` +
           `Format: ["Skill 1", "Skill 2", ...]`,
       };
     }
@@ -157,8 +178,13 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
         system:
           "You are an expert CV writer specialising in the UAE job market. " +
           "You write compelling professional summaries that pass ATS filters " +
-          "and engage human recruiters. Respond ONLY with a JSON array of " +
-          "exactly 3 strings. No explanation. No markdown.",
+          "and engage human recruiters. TRUTHFULNESS OVERRIDES EVERYTHING: " +
+          "state only facts present in the headline, roles, bullets and " +
+          "existing summary you are given. Never invent years of experience, " +
+          "metrics, team sizes, tools, clients or outcomes - write the literal " +
+          "placeholder {{number}} wherever such a figure belongs and the user " +
+          "will fill it in. Respond ONLY with a JSON array of exactly 3 " +
+          "strings. No explanation. No markdown.",
         user:
           `Write 3 different professional summary variations for this candidate:\n` +
           `Headline / Job Title: ${body.headline ?? ""}\n` +
@@ -166,8 +192,8 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
           `Existing summary for context: ${body.existingSummary ?? ""}\n\n` +
           `Requirements for each variation:\n` +
           `- 3-4 sentences maximum\n` +
-          `- Start with years of experience or a strong value statement\n` +
-          `- Include at least one metric or achievement\n` +
+          `- Open with the role and {{number}} years of experience (use the placeholder unless the years are stated above), or a strong value statement\n` +
+          `- Where a metric or achievement belongs, write {{number}} - never a figure that is not in the input\n` +
           `- UAE-market appropriate tone (professional, direct)\n` +
           `- ATS-friendly (include relevant keywords from their field)\n` +
           `- Each variation must have a distinct tone:\n` +
@@ -253,9 +279,17 @@ export async function POST(request: Request) {
 
     const data = await res.json();
     const rawText = responseText(data);
-    const results = extractJSON(rawText);
+    const parsed = extractJSON(rawText);
+    // Strings only, and every placeholder variant ([X], {{ metric }}) folded
+    // into the one token the UI explains - see lib/ai/placeholders.ts.
+    const results = Array.isArray(parsed)
+      ? parsed
+          .filter((r): r is string => typeof r === "string")
+          .map((r) => normalizePlaceholders(r.trim()))
+          .filter(Boolean)
+      : [];
 
-    if (!Array.isArray(results) || results.length === 0) {
+    if (results.length === 0) {
       return NextResponse.json(
         { error: "Failed to parse AI response" },
         { status: 500 },

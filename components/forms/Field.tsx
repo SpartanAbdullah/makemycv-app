@@ -61,6 +61,13 @@ type Props = {
    * feedback (valid/invalid) always wins. Pass false to opt out.
    */
   filledTint?: boolean;
+  /**
+   * Associate the label with a control when `children` is NOT a single
+   * element (e.g. input + a chip below it). Field can only auto-assign an id
+   * to a single child; with several children the label was silently
+   * unattached and the control had no accessible name (audit F07: Headline).
+   */
+  htmlFor?: string;
   children: ReactNode;
 };
 
@@ -89,6 +96,7 @@ export const Field = ({
   leftIcon,
   feedback,
   filledTint = true,
+  htmlFor,
   children,
 }: Props) => {
   const fieldId = useId();
@@ -104,7 +112,11 @@ export const Field = ({
           onChange?: ChangeEventHandler<HTMLElement>;
         }>)
       : null;
-  const assignedId = single && !single.props.id ? fieldId : single?.props.id;
+  const assignedId = single
+    ? !single.props.id
+      ? fieldId
+      : single.props.id
+    : htmlFor;
 
   // ── Decorative "filled" tier (B7) ──
   // Only host form controls participate; composite children (e.g. the

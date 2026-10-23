@@ -1275,6 +1275,13 @@ export const BuilderShell = ({
           background: "var(--ff-paper)",
         }}
       >
+        {/* Keyboard users used to need ~15 Tab presses (logo, score, three
+            top-bar actions, ten step beads) before reaching the first field
+            (audit F06). First focusable element on the page; visible only
+            while focused (globals.css .ff-skip-link). */}
+        <a href="#builder-form" className="ff-skip-link">
+          Skip to the form
+        </a>
         <TopBar
           cvName={cvName}
           saveError={saveError}
@@ -1427,6 +1434,8 @@ export const BuilderShell = ({
           >
             <main
               ref={mainRef}
+              id="builder-form"
+              tabIndex={-1}
               style={{
                 flex: 1,
                 display: "flex",

@@ -16,6 +16,320 @@ Format:
 
 ---
 
+## [2026-10-24 07:30] WP-9: cover letter v1 — `/cover-letter`, written from a disclosed CV excerpt
+
+**Goal:** Product #2 in CLAUDE.md, planned since May and never built (audit WP-9, recommendation
+accepted by the founder). A short UAE-style letter for the role the user is applying to, generated
+from their own CV, with the same truthfulness contract as the bullet rewriter and a disclosure that
+makes it the first — and only — feature to send CV text to a server.
+**Files:**
+- created: `lib/coverLetter/payload.ts` (+ `payload.test.ts`, 5 tests) — THE place that decides what
+  leaves the browser: first name, headline, summary, latest non-blank role (title, company, period,
+  ≤4 bullets ≤300 chars), ≤12 skill names, visa + availability. No contact details, photo, education,
+  certifications or languages. Client builds it, server re-parses and re-clips it (`parseCoverLetterRequest`),
+  and a CV with no role/summary/skills is rejected before any AI call.
+- created: `app/api/cover-letter/route.ts` — Haiku 5.5, `CLAUDE_EFFORT`, per-IP 6/24h + 2/60s
+  (`mmcv_cl_*`), 1 spend unit, retry-once, fence-tolerant JSON parse, `normalizePlaceholders` on the
+  way out. System prompt: only facts from the excerpt, `{{number}}` where a figure would help, 3
+  paragraphs, 150–230 words, no clichés, first name sign-off.
+- created: `hooks/useCoverLetter.ts` — fetch + the shared RATE_LIMITED/OTHER error shape.
+- created: `components/coverletter/CoverLetterPanel.tsx` — company / job title (required), hiring manager
+  and job ad (optional, ad collapsed behind a button), the disclosure box listing exactly what will be
+  sent (computed from the live excerpt), result with `PlaceholderText` highlighting, Edit toggle, Copy
+  and Download .docx both disabled while a placeholder remains, empty-CV guide. Prefills the job title
+  from `jdTarget` and, when arriving from JD Match, title + pasted ad via a tab-local
+  `sessionStorage` seed (`stashCoverLetterSeed`). `track("cover_letter_generate" | "cover_letter_export")`
+  with enum params only.
+- created: `lib/coverLetter/docx.ts` — `exportCoverLetterDocx`: name + contact line + date + company +
+  "Re: title" + paragraphs, assembled in the browser (contact details never went to the server).
+- created: `app/cover-letter/page.tsx` — noindex, same shell as `/jd-match`.
+- edited: `components/builder/steps/ReviewStep.tsx` — "Write a cover letter" next to "Tailor to a job".
+- edited: `components/jdmatch/JdMatchPanel.tsx` — one-line peer nudge under the score ("Did you know?
+  … Write it →") that seeds the cover letter page. The CV still never leaves JD Match.
+- edited: `lib/server/spendGuard.ts` — comments count five AI routes.
+- edited: `CLAUDE.md` — product #2 marked shipped, route map, privacy section names the excerpt and the
+  three places to update if it widens; axe + PDF-font notes.
+- edited: `ROADMAP.md` — 2026-10 shipped block extended (WP-6…WP-9).
+- sibling repo: `makemycv-site/app/privacy/page.tsx` — AI-features paragraph names the cover letter
+  writer and lists the excerpt (committed there).
+**Notes / risks / follow-up:** End-to-end verified against `next start`: the request body carries only
+the excerpt keys (no email/phone), a 145-word letter came back whose every figure (8 years, 18%,
+3 warehouses, team of 12, zero HSE, 24 months) exists in the fixture CV, a `{{number}}` run blocked
+copy/download until edited, and the .docx opened with name, company, "Re:" line and body. Not done in
+v1: tone/length options, PDF export of the letter, LinkedIn message (product #3). The limiter is
+deliberately tight (6/day) — raise it once real usage shows the spend. The `/cover-letter` page is
+`noindex`; add it to the www navigation/product copy only after a few real letters have been read.
+**Suggested commit:** feat(cover-letter): v1 — letter written from a disclosed CV excerpt with
+{{number}} placeholders, copy/.docx export, Review + JD Match entry points
+
+---
+
+## [2026-10-24 06:10] WP-8: PDF export embeds the real typefaces, carries metadata, stops violating the CSP
+
+**Goal:** Audit F08 / F28 / F29. Every PDF rendered in Helvetica regardless of the "Design & Font" choice
+(Inter / Bricolage / Instrument Serif existed only on screen), the file had no Title/Author, and each
+export logged a CSP violation because yoga-layout fetches its WebAssembly from a `data:` URL.
+**Files:**
+- created: `public/fonts/pdf/{inter,bricolage}-{400,700}.ttf`, `instrument-serif-400{,-italic}.ttf` —
+  static instances cut from the app's own variable woff2 files with fontTools (every axis pinned:
+  Bricolage `opsz` 14 = its text optical size; name records rewritten). `fontkit` cannot read woff2
+  or variable fonts, so this is the only form @react-pdf can embed. ~48–66 KB each, loaded lazily on
+  the first export only.
+- created: `lib/pdf/fonts.ts` — `registerPdfFonts()` (browser-only, idempotent), `pdfFontPair()`
+  (regular/bold family names or the Helvetica pair as fallback), `pdfFontsReady()`.
+- edited: `components/pdf/CVDocument.tsx` — `buildStyles(theme, fonts)` and every layout take the font
+  pair; the 34 inline `"Helvetica-Bold"` uses become `fonts.bold` + `fontWeight: 700`; `ProPdfHeading`
+  and `OnyxHeading` take `fonts`; `<Document title author subject language>` set from the CV.
+- edited: `hooks/useDownloadCV.ts` — registers the fonts before rendering.
+- edited: `next.config.ts` — `data:` added to `connect-src` with a comment on why it widens nothing.
+**Notes / risks / follow-up:** Verified with pdf.js over the exported files: `sans` embeds
+`Inter-Regular`, `display` embeds `BricolageGrotesque-Regular`, `serif` embeds `InstrumentSerif-Regular`;
+Title "First Last — CV", Author set; 0 CSP console messages; text extraction intact (ATS-safe).
+Subsetting is on (react-pdf default) so file sizes stay ~10–13 KB. Route-scoped font loading (F29) was
+NOT done: `--cv-font-*` tokens are defined on `:root`, so moving the faces off the root would restyle
+the CV. If `app/fonts/*.woff2` ever change, regenerate the TTFs (fontTools + brotli; script in the
+audit folder's history) — a mismatch is cosmetic, not breaking, because `pdfFontPair` falls back to
+Helvetica when registration fails.
+**Suggested commit:** feat(pdf): embed Inter/Bricolage/Instrument Serif, set document metadata, allow
+yoga's data: fetch in the CSP
+
+---
+
+## [2026-10-24 05:40] WP-7: accessibility pass — labels, skip link, roving step beads, contrast, axe in the smoke
+
+**Goal:** Audit findings F07, F09, F12, F13, F15 (`_cowork/audit-2026-10/06-REPORT.md`): the Headline
+field had no accessible name, there was no skip link on a page whose top bar + 10 step beads precede
+the form, every step bead was a tab stop, the faint text token failed AA, the photo "Change" button
+was ~20px tall, and two CV templates put the candidate's name in an `<h1>` under the page's own
+`<h1>`. Nothing enforced any of this, so the builder smoke now runs axe-core.
+**Files:**
+- edited: `components/forms/Field.tsx` — `htmlFor` prop so a label can point at a control when
+  `children` is not a single element (Headline = input + chip).
+- edited: `components/builder/steps/PersonalStep.tsx` — Headline input gets `id` + `htmlFor`.
+- edited: `components/builder/BuilderShell.tsx` — "Skip to the form" link (`.ff-skip-link`, visible on
+  focus) before the top bar; `<main id="builder-form" tabIndex={-1}>` as its target.
+- edited: `components/builder/StepBeads.tsx` — roving tabindex: one tab stop, Arrow/Home/End move
+  between beads.
+- edited: `components/builder/PhotoUpload.tsx` — "Change" button meets the touch-target floor.
+- edited: `lib/templates/classic.tsx`, `lib/templates/modern.tsx` — name heading is `aria-level={2}`
+  (visual unchanged; the document outline no longer has two h1s). CV output otherwise untouched.
+- edited: `app/globals.css` — `--ff-faint` #A6ADA4 → #656C63 (4.7:1 on the selected-card tint, 5.4:1 on
+  white); `.ff-skip-link`; new `--brand-gold-text` (#B38A3C, 3.2:1) for the wordmark only.
+- edited: `components/Logo.tsx` — wordmark 700 weight + `--brand-gold-text` for ".ae" (2.6:1 before).
+  The logo mark and every gold fill keep `--brand-gold`. The site's Logo still uses 600/#C49A48;
+  copy this change there when the site gets its own axe pass.
+- edited: `components/builder/steps/ReviewStep.tsx` — `TemplateCard` rebuilt as a stretched-button
+  card: the thumbnail (a scaled render of the real template, links included) is `inert` and no longer
+  inside the clickable element; a transparent `<button aria-pressed>` covers the card and the preview
+  button sits above it as a sibling. Fixes axe `nested-interactive` ×10.
+- edited: `components/resume-checker/UploadDropzone.tsx` — helper text slate-500/400 → slate-600 on the
+  tinted dropzone.
+- edited: `scripts/builder-smoke.mjs` — axe-core pass (serious/critical fail the run) on the personal,
+  experience and review steps, the checker upload and JD Match; `[inert]` excluded.
+**Notes / risks / follow-up:** The CV templates' own `text-slate-400` dates are 2.6:1 — deliberately
+left alone (ATS output unchanged) but worth a founder call: a slightly darker date colour in the
+templates would pass and is invisible to ATS. `inert` needs React 19 (present). `npm run smoke:builder`
+is all-PASS at 1440×900; mobile widths are not axe-scanned yet.
+**Suggested commit:** fix(a11y): label Headline, skip link, roving step beads, AA contrast, un-nest
+template cards; axe in the builder smoke
+
+---
+
+## [2026-10-24 04:10] WP-6 (app half): docs drift fixed, Sentry options, stray file
+
+**Goal:** The audit (F11) found the roadmap still listed "merge stagingmmc → main" as blocking (PR #21
+shipped it on 2026-10-09) and a `storeVersion` item that the migrator had already superseded; two
+cowork notes outside the repo still said the site's production branch was `preview`.
+**Files:**
+- edited: `ROADMAP.md` — stale merge item removed; store item rewritten to what is actually missing
+  (failure notice + migration fixture test); new "2026-10 — Audit fixes" shipped block; a post-deploy
+  GA4 verification item added.
+- edited: `next.config.ts` — Sentry's deprecated top-level options moved under `webpack`.
+- deleted: `public/OG_IMAGE_NEEDED.txt` — the OG image it asked for has existed since 2026-08-02.
+- outside this repo: `_cowork/memory.md` and `_cowork/PENDING-FEATURES.md` now open with a
+  HISTORICAL banner pointing at ROADMAP / DECISION_LOG / the audit.
+**Suggested commit:** chore: roadmap reflects shipped work; Sentry webpack options; drop stale OG note
+
+---
+
+## [2026-10-24 03:30] WP-2: builder ↔ checker round trip — UAE essentials parse, map to select options, survive import; checker takes DOCX; DOCX export prints the UAE line
+
+**Goal:** Audit findings F17 and F24 (`_cowork/audit-2026-10/06-REPORT.md`). A CV built here and run
+through its own checker was told it had "No availability or notice period" and "No UAE driving
+licence" (its only two errors) because the templates print all four essentials on ONE line
+("Visa: Employment visa · Available: 30 days notice · DL: Light Vehicle · Nationality: …") and the
+parser only matched a label at line start. "Fix in Builder" then wrote that whole line into
+`personal.visaStatus`, the UAE step's select showed nothing, and every template printed the garbage.
+Separately, the checker rejected DOCX although the DOCX adapter had existed since June, and the
+Word export omitted the UAE line entirely.
+**Files:**
+- created: `lib/data/uaeOptions.ts` (+ `uaeOptions.test.ts`, 15 tests) — the visa / availability /
+  licence option lists and conservative normalisers ("1 month" → "30 days notice", "husband's
+  sponsorship" → "Family sponsorship", "LMV" → "Light Vehicle"; a bare "Valid" licence or
+  "Negotiable" notice maps to nothing — detect, never assert).
+- edited: `lib/importers/textParser.ts` — `harvestUaeFields` splits compound lines on · • | before
+  matching; label aliases for what the templates print (`Available`, `DL`, `Notice`, `Driving
+  License`); values go through the normalisers; anything unmappable is returned as a leftover and
+  surfaces in `unplaced` (the review screen's "We couldn't place this") instead of a field.
+  The Claude checker path uses the same harvester for UAE fields, so the report benefits too.
+- edited: `components/builder/steps/UAEEssentialsStep.tsx` — the three selects render from the
+  shared option lists, so parser and UI can never disagree on vocabulary.
+- edited: `components/import/MappingReview.tsx` — header now lists the UAE details that were read
+  ("UAE details found: Visa: … · Available: …") or says none were found; the old "We can't read
+  visa status…" line is gone.
+- edited: `lib/importers/docxAdapter.ts` (exported `extractDocxTextInBrowser`),
+  `components/resume-checker/UploadDropzone.tsx` — the checker accepts `.docx` (old `.doc` gets a
+  "save as .docx" message); copy "PDF or DOCX · max 5MB"; `app/resume-checker/page.tsx` step +
+  formats FAQ updated.
+- edited: `lib/utils/docxExport.ts` — prints the same UAE essentials line as every template and
+  the PDF, right under the contact line. The round-trip test found the Word export had never
+  included it.
+- created: `__fixtures__/builder-classic-export.txt` — pdf.js line reconstruction of a PDF the
+  builder produced. `scripts/parser-fixtures.test.cjs` gains a round-trip block plus inline cases
+  for spaced colons / pipes, unmappable values → unplaced, and common phrasings; the two
+  `word-export-uae` assertions now expect option values instead of raw strings.
+**Notes / risks / follow-up:**
+- Verified on a prod build (Playwright, `pw/wp2-verify.mjs`, `pw/wp2-docx.mjs`): PDF import →
+  store `{Employment visa, 30 days notice, Light Vehicle, Pakistani}` and the selects show them;
+  DOCX export → checker report "ATS Essentials 100%", no false flags → Fix in Builder → same four
+  values. `npm test` 191/191, lint at cap, `smoke:builder` green.
+- A CV whose visa line we cannot map now shows that line under "We couldn't place this" and
+  leaves the select empty — previously it printed the raw text on the CV. That is the intended
+  trade: nothing unverifiable is asserted on a document that goes to an employer.
+- Templates other than Classic print the chips in their own order/separators; all use
+  `getEssentialChips`, so the labels are the same. The parser fixture covers the Classic/PDF form.
+**Suggested commit:** fix(parser): read the builder's own UAE essentials line, map to select options, accept DOCX in the checker
+
+---
+
+## [2026-10-24 02:45] WP-4: AI suggestions can no longer invent figures — placeholders the user must fill
+
+**Goal:** Audit finding F31 (`_cowork/audit-2026-10/06-REPORT.md`), reproduced in the UI: for a role
+with two real bullets and no numbers, "Suggest bullets with AI" offered "cutting stock discrepancies
+by 22%", "Directed operating budget of AED 4.5M, achieving 9% cost savings", "order accuracy from 91%
+to 98%", "team retention by 30%" as one-tap inserts. The prompt literally said "use realistic
+estimates if not provided". That contradicts every invariant the later features protect
+(rewrite-bullet, evidence detection, the credential guard) and UAE application claims are checkable.
+**Files:**
+- created: `lib/ai/placeholders.ts` (+ `placeholders.test.ts`, 10 tests) — the `{{number}}`
+  contract: detect / count / split / normalise ([X], {{ metric }} fold into the one token).
+- created: `components/ai/PlaceholderText.tsx` — renders text with every unresolved placeholder
+  highlighted, plus the one-line hint used everywhere.
+- edited: `app/api/ai-improve/route.ts` — bullets/summary prompts rewritten to the rewrite-bullet
+  contract (only facts from the input; write `{{number}}` where a figure belongs; never a real
+  number that is not in the input). Skills prompt: name a product only if the experience names it,
+  never suggest certifications. Results are normalised server-side.
+- edited: `components/builder/steps/ExperienceStep.tsx` — `SuggestionBullet` opens in edit mode
+  when a placeholder is present; Accept is disabled (and `acceptSuggestion` refuses) until every
+  placeholder is replaced; a pencil lets the user edit any suggestion before accepting.
+- edited: `components/AIResultsModal.tsx` — bullet cards with placeholders start in edit mode and
+  "Apply Selected Bullets" is disabled while a selected card still has one; "Use This Summary" is
+  disabled while the chosen variation has one; subtitles explain the rule.
+- created: `scripts/ai-eval.mjs` — MANUAL eval (spends budget): posts figure-free roles and counts
+  numeric literals the input did not contain.
+**Notes / risks / follow-up:**
+- Eval against this build: 3 runs (2 bullets, 1 summary; then the per-IP window), 11 generated
+  items, **0 invented numeric literals, 12 placeholders emitted**. Before the change the same
+  fixture produced four invented metrics in one call.
+- UI verified with a mocked `/api/ai-improve` response (Playwright): placeholder suggestion → Accept
+  disabled + hint; after replacing `{{number}}` with a real value → Accept enabled, bullet stored
+  without any token; summary modal: "Use This Summary" disabled on a placeholder variation,
+  enabled on a clean one.
+- Company names from the input may still be echoed ("…at Example Logistics LLC") — that is input,
+  not invention. Years of experience are now a placeholder unless the input states them.
+**Suggested commit:** fix(ai): suggestions write {{number}} placeholders instead of inventing figures
+
+---
+
+## [2026-10-24 02:05] WP-3: the first click on Continue no longer vanishes; last keystrokes are no longer dropped; toasts replace instead of stacking; builder smoke script
+
+**Goal:** Audit findings F01, F02, F03 (`_cowork/audit-2026-10/06-REPORT.md`). On the Summary
+step a <30-word summary made the first click on "Continue →" do nothing: the length warning was
+inserted on blur, 24 px of layout shift landed between mousedown and mouseup, and the click was
+lost — reproducible 3/3, invisible to every existing test. The Experience step's role card folded
+itself on blur (−219 px). "Section done ✓" toasts stacked four high over the skills chips.
+**Files:**
+- edited: `components/FieldError.tsx` — new `reserve` prop keeps the helper line's height when
+  there is no message, so a blur-time message cannot move what is below it.
+- edited: `components/builder/steps/SummaryStep.tsx` — the length warning now updates from the
+  debounced `watch` while typing (and still on blur); `FieldError` is rendered with `reserve`.
+- edited: `components/builder/steps/ExperienceStep.tsx`, `EducationStep.tsx` — entry cards no
+  longer fold on blur (`complete`/`onAutoCollapse` removed from `ExpandRoleCard`). The Education
+  one was caught by the new smoke script on its first run, not by the audit. Cards still fold via
+  the header, "Add another", and when another card opens.
+- edited: `lib/store/uiStore.ts` — `pushToast` replaces a visible action-less toast of the same
+  tone instead of stacking, and caps the queue at two; action (Undo) toasts are never displaced.
+- edited: all eight form steps (`PersonalStep`, `UAEEssentialsStep`, `SummaryStep`, `ExperienceStep`,
+  `EducationStep`, `LanguagesStep`, `CertificationsStep`, `ProjectsStep`) — **the debounced
+  form→store write is now flushed on unmount instead of cancelled.** The cleanup used to
+  `clearTimeout` the pending 250 ms write, so pressing Continue / Enter / a step bead right after
+  the last keystroke silently dropped that keystroke (the whole field, when autofill or paste set
+  it in one go). The smoke script's first run lost "Personal Info", "Work Experience" and
+  "Education" entirely this way. A `flushRef` holds the pending commit; cleanup runs it.
+- created: `scripts/builder-smoke.mjs`; edited `package.json` (`smoke:builder`) and `CLAUDE.md`
+  (checks list + the layout-on-blur rule). Drives the real builder against `next start`, clicks
+  Continue ONCE per step with a field still focused, asserts the URL moved, asserts the Review
+  step shows no amber box for a complete CV, and asserts a PDF downloads. Not a `test:*` script
+  on purpose — `npm test` must stay runnable without a server.
+**Notes / risks / follow-up:** `Field.tsx`'s own invalid-message line can still appear on blur
+for required fields; that case already blocks submission with a visible red message, so it was
+left alone — reserve a line there too if a swallowed click is ever reported on Personal.
+**Suggested commit:** fix(builder): keep layout stable on blur so one click on Continue always works
+
+---
+
+## [2026-10-24 01:40] WP-5 (app half): Review step warns only about required sections; checker timing copy matches reality
+
+**Goal:** Audit findings F05, F04, F18 (`_cowork/audit-2026-10/06-REPORT.md`). The Review step
+showed an amber "MISSING SECTIONS" box listing Certifications and Projects on a CV scored
+"Strong" — contradicting the house rule that only required things may warn — and still said
+"All six export as real text" with ten templates. The checker promised "about 30 seconds" while
+a one-page CV measured 38 s, so the "taking a moment" phase fired on every run.
+**Files:**
+- edited: `components/builder/steps/ReviewStep.tsx` — `incomplete` split into `missingRequired`
+  (amber box, unchanged styling) and `optionalEmpty` (neutral "Optional — add if relevant:" chips
+  that still jump to the step); template count now reads `templates.length`.
+- edited: `app/resume-checker/page.tsx` — every "about 30 seconds" → "about a minute" (title,
+  OG/Twitter descriptions, hero, example caption, final CTA). Formats FAQ untouched (WP-2 changes it).
+- edited: `components/resume-checker/UploadDropzone.tsx` — phase timers 2.5/6/12 s → 4/14/45 s so
+  "Still working…" only appears when a run is genuinely slow.
+**Notes / risks / follow-up:** The site half (marketing claims, same-tab CTAs, timing copy) is in
+`makemycv-site` on `staging`, same date. The parser round-trip fix that made the checker flag a
+builder-made CV is WP-2, not this entry.
+**Suggested commit:** fix(review): warn only about required sections; align checker timing copy
+
+---
+
+## [2026-10-24 01:10] WP-1: GA4 hits were blocked by the app CSP — fixed, and CSP violations now reach Sentry
+
+**Goal:** The Oct-2026 audit (`_cowork/audit-2026-10/06-REPORT.md`, finding F23) found that
+app.makemycv.ae has sent **zero** GA4 collect requests since GTM was added on 2026-08-10. The
+CSP `connect-src` listed `https://*.analytics.google.com`, and a CSP wildcard never matches the
+apex host — but GA4 posts to the apex `https://analytics.google.com/g/collect`, and with Google
+signals also to `www.google.com` and `stats.g.doubleclick.net`. gtm.js and gtag.js loaded, so
+Tag Assistant looked healthy while `cv_export`, `builder_start`, `builder_step` and the import
+events never left the browser. This restores the north-star measurement.
+**Files:**
+- edited: `next.config.ts` — connect-src now lists the GA4 apex hosts and the Google-signals
+  hosts alongside the regional wildcards, with a comment explaining the wildcard trap.
+- edited: `instrumentation-client.ts` — `securitypolicyviolation` listener reports the first 3
+  violations per page to Sentry (directive + blocked host only; no bodies, no CV content), so
+  the next silent block is visible instead of invisible.
+- edited: `app/layout.tsx`, `.env.example` — comments no longer claim the tag "works" once it
+  loads; they point at the connect-src requirement and at GA4 Realtime as the only real check.
+**Notes / risks / follow-up:**
+- Verify after deploy from PRODUCTION: load /builder, confirm ≥1 `…/g/collect` request returns
+  204/200 and the console shows no CSP violation; download a PDF and watch `cv_export` in GA4
+  Realtime. Tag Assistant cannot see a refused POST.
+- Verified locally: typecheck + lint green; a prod build serves the new header and a page-side
+  `fetch` to analytics.google.com is no longer refused (audit script `pw/csp-check.mjs`).
+- The GTM container still needs a Custom Event trigger + GA4 Event tag for each `track()` name
+  (`cv_export`, `builder_start`, `builder_step`, `cv_import`, `cv_import_failed`) — that part
+  lives in GTM, not in this repo, and could not be verified from code.
+**Suggested commit:** fix(analytics): allow GA4 collection hosts in CSP and report CSP violations to Sentry
+
+---
+
 ## [2026-10-10] Claude model: Haiku 4.5 → Haiku 5.5 on all four AI routes
 
 **Goal:** Move the AI features (ai-improve, JD match, bullet rewrite, resume-checker parse)

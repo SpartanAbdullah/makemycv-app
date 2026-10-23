@@ -40,6 +40,14 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
   // import (parent toggles its `phase === "review"` conditional), so a fresh
   // file always re-seeds — no stale-state risk.
   const [edited, setEdited] = useState<EditableCv>(() => mapParsedToCv(parsed));
+  // Mapped UAE Essentials, shown in the header so the user sees they were
+  // read (and can tell when the file labelled them in a way we couldn't map).
+  const uaeFound = [
+    edited.personal?.visaStatus && `Visa: ${edited.personal.visaStatus}`,
+    edited.personal?.availability && `Available: ${edited.personal.availability}`,
+    edited.personal?.drivingLicense && `Licence: ${edited.personal.drivingLicense}`,
+    edited.personal?.nationality && `Nationality: ${edited.personal.nationality}`,
+  ].filter((x): x is string => Boolean(x));
   const [mode, setMode] = useState<MergeMode>("replace");
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -320,8 +328,18 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
             </p>
             {sectionCount > 0 && (
               <p className="mt-2 text-xs text-slate-400">
-                We can&apos;t read visa status, notice period, nationality or
-                projects from files — you&apos;ll add those in the next steps.
+                {uaeFound.length > 0 ? (
+                  <>
+                    UAE details found: {uaeFound.join(" · ")}. Anything we
+                    couldn&apos;t map is listed under &ldquo;We couldn&apos;t
+                    place this&rdquo; below.
+                  </>
+                ) : (
+                  <>
+                    No visa status, notice period or licence line was found —
+                    you&apos;ll add those in the UAE Essentials step.
+                  </>
+                )}
               </p>
             )}
           </div>

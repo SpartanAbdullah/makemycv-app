@@ -9,8 +9,8 @@
 //
 // Budget model: a call costs "units" that reflect relative Anthropic cost.
 // /api/resume-checker/parse sends up to 100k chars with max_tokens 4096, so it
-// costs 3 units; the other three routes (ai-improve, jd-match, rewrite-bullet)
-// are small prompts with max_tokens ≤ 2048 and cost 1 unit each.
+// costs 3 units; the other routes (ai-improve, jd-match, rewrite-bullet,
+// cover-letter) are small prompts with max_tokens ≤ 2048 and cost 1 unit each.
 //
 // Backing store: the same @vercel/kv instance the per-IP limiters use — one
 // INCRBY per guarded call on a UTC-dated key ("aiGuard:daily:<yyyy-mm-dd>")
@@ -164,7 +164,7 @@ export function spendCapResponse(retryAfterSeconds: number) {
   );
 }
 
-// --- Per-IP in-memory fallback (all four AI routes) ---
+// --- Per-IP in-memory fallback (all five AI routes) ---
 //
 // Used when an Upstash per-IP limiter is unreachable OR times out. Called from
 // lib/server/rateLimit.ts on behalf of every AI route — not just parse, which

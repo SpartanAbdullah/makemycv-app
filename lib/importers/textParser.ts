@@ -30,6 +30,11 @@ import type {
   ParsedUaeFields,
 } from "./adapter";
 import type { CanonicalLanguageLevel } from "../store/migrate";
+import {
+  normalizeAvailability,
+  normalizeDrivingLicence,
+  normalizeVisaStatus,
+} from "../data/uaeOptions";
 
 // ── Token patterns ───────────────────────────────────────────────────────────
 
@@ -1024,6 +1029,22 @@ function rescueMisbucketedSkills(result: ParsedDocument): void {
 // Employment visa", "Nationality: Indian", "Notice Period: 30 days").
 // These were ignored before the 2026-06 wave-3 work; now they map straight
 // into the builder's UAE Essentials fields.
+//
+// 2026-10-24 (audit F17/F24, WP-2): two things changed.
+//  1. COMPOUND LINES. Our own templates print all four essentials on ONE line
+//     ("Visa: Employment visa · Available: 30 days notice · DL: Light Vehicle ·
+//     Nationality: Pakistani"), and so do many Word CVs ("Visa: X | Notice: Y").
+//     The old code matched a label only at line start, so a builder-made CV was
+//     told by the checker that it had no notice period and no licence, and the
+//     report import stuffed the whole line into `visaStatus`. Lines are now
+//     split on · • | before matching, and the templates' own labels (Available,
+//     DL) are aliases.
+//  2. ENUM VALUES. visaStatus / availability / drivingLicense are select fields
+//     in the builder. A value the select cannot show must not be stored — it
+//     would print on every template while the step shows "Select…". Values go
+//     through lib/data/uaeOptions.ts; anything unmappable is returned as a
+//     leftover so it lands in the review screen's "couldn't place" bucket
+//     instead of a field. Nationality stays free text.
 
 const UAE_LABEL_PATTERNS: Array<{
   key: keyof ParsedUaeFields;
@@ -1038,33 +1059,83 @@ const UAE_LABEL_PATTERNS: Array<{
     key: "dateOfBirth",
     re: /^(?:d\.?\s*o\.?\s*b\.?|date\s+of\s+birth|birth\s*date|born)\s*[:\-–]\s*(.+)$/i,
   },
-  { key: "visaStatus", re: /^(?:visa\s*status|visa|residency\s*status)\s*[:\-–]\s*(.+)$/i },
+  {
+    key: "visaStatus",
+    re: /^(?:visa\s*status|visa|residenc[ey]\s*status|residence\s*visa)\s*[:\-–]\s*(.+)$/i,
+  },
   {
     key: "availability",
-    re: /^(?:notice\s*period|availability|available\s*(?:from|to\s*join)?)\s*[:\-–]\s*(.+)$/i,
+    re: /^(?:notice\s*period|notice|availability|available\s*(?:from|to\s*join)?|joining(?:\s*time)?)\s*[:\-–]\s*(.+)$/i,
   },
-  { key: "drivingLicense", re: /^driving\s*licen[sc]e\s*[:\-–]\s*(.+)$/i },
+  {
+    key: "drivingLicense",
+    // "DL" is what our own templates print. A bare "Licence:" is deliberately
+    // NOT matched — on UAE CVs that line is usually a professional licence
+    // (DHA, RERA) that belongs with certifications, not here.
+    re: /^(?:(?:valid\s+)?(?:uae\s+)?driving\s*licen[sc]e|driver'?s\s*licen[sc]e|dl)\s*[:\-–]\s*(.+)$/i,
+  },
 ];
+
+/** Separators that join several labeled fields on one printed line. */
+const UAE_SEGMENT_SPLIT = /\s*[·•|]\s*/;
+
+function normalizeUaeValue(
+  key: keyof ParsedUaeFields,
+  raw: string,
+): string | null {
+  switch (key) {
+    case "visaStatus":
+      return normalizeVisaStatus(raw);
+    case "availability":
+      return normalizeAvailability(raw);
+    case "drivingLicense":
+      return normalizeDrivingLicence(raw);
+    default:
+      return raw.trim() || null;
+  }
+}
 
 function harvestUaeFields(lines: string[]): {
   uae: ParsedUaeFields;
   consumedLines: Set<number>;
+  /** Labeled segments the parser recognised but could not map to a select
+   *  option (e.g. "Driving Licence: Valid"), plus unlabeled segments sharing a
+   *  consumed line. Surfaced in MappingReview — never silently dropped. */
+  leftovers: string[];
 } {
   const uae: ParsedUaeFields = {};
   const consumed = new Set<number>();
+  const leftovers: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
-    for (const { key, re } of UAE_LABEL_PATTERNS) {
-      const m = line.match(re);
-      if (m && !uae[key]) {
-        uae[key] = m[1].trim();
-        consumed.add(i);
+    const segments = line
+      .split(UAE_SEGMENT_SPLIT)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    let matchedAny = false;
+    const unmatched: string[] = [];
+    for (const seg of segments) {
+      let hit = false;
+      for (const { key, re } of UAE_LABEL_PATTERNS) {
+        const m = seg.match(re);
+        if (!m) continue;
+        hit = true;
+        const mapped = normalizeUaeValue(key, m[1]);
+        if (mapped && !uae[key]) uae[key] = mapped;
+        else if (!mapped) leftovers.push(seg);
         break;
       }
+      if (hit) matchedAny = true;
+      else unmatched.push(seg);
+    }
+    if (matchedAny) {
+      consumed.add(i);
+      // Only on a COMPOUND line: a single unlabeled line is not ours to claim.
+      if (segments.length > 1) leftovers.push(...unmatched);
     }
   }
-  return { uae, consumedLines: consumed };
+  return { uae, consumedLines: consumed, leftovers };
 }
 
 // ── Phone normalization ──────────────────────────────────────────────────────
@@ -1319,7 +1390,11 @@ export function parseTextToDocument(text: string): ParsedDocument {
   // UAE labeled fields can appear anywhere (header block or a "Personal
   // Details" section) — sweep the whole document and consume the lines so
   // they don't pollute the section buffers.
-  const { uae, consumedLines: uaeConsumed } = harvestUaeFields(lines);
+  const {
+    uae,
+    consumedLines: uaeConsumed,
+    leftovers: uaeLeftovers,
+  } = harvestUaeFields(lines);
   result.uae = uae;
   for (const i of uaeConsumed) consumedLines.add(i);
 
@@ -1362,6 +1437,8 @@ export function parseTextToDocument(text: string): ParsedDocument {
     if (consumedLines.has(i)) continue;
     unplaced.push(line);
   }
+  // Labeled UAE values the select fields cannot show (see harvestUaeFields).
+  unplaced.push(...uaeLeftovers);
   result.unplaced = unplaced;
 
   for (let i = firstSectionIdx; i < lines.length; i++) {

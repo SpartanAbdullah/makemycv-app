@@ -231,8 +231,16 @@ export const ReviewStep = ({
     updateSection("settings", { ...data.settings, templateId: id });
   };
 
-  const incomplete = builderSteps.filter(
-    (step) => step.id !== "review" && !getStepCompletion(step, data),
+  // Only REQUIRED sections may warn (house rule in lib/validation/
+  // cvRequirements.ts). Until 2026-10 this list included Certifications and
+  // Projects, so a CV scored "Strong" still carried an amber "MISSING SECTIONS"
+  // box pointing at optional steps (audit F05). Optional empties are now a
+  // neutral "you could also add" row, never a warning.
+  const missingRequired = builderSteps.filter(
+    (step) => step.id !== "review" && step.required && !getStepCompletion(step, data),
+  );
+  const optionalEmpty = builderSteps.filter(
+    (step) => step.id !== "review" && !step.required && !getStepCompletion(step, data),
   );
 
   /* ── Stats + label come from the engine — never recomputed locally.
@@ -271,8 +279,8 @@ export const ReviewStep = ({
             </p>
           </div>
 
-          {/* Missing sections */}
-          {incomplete.length > 0 && (
+          {/* Missing REQUIRED sections — the only amber surface here */}
+          {missingRequired.length > 0 && (
             <div
               style={{
                 borderRadius: 12,
@@ -301,7 +309,7 @@ export const ReviewStep = ({
                   gap: 8,
                 }}
               >
-                {incomplete.map((step) => (
+                {missingRequired.map((step) => (
                   <button
                     key={step.id}
                     type="button"
@@ -321,6 +329,47 @@ export const ReviewStep = ({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Optional sections still empty — neutral, never a warning */}
+          {optionalEmpty.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "var(--ff-muted)",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
+                Optional — add if relevant:
+              </span>
+              {optionalEmpty.map((step) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => onJump(step.id)}
+                  style={{
+                    borderRadius: 999,
+                    border: "1px solid var(--ff-line)",
+                    background: "var(--ff-card)",
+                    padding: "4px 12px",
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: "var(--ff-ink-2)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {step.title}
+                </button>
+              ))}
             </div>
           )}
 
@@ -492,6 +541,17 @@ export const ReviewStep = ({
               <Icon name="lightbulb" size={14} />
               Tailor to a job
             </Link>
+            {/* Cover letter v1 (WP-9) — the second product, introduced
+                in-flow as a peer offer. The page discloses what leaves the
+                browser before anything is sent. */}
+            <Link
+              href="/cover-letter"
+              className="cv-btn-secondary"
+              style={{ width: "100%", textDecoration: "none" }}
+            >
+              <Icon name="edit" size={14} />
+              Write a cover letter
+            </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
             </div>
@@ -607,8 +667,8 @@ export const ReviewStep = ({
                 marginTop: 3,
               }}
             >
-              All six export as real text, not images. Classic and ATS Clean
-              are the safest picks for online applications.
+              All {templates.length} export as real text, not images. Classic
+              and ATS Clean are the safest picks for online applications.
             </div>
           </div>
 
@@ -872,17 +932,13 @@ const TemplateCard = ({
   onPreview?: () => void;
   children: ReactNode;
 }) => (
+  /* Stretched-button card (audit WP-7 / axe nested-interactive): the
+     thumbnail is a scaled render of the real template — links and all — so
+     it must not live INSIDE a button. The card is a plain box; the select
+     control is a transparent <button> stretched over it (zIndex 1) and the
+     "open full preview" control sits above that (zIndex 3) as a sibling.
+     `inert` keeps the thumbnail's links out of the tab order. */
   <div
-    role="button"
-    tabIndex={0}
-    onClick={onClick}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onClick();
-      }
-    }}
-    aria-pressed={selected}
     style={{
       position: "relative",
       overflow: "hidden",
@@ -890,52 +946,16 @@ const TemplateCard = ({
       borderRadius: 14,
       background: selected ? "var(--ff-accent-soft)" : "var(--ff-card)",
       border: `2px solid ${selected ? "var(--ff-accent)" : "var(--ff-line)"}`,
-      cursor: "pointer",
-      textAlign: "left",
       display: "flex",
       flexDirection: "column",
       transition:
         "background var(--transition-base), border-color var(--transition-base)",
     }}
   >
-    {onPreview && (
-      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
-         44px tap zone. The inline position:absolute overrides the class's
-         position:relative but the button is still a positioned containing
-         block, so the halo resolves against it; stopPropagation above means
-         halo taps open the preview, not select the card. */
-      <button
-        type="button"
-        className="ff-hit-target"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPreview();
-        }}
-        aria-label={`Open ${name} full preview`}
-        title="Open full preview"
-        style={{
-          position: "absolute",
-          bottom: 12,
-          right: 12,
-          zIndex: 3,
-          width: 28,
-          height: 28,
-          borderRadius: 8,
-          background: "var(--ff-ink)",
-          color: "white",
-          border: "none",
-          display: "grid",
-          placeItems: "center",
-          cursor: "pointer",
-          opacity: 0.92,
-        }}
-      >
-        <Icon name="search" size={13} />
-      </button>
-    )}
     <TemplateRibbon badges={badges} />
-    {children}
+    <div inert aria-hidden="true">{children}</div>
     <div
+      aria-hidden="true"
       style={{
         marginTop: 10,
         padding: "0 4px",
@@ -982,6 +1002,7 @@ const TemplateCard = ({
       )}
     </div>
     <p
+      aria-hidden="true"
       style={{
         fontSize: 11,
         color: "var(--ff-faint)",
@@ -996,5 +1017,52 @@ const TemplateCard = ({
     >
       {description}
     </p>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${name} template — ${description}`}
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 1,
+        background: "transparent",
+        border: "none",
+        borderRadius: 12,
+        padding: 0,
+        cursor: "pointer",
+      }}
+    />
+    {onPreview && (
+      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
+         44px tap zone. The inline position:absolute overrides the class's
+         position:relative but the button is still a positioned containing
+         block, so the halo resolves against it. */
+      <button
+        type="button"
+        className="ff-hit-target"
+        onClick={onPreview}
+        aria-label={`Open ${name} full preview`}
+        title="Open full preview"
+        style={{
+          position: "absolute",
+          bottom: 12,
+          right: 12,
+          zIndex: 3,
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "var(--ff-ink)",
+          color: "white",
+          border: "none",
+          display: "grid",
+          placeItems: "center",
+          cursor: "pointer",
+          opacity: 0.92,
+        }}
+      >
+        <Icon name="search" size={13} />
+      </button>
+    )}
   </div>
 );

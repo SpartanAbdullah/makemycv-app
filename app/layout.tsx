@@ -171,6 +171,14 @@ export default function RootLayout({
             is NOT cross-domain config: same container, same stream, shared root
             domain. See the GTM_ID comment at the top of this file.
 
+            Loading the tag is only half of it: the hits go to
+            analytics.google.com, www.google.com and stats.g.doubleclick.net,
+            and every one of those must be listed in the connect-src of the
+            CSP in next.config.ts. Until 2026-10-24 they were not (a wildcard
+            does not match an apex host), so this script loaded fine and
+            nothing was ever collected. Check GA4 Realtime from production
+            after any CSP change — Tag Assistant cannot see a blocked POST.
+
             No <noscript> iframe counterpart, unlike the marketing site: this app
             is a client-rendered CV builder that does nothing without JavaScript,
             so a noscript pixel would measure users who cannot use the product —

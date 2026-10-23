@@ -54,6 +54,11 @@ export const EducationStep = ({
   const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(education));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
   // First card opens by default — matching ExperienceStep — so a first-time
   // user lands on a typeable form, not a collapsed "Education 1" mystery
   // card (audit UX-12). This is a REQUIRED step.
@@ -119,16 +124,26 @@ export const EducationStep = ({
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        const commit = () => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
             updateSection("education", next);
           }
+        };
+        flushRef.current = commit;
+        debounceRef.current = setTimeout(() => {
+          flushRef.current = null;
+          commit();
         }, 250);
       }
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);
@@ -185,17 +200,10 @@ export const EducationStep = ({
                 <div
                   key={field.id}
                   className="cv-entry-card"
-                  onBlur={(e) => {
-                    // Auto-fold a completed entry when focus leaves the card.
-                    if (!isOpen) return;
-                    const complete = Boolean(
-                      degree.trim() && school.trim() && startDate.trim(),
-                    );
-                    if (!complete) return;
-                    if (e.currentTarget.contains(e.relatedTarget as Node | null))
-                      return;
-                    setOpenIndex(null);
-                  }}
+                  // No auto-fold on blur (removed 2026-10, audit F02/WP-3):
+                  // folding the card the moment focus left it moved the
+                  // Continue button under the user's own click, and the
+                  // click was lost. Cards fold via the header button.
                 >
                   <button
                     type="button"

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { stashCoverLetterSeed } from "../coverletter/CoverLetterPanel";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useJdMatch } from "../../hooks/useJdMatch";
 import { inferRoleFamily } from "../../lib/data/roleFamily";
@@ -786,6 +788,21 @@ export const JdMatchPanel = () => {
                       “Show changes” to see them applied.
                     </p>
                   )}
+
+                  {/* Friendly in-flow discovery (CLAUDE.md): the cover letter
+                      is offered as a peer would, once there is a role to
+                      write for. The role title + pasted ad travel in
+                      sessionStorage; the CV never does. */}
+                  <p style={{ fontSize: 13, color: "var(--ff-muted)", margin: 0, lineHeight: 1.5 }}>
+                    Did you know? You can also get a short cover letter written for this role from your CV.{" "}
+                    <Link
+                      href="/cover-letter"
+                      onClick={() => stashCoverLetterSeed({ jobTitle: result.jobTitle ?? undefined, jobText: analyzedText })}
+                      style={{ color: "var(--ff-accent-dark)", fontWeight: 600 }}
+                    >
+                      Write it →
+                    </Link>
+                  </p>
 
                   {/* Guided coach — the next highest-impact fix, front and centre */}
                   {hydrated && isPro && result.totalRequirements > 0 && (
