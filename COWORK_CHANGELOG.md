@@ -16,6 +16,23 @@ Format:
 
 ---
 
+## [2026-10-24 04:10] WP-6 (app half): docs drift fixed, Sentry options, stray file
+
+**Goal:** The audit (F11) found the roadmap still listed "merge stagingmmc → main" as blocking (PR #21
+shipped it on 2026-10-09) and a `storeVersion` item that the migrator had already superseded; two
+cowork notes outside the repo still said the site's production branch was `preview`.
+**Files:**
+- edited: `ROADMAP.md` — stale merge item removed; store item rewritten to what is actually missing
+  (failure notice + migration fixture test); new "2026-10 — Audit fixes" shipped block; a post-deploy
+  GA4 verification item added.
+- edited: `next.config.ts` — Sentry's deprecated top-level options moved under `webpack`.
+- deleted: `public/OG_IMAGE_NEEDED.txt` — the OG image it asked for has existed since 2026-08-02.
+- outside this repo: `_cowork/memory.md` and `_cowork/PENDING-FEATURES.md` now open with a
+  HISTORICAL banner pointing at ROADMAP / DECISION_LOG / the audit.
+**Suggested commit:** chore: roadmap reflects shipped work; Sentry webpack options; drop stale OG note
+
+---
+
 ## [2026-10-24 03:30] WP-2: builder ↔ checker round trip — UAE essentials parse, map to select options, survive import; checker takes DOCX; DOCX export prints the UAE line
 
 **Goal:** Audit findings F17 and F24 (`_cowork/audit-2026-10/06-REPORT.md`). A CV built here and run

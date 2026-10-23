@@ -101,7 +101,12 @@ export default withSentryConfig(nextConfig, {
 
   // The React component-name annotation adds a data attribute to every element.
   // Off: it bloats the DOM and the builder already has large render trees.
-  reactComponentAnnotation: { enabled: false },
+  // Moved under `webpack` (the un-namespaced keys are deprecated in
+  // @sentry/nextjs 10 and only apply to webpack builds; Turbopack ignores
+  // them either way).
+  webpack: {
+    reactComponentAnnotation: { enabled: false },
+    treeshake: { removeDebugLogging: true },
+  },
 
-  disableLogger: true,
 });
