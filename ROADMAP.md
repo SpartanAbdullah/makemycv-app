@@ -54,7 +54,11 @@ These cannot start until auth exists; auth itself is unscheduled.
 
 ## ✅ Shipped
 
-### 2026-10 — Audit fixes (WP-1…WP-5, PR from `stagingmmc`)
+### 2026-10 — Audit fixes (WP-1…WP-9, PR #22 from `stagingmmc`)
+- [x] 2026-10-24 — Cover letter v1 at `/cover-letter`: written from a disclosed CV excerpt, `{{number}}` placeholders, copy / .docx, entry points on Review and under the JD Match score
+- [x] 2026-10-24 — PDF export embeds Inter / Bricolage / Instrument Serif, carries title + author, no CSP violation
+- [x] 2026-10-24 — Accessibility: Headline labelled, skip link, roving step beads, AA contrast for faint text and the wordmark, template cards un-nested; axe-core runs in `smoke:builder`
+- [x] 2026-10-24 — Housekeeping: roadmap drift, Sentry webpack options, stray OG note
 - [x] 2026-10-24 — GA4 collection hosts allowed in the CSP (no app event had reached GA4 since 2026-08-10); CSP violations reported to Sentry
 - [x] 2026-10-24 — Builder: single click on Continue always works (no blur-time layout shift); last keystrokes flushed on step change; toasts replace instead of stack; `npm run smoke:builder`
 - [x] 2026-10-24 — AI suggestions never invent figures: `{{number}}` placeholders the user must fill

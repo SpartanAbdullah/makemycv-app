@@ -14,8 +14,11 @@ MakeMyCV helps a job seeker produce and sharpen their own application material.
 Three things, and only these three:
 
 1. **CV builder** — the core, shipped (`/builder`).
-2. **Cover letter** — planned, **not built**. No `coverLetter` symbol exists
-   anywhere in `lib/`, `components/` or `app/` today.
+2. **Cover letter** — v1 shipped 2026-10-24 (`/cover-letter`, audit WP-9).
+   Written from an *excerpt* of the CV (`lib/coverLetter/payload.ts` is the
+   one place that decides what leaves the browser); `{{number}}` placeholders
+   block copy/download until the user fills them in. Entry points: the Review
+   step and a nudge under the JD Match score.
 3. **Customised LinkedIn recruiter outreach message** — planned, **not built**.
 
 **We are not a job board and we do not aggregate job postings.** Features that
@@ -57,10 +60,12 @@ copied CSS and font files byte-identical from it. Copy from it again for
 brand-level UI changes rather than re-deriving them.
 
 This app (app.makemycv.ae): `/builder` (the CV builder, entry
-`components/builder/BuilderShell.tsx`), `/jd-match`, `/resume-checker`,
-`/preview`. Server routes live in `app/api/` (`ai-improve`, `jd-match`,
-`resume-checker`, `coupons`, `health`), rate-limited and spend-capped through
-`lib/server/`. Everything CV-shaped stays client-side (see privacy below).
+`components/builder/BuilderShell.tsx`), `/jd-match`, `/cover-letter`,
+`/resume-checker`, `/preview`. Server routes live in `app/api/` (`ai-improve`,
+`jd-match`, `cover-letter`, `resume-checker`, `coupons`, `health`),
+rate-limited and spend-capped through `lib/server/`. Everything CV-shaped stays
+client-side (see privacy below) — the cover letter is the one disclosed
+exception, and it sends an excerpt, not the CV.
 
 ---
 
@@ -83,7 +88,12 @@ implementation detail.
   into an error event. Keep it.
 - Any feature that would send CV text to a server (e.g. LLM-based semantic
   matching) is a **founder decision with a disclosure requirement**, not a
-  refactor. See `docs/jd-match-evidence-pass.md`.
+  refactor. See `docs/jd-match-evidence-pass.md`. The cover letter (2026-10)
+  is the first such feature: it sends the excerpt defined in
+  `lib/coverLetter/payload.ts` (headline, summary, latest role + ≤4 bullets,
+  ≤12 skill names, visa/availability — never contact details or the photo),
+  the page says so above the button, and the privacy policy on www names it.
+  Widening that excerpt means updating all three.
 
 Primary market is the UAE, so PDPL — not just GDPR — is the governing regime.
 
@@ -217,14 +227,22 @@ npm run build
   you remove some, lower the cap so it cannot drift back up.
 - **PDF output is not visually verifiable from here** and `@react-pdf/renderer`
   is not fully deterministic. `smoke:pdf` proves it renders, not that it looks
-  right.
+  right. Since 2026-10 the PDF embeds the real faces (Inter / Bricolage /
+  Instrument Serif) from `public/fonts/pdf/*.ttf` — static instances generated
+  from the variable woff2 files with fontTools (`fontkit` cannot read woff2 or
+  variable fonts). Regenerate them if `app/fonts/*.woff2` changes;
+  `lib/pdf/fonts.ts` falls back to Helvetica when they are not registered.
 - **Anything that changes layout on blur needs `smoke:builder`.** A helper line
   that appears when a field loses focus moves the Continue button during the
   user's own click and the click is lost (2026-10 audit F01). `FieldError` has a
   `reserve` prop for exactly this; role cards no longer fold on blur. Run
   `npm run build && npx next start -p 3000`, then `npm run smoke:builder` — it
   clicks Continue once per step with a field still focused and fails on a
-  swallowed click.
+  swallowed click. It also runs **axe-core** on the builder steps, the checker
+  and JD Match and fails on serious/critical violations (template-gallery
+  thumbnails are `inert` and excluded — their colours belong to the CV
+  templates). Keep the CV templates out of a11y fixes: the document's own
+  colours (e.g. `text-slate-400` dates) are a template design decision.
 - **Turbopack dev mode has a known wedge** — the builder can hang on
   "Loading builder..." with all chunks 200 and no console error. It is not
   necessarily your change. Verify against a **production build** before

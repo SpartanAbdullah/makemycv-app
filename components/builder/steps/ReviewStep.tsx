@@ -541,6 +541,17 @@ export const ReviewStep = ({
               <Icon name="lightbulb" size={14} />
               Tailor to a job
             </Link>
+            {/* Cover letter v1 (WP-9) — the second product, introduced
+                in-flow as a peer offer. The page discloses what leaves the
+                browser before anything is sent. */}
+            <Link
+              href="/cover-letter"
+              className="cv-btn-secondary"
+              style={{ width: "100%", textDecoration: "none" }}
+            >
+              <Icon name="edit" size={14} />
+              Write a cover letter
+            </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
             </div>

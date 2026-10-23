@@ -16,6 +16,54 @@ Format:
 
 ---
 
+## [2026-10-24 07:30] WP-9: cover letter v1 — `/cover-letter`, written from a disclosed CV excerpt
+
+**Goal:** Product #2 in CLAUDE.md, planned since May and never built (audit WP-9, recommendation
+accepted by the founder). A short UAE-style letter for the role the user is applying to, generated
+from their own CV, with the same truthfulness contract as the bullet rewriter and a disclosure that
+makes it the first — and only — feature to send CV text to a server.
+**Files:**
+- created: `lib/coverLetter/payload.ts` (+ `payload.test.ts`, 5 tests) — THE place that decides what
+  leaves the browser: first name, headline, summary, latest non-blank role (title, company, period,
+  ≤4 bullets ≤300 chars), ≤12 skill names, visa + availability. No contact details, photo, education,
+  certifications or languages. Client builds it, server re-parses and re-clips it (`parseCoverLetterRequest`),
+  and a CV with no role/summary/skills is rejected before any AI call.
+- created: `app/api/cover-letter/route.ts` — Haiku 5.5, `CLAUDE_EFFORT`, per-IP 6/24h + 2/60s
+  (`mmcv_cl_*`), 1 spend unit, retry-once, fence-tolerant JSON parse, `normalizePlaceholders` on the
+  way out. System prompt: only facts from the excerpt, `{{number}}` where a figure would help, 3
+  paragraphs, 150–230 words, no clichés, first name sign-off.
+- created: `hooks/useCoverLetter.ts` — fetch + the shared RATE_LIMITED/OTHER error shape.
+- created: `components/coverletter/CoverLetterPanel.tsx` — company / job title (required), hiring manager
+  and job ad (optional, ad collapsed behind a button), the disclosure box listing exactly what will be
+  sent (computed from the live excerpt), result with `PlaceholderText` highlighting, Edit toggle, Copy
+  and Download .docx both disabled while a placeholder remains, empty-CV guide. Prefills the job title
+  from `jdTarget` and, when arriving from JD Match, title + pasted ad via a tab-local
+  `sessionStorage` seed (`stashCoverLetterSeed`). `track("cover_letter_generate" | "cover_letter_export")`
+  with enum params only.
+- created: `lib/coverLetter/docx.ts` — `exportCoverLetterDocx`: name + contact line + date + company +
+  "Re: title" + paragraphs, assembled in the browser (contact details never went to the server).
+- created: `app/cover-letter/page.tsx` — noindex, same shell as `/jd-match`.
+- edited: `components/builder/steps/ReviewStep.tsx` — "Write a cover letter" next to "Tailor to a job".
+- edited: `components/jdmatch/JdMatchPanel.tsx` — one-line peer nudge under the score ("Did you know?
+  … Write it →") that seeds the cover letter page. The CV still never leaves JD Match.
+- edited: `lib/server/spendGuard.ts` — comments count five AI routes.
+- edited: `CLAUDE.md` — product #2 marked shipped, route map, privacy section names the excerpt and the
+  three places to update if it widens; axe + PDF-font notes.
+- edited: `ROADMAP.md` — 2026-10 shipped block extended (WP-6…WP-9).
+- sibling repo: `makemycv-site/app/privacy/page.tsx` — AI-features paragraph names the cover letter
+  writer and lists the excerpt (committed there).
+**Notes / risks / follow-up:** End-to-end verified against `next start`: the request body carries only
+the excerpt keys (no email/phone), a 145-word letter came back whose every figure (8 years, 18%,
+3 warehouses, team of 12, zero HSE, 24 months) exists in the fixture CV, a `{{number}}` run blocked
+copy/download until edited, and the .docx opened with name, company, "Re:" line and body. Not done in
+v1: tone/length options, PDF export of the letter, LinkedIn message (product #3). The limiter is
+deliberately tight (6/day) — raise it once real usage shows the spend. The `/cover-letter` page is
+`noindex`; add it to the www navigation/product copy only after a few real letters have been read.
+**Suggested commit:** feat(cover-letter): v1 — letter written from a disclosed CV excerpt with
+{{number}} placeholders, copy/.docx export, Review + JD Match entry points
+
+---
+
 ## [2026-10-24 06:10] WP-8: PDF export embeds the real typefaces, carries metadata, stops violating the CSP
 
 **Goal:** Audit F08 / F28 / F29. Every PDF rendered in Helvetica regardless of the "Design & Font" choice
