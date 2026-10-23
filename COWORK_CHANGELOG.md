@@ -16,6 +16,36 @@ Format:
 
 ---
 
+## [2026-10-24 01:10] WP-1: GA4 hits were blocked by the app CSP — fixed, and CSP violations now reach Sentry
+
+**Goal:** The Oct-2026 audit (`_cowork/audit-2026-10/06-REPORT.md`, finding F23) found that
+app.makemycv.ae has sent **zero** GA4 collect requests since GTM was added on 2026-08-10. The
+CSP `connect-src` listed `https://*.analytics.google.com`, and a CSP wildcard never matches the
+apex host — but GA4 posts to the apex `https://analytics.google.com/g/collect`, and with Google
+signals also to `www.google.com` and `stats.g.doubleclick.net`. gtm.js and gtag.js loaded, so
+Tag Assistant looked healthy while `cv_export`, `builder_start`, `builder_step` and the import
+events never left the browser. This restores the north-star measurement.
+**Files:**
+- edited: `next.config.ts` — connect-src now lists the GA4 apex hosts and the Google-signals
+  hosts alongside the regional wildcards, with a comment explaining the wildcard trap.
+- edited: `instrumentation-client.ts` — `securitypolicyviolation` listener reports the first 3
+  violations per page to Sentry (directive + blocked host only; no bodies, no CV content), so
+  the next silent block is visible instead of invisible.
+- edited: `app/layout.tsx`, `.env.example` — comments no longer claim the tag "works" once it
+  loads; they point at the connect-src requirement and at GA4 Realtime as the only real check.
+**Notes / risks / follow-up:**
+- Verify after deploy from PRODUCTION: load /builder, confirm ≥1 `…/g/collect` request returns
+  204/200 and the console shows no CSP violation; download a PDF and watch `cv_export` in GA4
+  Realtime. Tag Assistant cannot see a refused POST.
+- Verified locally: typecheck + lint green; a prod build serves the new header and a page-side
+  `fetch` to analytics.google.com is no longer refused (audit script `pw/csp-check.mjs`).
+- The GTM container still needs a Custom Event trigger + GA4 Event tag for each `track()` name
+  (`cv_export`, `builder_start`, `builder_step`, `cv_import`, `cv_import_failed`) — that part
+  lives in GTM, not in this repo, and could not be verified from code.
+**Suggested commit:** fix(analytics): allow GA4 collection hosts in CSP and report CSP violations to Sentry
+
+---
+
 ## [2026-10-10] Claude model: Haiku 4.5 → Haiku 5.5 on all four AI routes
 
 **Goal:** Move the AI features (ai-improve, JD match, bullet rewrite, resume-checker parse)
