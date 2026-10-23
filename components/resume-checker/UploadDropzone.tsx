@@ -245,10 +245,10 @@ export default function UploadDropzone() {
               <div className="text-lg font-semibold text-slate-900">
                 Drop your CV here, or click to upload
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-sm text-slate-600">
                 PDF or DOCX · max 5MB · no sign-up
               </div>
-              <div className="mt-1 text-xs text-slate-400">
+              <div className="mt-1 text-xs text-slate-600">
                 Your file is read in this browser — only the extracted text
                 is sent to build your report.
               </div>
@@ -269,7 +269,7 @@ export default function UploadDropzone() {
                 {PHASE_COPY[phase]}
               </div>
               {fileName && (
-                <div className="text-sm text-slate-500">{fileName}</div>
+                <div className="text-sm text-slate-600">{fileName}</div>
               )}
             </div>
           )}

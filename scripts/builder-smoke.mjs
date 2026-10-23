@@ -126,6 +126,32 @@ const toasts = await page.locator('[role="status"]').count();
 if (toasts <= 3) ok(`toast cap (${toasts} status regions incl. support card)`);
 else fail("toast cap", `${toasts} visible`);
 
+// Accessibility: axe-core (already in node_modules) on the pages a job seeker
+// actually lands on. Serious/critical violations fail the run (audit WP-7).
+const axePath = path.join(process.cwd(), "node_modules", "axe-core", "axe.min.js");
+const axePages = [
+  ["/builder", "builder · personal"],
+  ["/builder?step=experience", "builder · experience"],
+  ["/builder?step=review", "builder · review"],
+  ["/resume-checker", "checker upload"],
+  ["/jd-match", "jd match"],
+];
+for (const [p, label] of axePages) {
+  await page.goto(`${BASE}${p}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(700);
+  await page.addScriptTag({ path: axePath });
+  const result = await page.evaluate(async () => {
+    // [inert] = the template-gallery thumbnails: scaled renders of the CV
+      // document itself, decorative here. Their colours belong to the CV
+      // templates (deliberately untouched), not to the app chrome under test.
+      const r = await window.axe.run({ exclude: [["[inert]"]] }, { resultTypes: ["violations"] });
+    return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, n: v.nodes.length, target: v.nodes[0]?.target?.[0] ?? "" }));
+  });
+  const serious = result.filter((v) => v.impact === "serious" || v.impact === "critical");
+  if (serious.length === 0) ok(`axe ${label}: no serious/critical violations (${result.length} minor)`);
+  else fail(`axe ${label}`, serious.map((v) => `${v.id}[${v.impact}] ×${v.n} ${v.target}`).join("; "));
+}
+
 await browser.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 if (failures.length) {

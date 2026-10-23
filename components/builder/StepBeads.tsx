@@ -119,6 +119,31 @@ export const StepBeads = ({ steps, statuses, currentId, onStepClick, rightSlot }
               type="button"
               className="cv-step-seg"
               onClick={() => onStepClick(step.id)}
+              // Roving tabindex (audit F06): the bar is ONE tab stop — the
+              // current step — and Left/Right/Home/End move between beads.
+              // Ten separate tab stops stood between the top bar and the form.
+              tabIndex={isActive ? 0 : -1}
+              onKeyDown={(e) => {
+                const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+                if (!keys.includes(e.key)) return;
+                const beads = Array.from(
+                  e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                    "button.cv-step-seg",
+                  ) ?? [],
+                );
+                const i = beads.indexOf(e.currentTarget);
+                if (i === -1) return;
+                e.preventDefault();
+                const next =
+                  e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? beads.length - 1
+                      : e.key === "ArrowLeft"
+                        ? Math.max(0, i - 1)
+                        : Math.min(beads.length - 1, i + 1);
+                beads[next]?.focus();
+              }}
               aria-current={isActive ? "step" : undefined}
               aria-label={`${label} — ${stateText(status, isActive)}`}
               title={label}

@@ -921,17 +921,13 @@ const TemplateCard = ({
   onPreview?: () => void;
   children: ReactNode;
 }) => (
+  /* Stretched-button card (audit WP-7 / axe nested-interactive): the
+     thumbnail is a scaled render of the real template — links and all — so
+     it must not live INSIDE a button. The card is a plain box; the select
+     control is a transparent <button> stretched over it (zIndex 1) and the
+     "open full preview" control sits above that (zIndex 3) as a sibling.
+     `inert` keeps the thumbnail's links out of the tab order. */
   <div
-    role="button"
-    tabIndex={0}
-    onClick={onClick}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onClick();
-      }
-    }}
-    aria-pressed={selected}
     style={{
       position: "relative",
       overflow: "hidden",
@@ -939,52 +935,16 @@ const TemplateCard = ({
       borderRadius: 14,
       background: selected ? "var(--ff-accent-soft)" : "var(--ff-card)",
       border: `2px solid ${selected ? "var(--ff-accent)" : "var(--ff-line)"}`,
-      cursor: "pointer",
-      textAlign: "left",
       display: "flex",
       flexDirection: "column",
       transition:
         "background var(--transition-base), border-color var(--transition-base)",
     }}
   >
-    {onPreview && (
-      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
-         44px tap zone. The inline position:absolute overrides the class's
-         position:relative but the button is still a positioned containing
-         block, so the halo resolves against it; stopPropagation above means
-         halo taps open the preview, not select the card. */
-      <button
-        type="button"
-        className="ff-hit-target"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPreview();
-        }}
-        aria-label={`Open ${name} full preview`}
-        title="Open full preview"
-        style={{
-          position: "absolute",
-          bottom: 12,
-          right: 12,
-          zIndex: 3,
-          width: 28,
-          height: 28,
-          borderRadius: 8,
-          background: "var(--ff-ink)",
-          color: "white",
-          border: "none",
-          display: "grid",
-          placeItems: "center",
-          cursor: "pointer",
-          opacity: 0.92,
-        }}
-      >
-        <Icon name="search" size={13} />
-      </button>
-    )}
     <TemplateRibbon badges={badges} />
-    {children}
+    <div inert aria-hidden="true">{children}</div>
     <div
+      aria-hidden="true"
       style={{
         marginTop: 10,
         padding: "0 4px",
@@ -1031,6 +991,7 @@ const TemplateCard = ({
       )}
     </div>
     <p
+      aria-hidden="true"
       style={{
         fontSize: 11,
         color: "var(--ff-faint)",
@@ -1045,5 +1006,52 @@ const TemplateCard = ({
     >
       {description}
     </p>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${name} template — ${description}`}
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 1,
+        background: "transparent",
+        border: "none",
+        borderRadius: 12,
+        padding: 0,
+        cursor: "pointer",
+      }}
+    />
+    {onPreview && (
+      /* ff-hit-target: the -8px ::before halo extends the 28px button to a
+         44px tap zone. The inline position:absolute overrides the class's
+         position:relative but the button is still a positioned containing
+         block, so the halo resolves against it. */
+      <button
+        type="button"
+        className="ff-hit-target"
+        onClick={onPreview}
+        aria-label={`Open ${name} full preview`}
+        title="Open full preview"
+        style={{
+          position: "absolute",
+          bottom: 12,
+          right: 12,
+          zIndex: 3,
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "var(--ff-ink)",
+          color: "white",
+          border: "none",
+          display: "grid",
+          placeItems: "center",
+          cursor: "pointer",
+          opacity: 0.92,
+        }}
+      >
+        <Icon name="search" size={13} />
+      </button>
+    )}
   </div>
 );

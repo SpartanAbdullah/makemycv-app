@@ -90,7 +90,10 @@ export const ModernTemplate = ({
       <header className="border-b border-slate-200 pb-4">
         <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
           <div style={{ flex: 1, minWidth: 0 }} className="flex flex-col gap-2">
-            <h1 className="font-display text-[calc(1.875rem*var(--fs))] leading-[calc(2.25rem*var(--lh))] font-semibold tracking-tight">
+            <h1
+              aria-level={2}
+              className="font-display text-[calc(1.875rem*var(--fs))] leading-[calc(2.25rem*var(--lh))] font-semibold tracking-tight"
+            >
               {name}
             </h1>
             {data.personal.headline?.trim() && (

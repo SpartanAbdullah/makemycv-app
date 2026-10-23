@@ -16,6 +16,46 @@ Format:
 
 ---
 
+## [2026-10-24 05:40] WP-7: accessibility pass — labels, skip link, roving step beads, contrast, axe in the smoke
+
+**Goal:** Audit findings F07, F09, F12, F13, F15 (`_cowork/audit-2026-10/06-REPORT.md`): the Headline
+field had no accessible name, there was no skip link on a page whose top bar + 10 step beads precede
+the form, every step bead was a tab stop, the faint text token failed AA, the photo "Change" button
+was ~20px tall, and two CV templates put the candidate's name in an `<h1>` under the page's own
+`<h1>`. Nothing enforced any of this, so the builder smoke now runs axe-core.
+**Files:**
+- edited: `components/forms/Field.tsx` — `htmlFor` prop so a label can point at a control when
+  `children` is not a single element (Headline = input + chip).
+- edited: `components/builder/steps/PersonalStep.tsx` — Headline input gets `id` + `htmlFor`.
+- edited: `components/builder/BuilderShell.tsx` — "Skip to the form" link (`.ff-skip-link`, visible on
+  focus) before the top bar; `<main id="builder-form" tabIndex={-1}>` as its target.
+- edited: `components/builder/StepBeads.tsx` — roving tabindex: one tab stop, Arrow/Home/End move
+  between beads.
+- edited: `components/builder/PhotoUpload.tsx` — "Change" button meets the touch-target floor.
+- edited: `lib/templates/classic.tsx`, `lib/templates/modern.tsx` — name heading is `aria-level={2}`
+  (visual unchanged; the document outline no longer has two h1s). CV output otherwise untouched.
+- edited: `app/globals.css` — `--ff-faint` #A6ADA4 → #656C63 (4.7:1 on the selected-card tint, 5.4:1 on
+  white); `.ff-skip-link`; new `--brand-gold-text` (#B38A3C, 3.2:1) for the wordmark only.
+- edited: `components/Logo.tsx` — wordmark 700 weight + `--brand-gold-text` for ".ae" (2.6:1 before).
+  The logo mark and every gold fill keep `--brand-gold`. The site's Logo still uses 600/#C49A48;
+  copy this change there when the site gets its own axe pass.
+- edited: `components/builder/steps/ReviewStep.tsx` — `TemplateCard` rebuilt as a stretched-button
+  card: the thumbnail (a scaled render of the real template, links included) is `inert` and no longer
+  inside the clickable element; a transparent `<button aria-pressed>` covers the card and the preview
+  button sits above it as a sibling. Fixes axe `nested-interactive` ×10.
+- edited: `components/resume-checker/UploadDropzone.tsx` — helper text slate-500/400 → slate-600 on the
+  tinted dropzone.
+- edited: `scripts/builder-smoke.mjs` — axe-core pass (serious/critical fail the run) on the personal,
+  experience and review steps, the checker upload and JD Match; `[inert]` excluded.
+**Notes / risks / follow-up:** The CV templates' own `text-slate-400` dates are 2.6:1 — deliberately
+left alone (ATS output unchanged) but worth a founder call: a slightly darker date colour in the
+templates would pass and is invisible to ATS. `inert` needs React 19 (present). `npm run smoke:builder`
+is all-PASS at 1440×900; mobile widths are not axe-scanned yet.
+**Suggested commit:** fix(a11y): label Headline, skip link, roving step beads, AA contrast, un-nest
+template cards; axe in the builder smoke
+
+---
+
 ## [2026-10-24 04:10] WP-6 (app half): docs drift fixed, Sentry options, stray file
 
 **Goal:** The audit (F11) found the roadmap still listed "merge stagingmmc → main" as blocking (PR #21

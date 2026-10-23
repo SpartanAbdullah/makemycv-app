@@ -347,8 +347,10 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
           label="Headline"
           hint="Write the job title you want next."
           error={errors.headline?.message}
+          htmlFor="personal-headline"
         >
           <input
+            id="personal-headline"
             className="cv-input"
             placeholder="e.g. Senior Operations Manager"
             autoComplete="organization-title"

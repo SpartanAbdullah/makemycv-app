@@ -69,7 +69,10 @@ export function Logo({
           className="hidden min-[480px]:inline"
           style={{
             fontFamily: "var(--font-display)",
-            fontWeight: 600,
+            // 700, not 600: at 20px the wordmark only counts as "large text"
+            // (3:1 contrast) when it is bold. With --brand-gold-text the
+            // ".ae" passes; the brand gold itself is 2.6:1 (audit WP-7/axe).
+            fontWeight: 700,
             // ~20px next to the top bar's 32px tile — the site pairs a 36-40px
             // tile with 19-21px text; keep the same tile:text ratio here.
             fontSize: Math.round(height * 0.62),
@@ -79,7 +82,7 @@ export function Logo({
           }}
         >
           <span style={{ color: "var(--brand-navy)" }}>makemycv</span>
-          <span style={{ color: "var(--brand-gold)" }}>.ae</span>
+          <span style={{ color: "var(--brand-gold-text)" }}>.ae</span>
         </span>
       </span>
     ) : (
