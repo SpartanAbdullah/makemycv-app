@@ -8,6 +8,28 @@ import { parseTextToDocument } from "./textParser";
 
 const MIN_TEXT_LENGTH = 200;
 
+/**
+ * Extract raw text from a DOCX in the browser (mammoth). Shared by the
+ * builder import (below) and the ATS checker's dropzone (2026-10-24, WP-2:
+ * the checker accepted PDF only although this adapter had existed since
+ * June — Word is the most common CV format among UAE job seekers).
+ * Throws ImportParseError("corrupt-file") when the file cannot be opened.
+ */
+export async function extractDocxTextInBrowser(input: File): Promise<string> {
+  try {
+    const mammoth = await import("mammoth");
+    const arrayBuffer = await input.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  } catch (err) {
+    console.warn("[docxAdapter] Extraction failed:", err);
+    throw new ImportParseError(
+      "corrupt-file",
+      "This DOCX could not be opened. It may be corrupted or in an older .doc format — save it as .docx and try again.",
+    );
+  }
+}
+
 export const docxAdapter: ImportAdapter = {
   name: "DOCX",
 
@@ -15,19 +37,7 @@ export const docxAdapter: ImportAdapter = {
     if (typeof window === "undefined") return {};
 
     // Typed failures instead of swallow-to-`{}` — see pdfAdapter (UX-18).
-    let text: string;
-    try {
-      const mammoth = await import("mammoth");
-      const arrayBuffer = await (input as File).arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      text = result.value;
-    } catch (err) {
-      console.warn("[docxAdapter] Extraction failed:", err);
-      throw new ImportParseError(
-        "corrupt-file",
-        "This DOCX could not be opened. It may be corrupted or in an older .doc format — save it as .docx and try again.",
-      );
-    }
+    const text = await extractDocxTextInBrowser(input);
     if (text.trim().length < MIN_TEXT_LENGTH) {
       throw new ImportParseError(
         "empty-text",

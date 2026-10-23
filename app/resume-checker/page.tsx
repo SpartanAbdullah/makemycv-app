@@ -98,7 +98,7 @@ const CHECKS: Check[] = [
 ];
 
 const STEPS: Array<{ n: string; title: string; description: string }> = [
-  { n: "1", title: "Upload", description: "Drop your PDF. No account, no email." },
+  { n: "1", title: "Upload", description: "Drop your PDF or Word file. No account, no email." },
   { n: "2", title: "Parse", description: "We extract and score against ATS rules." },
   { n: "3", title: "Review", description: "Read every issue and fix with guidance." },
 ];
@@ -109,7 +109,7 @@ const STEPS: Array<{ n: string; title: string; description: string }> = [
 const FAQS: Array<{ q: string; a: string; aJsx?: React.ReactNode }> = [
   {
     q: "What formats do you support?",
-    a: "Text-based PDF today — the format you get when you export from Word, Google Docs, or most builders. DOCX is on the v2 roadmap. Scanned image PDFs (from phone photos) aren't supported yet because there's no readable text to score.",
+    a: "Text-based PDF and Word (.docx) — the formats you get when you export from Word, Google Docs, or most builders. Older .doc files should be saved as .docx first. Scanned image PDFs (from phone photos) aren't supported because there's no readable text to score.",
   },
   {
     q: "What happens to my CV?",

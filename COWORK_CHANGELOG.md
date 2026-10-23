@@ -16,6 +16,56 @@ Format:
 
 ---
 
+## [2026-10-24 03:30] WP-2: builder ↔ checker round trip — UAE essentials parse, map to select options, survive import; checker takes DOCX; DOCX export prints the UAE line
+
+**Goal:** Audit findings F17 and F24 (`_cowork/audit-2026-10/06-REPORT.md`). A CV built here and run
+through its own checker was told it had "No availability or notice period" and "No UAE driving
+licence" (its only two errors) because the templates print all four essentials on ONE line
+("Visa: Employment visa · Available: 30 days notice · DL: Light Vehicle · Nationality: …") and the
+parser only matched a label at line start. "Fix in Builder" then wrote that whole line into
+`personal.visaStatus`, the UAE step's select showed nothing, and every template printed the garbage.
+Separately, the checker rejected DOCX although the DOCX adapter had existed since June, and the
+Word export omitted the UAE line entirely.
+**Files:**
+- created: `lib/data/uaeOptions.ts` (+ `uaeOptions.test.ts`, 15 tests) — the visa / availability /
+  licence option lists and conservative normalisers ("1 month" → "30 days notice", "husband's
+  sponsorship" → "Family sponsorship", "LMV" → "Light Vehicle"; a bare "Valid" licence or
+  "Negotiable" notice maps to nothing — detect, never assert).
+- edited: `lib/importers/textParser.ts` — `harvestUaeFields` splits compound lines on · • | before
+  matching; label aliases for what the templates print (`Available`, `DL`, `Notice`, `Driving
+  License`); values go through the normalisers; anything unmappable is returned as a leftover and
+  surfaces in `unplaced` (the review screen's "We couldn't place this") instead of a field.
+  The Claude checker path uses the same harvester for UAE fields, so the report benefits too.
+- edited: `components/builder/steps/UAEEssentialsStep.tsx` — the three selects render from the
+  shared option lists, so parser and UI can never disagree on vocabulary.
+- edited: `components/import/MappingReview.tsx` — header now lists the UAE details that were read
+  ("UAE details found: Visa: … · Available: …") or says none were found; the old "We can't read
+  visa status…" line is gone.
+- edited: `lib/importers/docxAdapter.ts` (exported `extractDocxTextInBrowser`),
+  `components/resume-checker/UploadDropzone.tsx` — the checker accepts `.docx` (old `.doc` gets a
+  "save as .docx" message); copy "PDF or DOCX · max 5MB"; `app/resume-checker/page.tsx` step +
+  formats FAQ updated.
+- edited: `lib/utils/docxExport.ts` — prints the same UAE essentials line as every template and
+  the PDF, right under the contact line. The round-trip test found the Word export had never
+  included it.
+- created: `__fixtures__/builder-classic-export.txt` — pdf.js line reconstruction of a PDF the
+  builder produced. `scripts/parser-fixtures.test.cjs` gains a round-trip block plus inline cases
+  for spaced colons / pipes, unmappable values → unplaced, and common phrasings; the two
+  `word-export-uae` assertions now expect option values instead of raw strings.
+**Notes / risks / follow-up:**
+- Verified on a prod build (Playwright, `pw/wp2-verify.mjs`, `pw/wp2-docx.mjs`): PDF import →
+  store `{Employment visa, 30 days notice, Light Vehicle, Pakistani}` and the selects show them;
+  DOCX export → checker report "ATS Essentials 100%", no false flags → Fix in Builder → same four
+  values. `npm test` 191/191, lint at cap, `smoke:builder` green.
+- A CV whose visa line we cannot map now shows that line under "We couldn't place this" and
+  leaves the select empty — previously it printed the raw text on the CV. That is the intended
+  trade: nothing unverifiable is asserted on a document that goes to an employer.
+- Templates other than Classic print the chips in their own order/separators; all use
+  `getEssentialChips`, so the labels are the same. The parser fixture covers the Classic/PDF form.
+**Suggested commit:** fix(parser): read the builder's own UAE essentials line, map to select options, accept DOCX in the checker
+
+---
+
 ## [2026-10-24 02:45] WP-4: AI suggestions can no longer invent figures — placeholders the user must fill
 
 **Goal:** Audit finding F31 (`_cowork/audit-2026-10/06-REPORT.md`), reproduced in the UI: for a role

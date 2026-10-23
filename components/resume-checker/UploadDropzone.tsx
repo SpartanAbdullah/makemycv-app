@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractPdfTextInBrowser } from "@/lib/importers/pdfAdapter";
+import { extractDocxTextInBrowser } from "@/lib/importers/docxAdapter";
 
 type Phase =
   | "idle"
@@ -15,7 +16,7 @@ type Phase =
 
 const PHASE_COPY: Record<Phase, string> = {
   idle: "",
-  extracting: "Reading PDF in browser…",
+  extracting: "Reading your file in browser…",
   reading: "Reading your CV…",
   checking: "Checking against ATS rules…",
   scoring: "Scoring…",
@@ -24,6 +25,8 @@ const PHASE_COPY: Record<Phase, string> = {
 };
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export default function UploadDropzone() {
   const router = useRouter();
@@ -52,11 +55,23 @@ export default function UploadDropzone() {
   }, [phase]);
 
   const validate = useCallback((file: File): string | null => {
-    if (file.type && file.type !== "application/pdf") {
-      return "Only PDF files are supported.";
+    // PDF or DOCX (WP-2). Extension decides; MIME is only a cross-check
+    // because browsers report Word files inconsistently.
+    const name = file.name.toLowerCase();
+    const isPdf = name.endsWith(".pdf");
+    const isDocx = name.endsWith(".docx");
+    if (!isPdf && !isDocx) {
+      return name.endsWith(".doc")
+        ? "Old .doc format isn't supported — save it as .docx (or PDF) and try again."
+        : "Only PDF and DOCX files are supported.";
     }
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      return "File doesn't look like a PDF. Check the extension.";
+    if (
+      file.type &&
+      file.type !== "application/pdf" &&
+      file.type !== DOCX_MIME &&
+      file.type !== "application/octet-stream"
+    ) {
+      return "File doesn't look like a PDF or DOCX. Check the extension.";
     }
     if (file.size === 0) {
       return "This file is empty.";
@@ -80,12 +95,17 @@ export default function UploadDropzone() {
       setFileName(file.name);
       setPhase("extracting");
 
+      const isDocx = file.name.toLowerCase().endsWith(".docx");
       let rawText: string;
       try {
-        rawText = await extractPdfTextInBrowser(file);
+        rawText = isDocx
+          ? await extractDocxTextInBrowser(file)
+          : await extractPdfTextInBrowser(file);
       } catch {
         setError(
-          "We couldn't read this PDF. Try re-saving it from the original source.",
+          isDocx
+            ? "We couldn't open this Word file. Save it again as .docx (or export a PDF) and try again."
+            : "We couldn't read this PDF. Try re-saving it from the original source.",
         );
         setPhase("error");
         return;
@@ -93,7 +113,9 @@ export default function UploadDropzone() {
 
       if (rawText.trim().length < 200) {
         setError(
-          "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
+          isDocx
+            ? "This document has almost no readable text. Check the file and try again."
+            : "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
         );
         setPhase("error");
         return;
@@ -197,7 +219,7 @@ export default function UploadDropzone() {
             ref={inputRef}
             id="resume-checker-file"
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="sr-only"
             onChange={(e) => onFilesSelected(e.target.files)}
             disabled={isBusy}
@@ -224,7 +246,7 @@ export default function UploadDropzone() {
                 Drop your CV here, or click to upload
               </div>
               <div className="text-sm text-slate-500">
-                PDF only · max 5MB · no sign-up
+                PDF or DOCX · max 5MB · no sign-up
               </div>
               <div className="mt-1 text-xs text-slate-400">
                 Your file is read in this browser — only the extracted text
