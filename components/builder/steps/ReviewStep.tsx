@@ -231,8 +231,16 @@ export const ReviewStep = ({
     updateSection("settings", { ...data.settings, templateId: id });
   };
 
-  const incomplete = builderSteps.filter(
-    (step) => step.id !== "review" && !getStepCompletion(step, data),
+  // Only REQUIRED sections may warn (house rule in lib/validation/
+  // cvRequirements.ts). Until 2026-10 this list included Certifications and
+  // Projects, so a CV scored "Strong" still carried an amber "MISSING SECTIONS"
+  // box pointing at optional steps (audit F05). Optional empties are now a
+  // neutral "you could also add" row, never a warning.
+  const missingRequired = builderSteps.filter(
+    (step) => step.id !== "review" && step.required && !getStepCompletion(step, data),
+  );
+  const optionalEmpty = builderSteps.filter(
+    (step) => step.id !== "review" && !step.required && !getStepCompletion(step, data),
   );
 
   /* ── Stats + label come from the engine — never recomputed locally.
@@ -271,8 +279,8 @@ export const ReviewStep = ({
             </p>
           </div>
 
-          {/* Missing sections */}
-          {incomplete.length > 0 && (
+          {/* Missing REQUIRED sections — the only amber surface here */}
+          {missingRequired.length > 0 && (
             <div
               style={{
                 borderRadius: 12,
@@ -301,7 +309,7 @@ export const ReviewStep = ({
                   gap: 8,
                 }}
               >
-                {incomplete.map((step) => (
+                {missingRequired.map((step) => (
                   <button
                     key={step.id}
                     type="button"
@@ -321,6 +329,47 @@ export const ReviewStep = ({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Optional sections still empty — neutral, never a warning */}
+          {optionalEmpty.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "var(--ff-muted)",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
+                Optional — add if relevant:
+              </span>
+              {optionalEmpty.map((step) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => onJump(step.id)}
+                  style={{
+                    borderRadius: 999,
+                    border: "1px solid var(--ff-line)",
+                    background: "var(--ff-card)",
+                    padding: "4px 12px",
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: "var(--ff-ink-2)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {step.title}
+                </button>
+              ))}
             </div>
           )}
 
@@ -607,8 +656,8 @@ export const ReviewStep = ({
                 marginTop: 3,
               }}
             >
-              All six export as real text, not images. Classic and ATS Clean
-              are the safest picks for online applications.
+              All {templates.length} export as real text, not images. Classic
+              and ATS Clean are the safest picks for online applications.
             </div>
           </div>
 

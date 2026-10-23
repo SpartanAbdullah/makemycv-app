@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   // including it twice produced "… | MakeMyCV | MakeMyCV" (audit ENG-19).
   title: "Free ATS Resume Checker for UAE Jobs",
   description:
-    "ATS-check your CV in about 30 seconds. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
+    "ATS-check your CV in about a minute. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
   // No robots override: the app subdomain inherits the layout's noindex —
   // www.makemycv.ae/resume-checker is the indexable SEO surface (see
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Free ATS Resume Checker for UAE Jobs",
     description:
-      "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
+      "Upload your CV, get a free ATS report in about a minute. No sign-up. Built for the UAE job market.",
     url: "https://app.makemycv.ae/resume-checker",
     type: "website",
     siteName: SITE_NAME,
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Free ATS Resume Checker for UAE Jobs",
     description:
-      "Upload your CV, get a free ATS report in about 30 seconds. No sign-up. Built for the UAE job market.",
+      "Upload your CV, get a free ATS report in about a minute. No sign-up. Built for the UAE job market.",
     images: ["/og-image.png"],
     creator: "@makemycv",
   },
@@ -181,7 +181,7 @@ export default function ResumeCheckerPage() {
             Free · No sign-up · UAE-focused
           </div>
           <h1 className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-            ATS-check your CV in about 30 seconds.
+            ATS-check your CV in about a minute.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-white/70 sm:text-lg">
             We read your CV the way ATS software does &mdash; raw text
@@ -198,7 +198,7 @@ export default function ResumeCheckerPage() {
             can&apos;t read your file cleanly, the application stops there.
             This free checker reads your CV the same way an ATS does &mdash;
             raw text extraction and section detection &mdash; and flags
-            exactly what breaks it, in about 30 seconds, no sign-up.
+            exactly what breaks it, in about a minute, no sign-up.
           </p>
           <p className="mx-auto mt-3 max-w-xl text-xs text-white/50">
             Your CV is processed securely and deleted after 24 hours.
@@ -216,7 +216,7 @@ export default function ResumeCheckerPage() {
             <div>
               <ExampleReportPreview />
               <p className="mt-3 text-center text-xs text-slate-500">
-                Here&apos;s what you&apos;ll see in about 30 seconds.
+                Here&apos;s what you&apos;ll see in about a minute.
               </p>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function ResumeCheckerPage() {
             </svg>
           </a>
           <p className="mt-4 text-xs text-white/60">
-            Free. No account. Takes about 30 seconds.
+            Free. No account. Takes about a minute.
           </p>
           <p className="mt-3 text-sm text-white/70">
             No CV yet?{" "}

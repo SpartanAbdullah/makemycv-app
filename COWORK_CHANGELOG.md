@@ -16,6 +16,28 @@ Format:
 
 ---
 
+## [2026-10-24 01:40] WP-5 (app half): Review step warns only about required sections; checker timing copy matches reality
+
+**Goal:** Audit findings F05, F04, F18 (`_cowork/audit-2026-10/06-REPORT.md`). The Review step
+showed an amber "MISSING SECTIONS" box listing Certifications and Projects on a CV scored
+"Strong" — contradicting the house rule that only required things may warn — and still said
+"All six export as real text" with ten templates. The checker promised "about 30 seconds" while
+a one-page CV measured 38 s, so the "taking a moment" phase fired on every run.
+**Files:**
+- edited: `components/builder/steps/ReviewStep.tsx` — `incomplete` split into `missingRequired`
+  (amber box, unchanged styling) and `optionalEmpty` (neutral "Optional — add if relevant:" chips
+  that still jump to the step); template count now reads `templates.length`.
+- edited: `app/resume-checker/page.tsx` — every "about 30 seconds" → "about a minute" (title,
+  OG/Twitter descriptions, hero, example caption, final CTA). Formats FAQ untouched (WP-2 changes it).
+- edited: `components/resume-checker/UploadDropzone.tsx` — phase timers 2.5/6/12 s → 4/14/45 s so
+  "Still working…" only appears when a run is genuinely slow.
+**Notes / risks / follow-up:** The site half (marketing claims, same-tab CTAs, timing copy) is in
+`makemycv-site` on `staging`, same date. The parser round-trip fix that made the checker flag a
+builder-made CV is WP-2, not this entry.
+**Suggested commit:** fix(review): warn only about required sections; align checker timing copy
+
+---
+
 ## [2026-10-24 01:10] WP-1: GA4 hits were blocked by the app CSP — fixed, and CSP violations now reach Sentry
 
 **Goal:** The Oct-2026 audit (`_cowork/audit-2026-10/06-REPORT.md`, finding F23) found that

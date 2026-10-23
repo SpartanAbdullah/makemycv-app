@@ -38,9 +38,12 @@ export default function UploadDropzone() {
   // Phase animation timers (visual progress, not tied to server)
   useEffect(() => {
     if (phase !== "reading") return;
-    const t1 = setTimeout(() => setPhase((p) => (p === "reading" ? "checking" : p)), 2500);
-    const t2 = setTimeout(() => setPhase((p) => (p === "checking" ? "scoring" : p)), 6000);
-    const t3 = setTimeout(() => setPhase((p) => (p === "scoring" ? "long" : p)), 12000);
+    // Measured 2026-10 (audit F18): a one-page CV takes ~35–40 s end to end
+    // on Haiku 5.5, so the "taking a moment" phase must not fire at 12 s or
+    // every user sees the slow-path copy on every run.
+    const t1 = setTimeout(() => setPhase((p) => (p === "reading" ? "checking" : p)), 4000);
+    const t2 = setTimeout(() => setPhase((p) => (p === "checking" ? "scoring" : p)), 14000);
+    const t3 = setTimeout(() => setPhase((p) => (p === "scoring" ? "long" : p)), 45000);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
