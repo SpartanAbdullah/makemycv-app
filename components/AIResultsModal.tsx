@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import type { AIError, AIImproveType } from "../hooks/useAIImprove";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "./ui/ModalCloseButton";
+import { hasPlaceholder } from "../lib/ai/placeholders";
+import { PlaceholderText, PLACEHOLDER_HINT } from "./ai/PlaceholderText";
 
 type Props = {
   isOpen: boolean;
@@ -23,9 +25,9 @@ const TITLES: Record<AIImproveType, string> = {
 };
 
 const SUBTITLES: Record<AIImproveType, string> = {
-  bullets: "Select the ones you want to add, or edit before applying",
+  bullets: "Select the ones you want to add. Suggestions never invent figures - fill in any {{number}} first",
   skills: "Select the skills you want to add to your CV",
-  summary: "Pick the variation that best represents you",
+  summary: "Pick the variation that best represents you - fill in any {{number}} first",
 };
 
 /* ─── Bullets sub-view ─────────────────────────────────────── */
@@ -37,9 +39,11 @@ function BulletsView({
   results: string[];
   onApply: (s: string[]) => void;
 }) {
-  const [cards, setCards] = useState(() =>
-    results.map((r) => ({ selected: true, editing: false, text: r })),
-  );
+  // Cards carrying a {{number}} placeholder open in edit mode; the apply
+  // button stays disabled until every SELECTED card is placeholder-free.
+  const toCards = (rs: string[]) =>
+    rs.map((r) => ({ selected: true, editing: hasPlaceholder(r), text: r }));
+  const [cards, setCards] = useState(() => toCards(results));
 
   // Reset when a new batch of suggestions arrives. Adjusting state DURING
   // render is React's documented pattern for "derive state from a prop
@@ -49,7 +53,7 @@ function BulletsView({
   const [prevResults, setPrevResults] = useState(results);
   if (prevResults !== results) {
     setPrevResults(results);
-    setCards(results.map((r) => ({ selected: true, editing: false, text: r })));
+    setCards(toCards(results));
   }
 
   const toggle = (i: number) =>
@@ -60,6 +64,7 @@ function BulletsView({
     setCards((p) => p.map((c, j) => (j === i ? { ...c, text: t } : c)));
 
   const selected = cards.filter((c) => c.selected).map((c) => c.text);
+  const blocked = selected.some((t) => hasPlaceholder(t));
 
   return (
     <>
@@ -77,7 +82,9 @@ function BulletsView({
                 className="mt-1 accent-[var(--ff-accent)]"
               />
               {!card.editing && (
-                <span className="text-sm text-[var(--ff-ink-2)] flex-1">{card.text}</span>
+                <span className="text-sm text-[var(--ff-ink-2)] flex-1">
+                  <PlaceholderText text={card.text} />
+                </span>
               )}
             </label>
             {card.editing && (
@@ -98,10 +105,15 @@ function BulletsView({
           </div>
         ))}
       </div>
+      {blocked && (
+        <p className="mt-3 text-xs leading-relaxed text-[var(--ff-warn)]">
+          {PLACEHOLDER_HINT}
+        </p>
+      )}
       <button
         type="button"
-        disabled={selected.length === 0}
-        onClick={() => onApply(selected)}
+        disabled={selected.length === 0 || blocked}
+        onClick={() => onApply(selected.map((t) => t.trim()))}
         className="cv-btn-primary mt-4 w-full"
       >
         Apply Selected Bullets
@@ -194,6 +206,7 @@ function SummaryView({
 
   const setText = (i: number, t: string) =>
     setTexts((p) => p.map((v, j) => (j === i ? t : v)));
+  const blocked = hasPlaceholder(texts[selectedIdx] ?? "");
 
   return (
     <>
@@ -225,7 +238,9 @@ function SummaryView({
                 className="w-full rounded-lg border border-[var(--ff-line-strong)] px-3 py-2 text-sm focus:border-[var(--ff-accent)] focus:outline-none"
               />
             ) : (
-              <p className="text-sm leading-relaxed text-[var(--ff-ink-2)]">{text}</p>
+              <p className="text-sm leading-relaxed text-[var(--ff-ink-2)]">
+                <PlaceholderText text={text} />
+              </p>
             )}
             <button
               type="button"
@@ -240,9 +255,15 @@ function SummaryView({
           </div>
         ))}
       </div>
+      {blocked && (
+        <p className="mt-3 text-xs leading-relaxed text-[var(--ff-warn)]">
+          {PLACEHOLDER_HINT} Use &ldquo;Edit this variation&rdquo; to fill it in.
+        </p>
+      )}
       <button
         type="button"
-        onClick={() => onApply([texts[selectedIdx]])}
+        disabled={blocked}
+        onClick={() => onApply([texts[selectedIdx].trim()])}
         className="cv-btn-primary mt-4 w-full"
       >
         Use This Summary

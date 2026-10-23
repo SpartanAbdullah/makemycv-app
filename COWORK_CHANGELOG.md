@@ -16,6 +16,45 @@ Format:
 
 ---
 
+## [2026-10-24 02:45] WP-4: AI suggestions can no longer invent figures — placeholders the user must fill
+
+**Goal:** Audit finding F31 (`_cowork/audit-2026-10/06-REPORT.md`), reproduced in the UI: for a role
+with two real bullets and no numbers, "Suggest bullets with AI" offered "cutting stock discrepancies
+by 22%", "Directed operating budget of AED 4.5M, achieving 9% cost savings", "order accuracy from 91%
+to 98%", "team retention by 30%" as one-tap inserts. The prompt literally said "use realistic
+estimates if not provided". That contradicts every invariant the later features protect
+(rewrite-bullet, evidence detection, the credential guard) and UAE application claims are checkable.
+**Files:**
+- created: `lib/ai/placeholders.ts` (+ `placeholders.test.ts`, 10 tests) — the `{{number}}`
+  contract: detect / count / split / normalise ([X], {{ metric }} fold into the one token).
+- created: `components/ai/PlaceholderText.tsx` — renders text with every unresolved placeholder
+  highlighted, plus the one-line hint used everywhere.
+- edited: `app/api/ai-improve/route.ts` — bullets/summary prompts rewritten to the rewrite-bullet
+  contract (only facts from the input; write `{{number}}` where a figure belongs; never a real
+  number that is not in the input). Skills prompt: name a product only if the experience names it,
+  never suggest certifications. Results are normalised server-side.
+- edited: `components/builder/steps/ExperienceStep.tsx` — `SuggestionBullet` opens in edit mode
+  when a placeholder is present; Accept is disabled (and `acceptSuggestion` refuses) until every
+  placeholder is replaced; a pencil lets the user edit any suggestion before accepting.
+- edited: `components/AIResultsModal.tsx` — bullet cards with placeholders start in edit mode and
+  "Apply Selected Bullets" is disabled while a selected card still has one; "Use This Summary" is
+  disabled while the chosen variation has one; subtitles explain the rule.
+- created: `scripts/ai-eval.mjs` — MANUAL eval (spends budget): posts figure-free roles and counts
+  numeric literals the input did not contain.
+**Notes / risks / follow-up:**
+- Eval against this build: 3 runs (2 bullets, 1 summary; then the per-IP window), 11 generated
+  items, **0 invented numeric literals, 12 placeholders emitted**. Before the change the same
+  fixture produced four invented metrics in one call.
+- UI verified with a mocked `/api/ai-improve` response (Playwright): placeholder suggestion → Accept
+  disabled + hint; after replacing `{{number}}` with a real value → Accept enabled, bullet stored
+  without any token; summary modal: "Use This Summary" disabled on a placeholder variation,
+  enabled on a clean one.
+- Company names from the input may still be echoed ("…at Example Logistics LLC") — that is input,
+  not invention. Years of experience are now a placeholder unless the input states them.
+**Suggested commit:** fix(ai): suggestions write {{number}} placeholders instead of inventing figures
+
+---
+
 ## [2026-10-24 02:05] WP-3: the first click on Continue no longer vanishes; last keystrokes are no longer dropped; toasts replace instead of stacking; builder smoke script
 
 **Goal:** Audit findings F01, F02, F03 (`_cowork/audit-2026-10/06-REPORT.md`). On the Summary

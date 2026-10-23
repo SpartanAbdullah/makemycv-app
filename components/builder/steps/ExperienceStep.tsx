@@ -13,6 +13,8 @@ import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
+import { hasPlaceholder } from "../../../lib/ai/placeholders";
+import { PlaceholderText, PLACEHOLDER_HINT } from "../../ai/PlaceholderText";
 import { BulletRow } from "../BulletRow";
 import { CardIconBtn } from "./shared";
 import { AiDisclosure } from "../AiDisclosure";
@@ -158,12 +160,17 @@ export const ExperienceStep = ({
     });
   };
 
-  const acceptSuggestion = (index: number, suggestion: string) => {
+  // `suggestion` is the queue key (the text as generated); `finalText` is what
+  // the user accepted after filling in any {{number}} placeholder. Text that
+  // still carries a placeholder is never inserted (audit F31).
+  const acceptSuggestion = (index: number, suggestion: string, finalText: string) => {
     const entry = getValues(`experience.${index}`);
     if (!entry) return;
+    const clean = finalText.trim();
+    if (!clean || hasPlaceholder(clean)) return;
     const existing = (entry.bullets || []).filter(Boolean);
     if (existing.length >= MAX_BULLETS) return;
-    update(index, { ...entry, bullets: [...existing, suggestion] });
+    update(index, { ...entry, bullets: [...existing, clean] });
     setSuggestions((prev) => ({
       ...prev,
       [index]: (prev[index] ?? []).filter((s) => s !== suggestion),
@@ -655,7 +662,7 @@ export const ExperienceStep = ({
                       <SuggestionBullet
                         key={s}
                         text={s}
-                        onAccept={() => acceptSuggestion(index, s)}
+                        onAccept={(finalText) => acceptSuggestion(index, s, finalText)}
                         onReject={() => rejectSuggestion(index, s)}
                       />
                     ))}
@@ -1032,108 +1039,164 @@ const SuggestionBullet = ({
   onReject,
 }: {
   text: string;
-  onAccept: () => void;
+  onAccept: (finalText: string) => void;
   onReject: () => void;
-}) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "flex-start",
-      gap: 10,
-      padding: "12px 14px",
-      background: "#F4FAF6",
-      border: "1px dashed rgba(14,124,74,0.55)",
-      borderRadius: 10,
-      animation: "tip-enter 250ms ease both",
-    }}
-  >
-    <span
+}) => {
+  // A suggestion with a {{number}} placeholder opens in edit mode and cannot
+  // be accepted until the user has replaced every placeholder with a real
+  // figure (audit F31: the previous prompt invented the figures instead).
+  const [draft, setDraft] = useState(text);
+  const [editing, setEditing] = useState(() => hasPlaceholder(text));
+  const blocked = hasPlaceholder(draft) || !draft.trim();
+
+  return (
+    <div
       style={{
-        width: 18,
-        height: 18,
-        borderRadius: 6,
-        background: "var(--ff-accent)",
-        color: "white",
-        display: "grid",
-        placeItems: "center",
-        flexShrink: 0,
-        marginTop: 1,
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        padding: "12px 14px",
+        background: "#F4FAF6",
+        border: "1px dashed rgba(14,124,74,0.55)",
+        borderRadius: 10,
+        animation: "tip-enter 250ms ease both",
       }}
     >
-      <Icon name="sparkle" size={11} />
-    </span>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div
+      <span
         style={{
-          fontFamily: "var(--font-body)",
-          fontSize: 10,
-          color: "var(--ff-accent-dark)",
-          letterSpacing: "0.1em",
-          marginBottom: 4,
-          fontWeight: 600,
-          textTransform: "uppercase",
-        }}
-      >
-        AI suggestion
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--font-body)",
-          fontSize: 14,
-          color: "var(--ff-ink)",
-          lineHeight: 1.5,
-        }}
-      >
-        {text}
-      </div>
-    </div>
-    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-      <button
-        type="button"
-        onClick={onAccept}
-        aria-label="Accept suggestion"
-        title="Accept"
-        className="ff-hit-target"
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 999,
+          width: 18,
+          height: 18,
+          borderRadius: 6,
           background: "var(--ff-accent)",
-          border: "none",
           color: "white",
           display: "grid",
           placeItems: "center",
-          cursor: "pointer",
-          padding: 0,
+          flexShrink: 0,
+          marginTop: 1,
         }}
       >
-        <Icon name="check" size={13} strokeWidth={3} />
-      </button>
-      <button
-        type="button"
-        onClick={onReject}
-        aria-label="Reject suggestion"
-        title="Reject"
-        className="ff-hit-target"
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 999,
-          background: "var(--ff-card)",
-          border: "1px solid var(--ff-line)",
-          color: "var(--ff-muted)",
-          display: "grid",
-          placeItems: "center",
-          cursor: "pointer",
-          fontSize: 14,
-          padding: 0,
-        }}
-      >
-        <Icon name="x" size={13} />
-      </button>
+        <Icon name="sparkle" size={11} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 10,
+            color: "var(--ff-accent-dark)",
+            letterSpacing: "0.1em",
+            marginBottom: 4,
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          AI suggestion
+        </div>
+        {editing ? (
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={2}
+            aria-label="Edit suggestion"
+            className="cv-input cv-textarea"
+            style={{ fontSize: 14, lineHeight: 1.5, minHeight: 64 }}
+          />
+        ) : (
+          <div
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: 14,
+              color: "var(--ff-ink)",
+              lineHeight: 1.5,
+            }}
+          >
+            <PlaceholderText text={draft} />
+          </div>
+        )}
+        {hasPlaceholder(draft) && (
+          <p
+            style={{
+              marginTop: 6,
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: "var(--ff-warn)",
+            }}
+          >
+            {PLACEHOLDER_HINT}
+          </p>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => onAccept(draft)}
+          disabled={blocked}
+          aria-label={blocked ? "Fill in the number before accepting" : "Accept suggestion"}
+          title={blocked ? "Fill in the number first" : "Accept"}
+          className="ff-hit-target"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            background: blocked ? "var(--ff-line)" : "var(--ff-accent)",
+            border: "none",
+            color: "white",
+            display: "grid",
+            placeItems: "center",
+            cursor: blocked ? "not-allowed" : "pointer",
+            padding: 0,
+          }}
+        >
+          <Icon name="check" size={13} strokeWidth={3} />
+        </button>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit suggestion"
+            title="Edit"
+            className="ff-hit-target"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              background: "var(--ff-card)",
+              border: "1px solid var(--ff-line)",
+              color: "var(--ff-muted)",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <Icon name="edit" size={12} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onReject}
+          aria-label="Reject suggestion"
+          title="Reject"
+          className="ff-hit-target"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            background: "var(--ff-card)",
+            border: "1px solid var(--ff-line)",
+            color: "var(--ff-muted)",
+            display: "grid",
+            placeItems: "center",
+            cursor: "pointer",
+            fontSize: 14,
+            padding: 0,
+          }}
+        >
+          <Icon name="x" size={13} />
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ─── UAE Idea Suggestions panel (static, zero-AI) ───────────
    Replicates the cvtoolspro "Idea Suggestion" affordance with a
