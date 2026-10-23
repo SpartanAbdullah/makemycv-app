@@ -32,6 +32,11 @@ export const ProjectsStep = ({
   const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(projects));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
 
   const {
     register,
@@ -77,16 +82,26 @@ export const ProjectsStep = ({
         if (nextSerialized === lastSerializedRef.current) return;
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        const commit = () => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
             updateSection("projects", next);
           }
+        };
+        flushRef.current = commit;
+        debounceRef.current = setTimeout(() => {
+          flushRef.current = null;
+          commit();
         }, 250);
       }
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);

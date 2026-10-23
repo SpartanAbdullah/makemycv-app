@@ -16,6 +16,43 @@ Format:
 
 ---
 
+## [2026-10-24 02:05] WP-3: the first click on Continue no longer vanishes; last keystrokes are no longer dropped; toasts replace instead of stacking; builder smoke script
+
+**Goal:** Audit findings F01, F02, F03 (`_cowork/audit-2026-10/06-REPORT.md`). On the Summary
+step a <30-word summary made the first click on "Continue →" do nothing: the length warning was
+inserted on blur, 24 px of layout shift landed between mousedown and mouseup, and the click was
+lost — reproducible 3/3, invisible to every existing test. The Experience step's role card folded
+itself on blur (−219 px). "Section done ✓" toasts stacked four high over the skills chips.
+**Files:**
+- edited: `components/FieldError.tsx` — new `reserve` prop keeps the helper line's height when
+  there is no message, so a blur-time message cannot move what is below it.
+- edited: `components/builder/steps/SummaryStep.tsx` — the length warning now updates from the
+  debounced `watch` while typing (and still on blur); `FieldError` is rendered with `reserve`.
+- edited: `components/builder/steps/ExperienceStep.tsx`, `EducationStep.tsx` — entry cards no
+  longer fold on blur (`complete`/`onAutoCollapse` removed from `ExpandRoleCard`). The Education
+  one was caught by the new smoke script on its first run, not by the audit. Cards still fold via
+  the header, "Add another", and when another card opens.
+- edited: `lib/store/uiStore.ts` — `pushToast` replaces a visible action-less toast of the same
+  tone instead of stacking, and caps the queue at two; action (Undo) toasts are never displaced.
+- edited: all eight form steps (`PersonalStep`, `UAEEssentialsStep`, `SummaryStep`, `ExperienceStep`,
+  `EducationStep`, `LanguagesStep`, `CertificationsStep`, `ProjectsStep`) — **the debounced
+  form→store write is now flushed on unmount instead of cancelled.** The cleanup used to
+  `clearTimeout` the pending 250 ms write, so pressing Continue / Enter / a step bead right after
+  the last keystroke silently dropped that keystroke (the whole field, when autofill or paste set
+  it in one go). The smoke script's first run lost "Personal Info", "Work Experience" and
+  "Education" entirely this way. A `flushRef` holds the pending commit; cleanup runs it.
+- created: `scripts/builder-smoke.mjs`; edited `package.json` (`smoke:builder`) and `CLAUDE.md`
+  (checks list + the layout-on-blur rule). Drives the real builder against `next start`, clicks
+  Continue ONCE per step with a field still focused, asserts the URL moved, asserts the Review
+  step shows no amber box for a complete CV, and asserts a PDF downloads. Not a `test:*` script
+  on purpose — `npm test` must stay runnable without a server.
+**Notes / risks / follow-up:** `Field.tsx`'s own invalid-message line can still appear on blur
+for required fields; that case already blocks submission with a visible red message, so it was
+left alone — reserve a line there too if a swallowed click is ever reported on Personal.
+**Suggested commit:** fix(builder): keep layout stable on blur so one click on Continue always works
+
+---
+
 ## [2026-10-24 01:40] WP-5 (app half): Review step warns only about required sections; checker timing copy matches reality
 
 **Goal:** Audit findings F05, F04, F18 (`_cowork/audit-2026-10/06-REPORT.md`). The Review step

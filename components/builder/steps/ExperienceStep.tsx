@@ -48,6 +48,11 @@ export const ExperienceStep = ({
   const pushToast = useUiStore((s) => s.pushToast);
   const lastSerializedRef = useRef<string>(JSON.stringify(experience));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -204,16 +209,26 @@ export const ExperienceStep = ({
         const nextSerialized = JSON.stringify(next);
         if (nextSerialized === lastSerializedRef.current) return;
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        const commit = () => {
           if (nextSerialized !== lastSerializedRef.current) {
             lastSerializedRef.current = nextSerialized;
             updateSection("experience", next);
           }
+        };
+        flushRef.current = commit;
+        debounceRef.current = setTimeout(() => {
+          flushRef.current = null;
+          commit();
         }, 250);
       }
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);
@@ -346,11 +361,9 @@ export const ExperienceStep = ({
           const bullets = watch(`experience.${index}.bullets`) || [""];
           const filledBullets = bullets.filter(Boolean).length;
           const roleSuggestions = suggestions[index] ?? [];
-          // Compulsory fields (schema-required): once filled, the card
-          // auto-folds when focus leaves it (see ExpandRoleCard onBlur).
-          const entryComplete = Boolean(
-            role.trim() && company.trim() && startDate.trim(),
-          );
+          // The card no longer auto-folds when its compulsory fields are
+          // filled and focus leaves (audit F02: folding moved the Continue
+          // button 219px under the pointer during the user's own click).
 
           return (
             <ExpandRoleCard
@@ -385,8 +398,6 @@ export const ExperienceStep = ({
               title={role || `Role ${index + 1}`}
               subline={summarySubLine}
               isCurrent={isCurrent}
-              complete={entryComplete}
-              onAutoCollapse={() => setOpenIndex(null)}
             >
               {isOpen && (
                 <div style={{ padding: 20, borderTop: "1px solid var(--ff-line)" }}>
@@ -858,8 +869,6 @@ const ExpandRoleCard = ({
   title,
   subline,
   isCurrent,
-  complete,
-  onAutoCollapse,
   children,
 }: {
   isOpen: boolean;
@@ -874,8 +883,6 @@ const ExpandRoleCard = ({
   title: string;
   subline: string;
   isCurrent: boolean;
-  complete: boolean;
-  onAutoCollapse: () => void;
   children: React.ReactNode;
 }) => (
   <div
@@ -883,13 +890,10 @@ const ExpandRoleCard = ({
     onDragOver={onDragOver}
     onDragLeave={onDragLeave}
     onDrop={onDrop}
-    onBlur={(e) => {
-      // Auto-fold a completed entry when focus leaves the card (the user
-      // clicked/tabbed elsewhere). Guarded so it never collapses mid-edit.
-      if (!isOpen || !complete) return;
-      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-      onAutoCollapse();
-    }}
+    // No auto-fold on blur (removed 2026-10, audit F02). Folding the card the
+    // moment focus left it shifted everything below by ~220px during the
+    // user's own click on Continue / Add bullet. Cards fold via the header
+    // chevron, "Add another role", or when a new role opens.
     style={{
       opacity: isDragging ? 0.5 : 1,
       transform: isDropTarget ? "translateY(-1px)" : undefined,

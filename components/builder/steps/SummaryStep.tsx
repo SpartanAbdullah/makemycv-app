@@ -36,6 +36,11 @@ export const SummaryStep = ({
     JSON.stringify({ ...useCvStore.getState().data.personal, summary })
   );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
 
   const {
     register,
@@ -106,15 +111,31 @@ export const SummaryStep = ({
       if (nextSerialized === lastSerializedRef.current) return;
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
+      const commit = () => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
           updateSection("personal", nextPersonal);
         }
+        // Length guidance updates WHILE typing (debounced), not only on blur.
+        // When it appeared on blur it inserted a line under the textarea in the
+        // same tick the user's mousedown left the field, moving Continue out
+        // from under the pointer (audit F01). onBlur still re-validates below
+        // for the paste-then-click case; FieldError reserves the line either way.
+        setSummaryWarning(validateSummaryLength(value.summary || ""));
+      };
+      flushRef.current = commit;
+      debounceRef.current = setTimeout(() => {
+        flushRef.current = null;
+        commit();
       }, 250);
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);
@@ -175,7 +196,7 @@ export const SummaryStep = ({
               </p>
             );
           })()}
-          <FieldError message={summaryWarning} type="warning" />
+          <FieldError message={summaryWarning} type="warning" reserve />
 
           {/* Instant starter summaries — domain-tailored, no AI, no quota.
               Shown only while the box is empty so we never overwrite work. */}

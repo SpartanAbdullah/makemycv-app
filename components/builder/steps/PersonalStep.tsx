@@ -94,6 +94,11 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
     serializeOwned(personal as unknown as Record<string, unknown>),
   );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The pending (debounced) form→store write, so it can be FLUSHED when this
+  // step unmounts. Until 2026-10 the cleanup only cleared the timer, which
+  // threw away up to 250 ms of typing when the user hit Continue / Enter /
+  // a step bead right after their last keystroke (caught by smoke:builder).
+  const flushRef = useRef<(() => void) | null>(null);
   // True once the user explicitly picks "Other city…" in the emirate select.
   const [customLocation, setCustomLocation] = useState(false);
   // Blur-time validity feedback for the required fields (guided feedback).
@@ -158,7 +163,7 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       const nextSerialized = serializeOwned(value as Record<string, unknown>);
       if (nextSerialized === lastSerializedRef.current) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
+      const commit = () => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
           // Merge THIS step's fields over the live store instead of replacing
@@ -175,10 +180,20 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
             ...pickOwned(value as Record<string, unknown>),
           } as CvPersonal);
         }
+      };
+      flushRef.current = commit;
+      debounceRef.current = setTimeout(() => {
+        flushRef.current = null;
+        commit();
       }, 250);
     });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        // Flush, don't drop: the user's last edit must reach the store.
+        flushRef.current?.();
+        flushRef.current = null;
+      }
       subscription.unsubscribe();
     };
   }, [watch, updateSection]);

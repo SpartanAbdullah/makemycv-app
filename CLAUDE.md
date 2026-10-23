@@ -195,6 +195,7 @@ npm test          # aggregate runner; discovers every test:* script
 npm run test:unit # tsc -p tsconfig.test.json + node --test
 npm run test:parser
 npm run smoke:pdf
+npm run smoke:builder  # drives the real builder against `next start` (see scripts/builder-smoke.mjs)
 npm run lint      # --max-warnings=11
 npm run build
 ```
@@ -217,6 +218,13 @@ npm run build
 - **PDF output is not visually verifiable from here** and `@react-pdf/renderer`
   is not fully deterministic. `smoke:pdf` proves it renders, not that it looks
   right.
+- **Anything that changes layout on blur needs `smoke:builder`.** A helper line
+  that appears when a field loses focus moves the Continue button during the
+  user's own click and the click is lost (2026-10 audit F01). `FieldError` has a
+  `reserve` prop for exactly this; role cards no longer fold on blur. Run
+  `npm run build && npx next start -p 3000`, then `npm run smoke:builder` — it
+  clicks Continue once per step with a field still focused and fails on a
+  swallowed click.
 - **Turbopack dev mode has a known wedge** — the builder can hang on
   "Loading builder..." with all chunks 200 and no console error. It is not
   necessarily your change. Verify against a **production build** before
