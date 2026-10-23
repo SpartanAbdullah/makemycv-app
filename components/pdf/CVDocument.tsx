@@ -19,6 +19,7 @@ import { meaningfulExperience } from "../../lib/utils/experience";
 import { meaningfulEducation } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
 import { splitSkills } from "../../lib/utils/skills";
+import { pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -345,14 +346,25 @@ const SECTION_GAP_KEYS: Record<string, ReadonlyArray<"marginTop" | "marginBottom
   atsSectionHeading: ["marginTop"],
 };
 
-const buildStyles = (t: {
-  fontScale: number;
-  lineScale: number;
-  spaceScale: number;
-}) => {
+const buildStyles = (
+  t: {
+    fontScale: number;
+    lineScale: number;
+    spaceScale: number;
+  },
+  fonts: PdfFontPair = { regular: "Helvetica", bold: "Helvetica-Bold" },
+) => {
   const out: Record<string, Style> = {};
   for (const k in BASE_STYLES) {
     const v: Style = { ...BASE_STYLES[k] };
+    // BASE_STYLES is written against the Helvetica pair; swap in the user's
+    // CV face (Inter / Bricolage / Instrument Serif) once registered — see
+    // lib/pdf/fonts.ts. Custom families select weight via fontWeight.
+    if (v.fontFamily === "Helvetica") v.fontFamily = fonts.regular;
+    if (v.fontFamily === "Helvetica-Bold") {
+      v.fontFamily = fonts.bold;
+      v.fontWeight = 700;
+    }
     if (typeof v.fontSize === "number") v.fontSize = v.fontSize * t.fontScale;
     if (typeof v.lineHeight === "number") v.lineHeight = v.lineHeight * t.lineScale;
     const gapProps = SECTION_GAP_KEYS[k];
@@ -438,7 +450,8 @@ const EducationEntry = ({
 
 const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#1e5b54");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
@@ -660,7 +673,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
               <Text style={s.body}>
                 {data.languages.map((lang, i, arr) => (
                   <Text key={lang.id}>
-                    <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                       {lang.name}
                     </Text>
                     {lang.level
@@ -679,7 +692,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
               </View>
               {data.certifications.map((cert) => (
                 <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                     {cert.name.trim()}
                   </Text>
                   <Text style={{ color: SLATE_500 }}>
@@ -747,7 +760,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1E2A4A");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
@@ -899,7 +913,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                   {lang.name}
                 </Text>
                 {lang.level
@@ -919,7 +933,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                 <Text
                   style={{
                     fontSize: 7.5 * theme.fontScale,
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     color: onAccent,
                     lineHeight: 1.4 * theme.lineScale,
                   }}
@@ -1094,7 +1108,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#111827");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1248,7 +1263,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.entryRow}>
                 <Text
                   style={{
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     fontSize: 8.6 * theme.fontScale,
                     color: "#111827",
                   }}
@@ -1301,7 +1316,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
               s={s}
               fontScale={theme.fontScale}
               headingStyle={{
-                fontFamily: "Helvetica-Bold",
+                fontFamily: fonts.bold, fontWeight: 700,
                 fontSize: 8.6 * theme.fontScale,
                 color: "#111827",
               }}
@@ -1320,7 +1335,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           <Text style={{ ...s.body, color: "#374151" }}>
             {data.languages.map((lang, i, arr) => (
               <Text key={lang.id}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                   {lang.name}
                 </Text>
                 {lang.level
@@ -1342,7 +1357,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
               key={cert.id}
               style={{ ...s.body, color: "#374151", marginBottom: 3 }}
             >
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+              <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                 {cert.name.trim()}
               </Text>
               {cert.issuer ? ` · ${cert.issuer.trim()}` : ""}
@@ -1362,7 +1377,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
               <View key={project.id} style={{ marginBottom: 8 * theme.spaceScale }} wrap={false}>
                 <Text
                   style={{
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     fontSize: 8.6 * theme.fontScale,
                     color: "#111827",
                   }}
@@ -1421,7 +1436,8 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
   const theme = resolveTheme(data.settings, "#1e5b54");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1618,7 +1634,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               <Text style={s.body}>
                 {data.languages.map((lang, i, arr) => (
                   <Text key={lang.id}>
-                    <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                       {lang.name}
                     </Text>
                     {lang.level
@@ -1637,7 +1653,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               </View>
               {data.certifications.map((cert) => (
                 <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                     {cert.name.trim()}
                   </Text>
                   <Text style={{ color: SLATE_500 }}>
@@ -1737,7 +1753,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#1B2A4A");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -1765,7 +1782,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           <Text
             style={{
               fontSize: 20 * theme.fontScale,
-              fontFamily: "Helvetica-Bold",
+              fontFamily: fonts.bold, fontWeight: 700,
               color: onAccent,
               lineHeight: 1.15 * theme.lineScale,
             }}
@@ -1864,7 +1881,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                     style={{
                       fontSize: 7 * theme.fontScale,
                       color: onAccentMuted,
-                      fontFamily: "Helvetica-Bold",
+                      fontFamily: fonts.bold, fontWeight: 700,
                       marginRight: 3,
                     }}
                   >
@@ -2012,7 +2029,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   key={lang.id}
                   style={{ fontSize: 8 * theme.fontScale, color: SLATE_700, lineHeight: 1.6 * theme.lineScale }}
                 >
-                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                     {lang.name}
                   </Text>
                   {lang.level
@@ -2033,7 +2050,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       fontSize: 8 * theme.fontScale,
-                      fontFamily: "Helvetica-Bold",
+                      fontFamily: fonts.bold, fontWeight: 700,
                       color: SLATE_800,
                     }}
                   >
@@ -2123,7 +2140,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
   const theme = resolveTheme(data.settings, "#0F172A");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
@@ -2146,7 +2164,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
           <Text
             style={{
               fontSize: 20 * theme.fontScale,
-              fontFamily: "Helvetica-Bold",
+              fontFamily: fonts.bold, fontWeight: 700,
               color: "#0F172A",
               lineHeight: 1.15 * theme.lineScale,
             }}
@@ -2301,7 +2319,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 <Text
                   style={{
                     fontSize: 6 * theme.fontScale,
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
@@ -2343,7 +2361,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 <Text
                   style={{
                     fontSize: 6 * theme.fontScale,
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     color: onAccentMuted,
                     letterSpacing: 0.4,
                   }}
@@ -2380,7 +2398,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                   {lang.name}
                 </Text>
                 {lang.level
@@ -2400,7 +2418,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                 <Text
                   style={{
                     fontSize: 7.5 * theme.fontScale,
-                    fontFamily: "Helvetica-Bold",
+                    fontFamily: fonts.bold, fontWeight: 700,
                     color: onAccent,
                     lineHeight: 1.4 * theme.lineScale,
                   }}
@@ -2438,11 +2456,13 @@ const ProPdfHeading = ({
   accent,
   fontScale,
   spaceScale,
+  fonts,
 }: {
   children: string;
   accent: string;
   fontScale: number;
   spaceScale: number;
+  fonts: PdfFontPair;
 }) => (
   <View
     style={{
@@ -2456,7 +2476,7 @@ const ProPdfHeading = ({
     <Text
       style={{
         fontSize: 9 * fontScale,
-        fontFamily: "Helvetica-Bold",
+        fontFamily: fonts.bold, fontWeight: 700,
         color: "#111827",
         letterSpacing: 1,
         textTransform: "uppercase",
@@ -2476,7 +2496,8 @@ const ProfessionalPDFLayout = ({
   withPhoto: boolean;
 }) => {
   const theme = resolveTheme(data.settings, "#1f2937");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   // On a white page, accent is used only as text/border → use the readable form.
   const accent = theme.accentText;
   const name =
@@ -2518,7 +2539,7 @@ const ProfessionalPDFLayout = ({
     <>
       {generalSkills.length > 0 && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</ProPdfHeading>
           <Text style={{ ...s.body, textAlign: "center" }}>
             {generalSkills.map((sk) => sk.name).join("   •   ")}
           </Text>
@@ -2526,7 +2547,7 @@ const ProfessionalPDFLayout = ({
       )}
       {technicalSkills.length > 0 && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Technical Skills</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Technical Skills</ProPdfHeading>
           <Text style={{ ...s.body, textAlign: "center" }}>
             {technicalSkills.map((sk) => sk.name).join("   •   ")}
           </Text>
@@ -2556,7 +2577,7 @@ const ProfessionalPDFLayout = ({
         <Text
           style={{
             fontSize: 20 * theme.fontScale,
-            fontFamily: "Helvetica-Bold",
+            fontFamily: fonts.bold, fontWeight: 700,
             color: "#111827",
             letterSpacing: 1,
             textAlign: "center",
@@ -2583,7 +2604,7 @@ const ProfessionalPDFLayout = ({
 
       {hasSummary && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Summary</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Summary</ProPdfHeading>
           <Text style={s.body}>{data.personal.summary?.trim()}</Text>
         </View>
       )}
@@ -2592,7 +2613,7 @@ const ProfessionalPDFLayout = ({
 
       {hasExperience && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</ProPdfHeading>
           {experience.map((role) => (
             <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
               <View style={s.entryRow}>
@@ -2617,7 +2638,7 @@ const ProfessionalPDFLayout = ({
 
       {hasEducation && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
           {education.map((edu) => (
             <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
           ))}
@@ -2630,7 +2651,7 @@ const ProfessionalPDFLayout = ({
         <View style={s.twoCol}>
           {hasLanguages && (
             <View style={s.twoColItem}>
-              <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Languages</ProPdfHeading>
+              <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Languages</ProPdfHeading>
               <Text style={{ ...s.body, textAlign: "center" }}>
                 {data.languages
                   .map(
@@ -2643,7 +2664,7 @@ const ProfessionalPDFLayout = ({
           )}
           {hasCertifications && (
             <View style={s.twoColItem}>
-              <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</ProPdfHeading>
+              <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</ProPdfHeading>
               {data.certifications.map((cert) => (
                 <Text key={cert.id} style={{ ...s.body, textAlign: "center" }}>
                   {cert.name.trim()}
@@ -2659,7 +2680,7 @@ const ProfessionalPDFLayout = ({
 
       {hasProjects && (
         <View>
-          <ProPdfHeading accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
+          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
           {projects.map((project) => (
             <View key={project.id} style={s.entryBlock} wrap={false}>
               <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
@@ -2681,11 +2702,13 @@ const OnyxHeading = ({
   accent,
   fontScale,
   spaceScale,
+  fonts,
 }: {
   children: string;
   accent: string;
   fontScale: number;
   spaceScale: number;
+  fonts: PdfFontPair;
 }) => (
   <View
     style={{
@@ -2699,7 +2722,7 @@ const OnyxHeading = ({
     <Text
       style={{
         fontSize: 9.5 * fontScale,
-        fontFamily: "Helvetica-Bold",
+        fontFamily: fonts.bold, fontWeight: 700,
         color: "#1F2937",
         letterSpacing: 0.6,
         textTransform: "uppercase",
@@ -2712,7 +2735,8 @@ const OnyxHeading = ({
 
 const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#262626");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   const bandBorder =
@@ -2751,7 +2775,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
   const sideLabel = {
     fontSize: 7 * theme.fontScale,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: fonts.bold, fontWeight: 700,
     color: onAccentMuted,
     letterSpacing: 0.8,
     marginBottom: 5,
@@ -2793,7 +2817,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
           {firstName} {lastName}
         </Text>
         {headline ? (
@@ -2847,7 +2871,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={sideText}>
-                <Text style={{ fontFamily: "Helvetica-Bold", color: onAccent }}>{lang.name}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: onAccent }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
             ))}
@@ -2859,7 +2883,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>DETAILS</Text>
             {essentialChips.map((chip) => (
               <Text key={chip.label} style={sideText}>
-                <Text style={{ color: onAccentMuted, fontFamily: "Helvetica-Bold" }}>{chip.label}: </Text>
+                <Text style={{ color: onAccentMuted, fontFamily: fonts.bold, fontWeight: 700 }}>{chip.label}: </Text>
                 {chip.value}
               </Text>
             ))}
@@ -2871,7 +2895,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
       <View style={{ flex: 1, paddingLeft: 18 * m }}>
         {hasExperience && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
             {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
@@ -2894,7 +2918,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
             {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
             ))}
@@ -2903,7 +2927,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
               {data.skills.map((skill) => (
                 <Text
@@ -2928,10 +2952,10 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
                 {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
                   ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
                   : ""}
@@ -2942,7 +2966,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
@@ -2962,7 +2986,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
 const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#ECE3D2");
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   const bandBorder =
@@ -3009,7 +3034,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const SIDE_MUTED = onAccentMuted;
   const sideLabel = {
     fontSize: 7 * theme.fontScale,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: fonts.bold, fontWeight: 700,
     color: SIDE_MUTED,
     letterSpacing: 0.8,
     marginBottom: 5,
@@ -3050,7 +3075,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: "Helvetica-Bold", color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
           {firstName} {lastName}
         </Text>
         {headline ? (
@@ -3058,7 +3083,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
             style={{
               fontSize: 8 * theme.fontScale,
               color: onAccentMuted,
-              fontFamily: "Helvetica-Bold",
+              fontFamily: fonts.bold, fontWeight: 700,
               textAlign: "center",
               marginTop: 3,
               paddingBottom: 12,
@@ -3075,7 +3100,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>PERSONAL DETAILS</Text>
             {personalDetails.map((d) => (
               <View key={d.label} style={{ marginBottom: 4 }}>
-                <Text style={{ fontSize: 6.5 * theme.fontScale, fontFamily: "Helvetica-Bold", color: SIDE_MUTED, letterSpacing: 0.4 }}>
+                <Text style={{ fontSize: 6.5 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: SIDE_MUTED, letterSpacing: 0.4 }}>
                   {d.label.toUpperCase()}
                 </Text>
                 <Text style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.4 * theme.lineScale }}>{d.value}</Text>
@@ -3110,7 +3135,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 1 }}>
-                <Text style={{ fontFamily: "Helvetica-Bold", color: "#292524" }}>{lang.name}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: "#292524" }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
             ))}
@@ -3122,14 +3147,14 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
       <View style={{ flex: 1, paddingLeft: 18 * m }}>
         {hasSummary && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>About Me</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>About Me</OnyxHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
             {experience.map((role) => (
               <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
                 <View style={s.entryRow}>
@@ -3152,7 +3177,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
             {education.map((edu) => (
               <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
             ))}
@@ -3161,7 +3186,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
               {data.skills.map((skill) => (
                 <Text
@@ -3186,10 +3211,10 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                <Text style={{ fontFamily: "Helvetica-Bold", color: SLATE_800 }}>{cert.name.trim()}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
                 {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
                   ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
                   : ""}
@@ -3200,7 +3225,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
@@ -3235,7 +3260,8 @@ export const CVDocument = ({
   // margins tied to s.page's 24/27, so scaling their page padding would break
   // the bleed; their main-column margins land in the next pass.
   const theme = resolveTheme(data.settings);
-  const s = buildStyles(theme);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
   const marginScale = theme.marginScale;
   // Templates whose content sits directly under s.page (no edge-bleed) — their
   // page padding scales with margins. Modern is two-column but has no bleed, so
@@ -3283,8 +3309,20 @@ export const CVDocument = ({
     }
   };
 
+  const fullName = [data.personal.firstName, data.personal.lastName]
+    .map((v) => (v ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
   return (
-    <Document>
+    <Document
+      // PDF metadata (audit F09): some ATS/HR tools show the file's Title, and
+      // an empty one reads as sloppy. No producer/creator override — react-pdf's
+      // default is fine; language helps screen readers pick the voice.
+      title={fullName ? `${fullName} — CV` : "CV"}
+      author={fullName || undefined}
+      subject="Curriculum vitae"
+      language="en"
+    >
       <Page size="A4" style={pageStyle}>
         {plan === "free" && (
           <View style={s.watermarkContainer} fixed>

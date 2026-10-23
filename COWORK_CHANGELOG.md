@@ -16,6 +16,37 @@ Format:
 
 ---
 
+## [2026-10-24 06:10] WP-8: PDF export embeds the real typefaces, carries metadata, stops violating the CSP
+
+**Goal:** Audit F08 / F28 / F29. Every PDF rendered in Helvetica regardless of the "Design & Font" choice
+(Inter / Bricolage / Instrument Serif existed only on screen), the file had no Title/Author, and each
+export logged a CSP violation because yoga-layout fetches its WebAssembly from a `data:` URL.
+**Files:**
+- created: `public/fonts/pdf/{inter,bricolage}-{400,700}.ttf`, `instrument-serif-400{,-italic}.ttf` —
+  static instances cut from the app's own variable woff2 files with fontTools (every axis pinned:
+  Bricolage `opsz` 14 = its text optical size; name records rewritten). `fontkit` cannot read woff2
+  or variable fonts, so this is the only form @react-pdf can embed. ~48–66 KB each, loaded lazily on
+  the first export only.
+- created: `lib/pdf/fonts.ts` — `registerPdfFonts()` (browser-only, idempotent), `pdfFontPair()`
+  (regular/bold family names or the Helvetica pair as fallback), `pdfFontsReady()`.
+- edited: `components/pdf/CVDocument.tsx` — `buildStyles(theme, fonts)` and every layout take the font
+  pair; the 34 inline `"Helvetica-Bold"` uses become `fonts.bold` + `fontWeight: 700`; `ProPdfHeading`
+  and `OnyxHeading` take `fonts`; `<Document title author subject language>` set from the CV.
+- edited: `hooks/useDownloadCV.ts` — registers the fonts before rendering.
+- edited: `next.config.ts` — `data:` added to `connect-src` with a comment on why it widens nothing.
+**Notes / risks / follow-up:** Verified with pdf.js over the exported files: `sans` embeds
+`Inter-Regular`, `display` embeds `BricolageGrotesque-Regular`, `serif` embeds `InstrumentSerif-Regular`;
+Title "First Last — CV", Author set; 0 CSP console messages; text extraction intact (ATS-safe).
+Subsetting is on (react-pdf default) so file sizes stay ~10–13 KB. Route-scoped font loading (F29) was
+NOT done: `--cv-font-*` tokens are defined on `:root`, so moving the faces off the root would restyle
+the CV. If `app/fonts/*.woff2` ever change, regenerate the TTFs (fontTools + brotli; script in the
+audit folder's history) — a mismatch is cosmetic, not breaking, because `pdfFontPair` falls back to
+Helvetica when registration fails.
+**Suggested commit:** feat(pdf): embed Inter/Bricolage/Instrument Serif, set document metadata, allow
+yoga's data: fetch in the CSP
+
+---
+
 ## [2026-10-24 05:40] WP-7: accessibility pass — labels, skip link, roving step beads, contrast, axe in the smoke
 
 **Goal:** Audit findings F07, F09, F12, F13, F15 (`_cowork/audit-2026-10/06-REPORT.md`): the Headline

@@ -54,9 +54,14 @@ const nextConfig: NextConfig = {
               // builder_start and builder_step never reached GA4. Both the
               // apex hosts and the wildcards are listed on purpose; removing
               // either reintroduces a silent, data-looks-present failure.
+              // `data:` in connect-src: @react-pdf's layout engine (yoga-layout)
+              // loads its WebAssembly from an inline data: URL via fetch. Without
+              // this every PDF export logged a CSP violation and took the slower
+              // JS fallback (audit F08). A data: URL cannot reach a network host,
+              // so it widens nothing.
               // No frame-src entry is needed: unlike the marketing site, this
               // app deliberately ships no GTM <noscript> iframe.
-              "connect-src 'self' https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://*.google.com https://www.google.ae https://stats.g.doubleclick.net https://*.doubleclick.net",
+              "connect-src 'self' data: https://cdnjs.cloudflare.com https://api.anthropic.com https://vitals.vercel-insights.com https://*.ingest.de.sentry.io https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.google.com https://*.google.com https://www.google.ae https://stats.g.doubleclick.net https://*.doubleclick.net",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
