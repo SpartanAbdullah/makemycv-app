@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { track } from "../../../lib/analytics";
 import { builderSteps } from "../../../lib/utils/steps";
 import { getStepCompletion } from "../../../lib/utils/stepValidation";
 import { useCvStore } from "../../../lib/store/cvStore";
@@ -206,20 +207,23 @@ export const ReviewStep = ({
   // audience), clipboard as fallback.
   const handleShareLink = async () => {
     if (typeof navigator === "undefined") return;
-    const shareUrl = "https://makemycv.ae";
+    // UTM-tagged so a friend who arrives from a share shows up as its own
+    // source in GA4 instead of "direct" (2026-10-24).
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
           title: "MakeMyCV — free UAE CV builder",
-          url: shareUrl,
+          url: "https://makemycv.ae/?utm_source=user_share&utm_medium=share_sheet&utm_campaign=review_step",
         });
+        track("share_click", { method: "share_sheet", surface: "review" });
       } catch {
         /* share sheet dismissed */
       }
       return;
     }
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText("https://makemycv.ae/?utm_source=user_share&utm_medium=copy_link&utm_campaign=review_step");
+      track("share_click", { method: "copy_link", surface: "review" });
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     } catch {

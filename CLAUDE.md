@@ -62,8 +62,9 @@ brand-level UI changes rather than re-deriving them.
 This app (app.makemycv.ae): `/builder` (the CV builder, entry
 `components/builder/BuilderShell.tsx`), `/jd-match`, `/cover-letter`,
 `/resume-checker`, `/preview`. Server routes live in `app/api/` (`ai-improve`,
-`jd-match`, `cover-letter`, `resume-checker`, `coupons`, `health`),
-rate-limited and spend-capped through `lib/server/`. Everything CV-shaped stays
+`jd-match`, `cover-letter`, `resume-checker`, `coupons`, `health`, and the
+feedback trio `rating`, `ratings/summary`, `subscribe`), rate-limited and
+spend-capped through `lib/server/`. Everything CV-shaped stays
 client-side (see privacy below) — the cover letter is the one disclosed
 exception, and it sends an excerpt, not the CV.
 
@@ -94,6 +95,21 @@ implementation detail.
   ≤12 skill names, visa/availability — never contact details or the photo),
   the page says so above the button, and the privacy policy on www names it.
   Widening that excerpt means updating all three.
+
+- **Feedback data (2026-10) is the one thing we store about people**, and it
+  lives in Supabase (EU region) behind the service-role key in
+  `lib/server/supabase.ts` — RLS on, no policies, server routes only. A star
+  is anonymous; a quote carries a name only if the user typed one and ticked
+  consent, and is shown on www only after `approved_at` is set BY HAND in the
+  dashboard. Email sign-ups are double opt-in (`/api/subscribe` → Resend →
+  `/confirm`), store the consent text version, and unsubscribe in one click.
+  Never log the email or the quote; analytics params stay enums and counts.
+- **Analytics consent is Consent Mode v2** (`lib/consent.ts`,
+  `components/consent/*`, `proxy.ts`): EU/UK/CH visitors start denied,
+  everyone else granted with an opt-out, stored in `mmcv_consent` on
+  `.makemycv.ae`. The consent files are byte-identical copies of the site's —
+  edit both. The inline default MUST stay ahead of the GTM script in
+  `app/layout.tsx`.
 
 Primary market is the UAE, so PDPL — not just GDPR — is the governing regime.
 
@@ -217,6 +233,12 @@ npm run build
   or `.tsx`, or this config breaks.
 - **A new suite is just a `test:*` script** in `package.json`;
   `scripts/run-all-tests.mjs` picks it up automatically.
+- **Feature switches for the feedback surfaces**: `NEXT_PUBLIC_FEEDBACK=1` shows
+  the rating strip, `NEXT_PUBLIC_EMAIL_SIGNUP=1` the email field; the routes
+  answer 503 without `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` (and
+  `RESEND_API_KEY` for email). Locally they stay off; the end-to-end check
+  uses a mock PostgREST/Resend (`_cowork/audit-2026-10/scripts/mock-backend.mjs`).
+  Every analytics event name also needs a trigger + tag published in GTM.
 - CI (`.github/workflows/ci.yml`, pushes to `main`/`stagingmmc` and PRs) runs
   typecheck → lint → test on Node 22. It does **not** run `next build`; Vercel
   does that on deploy.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "../lib/analytics";
 
 /**
  * Brag-able score share card — renders "My CV scores N/100" to an
@@ -72,8 +73,9 @@ export const ShareScoreCard = ({ total }: { total: number }) => {
           await navigator.share({
             files: [file],
             title: "My CV score",
-            text: `My CV scores ${total}/100 on MakeMyCV — free UAE CV builder. makemycv.ae`,
+            text: `My CV scores ${total}/100 on MakeMyCV — free UAE CV builder. https://makemycv.ae/?utm_source=user_share&utm_medium=score_card`,
           });
+          track("share_click", { method: "score_card", surface: "review" });
           return;
         } catch {
           /* share sheet dismissed — fall through to download */
@@ -84,6 +86,7 @@ export const ShareScoreCard = ({ total }: { total: number }) => {
       a.href = url;
       a.download = "makemycv-score.png";
       a.click();
+      track("share_click", { method: "score_card_download", surface: "review" });
       URL.revokeObjectURL(url);
     } finally {
       setBusy(false);

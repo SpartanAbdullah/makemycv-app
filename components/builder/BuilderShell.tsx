@@ -51,6 +51,7 @@ import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadSupportCard } from "./DownloadSupportCard";
+import { CookieSettingsLink } from "../consent/CookieSettingsLink";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
   /** Opens a PDF/DOCX picker; format is routed by file extension. */
@@ -617,6 +618,11 @@ const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
   return (
     <div
       ref={wrapRef}
+      // Scrollable in width mode, so keyboard users must be able to reach it
+      // (axe scrollable-region-focusable, 2026-10). Page mode never scrolls.
+      tabIndex={fitWidth ? 0 : -1}
+      role="region"
+      aria-label="CV preview"
       style={{
         flex: 1,
         // Sunken canvas in width mode so any residual gutter reads as a
@@ -1499,6 +1505,8 @@ export const BuilderShell = ({
                 >
                   Built by Abdullah
                 </a>
+                <span aria-hidden="true"> · </span>
+                <CookieSettingsLink style={{ color: "var(--ff-muted)" }} />
               </div>
             </main>
           </div>

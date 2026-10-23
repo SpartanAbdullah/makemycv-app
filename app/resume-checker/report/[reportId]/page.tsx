@@ -6,6 +6,7 @@ import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
 import PostReportTipJar from "@/components/resume-checker/PostReportTipJar";
+import { RatingStrip } from "@/components/feedback/RatingStrip";
 import { Logo } from "@/components/Logo";
 import { SUPPORT_URL } from "@/lib/config/support";
 
@@ -139,6 +140,12 @@ export default async function ReportPage({
             <div data-report-end aria-hidden />
           </div>
         </div>
+      </section>
+
+      {/* One-tap rating + optional email, after the report has been read
+          (2026-10-24). Renders nothing when switched off or already answered. */}
+      <section aria-label="Rate this report" className="mx-auto max-w-6xl px-6 pt-8">
+        <RatingStrip surface="post_checker" source="post_checker" variant="card" />
       </section>
 
       {/* Footer — subtle support link, NOT a CTA */}

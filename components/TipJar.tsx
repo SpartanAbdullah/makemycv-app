@@ -1,6 +1,7 @@
 "use client";
 
 import { KofiIcon } from "./KofiIcon";
+import { track } from "../lib/analytics";
 
 /**
  * TipJar — Ko-fi-primary, PayPal-secondary tip surface.
@@ -51,6 +52,7 @@ export const TipJar = ({
   const isCompact = variant === "compact";
 
   const openTipUrl = (url: string) => {
+    track("tip_click", { rail: url === KOFI_URL ? "kofi" : "paypal", context: context ?? "unknown" });
     window.open(url, "_blank", "noopener,noreferrer");
     markTipped();
     if (onDismiss) {
