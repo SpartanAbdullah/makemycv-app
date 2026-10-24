@@ -11,6 +11,8 @@ import {
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME } from "@/lib/seo/schema";
+import { CONSENT_DEFAULT_SCRIPT } from "@/lib/consent";
+import { ConsentBanner } from "@/components/consent/ConsentBanner";
 
 /* GTM container ID — the SAME container the marketing site loads (GA4 audit,
    10 Aug 2026). Deliberately one container and one data stream, not two:
@@ -183,6 +185,15 @@ export default function RootLayout({
             is a client-rendered CV builder that does nothing without JavaScript,
             so a noscript pixel would measure users who cannot use the product —
             and it would need a CSP frame-src exemption to load at all. */}
+        {/* Consent Mode v2 default (2026-10-24) — MUST run before GTM. EU/UK/CH
+            visitors start with analytics denied, everyone else granted, a
+            stored choice wins; ad_* is denied for all. See lib/consent.ts. */}
+        {GTM_ID && (
+          <Script id="consent-default" strategy="beforeInteractive">
+            {CONSENT_DEFAULT_SCRIPT}
+          </Script>
+        )}
+        {GTM_ID && <ConsentBanner />}
         {GTM_ID && (
           <Script id="google-tag-manager" strategy="lazyOnload">
             {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

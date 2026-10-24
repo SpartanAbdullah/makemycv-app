@@ -55,6 +55,7 @@ These cannot start until auth exists; auth itself is unscheduled.
 ## ✅ Shipped
 
 ### 2026-10 — Audit fixes (WP-1…WP-9, PR #22 from `stagingmmc`)
+- [x] 2026-10-24 — Feedback loop: one-tap ratings + consented quotes, double opt-in email list (Supabase EU + Resend), Consent Mode v2 banner, tip/share/support events, UTM on shares. Needs env vars + GTM tags before it shows (see COWORK_CHANGELOG).
 - [x] 2026-10-24 — Cover letter v1 at `/cover-letter`: written from a disclosed CV excerpt, `{{number}}` placeholders, copy / .docx, entry points on Review and under the JD Match score
 - [x] 2026-10-24 — PDF export embeds Inter / Bricolage / Instrument Serif, carries title + author, no CSP violation
 - [x] 2026-10-24 — Accessibility: Headline labelled, skip link, roving step beads, AA contrast for faint text and the wordmark, template cards un-nested; axe-core runs in `smoke:builder`

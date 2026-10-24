@@ -16,6 +16,68 @@ Format:
 
 ---
 
+## [2026-10-24 10:30] Feedback loop + consent: one-tap ratings, consented quotes, email opt-in, Consent Mode v2, tip/share tracking
+
+**Goal:** Founder question after the audit: "are we taking any benefit from users who build a CV
+and leave?" The answer was no — no rating, no testimonial path, no way to re-contact anyone, no
+measurement of tips or shares, and GA4 ran with no consent layer while pinging Google's advertising
+hosts. Decisions taken with the founder: one-tap stars (writing is optional), capture emails, store
+in Supabase (EU) + send with Resend, region-aware consent banner.
+**Files:**
+- created: `lib/feedback/rating.ts`, `lib/feedback/subscribe.ts` (+ `feedback.test.ts`, 9 tests) — pure
+  parsers and limits; `CONSENT_TEXT_VERSION` is stored with every sign-up.
+- created: `lib/server/supabase.ts` (PostgREST over fetch, service key, server-only), `lib/server/email.ts`
+  (Resend over fetch; `RESEND_API_URL` override exists only for the local mock), `lib/server/tokens.ts`
+  (random tokens, SHA-256 at rest, constant-time compare), `lib/server/cors.ts` (allow-list for www),
+  `lib/server/origins.ts`.
+- created: `app/api/rating/route.ts` — POST one star → `{id, token}`; PATCH the optional line within 24 h,
+  token spent after one use. Per-IP 3/min + 6/day in KV; no IP stored; country = Vercel header, 2 letters.
+- created: `app/api/ratings/summary/route.ts` — count, average, human-approved quotes; edge-cached 1 h.
+- created: `app/api/subscribe/route.ts` (+ `confirm/`, `unsubscribe/`) — double opt-in; same response for
+  new / pending / already-confirmed so the endpoint cannot enumerate; confirm link valid 7 days; unsubscribe
+  idempotent, GET and POST (RFC 8058 ready); both land on www/thanks with a message.
+- created: `supabase/migrations/20261024_feedback.sql` — `ratings` + `subscribers`, RLS on with NO policies,
+  anon revoked; `approved_at` is set by hand in the dashboard, never by code.
+- created: `components/feedback/RatingStrip.tsx` — stars → thanks → "Add a line (optional)" with the
+  "you may quote me" tick + optional first name/role → email field. Each block hides when its flag is off
+  or it was answered (30 days for stars; for good once an address was sent). Mounted in
+  `DownloadSupportCard` (after every export) and on the ATS report page.
+- created: `lib/consent.ts`, `components/consent/{ConsentBanner,CookieSettingsLink,useClientValue}.tsx` —
+  Consent Mode v2: inline default BEFORE GTM (EU/UK/CH denied, elsewhere granted, stored choice wins,
+  ad_* always denied), banner with two voices (Accept/Decline vs OK/Opt out), `mmcv_consent` cookie on
+  `.makemycv.ae` for a year, GA cookies expired on decline, "Cookie settings" reopens it. Byte-identical
+  copies live in the site repo.
+- created: `proxy.ts` — stamps `mmcv_geo=eu|row` (30 days) from the Vercel country header; only the bucket
+  is stored.
+- edited: `app/layout.tsx` (consent default + banner, both gated on GTM_ID), `components/builder/BuilderShell.tsx`
+  (Cookie settings in the footer), `components/builder/DownloadSupportCard.tsx` (strip + `support_click`),
+  `components/TipJar.tsx` (`tip_click` with rail + context), `components/builder/steps/ReviewStep.tsx` and
+  `components/ShareScoreCard.tsx` (`share_click`, UTM-tagged links), `app/resume-checker/report/[reportId]/page.tsx`
+  (strip), `.env.example` (SUPABASE_*, RESEND_*, origins, the two NEXT_PUBLIC switches).
+**Notes / risks / follow-up:**
+- NOTHING is live until Vercel has the env vars: the strip and the forms render only with
+  `NEXT_PUBLIC_FEEDBACK=1` / `NEXT_PUBLIC_EMAIL_SIGNUP=1`, and the routes answer 503 without
+  `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (+ `RESEND_API_KEY` for email). The Supabase org is on the
+  free plan at its 2-project cap, so the project did not get created — founder to free a slot, upgrade, or
+  name a host; then apply the migration file.
+- GTM: every new event (`rating_submit`, `rating_quote`, `email_subscribe`, `tip_click`, `support_click`,
+  `share_click`, `cover_letter_generate`, `cover_letter_export`) needs a Custom Event trigger + GA4 tag
+  PUBLISHED in GTM-5H2LMVJT or it goes nowhere. For EU "Decline" to block GA4 entirely (not just cookieless
+  pings), add a consent-based trigger exception on the GA4 tag. Turn Google Signals OFF in the GA4 property
+  — the privacy policy now says advertising features are off, and the doubleclick/google.ae pings prove it
+  is currently on.
+- Verified locally against a mock PostgREST + Resend (`_cowork/audit-2026-10/scripts/mock-backend.mjs`,
+  `feedback-e2e.mjs`): EU default denied + banner + decline → cookie + consent update + GA cookies cleared;
+  ROW default granted; star → row with country, quote with consent and name, token spent; subscribe →
+  email with confirm link → confirmed + unsubscribe token → unsubscribe; bad token → expired page; summary
+  hides unapproved quotes; CORS allows www only. axe clean on the strip and the banner.
+- The quote path is deliberately slow: nothing appears on www until `approved_at` is set by hand AND
+  25+ ratings exist (`RatingsProof` on the site).
+**Suggested commit:** feat(feedback): one-tap ratings with consented quotes, double opt-in email list,
+Consent Mode v2 banner, tip/share/support tracking
+
+---
+
 ## [2026-10-24 07:30] WP-9: cover letter v1 — `/cover-letter`, written from a disclosed CV excerpt
 
 **Goal:** Product #2 in CLAUDE.md, planned since May and never built (audit WP-9, recommendation

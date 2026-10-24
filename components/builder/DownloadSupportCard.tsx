@@ -1,6 +1,8 @@
 "use client";
 
 import { SUPPORT_URL } from "../../lib/config/support";
+import { track } from "../../lib/analytics";
+import { RatingStrip } from "../feedback/RatingStrip";
 
 /**
  * DownloadSupportCard — the post-export support ask, inline.
@@ -46,8 +48,9 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
     <div
       role="status"
       data-download-support-card
-      className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] px-4 py-2.5 text-sm leading-snug text-[var(--ff-accent-dark)] sm:px-6"
+      className="flex shrink-0 flex-col gap-2 border-b border-[var(--ff-accent-ring)] bg-[var(--ff-accent-soft)] px-4 py-2.5 text-sm leading-snug text-[var(--ff-accent-dark)] sm:px-6"
     >
+      <div className="flex items-center justify-between gap-3">
       {/* Copy length is load-bearing, not cosmetic. Measured in a production
           build: this wraps to two lines (59.3px total, inside the 64px budget)
           at 320, 360 and 375px. An earlier draft opened with "Downloaded." and
@@ -61,6 +64,7 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold underline underline-offset-2 hover:opacity-80"
+          onClick={() => track("support_click", { surface: "post_export" })}
         >
           buy me a karak
         </a>
@@ -75,6 +79,13 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
       >
         ✕
       </button>
+      </div>
+      {/* One-tap rating + optional email (2026-10-24). Each block hides
+          itself when its server side is off or it was answered recently, so
+          on most exports this renders nothing and the strip stays one line.
+          The 64px budget above applies to the karak line only; this block
+          pushes content down in-flow, it never covers anything. */}
+      <RatingStrip surface="post_export" source="post_export" />
     </div>
   );
 };
