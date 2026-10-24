@@ -16,6 +16,50 @@ Format:
 
 ---
 
+## [2026-10-24 21:40] PDF export: six verified download defects fixed, operator-level smoke checks
+
+**Goal:** The 2026-10-24 template audit (`docs/template-audit-2026-10.md`, 56 prioritised defects from
+one reviewer per template + a skeptic pass + three market-research lenses) found six high-severity
+defects that a skeptic could not refute, all in the downloaded PDF — the artefact the user actually
+submits. Founder decision: fix these before adding the two new templates (Gulf Standard, Banner) so the
+new layouts are written against corrected primitives.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` —
+  - Alpha colours → opaque hex via `mix()` (react-pdf writes `rgba()` as 8-digit hex and pdfkit
+    misparses it as solid neon green): Executive headline rule + photo ring, Exec Split essentials
+    chip fill + photo ring, Corporate photo ring, Onyx and Sandstone band borders.
+  - Executive: the navy band is a `fixed`, absolutely positioned layer behind the (now transparent)
+    sidebar View, so page 2+ no longer starts with a 27pt white notch.
+  - Corporate: sidebar contact + personal-details values use `theme.onAccentMuted` instead of the
+    base style's hardcoded `#CBD5E1` (invisible on light accents such as Sand); labels one step
+    quieter via `mix(onAccent, accent, 0.55)`.
+  - Sandstone: PDF language names follow the sidebar ink (`SIDE_TEXT`) like the preview, not `#292524`.
+  - Onyx + Sandstone: LinkedIn/website strings step down in size by length (>34 chars → 6.4pt,
+    >44 → 5.8pt) like the email line already did, so they no longer run out of the band.
+  - Modern: `ModernPDFLayout` rewritten (subagent, rebased, one commit) to mirror `modern.tsx` —
+    two-column body (main flex 2: Profile > Experience > Languages > Certifications > Projects;
+    150pt aside: Education > Skills), bordered experience cards, chips for skills and essentials,
+    live type sizes ×0.75, all density scales. Verified by pdf.js text extraction (column x
+    positions, heading order, no overlap). Deliberate deviations are listed in the commit message
+    (fixed aside width, display face for the name, flexShrink on dates, cards may split across
+    pages with an open box rather than clip).
+- edited: `scripts/pdf-smoke.tsx` — renders every template twice (fixture, and the experience list
+  tripled as `<id>-long.pdf` so each layout crosses a page break); refuses any `rgba(` in
+  CVDocument.tsx.
+- created: `scripts/pdf-ops-check.mjs` — inspects the operator list of every smoke PDF with pdf.js:
+  fails on the neon-green colour signature and on an Executive band that is not a full-height
+  150pt rectangle at the page edge on every page. Chained into `npm run smoke:pdf`.
+- edited: `package.json` — `smoke:pdf` chains the operator check.
+- created: `docs/template-audit-2026-10.md` — the full audit (scores, defects, themes, research,
+  shortlist, recommendation).
+**Notes / risks / follow-up:** The audit's 50 remaining medium/low defects are not addressed here;
+the biggest cross-cutting ones are the shared PDF primitives (EducationEntry, the "Role | Company"
+row, chips flattening to text, density scales on bleed pages) and badge/copy honesty in the registry.
+The 1x1 placeholder photo in the smoke fixture prints "Incomplete or corrupt PNG" warnings — known
+noise, not a failure. PDF output still cannot be eyeballed from here; the new checks are
+operator-level, not pixel-level.
+**Suggested commit:** fix(pdf): six verified download defects + operator-level smoke checks
+
 ## [2026-10-24 19:05] Review step: customize card reordered, headed "Your call"
 
 **Goal:** Founder, 2026-10-24 (confirmed in chat before editing): the Review page's customize card
