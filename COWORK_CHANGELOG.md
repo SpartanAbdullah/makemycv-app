@@ -16,6 +16,21 @@ Format:
 
 ---
 
+## [2026-10-24 19:05] Review step: customize card reordered, headed "Your call"
+
+**Goal:** Founder, 2026-10-24 (confirmed in chat before editing): the Review page's customize card
+should run in the order a person decides things — picture, typeface, colour, then the fine-tuning
+sliders — and the card heading should say something warmer than "Design & Font". Chosen heading:
+"Your call".
+**Files:**
+- edited: `components/builder/CustomizePanel.tsx` — card heading "Design & Font" → "Your call"
+  (subtitle unchanged); groups reordered to Photo → Font style → Colours → a "Design & Font"
+  sub-label over the four sliders (page margins, font size, line height, section spacing). No control,
+  label, aria-label or setting key changed; only order and the two headings.
+**Notes / risks / follow-up:** Nothing else keys on the old heading text (grep: only docs/changelog
+prose). Verified on a production build on the Review step at 1920x908.
+**Suggested commit:** feat(review): customize card runs photo → font → colours → sliders under "Your call"
+
 ## [2026-10-24 18:45] Builder: CV preview owns the full right column (split shell)
 
 **Goal:** Founder report 2026-10-24: on desktop the live preview wasted space on every side. A first
