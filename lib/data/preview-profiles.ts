@@ -614,14 +614,14 @@ const forTemplate = (
  */
 const rashidGulf: CvData = {
   personal: {
-    firstName: "Rashid",
+    firstName: "Rashida",
     lastName: "Khan",
     headline: "Senior Procurement Officer — Construction",
-    email: "rashid.khan@email.ae",
+    email: "rashida.khan@email.ae",
     phone: "+971 52 3XX XXXX",
     location: "Dubai, UAE",
     website: "",
-    linkedin: "linkedin.com/in/rashid-khan-procurement",
+    linkedin: "linkedin.com/in/rashida-khan-procurement",
     summary:
       "Senior procurement officer with 14 years in construction supply chains, " +
       "12 of them in the UAE, buying for high-rise, infrastructure and fit-out " +
