@@ -24,7 +24,7 @@ import { meaningfulExperience } from "../../lib/utils/experience";
 import { meaningfulEducation } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
 import { splitSkills } from "../../lib/utils/skills";
-import { pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
+import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -1445,29 +1445,98 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
 /* ═══════════════════════════════════════════════════════════
    MODERN PDF LAYOUT
    ═══════════════════════════════════════════════════════════ */
+/*
+ * Mirrors lib/templates/modern.tsx section by section (2026-10-24 parity
+ * fix — the download used to be a single-column "Summary" stack that shared
+ * nothing but the data with the preview). A padded page (the router scales
+ * the 27/24pt padding with Page Margins), a header closed by a slate-200
+ * rule, then a TWO-COLUMN body: main column Profile > Experience (bordered,
+ * rounded cards) > Languages > Certifications > Projects, and a 150pt aside
+ * (the live 200px) holding Education > Skills (chips). Modern hardcodes
+ * emerald/slate exactly like the live file and does not use the theme
+ * accent; parity with the preview is the goal, not a redesign.
+ *
+ * px → pt at 0.75: name 30px → 22.5pt, body 14px → 10.5pt, small 12px → 9pt,
+ * essentials chip 10px/9px → 7.5/6.75pt, gaps 16/12/8/4px → 12/9/6/3pt.
+ * Line-heights are the live ratios (36/30, 20/14, 16/12, 1.375). Density:
+ * fontScale on every size (and on the em-based letter-spacing), lineScale on
+ * every line-height, spaceScale ONLY on the gaps between sections — the live
+ * template's --sp — and marginScale on the page padding via the router.
+ * Tailwind semibold → the 700 cut (the PDF faces ship 400/700 only).
+ */
+
+const MODERN_SLATE_100 = "#F1F5F9";
+const MODERN_EMERALD_50 = "#ECFDF5";
+const MODERN_EMERALD_200 = "#A7F3D0";
+const MODERN_EMERALD_700 = "#047857";
+const MODERN_GREEN_700 = "#15803D";
+
+/** list-disc pl-5: text starts 15pt in, the marker sits in that gutter in the
+ *  list's own colour, no gap between items (the live <ul> has no space-y). */
+const ModernBullets = ({
+  items,
+  style,
+  marginTop = 0,
+}: {
+  items: string[];
+  style: Style;
+  marginTop?: number;
+}) => {
+  const bullets = items.map((b) => b.trim()).filter(Boolean);
+  if (bullets.length === 0) return null;
+  return (
+    <View style={{ marginTop, paddingLeft: 6 }}>
+      {bullets.map((bullet, i) => (
+        <View key={i} style={{ flexDirection: "row" }}>
+          <Text style={{ ...style, width: 9 }}>•</Text>
+          <Text style={{ ...style, flex: 1 }}>{bullet}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/** h2 with the live `avoid-orphan` intent: never leave a heading alone at the
+ *  foot of a page — break before it unless ~36pt of its section follows. */
+const ModernHeading = ({ children, style }: { children: string; style: Style }) => (
+  <Text style={style} minPresenceAhead={36}>
+    {children}
+  </Text>
+);
 
 const ModernPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#1e5b54");
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  // mt-[calc(1.5rem*var(--sp))] / space-y-[calc(1.5rem*var(--sp))] = 24px → 18pt
+  const sectionGap = 18 * theme.spaceScale;
+  // The live name is set in the display face (`font-display` → Bricolage)
+  // whatever body face the user picked; do the same once the faces are
+  // registered, falling back to the bold body face (Node / registration failed).
+  const nameFont = pdfFontsReady() ? PDF_FAMILY.display : fonts.bold;
+
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
     "Your Name";
-
-  const hasSummary = Boolean(data.personal.summary?.trim());
+  const headline = data.personal.headline?.trim() || "";
   const experience = meaningfulExperience(data.experience);
-  const hasExperience = experience.length > 0;
   const education = meaningfulEducation(data.education);
-  const hasEducation = education.length > 0;
-  const hasSkills = data.skills.length > 0;
+  const projects = meaningfulProjects(data.projects);
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasExperience = experience.length > 0;
   const hasLanguages = data.languages.length > 0;
   const hasCertifications = data.certifications.length > 0;
-  const projects = meaningfulProjects(data.projects);
   const hasProjects = projects.length > 0;
-  const theme = resolveTheme(data.settings, "#1e5b54");
-  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
-  const s = buildStyles(theme, fonts);
+  const hasEducation = education.length > 0;
+  const hasSkills = data.skills.length > 0;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
+  const essentialChips = getEssentialChips(data.personal);
 
+  // Live order: email, phone, location, website, linkedin, DOB — no "|"
+  // separators, a 16px/4px wrap gap instead.
   type ContactItem = { text: string; href?: string };
   const contacts: ContactItem[] = [];
   if (data.personal.email?.trim())
@@ -1482,64 +1551,129 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
     });
   if (data.personal.location?.trim())
     contacts.push({ text: data.personal.location.trim() });
-  if (data.personal.linkedin?.trim())
-    contacts.push({
-      text: shortenDisplayUrl(data.personal.linkedin),
-      href: normalizeHref(data.personal.linkedin),
-    });
   if (data.personal.website?.trim())
     contacts.push({
       text: shortenDisplayUrl(data.personal.website),
       href: normalizeHref(data.personal.website),
     });
+  if (data.personal.linkedin?.trim())
+    contacts.push({
+      text: shortenDisplayUrl(data.personal.linkedin),
+      href: normalizeHref(data.personal.linkedin),
+    });
   if (data.personal.dateOfBirth?.trim())
     contacts.push({ text: `DOB: ${data.personal.dateOfBirth.trim()}` });
 
-  const essentialChips = getEssentialChips(data.personal);
-
-  const modernSectionHeadingWrap: Style = {
-    borderLeftWidth: 3,
-    borderLeftColor: theme.accentText,
-    paddingLeft: 8,
-    marginBottom: 6,
+  /* ── Modern type scale ── */
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  // h2: text-xs/4 font-semibold uppercase tracking-[0.2em] text-slate-500
+  const heading: Style = {
+    fontSize: 9 * fs,
+    lineHeight: (16 / 12) * ls,
+    ...bold,
+    textTransform: "uppercase",
+    letterSpacing: 0.2 * 9 * fs,
+    color: SLATE_500,
   };
+  // text-sm/5 text-slate-700 — paragraphs, bullets, languages, certs
+  const body: Style = {
+    fontSize: 10.5 * fs,
+    lineHeight: (20 / 14) * ls,
+    color: SLATE_700,
+  };
+  // text-sm/5 font-semibold in the root's slate-900 — role, school, project
+  const bodyStrong: Style = { ...body, ...bold, color: SLATE_900 };
+  // text-xs/4 text-slate-500 — contact, company line, degree line
+  const small: Style = {
+    fontSize: 9 * fs,
+    lineHeight: (16 / 12) * ls,
+    color: SLATE_500,
+  };
+
+  // space-y only separates sections that are present, so the first rendered
+  // section in each column gets no top margin whichever one it is.
+  const present: Record<string, boolean> = {
+    profile: hasSummary,
+    experience: hasExperience,
+    languages: hasLanguages,
+    certifications: hasCertifications,
+    projects: hasProjects,
+    education: hasEducation,
+    skills: hasSkills,
+  };
+  const mainOrder = [
+    "profile",
+    "experience",
+    "languages",
+    "certifications",
+    "projects",
+  ].filter((k) => present[k]);
+  const asideOrder = ["education", "skills"].filter((k) => present[k]);
+  const gapFor = (order: string[], key: string): Style =>
+    order[0] === key ? {} : { marginTop: sectionGap };
 
   return (
     <View>
-      {/* ── Header ── */}
-      <View style={s.headerRow}>
-        <View style={s.headerLeft}>
-          <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, color: theme.accentText, lineHeight: 1 * theme.lineScale }}>
-              {name}
+      {/* ── Header: border-b border-slate-200 pb-4, flex gap-4 ── */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 12,
+          borderBottomWidth: 0.75,
+          borderBottomColor: SLATE_200,
+          paddingBottom: 12,
+        }}
+      >
+        {/* flex-col gap-2 */}
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text
+            style={{
+              fontSize: 22.5 * fs,
+              lineHeight: 1.2 * ls,
+              fontFamily: nameFont,
+              fontWeight: 700,
+              letterSpacing: -0.025 * 22.5 * fs,
+              color: SLATE_900,
+            }}
+          >
+            {name}
+          </Text>
+          {headline ? (
+            <Text
+              style={{
+                fontSize: 10.5 * fs,
+                lineHeight: (20 / 14) * ls,
+                color: SLATE_500,
+              }}
+            >
+              {headline}
             </Text>
-          </View>
-          {data.personal.headline?.trim() ? (
-            <View style={{ marginBottom: 3 }}>
-              <Text style={{ ...s.headline, lineHeight: 1.2 * theme.lineScale }}>
-                {data.personal.headline.trim()}
-              </Text>
-            </View>
           ) : null}
           {contacts.length > 0 && (
-            <View style={s.contactRow}>
-              {contacts.map((item, i) => (
-                <View
-                  key={i}
-                  style={{ flexDirection: "row", alignItems: "center" }}
-                >
-                  {item.href ? (
-                    <Link src={item.href} style={s.contactLink}>
-                      {item.text}
-                    </Link>
-                  ) : (
-                    <Text style={s.contactItem}>{item.text}</Text>
-                  )}
-                  {i < contacts.length - 1 && (
-                    <Text style={s.contactSep}>|</Text>
-                  )}
-                </View>
-              ))}
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                columnGap: 12,
+                rowGap: 3,
+              }}
+            >
+              {contacts.map((item, i) =>
+                item.href ? (
+                  <Link
+                    key={i}
+                    src={item.href}
+                    style={{ ...small, textDecoration: "underline" }}
+                  >
+                    {item.text}
+                  </Link>
+                ) : (
+                  <Text key={i} style={small}>
+                    {item.text}
+                  </Text>
+                ),
+              )}
             </View>
           )}
           {essentialChips.length > 0 && (
@@ -1547,23 +1681,46 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
+                gap: 4.5,
                 marginTop: 3,
               }}
             >
-              {essentialChips.map((chip, i) => (
+              {essentialChips.map((chip) => (
                 <View
                   key={chip.label}
-                  style={{ flexDirection: "row", alignItems: "center" }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 3,
+                    borderWidth: 0.75,
+                    borderColor: MODERN_EMERALD_200,
+                    backgroundColor: MODERN_EMERALD_50,
+                    borderRadius: 999,
+                    paddingHorizontal: 6,
+                    paddingVertical: 1.5,
+                  }}
                 >
-                  <Text style={{ fontSize: 9 * theme.fontScale, color: theme.accentText, fontWeight: 600 }}>
-                    {chip.label}:
+                  <Text
+                    style={{
+                      fontSize: 6.75 * fs,
+                      lineHeight: 1.375 * ls,
+                      ...bold,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.05 * 6.75 * fs,
+                      color: MODERN_EMERALD_700,
+                    }}
+                  >
+                    {chip.label}
                   </Text>
-                  <Text style={{ fontSize: 9 * theme.fontScale, color: "#374151", marginLeft: 2 }}>
+                  <Text
+                    style={{
+                      fontSize: 7.5 * fs,
+                      lineHeight: 1.375 * ls,
+                      color: SLATE_700,
+                    }}
+                  >
                     {chip.value}
                   </Text>
-                  {i < essentialChips.length - 1 && (
-                    <Text style={{ ...s.contactSep, color: "#C7D2FE" }}>·</Text>
-                  )}
                 </View>
               ))}
             </View>
@@ -1573,160 +1730,256 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <Image
             src={data.personal.photo}
             style={{
-              ...s.photo,
-              borderRadius:
-                data.settings.photoShape === "square" ? 8 : 30,
+              width: 60,
+              height: 60,
+              borderRadius: data.settings.photoShape === "square" ? 6 : 30,
+              objectFit: "cover",
+              borderWidth: 1.5,
+              borderColor: SLATE_200,
             }}
           />
         )}
       </View>
 
-      {/* ── Summary ── */}
-      {hasSummary && (
-        <View style={s.section}>
-          <View style={modernSectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Summary</Text>
-          </View>
-          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
-        </View>
-      )}
-
-      {/* ── Experience ── */}
-      {hasExperience && (
-        <View style={s.section}>
-          <View style={modernSectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Experience</Text>
-          </View>
-          {experience.map((role) => (
-            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-              <View style={s.entryRow}>
-                <Text style={{ ...s.entryTitle, flex: 1 }}>
-                  {role.role?.trim() || "Role"}
-                  {role.company ? (
-                    <Text style={s.entryCompany}>
-                      {` | ${role.company.trim()}`}
-                    </Text>
-                  ) : null}
-                </Text>
-                <Text style={s.entryDate}>
-                  {formatDateRange(
-                    role.startDate,
-                    role.endDate,
-                    role.isCurrent,
-                  )}
-                </Text>
-              </View>
-              {role.location?.trim() && (
-                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-              )}
-              <BulletList bullets={role.bullets} s={s} />
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* ── Education ── */}
-      {hasEducation && (
-        <View style={s.section}>
-          <View style={modernSectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Education</Text>
-          </View>
-          {education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
-          ))}
-        </View>
-      )}
-
-      {/* ── Skills ── */}
-      {hasSkills && (
-        <View style={s.section}>
-          <View style={modernSectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Skills</Text>
-          </View>
-          <Text style={s.body}>
-            {data.skills.map((sk) => sk.name).join(", ")}
-          </Text>
-        </View>
-      )}
-
-      {/* ── Languages & Certifications ── */}
-      {(hasLanguages || hasCertifications) && (
-        <View style={s.twoCol}>
-          {hasLanguages && (
-            <View style={s.twoColItem}>
-              <View style={modernSectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Languages</Text>
-              </View>
-              <Text style={s.body}>
-                {data.languages.map((lang, i, arr) => (
-                  <Text key={lang.id}>
-                    <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                      {lang.name}
-                    </Text>
-                    {lang.level
-                      ? ` — ${formatLanguageLevel(lang.level)}`
-                      : ""}
-                    {i < arr.length - 1 ? "  |  " : ""}
-                  </Text>
-                ))}
+      {/* ── Body: grid-cols-[2fr_1fr] gap-8 → main column + 150pt aside ── */}
+      <View style={{ flexDirection: "row", gap: 24, marginTop: sectionGap }}>
+        {/* ── Main column ── */}
+        <View style={{ flex: 2 }}>
+          {hasSummary && (
+            <View style={gapFor(mainOrder, "profile")}>
+              <ModernHeading style={heading}>Profile</ModernHeading>
+              <Text style={{ ...body, marginTop: 6 }}>
+                {data.personal.summary?.trim()}
               </Text>
             </View>
           )}
-          {hasCertifications && (
-            <View style={s.twoColItem}>
-              <View style={modernSectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Certifications</Text>
+
+          {hasExperience && (
+            <View style={gapFor(mainOrder, "experience")}>
+              <ModernHeading style={heading}>Experience</ModernHeading>
+              {/* mt-3 space-y-4; each role is a rounded-xl bordered card */}
+              <View style={{ marginTop: 9 }}>
+                {experience.map((role, i) => {
+                  const company = role.company?.trim() || "";
+                  const location = role.location?.trim() || "";
+                  const subline =
+                    company && location
+                      ? `${company} - ${location}`
+                      : company || location;
+                  return (
+                    <View
+                      key={role.id}
+                      minPresenceAhead={48}
+                      style={{
+                        marginTop: i > 0 ? 12 : 0,
+                        borderWidth: 0.75,
+                        borderColor: SLATE_200,
+                        borderRadius: 9,
+                        padding: 9,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 6,
+                        }}
+                      >
+                        <Text style={{ ...bodyStrong, flex: 1 }}>
+                          {role.role?.trim() || "Role"}
+                        </Text>
+                        {/* the date span inherits the row's font-semibold */}
+                        <Text
+                          style={{
+                            ...small,
+                            ...bold,
+                            color: SLATE_400,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {formatDateRange(
+                            role.startDate,
+                            role.endDate,
+                            role.isCurrent,
+                          )}
+                        </Text>
+                      </View>
+                      {subline ? <Text style={small}>{subline}</Text> : null}
+                      <ModernBullets
+                        items={role.bullets}
+                        style={body}
+                        marginTop={6}
+                      />
+                    </View>
+                  );
+                })}
               </View>
-              {data.certifications.map((cert) => (
-                <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                  <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                    {cert.name.trim()}
+            </View>
+          )}
+
+          {hasLanguages && (
+            <View style={gapFor(mainOrder, "languages")}>
+              <ModernHeading style={heading}>Languages</ModernHeading>
+              {/* mt-3 space-y-2 */}
+              <View style={{ marginTop: 9 }}>
+                {data.languages.map((lang, i) => (
+                  <Text
+                    key={lang.id}
+                    style={{ ...body, marginTop: i > 0 ? 6 : 0 }}
+                  >
+                    <Text style={bold}>{lang.name}</Text>
+                    {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
                   </Text>
-                  <Text style={{ color: SLATE_500 }}>
-                    {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
-                    {cert.date ? ` | ${cert.date.trim()}` : ""}
-                  </Text>
-                </Text>
-              ))}
+                ))}
+              </View>
+            </View>
+          )}
+
+          {hasCertifications && (
+            <View style={gapFor(mainOrder, "certifications")}>
+              <ModernHeading style={heading}>Certifications</ModernHeading>
+              {/* mt-3 space-y-2 */}
+              <View style={{ marginTop: 9 }}>
+                {data.certifications.map((cert, i) => {
+                  const meta = [cert.issuer?.trim(), cert.date?.trim()]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <Text
+                      key={cert.id}
+                      style={{ ...body, marginTop: i > 0 ? 6 : 0 }}
+                    >
+                      {cert.name.trim()}
+                      {meta ? ` — ${meta}` : ""}
+                    </Text>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {hasProjects && (
+            <View style={gapFor(mainOrder, "projects")}>
+              {projects.map((project, index) => {
+                const bullets = (project.bullets ?? [])
+                  .map((b) => b.trim())
+                  .filter(Boolean);
+                const [firstBullet, ...remainingBullets] = bullets;
+                const showLink = shouldShowProjectLink(project.link);
+                return (
+                  <View key={project.id}>
+                    {/* keep-with-next: heading (first project), title and
+                        first bullet stay on one page; the rest may break */}
+                    <View wrap={false}>
+                      {index === 0 ? (
+                        <ModernHeading style={heading}>Projects</ModernHeading>
+                      ) : null}
+                      <Text style={{ ...bodyStrong, marginTop: 9 }}>
+                        {project.name?.trim() || "Project"}
+                        {showLink ? (
+                          <Link
+                            src={normalizeHref(project.link)}
+                            style={{ ...bodyStrong, textDecoration: "underline" }}
+                          >
+                            {` - ${project.link?.trim()}`}
+                          </Link>
+                        ) : null}
+                      </Text>
+                      {firstBullet ? (
+                        <ModernBullets items={[firstBullet]} style={body} />
+                      ) : null}
+                    </View>
+                    {remainingBullets.length > 0 ? (
+                      <ModernBullets items={remainingBullets} style={body} />
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
-      )}
 
-      {/* ── Projects ── */}
-      {hasProjects && (
-        <View style={s.section}>
-          <View style={modernSectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Projects</Text>
-          </View>
-          {projects.map((project) => {
-            const showLink = shouldShowProjectLink(project.link);
-            return (
-              <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>
-                  {project.name?.trim() || "Project"}
-                  {showLink ? (
-                    <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                      {" | "}
-                      <Link
-                        src={normalizeHref(project.link)}
-                        style={{
-                          ...s.entryCompany,
-                          color: SLATE_500,
-                          textDecoration: "underline",
-                        }}
-                      >
-                        {project.link?.trim()}
-                      </Link>
-                    </Text>
-                  ) : null}
-                </Text>
-                <BulletList bullets={project.bullets ?? []} s={s} />
+        {/* ── Aside (live: 200px, flex-shrink 0) ── */}
+        <View style={{ width: 150, flexShrink: 0 }}>
+          {hasEducation && (
+            <View style={gapFor(asideOrder, "education")}>
+              <ModernHeading style={heading}>Education</ModernHeading>
+              {/* mt-3 space-y-3 */}
+              <View style={{ marginTop: 9 }}>
+                {education.map((edu, i) => {
+                  const dates = formatDateRange(edu.startDate, edu.endDate);
+                  const attestedBy = edu.attested
+                    ? edu.attestingBody?.trim() || ""
+                    : "";
+                  const field = edu.field?.trim();
+                  return (
+                    <View
+                      key={edu.id}
+                      wrap={false}
+                      style={{ marginTop: i > 0 ? 9 : 0 }}
+                    >
+                      <Text style={bodyStrong}>
+                        {edu.school?.trim() || "School"}
+                      </Text>
+                      <Text style={small}>
+                        {edu.degree?.trim() || "Degree"}
+                        {field ? ` - ${field}` : ""}
+                      </Text>
+                      {dates ? (
+                        <Text style={{ ...small, color: SLATE_400 }}>{dates}</Text>
+                      ) : null}
+                      {attestedBy ? (
+                        <Text
+                          style={{
+                            ...small,
+                            color: MODERN_GREEN_700,
+                            marginTop: 1.5,
+                          }}
+                        >
+                          {`✓ Attested — ${attestedBy}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
-            );
-          })}
+            </View>
+          )}
+
+          {hasSkills && (
+            <View style={gapFor(asideOrder, "skills")}>
+              <ModernHeading style={heading}>Skills</ModernHeading>
+              {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 9,
+                }}
+              >
+                {data.skills.map((skill) => (
+                  <Text
+                    key={skill.id}
+                    style={{
+                      fontSize: 9 * fs,
+                      lineHeight: (16 / 12) * ls,
+                      color: SLATE_900,
+                      backgroundColor: MODERN_SLATE_100,
+                      borderRadius: 999,
+                      paddingHorizontal: 9,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    {skill.name}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 };
@@ -3317,9 +3570,11 @@ export const CVDocument = ({
   const s = buildStyles(theme, fonts);
   const marginScale = theme.marginScale;
   // Templates whose content sits directly under s.page (no edge-bleed) — their
-  // page padding scales with margins. Modern is two-column but has no bleed, so
-  // it belongs here too. The true edge-bleed sidebars (executive/exec-split/
-  // corp-sidebar/onyx/sandstone) instead scale their MAIN-COLUMN padding.
+  // page padding scales with margins. Modern belongs here even though its BODY
+  // is two-column (main column + 150pt aside, see ModernPDFLayout): it is a
+  // padded page like the live template's 36px/32px padding, not a bleed
+  // sidebar. The true edge-bleed sidebars (executive/exec-split/corp-sidebar/
+  // onyx/sandstone) instead scale their MAIN-COLUMN padding.
   const SINGLE_COLUMN = new Set([
     "classic",
     "ats-clean",
