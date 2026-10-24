@@ -13,6 +13,11 @@ import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
+// Opaque tints for the PDF: react-pdf converts alpha colours to 8-digit hex
+// and pdfkit misparses that as solid neon green (audit 2026-10), so every
+// translucent-looking colour is pre-blended with mix() instead. The pdf
+// smoke script fails the build if an alpha colour creeps back in.
+import { mix } from "../../lib/utils/color";
 import { formatDateRange, normalizeHref } from "../../lib/utils/format";
 import { meaningfulProjects } from "../../lib/utils/projects";
 import { meaningfulExperience } from "../../lib/utils/experience";
@@ -236,13 +241,15 @@ const BASE_STYLES: Record<string, Style> = {
   },
 
   /* ── Executive sidebar ──────────────────────────────────── */
-  /* Negative margins extend the navy panel to the page top/bottom/left
-     edges, escaping the page-level 27pt/24pt padding so the sidebar bleeds
-     edge-to-edge (matches the live preview). Width and padding mirror the
+  /* Negative margins extend the panel to the page top/bottom/left edges,
+     escaping the page-level 27pt/24pt padding (matches the live preview).
+     The navy fill itself is NOT here: it is a separate fixed, absolutely
+     positioned band in ExecutivePDFLayout, because a background on this
+     View left a 27pt white notch at the top of page 2+ (react-pdf rebuilds
+     the split continuation with marginTop 0). Width and padding mirror the
      live template's 200px sidebar with 28px/20px padding. */
   execSidebar: {
     width: 150,
-    backgroundColor: "#1E2A4A",
     marginTop: -27,
     marginBottom: -27,
     marginLeft: -24,
@@ -265,7 +272,8 @@ const BASE_STYLES: Record<string, Style> = {
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: "rgba(255,255,255,0.15)",
+    // Opaque 15%-white-on-navy; overridden per theme at render.
+    borderBottomColor: "#404A65",
   },
   execSideLabel: {
     fontSize: 7,
@@ -808,9 +816,26 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const essentialChips = getEssentialChips(data.personal);
 
   return (
+    <>
+      {/* The navy band is its own fixed, absolutely positioned layer so it
+          covers every page edge to edge. As the sidebar View's background it
+          left a 27pt white notch on page 2+ (audit 2026-10). Yoga places an
+          absolute child against the parent's padding edge, so 0/0/0 on a
+          direct child of the Page reaches the physical page edges. */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: 150,
+          backgroundColor: theme.accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Sidebar ── */}
-      <View style={{ ...s.execSidebar, backgroundColor: theme.accent }}>
+      {/* ── Sidebar (transparent; the fixed band above is its fill) ── */}
+      <View style={s.execSidebar}>
         {/* Photo */}
         {showPhoto && data.personal.photo && (
           <View style={{ marginBottom: 12 }}>
@@ -823,7 +848,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   data.settings.photoShape === "square" ? 6 : 32,
                 objectFit: "cover",
                 borderWidth: 1.5,
-                borderColor: "rgba(255,255,255,0.2)",
+                borderColor: mix(onAccent, theme.accent, 0.8),
               }}
             />
           </View>
@@ -845,7 +870,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
         {/* Headline */}
         {data.personal.headline?.trim() ? (
-          <Text style={{ ...s.execHeadline, color: onAccentMuted }}>{data.personal.headline.trim()}</Text>
+          <Text style={{ ...s.execHeadline, color: onAccentMuted, borderBottomColor: mix(onAccent, theme.accent, 0.85) }}>{data.personal.headline.trim()}</Text>
         ) : null}
 
         {/* Contact */}
@@ -1053,6 +1078,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -1867,7 +1893,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
                   key={chip.label}
                   style={{
                     flexDirection: "row",
-                    backgroundColor: "rgba(255,255,255,0.10)",
+                    backgroundColor: mix(theme.onAccent, theme.accent, 0.9),
                     borderRadius: 8,
                     paddingTop: 1,
                     paddingBottom: 1,
@@ -1906,7 +1932,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               objectFit: "cover",
               marginLeft: 12,
               borderWidth: 1.5,
-              borderColor: "rgba(255,255,255,0.25)",
+              borderColor: mix(theme.onAccent, theme.accent, 0.75),
             }}
           />
         )}
@@ -2304,7 +2330,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   data.settings.photoShape === "square" ? 6 : 28,
                 objectFit: "cover",
                 borderWidth: 1.5,
-                borderColor: "rgba(255,255,255,0.15)",
+                borderColor: mix(theme.onAccent, theme.accent, 0.85),
               }}
             />
           </View>
@@ -2320,7 +2346,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   style={{
                     fontSize: 6 * theme.fontScale,
                     fontFamily: fonts.bold, fontWeight: 700,
-                    color: onAccentMuted,
+                    // One step quieter than the values beneath (which are
+                    // onAccentMuted now) so the label/value hierarchy holds.
+                    color: mix(theme.onAccent, theme.accent, 0.55),
                     letterSpacing: 0.4,
                   }}
                 >
@@ -2331,6 +2359,9 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                     src={item.href}
                     style={{
                       ...s.execContactItem,
+                      // Theme ink, not the base style's #CBD5E1: on light
+                      // accents (Sand) the hardcoded grey vanished (audit).
+                      color: onAccentMuted,
                       fontSize: (item.fontSize ?? 7.5) * theme.fontScale,
                       textDecoration: "underline",
                     }}
@@ -2341,6 +2372,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   <Text
                     style={{
                       ...s.execContactItem,
+                      color: onAccentMuted,
                       fontSize: (item.fontSize ?? 7.5) * theme.fontScale,
                     }}
                   >
@@ -2362,13 +2394,15 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
                   style={{
                     fontSize: 6 * theme.fontScale,
                     fontFamily: fonts.bold, fontWeight: 700,
-                    color: onAccentMuted,
+                    // One step quieter than the values beneath (which are
+                    // onAccentMuted now) so the label/value hierarchy holds.
+                    color: mix(theme.onAccent, theme.accent, 0.55),
                     letterSpacing: 0.4,
                   }}
                 >
                   {chip.label.toUpperCase()}
                 </Text>
-                <Text style={{ ...s.execContactItem, fontSize: 7.5 * theme.fontScale }}>
+                <Text style={{ ...s.execContactItem, color: onAccentMuted, fontSize: 7.5 * theme.fontScale }}>
                   {chip.value}
                 </Text>
               </View>
@@ -2739,8 +2773,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
-  const bandBorder =
-    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)";
+  // Opaque equivalent of 18% white / 12% black over the band.
+  const bandBorder = mix(onAccent, accent, onAccent === "#FFFFFF" ? 0.82 : 0.88);
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
@@ -2768,10 +2802,21 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
   if (data.personal.location?.trim())
     contactItems.push({ text: data.personal.location.trim() });
-  if (data.personal.linkedin?.trim())
-    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
-  if (data.personal.website?.trim())
-    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+  // A long single-token URL cannot wrap (hyphenation is off; textkit breaks
+  // only on spaces) and ran out of the band into the main column (audit
+  // 2026-10), so step the size down by length the way the email line does.
+  const urlSize = (text: string) => {
+    const base = text.length > 44 ? 5.8 : text.length > 34 ? 6.4 : undefined;
+    return base === undefined ? undefined : base * theme.fontScale;
+  };
+  if (data.personal.linkedin?.trim()) {
+    const text = shortenDisplayUrl(data.personal.linkedin);
+    contactItems.push({ text, href: normalizeHref(data.personal.linkedin), fontSize: urlSize(text) });
+  }
+  if (data.personal.website?.trim()) {
+    const text = shortenDisplayUrl(data.personal.website);
+    contactItems.push({ text, href: normalizeHref(data.personal.website), fontSize: urlSize(text) });
+  }
 
   const sideLabel = {
     fontSize: 7 * theme.fontScale,
@@ -2990,8 +3035,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
-  const bandBorder =
-    onAccent === "#FFFFFF" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)";
+  // Opaque equivalent of 18% white / 10% black over the band.
+  const bandBorder = mix(onAccent, accent, onAccent === "#FFFFFF" ? 0.82 : 0.9);
   const firstName = data.personal.firstName?.trim() || "First";
   const lastName = data.personal.lastName?.trim() || "Last";
   const headline = data.personal.headline?.trim() || "";
@@ -3025,10 +3070,18 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
     contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
   if (data.personal.location?.trim())
     contactItems.push({ text: data.personal.location.trim() });
-  if (data.personal.linkedin?.trim())
-    contactItems.push({ text: shortenDisplayUrl(data.personal.linkedin), href: normalizeHref(data.personal.linkedin) });
-  if (data.personal.website?.trim())
-    contactItems.push({ text: shortenDisplayUrl(data.personal.website), href: normalizeHref(data.personal.website) });
+  // Same length-step as the email line: a long single-token URL cannot wrap
+  // and ran out of the 180pt band into the main column (audit 2026-10).
+  // Unscaled here; the renderer multiplies by fontScale.
+  const urlSize = (text: string) => (text.length > 44 ? 5.8 : text.length > 34 ? 6.4 : undefined);
+  if (data.personal.linkedin?.trim()) {
+    const text = shortenDisplayUrl(data.personal.linkedin);
+    contactItems.push({ text, href: normalizeHref(data.personal.linkedin), fontSize: urlSize(text) });
+  }
+  if (data.personal.website?.trim()) {
+    const text = shortenDisplayUrl(data.personal.website);
+    contactItems.push({ text, href: normalizeHref(data.personal.website), fontSize: urlSize(text) });
+  }
 
   const SIDE_TEXT = onAccent;
   const SIDE_MUTED = onAccentMuted;
@@ -3135,7 +3188,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 1 }}>
-                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: "#292524" }}>{lang.name}</Text>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SIDE_TEXT }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
             ))}

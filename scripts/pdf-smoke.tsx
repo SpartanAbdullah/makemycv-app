@@ -14,7 +14,7 @@
  * mixed-case skill names (casing corruption), a 10-bullet role (page-break
  * behavior), and yyyy-mm dates (date normalization).
  */
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
@@ -154,18 +154,43 @@ const TEMPLATE_IDS = [
 ];
 
 async function main() {
+  // react-pdf turns rgba() into 8-digit hex that pdfkit misparses as solid
+  // neon green (audit 2026-10): every colour handed to the PDF must be an
+  // opaque hex, so fail loudly if one creeps back into the layouts.
+  const pdfSource = readFileSync(
+    join(process.cwd(), "components", "pdf", "CVDocument.tsx"),
+    "utf8",
+  );
+  if (/rgba\(/.test(pdfSource)) {
+    throw new Error(
+      "CVDocument.tsx contains rgba() colours — use an opaque hex via mix() instead",
+    );
+  }
   const outDir = join(process.cwd(), ".smoke-pdfs");
   mkdirSync(outDir, { recursive: true });
-  for (const templateId of TEMPLATE_IDS) {
-    const data: CvData = {
-      ...fixture,
-      settings: { ...fixture.settings, templateId },
-    };
-    const doc = createElement(CVDocument, { data, plan: "pro", templateId });
-    const file = join(outDir, `${templateId}.pdf`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await ReactPDF.renderToFile(doc as any, file);
-    console.log(`rendered ${file}`);
+  // Every template renders twice: the fixture as is, and with the
+  // experience list tripled (<id>-long.pdf) so each layout also crosses a
+  // page break — audit 2026-10: the Executive band left a white notch on
+  // page 2 that a one-page render could never show. scripts/pdf-ops-check.mjs
+  // (chained after this in `npm run smoke:pdf`) inspects the output.
+  for (const long of [false, true]) {
+    const experience = long
+      ? [0, 1, 2].flatMap((n) =>
+          fixture.experience.map((e) => ({ ...e, id: `${e.id}-p${n}` })),
+        )
+      : fixture.experience;
+    for (const templateId of TEMPLATE_IDS) {
+      const data: CvData = {
+        ...fixture,
+        experience,
+        settings: { ...fixture.settings, templateId },
+      };
+      const doc = createElement(CVDocument, { data, plan: "pro", templateId });
+      const file = join(outDir, `${templateId}${long ? "-long" : ""}.pdf`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ReactPDF.renderToFile(doc as any, file);
+      console.log(`rendered ${file}`);
+    }
   }
 }
 
