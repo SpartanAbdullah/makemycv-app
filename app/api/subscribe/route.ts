@@ -7,6 +7,7 @@ import { hashToken, newToken } from "@/lib/server/tokens";
 import { preflight, withCors } from "@/lib/server/cors";
 import { CONSENT_TEXT_VERSION, parseSubscribe } from "@/lib/feedback/subscribe";
 import { APP_ORIGIN } from "@/lib/server/origins";
+import { logRouteError } from "@/lib/server/logRouteError";
 
 /**
  * Email sign-up, step 1 of 2 (2026-10-24): store the address with the consent
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
       await sendEmail({ to: req.email, ...confirmEmail(url) });
     }
     return json(request, { ok: true });
-  } catch {
+  } catch (err) {
+    logRouteError("api/subscribe", err);
     return json(request, { error: "server_error" }, 500);
   }
 }

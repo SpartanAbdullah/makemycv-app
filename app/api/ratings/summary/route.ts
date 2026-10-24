@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sbSelect, supabaseConfigured } from "@/lib/server/supabase";
 import type { RatingSummary } from "@/lib/feedback/rating";
+import { logRouteError } from "@/lib/server/logRouteError";
 
 /**
  * Public, cached summary for the marketing site (2026-10-24): how many stars,
@@ -32,7 +33,8 @@ export async function GET() {
       quotes: quotes.map((q) => ({ quote: q.quote, name: q.display_name ?? "", role: q.display_role ?? "" })),
     };
     return NextResponse.json(body, { headers });
-  } catch {
+  } catch (err) {
+    logRouteError("api/ratings/summary", err);
     return NextResponse.json(EMPTY, { headers: { "Cache-Control": "no-store" } });
   }
 }

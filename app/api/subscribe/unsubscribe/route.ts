@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sbPatch, supabaseConfigured } from "@/lib/server/supabase";
 import { SITE_ORIGIN } from "@/lib/server/origins";
+import { logRouteError } from "@/lib/server/logRouteError";
 
 /**
  * One-click unsubscribe. The token is the one printed into every email
@@ -17,7 +18,8 @@ async function unsubscribe(request: Request) {
   if (supabaseConfigured() && /^[A-Za-z0-9_-]{20,64}$/.test(t)) {
     try {
       await sbPatch("subscribers", `unsubscribe_token=eq.${t}&unsubscribed_at=is.null`, { unsubscribed_at: new Date().toISOString() }, "id");
-    } catch {
+    } catch (err) {
+      logRouteError("api/subscribe/unsubscribe", err);
       /* fall through to the same page */
     }
   }

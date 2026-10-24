@@ -5,6 +5,7 @@ import { sbInsert, sbPatch, sbSelect, supabaseConfigured } from "@/lib/server/su
 import { hashToken, newToken, tokenMatches } from "@/lib/server/tokens";
 import { preflight, withCors } from "@/lib/server/cors";
 import { RATING_LIMITS, parseRatingQuote, parseRatingSubmit } from "@/lib/feedback/rating";
+import { logRouteError } from "@/lib/server/logRouteError";
 
 /**
  * Ratings (2026-10-24).
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
       "id",
     );
     return json(request, { id: row.id, token });
-  } catch {
+  } catch (err) {
+    logRouteError("api/rating POST", err);
     return json(request, { error: "server_error" }, 500);
   }
 }
@@ -87,7 +89,8 @@ export async function PATCH(request: Request) {
       "id",
     );
     return json(request, { ok: true });
-  } catch {
+  } catch (err) {
+    logRouteError("api/rating PATCH", err);
     return json(request, { error: "server_error" }, 500);
   }
 }

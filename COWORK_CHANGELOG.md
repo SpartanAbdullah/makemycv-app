@@ -16,6 +16,27 @@ Format:
 
 ---
 
+## [2026-10-24 16:30] Feedback routes: log the error behind every `server_error`
+
+**Goal:** First production check of the feedback round: `/api/subscribe` answered 500 `server_error`
+for every address while `/api/rating` and `/api/ratings/summary` worked. The catch blocks swallowed
+the cause, so the Vercel runtime log was empty and Resend-vs-Supabase could not be told apart from
+outside. Likely cause at the time of writing: the makemycv.ae domain was still "verifying" in
+Resend, so the confirmation send is rejected.
+**Files:**
+- created: `lib/server/logRouteError.ts` — one `console.error` line: route + error message (max 300
+  chars), never the request body, so no email address or quote text reaches the log.
+- edited: `app/api/rating/route.ts` (POST + PATCH), `app/api/subscribe/route.ts`,
+  `app/api/subscribe/confirm/route.ts`, `app/api/subscribe/unsubscribe/route.ts`,
+  `app/api/ratings/summary/route.ts` — call it in the existing catch blocks; responses unchanged.
+**Notes / risks / follow-up:** Response bodies stay flat (`server_error`, `expired`, EMPTY) so the
+endpoints still leak nothing. After deploy, a failing sign-up shows in Vercel → Logs as
+`[api/subscribe] Resend → 403 …` or `[api/subscribe] Supabase POST subscribers → …`. Supabase error
+text comes from PostgREST and does not echo the inserted row. tsc 0, lint 11/11.
+**Suggested commit:** fix(feedback): log the cause behind server_error in the feedback routes
+
+---
+
 ## [2026-10-24 10:30] Feedback loop + consent: one-tap ratings, consented quotes, email opt-in, Consent Mode v2, tip/share tracking
 
 **Goal:** Founder question after the audit: "are we taking any benefit from users who build a CV
