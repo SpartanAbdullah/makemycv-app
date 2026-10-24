@@ -211,9 +211,8 @@ const PreviewOverlay = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-/* ─── TopBar — 64px, logo + autosave + score chip + actions ── */
+/* ─── TopBar — 64px, logo + score chip + actions ───────────── */
 const TopBar = ({
-  cvName,
   saveError,
   scoreReport,
   scoreDelta,
@@ -221,7 +220,6 @@ const TopBar = ({
   onDownload,
   isDownloading,
 }: {
-  cvName: string;
   saveError: boolean;
   scoreReport: ScoreReport;
   /** Points gained/lost since import. undefined = no baseline, pill hidden. */
@@ -248,19 +246,12 @@ const TopBar = ({
       {/* Left — logo + auto-save chip */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
         <Logo variant="horizontal" height={32} />
-        <div
-          className="hidden md:block"
-          style={{
-            width: 1,
-            height: 18,
-            background: "var(--ff-line)",
-            margin: "0 4px",
-            flexShrink: 0,
-          }}
-        />
-        {saveError ? (
-          // Save failures must be loud on EVERY viewport — the happy-path
-          // label is cosmetic, this one is data loss in progress.
+        {saveError && (
+          // Save failures must be loud on EVERY viewport. (The happy-path
+          // "<name> · saved on this device" label that used to sit here was
+          // dropped 2026-10-24 — founder: it was noise, and the room is
+          // better spent on the score chip and actions. The privacy promise
+          // still appears in the form footer.)
           <span
             role="status"
             style={{
@@ -278,21 +269,6 @@ const TopBar = ({
           >
             Not saved — storage full
           </span>
-        ) : (
-          <span
-            className="hidden md:inline"
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 11,
-              color: "var(--ff-muted)",
-              letterSpacing: "0.06em",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {cvName} · saved on this device
-          </span>
         )}
       </div>
 
@@ -304,14 +280,18 @@ const TopBar = ({
             entry point for everyone else. */}
         <Link
           href="/jd-match"
+          aria-label="Match to a job"
           className="hidden lg:inline-flex cv-top-btn cv-top-btn-secondary"
         >
           <Icon name="lightbulb" size={13} />
-          Match to a job
+          {/* Label spans collapse to icon-only when the left column is
+              narrow (see the @container rule in the shell's style block). */}
+          <span className="cv-top-btn-label">Match to a job</span>
         </Link>
         <button
           type="button"
           onClick={onTemplates}
+          aria-label="All templates"
           className="hidden sm:inline-flex cv-top-btn cv-top-btn-secondary"
         >
           <svg
@@ -330,7 +310,7 @@ const TopBar = ({
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
           </svg>
-          All templates
+          <span className="cv-top-btn-label">All templates</span>
         </button>
         <button
           type="button"
@@ -365,10 +345,22 @@ const TopBar = ({
   );
 };
 
-/* ─── Right preview drawer (xl+ only) ─────────────────────── */
-type PreviewFitMode = "width" | "page";
+/* ─── Right preview column (xl+ only) ─────────────────────── */
+/* Founder request 2026-10-24: the CV owns the whole right-hand column —
+ * from the top of the window to the bottom and out to the right edge —
+ * and the full page is visible at once. The column is sized to A4's
+ * aspect from the viewport height (--preview-col-w in the shell's style
+ * block), so a one-page CV fills it exactly with no gutter on any side;
+ * longer CVs scroll inside it. The template cycler and Fullscreen sit in a
+ * toolbar that slides down from the top on hover / keyboard focus, so
+ * nothing covers the sheet while the user is reading it. The old drawer
+ * (absolute inside MAIN AREA, 24px insets, fixed footer, fit toggle) is
+ * gone: with an A4-shaped column "fit width" and "fit page" are the same
+ * scale, so there is nothing left to toggle. */
+const A4_W = 794;
+const A4_H = 1123;
 
-const PreviewDrawer = ({
+const PreviewColumn = ({
   templateId,
   onPrevTemplate,
   onNextTemplate,
@@ -380,55 +372,62 @@ const PreviewDrawer = ({
   onFullscreen: () => void;
 }) => {
   const template = getTemplateById(templateId);
-  // "width" (default) fills the drawer edge-to-edge and scrolls — readable
-  // while editing. "page" keeps the old fit-everything-at-once view for an
-  // at-a-glance check of the whole layout.
-  const [fitMode, setFitMode] = useState<PreviewFitMode>("width");
-  return (
-    <div
-      style={{
-        position: "absolute",
-        right: "var(--drawer-gap)",
-        // Flush against the progress-bar line (founder request 2026-07: the
-        // 24px inset above the drawer read as wasted space) AND against the
-        // viewport bottom (founder request 2026-10-24: the matching inset
-        // below it was the same waste). The bar's own bottom border acts as
-        // the drawer's top edge, so borderTop is off; the viewport edge is
-        // the bottom, so borderBottom is off and nothing is rounded. The
-        // right gap stays — it is the lane for the form's own scrollbar.
-        top: 0,
-        bottom: 0,
-        width: "var(--drawer-w)",
-        background: "var(--ff-card)",
-        border: "1px solid var(--ff-line)",
-        borderTop: "none",
-        borderBottom: "none",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-drawer)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        zIndex: 5,
-      }}
-    >
-      {/* Drawer body — the CV render area. Default fit-width mode renders the
-          page at the drawer's full width and scrolls vertically (readable
-          text while editing); fit-page mode shrinks the whole CV into view
-          at once. The CV renders in full including its own page padding —
-          faithful to the export. */}
-      <DrawerPreviewBody fitMode={fitMode} />
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.8);
+  const [contentHeight, setContentHeight] = useState(A4_H);
 
-      {/* Drawer footer — template cycler + action buttons. 8px vertical
-          padding (was 12) gives the sheet above it 8px more; the controls
-          keep their shared 36px height. */}
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const content = contentRef.current;
+    if (!wrap || !content) return;
+
+    const update = () => {
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      if (w <= 0 || h <= 0) return;
+      // Fit exactly one A4 page. Width-bound in practice (the column is
+      // A4-shaped); height-bound only when the column is clamped wider
+      // than the viewport height allows. The scrollbar is hidden (CSS), so
+      // clientWidth never changes with content height and the scale cannot
+      // oscillate with a scrollbar that appears and disappears.
+      setScale(Math.min(w / A4_W, h / A4_H));
+      // minHeight on the sheet keeps this >= A4_H, so a short CV still
+      // reads as a full white page rather than a strip on a grey canvas.
+      setContentHeight(Math.max(content.scrollHeight, A4_H));
+    };
+
+    update();
+    const wrapObs = new ResizeObserver(update);
+    const contentObs = new ResizeObserver(update);
+    wrapObs.observe(wrap);
+    contentObs.observe(content);
+    return () => {
+      wrapObs.disconnect();
+      contentObs.disconnect();
+    };
+  }, []);
+
+  return (
+    <aside className="cv-preview-col hidden xl:flex" aria-label="Live CV preview">
+      {/* Slide-down toolbar — hidden until the pointer is over the column
+          or something inside it has focus (see .cv-preview-tools in the
+          style block). */}
       <div
+        className="cv-preview-tools"
         style={{
-          padding: "8px 12px",
-          borderTop: "1px solid var(--ff-line)",
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2,
           display: "flex",
-          gap: 8,
-          flexShrink: 0,
           alignItems: "center",
+          gap: 8,
+          padding: "8px 12px",
+          background: "var(--ff-card)",
+          borderBottom: "1px solid var(--ff-line)",
+          boxShadow: "var(--shadow-float)",
         }}
       >
         {/* Template cycler */}
@@ -437,8 +436,8 @@ const PreviewDrawer = ({
             display: "inline-flex",
             alignItems: "center",
             gap: 2,
-            // 36px is the footer's shared control height — the cycler already
-            // computes to exactly 36, pinning it keeps siblings flush.
+            // 36px is the toolbar's shared control height — the cycler
+            // already computes to exactly 36, pinning it keeps siblings flush.
             height: 36,
             padding: "3px 4px 3px 10px",
             background: "var(--ff-paper)",
@@ -479,64 +478,6 @@ const PreviewDrawer = ({
             <Icon name="chevron-right" size={12} color="var(--ff-muted)" />
           </button>
         </div>
-        {/* Fit mode toggle — replaces the duplicate "Download PDF" button
-            (the TopBar Download is the single, export-gated CTA). */}
-        <div
-          role="group"
-          aria-label="Preview fit mode"
-          style={{
-            display: "inline-flex",
-            // Shared 36px footer control height: 28px segments + 3+3 padding
-            // + 2px border.
-            height: 36,
-            padding: 3,
-            background: "var(--ff-paper)",
-            border: "1px solid var(--ff-line)",
-            borderRadius: 999,
-            flexShrink: 0,
-            gap: 2,
-          }}
-        >
-          {(
-            [
-              { mode: "width" as PreviewFitMode, label: "Fit width" },
-              { mode: "page" as PreviewFitMode, label: "Fit page" },
-            ]
-          ).map(({ mode, label }) => {
-            const active = fitMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setFitMode(mode)}
-                aria-pressed={active}
-                // Background/color/hover live on .cv-fit-seg (globals.css);
-                // the aria-pressed attribute drives the active-segment state
-                // via its [aria-pressed="true"] selector — no inline colors,
-                // or they'd override the class :hover rule.
-                className="cv-fit-seg"
-                style={{
-                  fontFamily: "var(--font-body)",
-                  // 12.5 matches the Fullscreen button label — one font size
-                  // across the footer's action controls.
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  height: 28,
-                  padding: "0 10px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  border: "none",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
         <button
           type="button"
           onClick={onFullscreen}
@@ -548,9 +489,6 @@ const PreviewDrawer = ({
             fontFamily: "var(--font-body)",
             fontSize: 12.5,
             color: "var(--ff-ink)",
-            // Pill family at the shared 36px footer height — matches the
-            // cycler and fit toggle beside it (and the mobile footer's
-            // full-width pill Download).
             height: 36,
             padding: "0 9px",
             display: "inline-flex",
@@ -564,115 +502,45 @@ const PreviewDrawer = ({
           Fullscreen
         </button>
       </div>
-    </div>
-  );
-};
 
-/* Preview body — two fit modes (the founder feedback round, B6):
- *
- * "width" (default): scale = min(wrapW / A4_W, 1). The page fills the
- * drawer edge-to-edge and the body scrolls vertically — 1.3×–2.9× larger
- * than the old fit-page view, so body text is actually readable while
- * editing. Same proven pattern as MobilePreviewView (spacer div carries
- * the scaled height; content stays 794px wide so scrollHeight is
- * scale-independent — no ResizeObserver feedback loop).
- *
- * "page": the original behaviour — scale = min(wrapW / A4_W, wrapH /
- * contentH, 1) so the entire CV is visible at once with no scrolling.
- *
- * Two ResizeObservers feed the calculation: one on the wrap (drawer size)
- * and one on the inner content (unscaled CV height). The live preview
- * renders the CV in full, including each template's own page padding —
- * faithful to the export (an earlier top-clipping experiment broke the
- * full-bleed sidebar templates; don't reintroduce it). */
-const A4_W = 794;
-const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0.45);
-  const [contentHeight, setContentHeight] = useState(1123);
-
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    const content = contentRef.current;
-    if (!wrap || !content) return;
-
-    const update = () => {
-      const w = wrap.clientWidth;
-      const h = wrap.clientHeight;
-      const ch = content.scrollHeight;
-      if (w <= 0 || h <= 0 || ch <= 0) return;
-      // No upper cap (founder request 2026-10-24): the old min(w / A4_W, 1)
-      // left ~50px of sunken gutter either side of the 794px sheet on wide
-      // drawers, which read as wasted space. The CV is live DOM, not a
-      // raster, so the browser re-rasterises it crisply at any static scale.
-      const scaleW = w / A4_W;
-      setScale(fitMode === "page" ? Math.min(scaleW, h / ch) : scaleW);
-      setContentHeight(ch);
-    };
-
-    update();
-    const wrapObs = new ResizeObserver(update);
-    const contentObs = new ResizeObserver(update);
-    wrapObs.observe(wrap);
-    contentObs.observe(content);
-    return () => {
-      wrapObs.disconnect();
-      contentObs.disconnect();
-    };
-  }, [fitMode]);
-
-  const fitWidth = fitMode === "width";
-  return (
-    <div
-      ref={wrapRef}
-      // Scrollable in width mode, so keyboard users must be able to reach it
-      // (axe scrollable-region-focusable, 2026-10). Page mode never scrolls.
-      tabIndex={fitWidth ? 0 : -1}
-      role="region"
-      aria-label="CV preview"
-      style={{
-        flex: 1,
-        // Sunken canvas in width mode so any residual gutter reads as a
-        // deliberate desk surface, not dead whitespace.
-        background: fitWidth ? "var(--ff-sunken, #F1F2F0)" : "white",
-        overflowY: fitWidth ? "auto" : "hidden",
-        overflowX: "hidden",
-        // Reserve the scrollbar lane permanently in width mode. The scale is
-        // now derived from clientWidth with no cap, so a scrollbar that
-        // appears and disappears would change the width, re-scale the page,
-        // and could oscillate for a CV whose scaled height sits within a
-        // scrollbar-width of the body height. A stable gutter removes the
-        // feedback path entirely.
-        scrollbarGutter: fitWidth ? "stable" : undefined,
-        position: "relative",
-      }}
-    >
-      {/* Spacer carries the scaled height in width mode so the wrap can
-          scroll; in page mode everything fits and the height is moot. */}
+      {/* The sheet. Scrollable for multi-page CVs, so keyboard users must be
+          able to reach it (axe scrollable-region-focusable, 2026-10); focus
+          also reveals the toolbar above. */}
       <div
+        ref={wrapRef}
+        tabIndex={0}
+        role="region"
+        aria-label="CV preview"
+        className="cv-preview-scroll"
         style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
           position: "relative",
-          height: fitWidth ? contentHeight * scale : "100%",
         }}
       >
-        <div
-          ref={contentRef}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: "50%",
-            width: A4_W,
-            transformOrigin: "top center",
-            transform: `translateX(-50%) scale(${scale})`,
-            background: "white",
-            boxShadow: fitWidth ? "0 6px 24px rgba(11,15,12,0.08)" : undefined,
-          }}
-        >
-          <PreviewPanel sticky={false} />
+        {/* Spacer carries the scaled height so the wrap can scroll; the
+            sheet stays A4_W wide so scrollHeight is scale-independent. */}
+        <div style={{ position: "relative", height: contentHeight * scale }}>
+          <div
+            ref={contentRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: "50%",
+              width: A4_W,
+              minHeight: A4_H,
+              transformOrigin: "top center",
+              transform: `translateX(-50%) scale(${scale})`,
+              background: "white",
+            }}
+          >
+            <PreviewPanel sticky={false} />
+          </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
 
@@ -1092,13 +960,6 @@ export const BuilderShell = ({
       ? scoreReport.total - scoreBaseline.total
       : undefined;
 
-  const cvName =
-    (data.personal.firstName?.trim() || data.personal.lastName?.trim())
-      ? `${data.personal.firstName?.trim() ?? ""} ${data.personal.lastName?.trim() ?? ""}`
-          .trim()
-          .split(" ")[0] + "'s CV"
-      : "Untitled CV";
-
   // ---- Template cycling (drawer chevrons) ----
   const handleCycleTemplate = (direction: 1 | -1) => {
     const idx = templates.findIndex((t) => t.id === data.settings.templateId);
@@ -1286,9 +1147,11 @@ export const BuilderShell = ({
         value={{ requestDownload: handleDownload, isDownloading }}
       >
       <div
+        // Column below xl, row (left column | preview column) at xl+ —
+        // flex-direction lives in the style block (.cv-shell).
+        className="cv-shell"
         style={{
           display: "flex",
-          flexDirection: "column",
           height: "100dvh",
           width: "100%",
           overflow: "hidden",
@@ -1303,8 +1166,12 @@ export const BuilderShell = ({
         <a href="#builder-form" className="ff-skip-link">
           Skip to the form
         </a>
+        {/* Left column: chrome + form. Below xl it is display:contents (no
+            box of its own, so its children stay direct flex items of the
+            shell exactly as before); at xl+ it is a flex column beside the
+            full-height preview column. */}
+        <div className="cv-shell-left">
         <TopBar
-          cvName={cvName}
           saveError={saveError}
           scoreReport={scoreReport}
           scoreDelta={scoreDelta}
@@ -1542,20 +1409,21 @@ export const BuilderShell = ({
             </div>
           )}
 
-          {/* Preview drawer — mounted ONLY on confirmed xl+ viewports
-              (audit PERF-1); the hidden/xl:block class stays as a CSS
-              belt-and-braces. Hidden on the review step. */}
-          {!stepIsReview && isDesktop && (
-            <div className="hidden xl:block" style={{ pointerEvents: "auto" }}>
-              <PreviewDrawer
-                templateId={data.settings.templateId}
-                onPrevTemplate={() => handleCycleTemplate(-1)}
-                onNextTemplate={() => handleCycleTemplate(1)}
-                onFullscreen={() => setPreviewOpen(true)}
-              />
-            </div>
-          )}
         </div>
+        </div>
+
+        {/* Preview column — mounted ONLY on confirmed xl+ viewports
+            (audit PERF-1); its hidden/xl:flex classes stay as a CSS
+            belt-and-braces. Hidden on the review step. A sibling of
+            .cv-shell-left, so it spans the full window height. */}
+        {!stepIsReview && isDesktop && (
+          <PreviewColumn
+            templateId={data.settings.templateId}
+            onPrevTemplate={() => handleCycleTemplate(-1)}
+            onNextTemplate={() => handleCycleTemplate(1)}
+            onFullscreen={() => setPreviewOpen(true)}
+          />
+        )}
 
         {/* Mobile Edit | Preview toggle — replaces the old floating pill.
             Hidden on xl+ via Tailwind (side-by-side handles desktop). */}
@@ -1697,16 +1565,10 @@ export const BuilderShell = ({
           @media (min-width: 1280px) {
             .ff-form-column {
               padding: 28px 24px 28px 40px;
-              /* Fill the space up to 28px short of the drawer, capped at
-                 --form-max for ultra-wide readability. The reservation MUST
-                 live inside max-width: with a plain margin-right, an
-                 over-constrained row (width:100% + margin) resolves by
-                 IGNORING margin-right in LTR, and the form would slide
-                 under the drawer. */
-              max-width: min(
-                var(--form-max),
-                calc(100% - var(--drawer-w) - var(--drawer-gap) - 28px)
-              );
+              /* The preview is a flex sibling column now, not an absolute
+                 drawer laid over this one, so the form only needs the
+                 --form-max readability cap. */
+              max-width: var(--form-max);
             }
             .ff-form-column-review {
               /* Review step has no preview drawer, so it can use the whole
@@ -1716,6 +1578,65 @@ export const BuilderShell = ({
               margin-right: 0;
               padding: 28px 40px 28px 40px;
             }
+          }
+          /* ── Split shell ──────────────────────────────────────────
+             Founder request 2026-10-24: the CV owns the whole right-hand
+             column — top of the window to the bottom, out to the right
+             edge — with the full page visible. The column is A4-shaped from
+             the viewport height, so one page fills it with no gutter on any
+             side. Below xl nothing here applies: .cv-shell-left has no box
+             and the shell is the same flex column it always was. */
+          .cv-shell { flex-direction: column; }
+          .cv-shell-left { display: contents; }
+          @media (min-width: 1280px) {
+            .cv-shell { flex-direction: row; }
+            .cv-shell-left {
+              display: flex;
+              flex-direction: column;
+              flex: 1 1 0;
+              min-width: 0;
+              height: 100%;
+              container-type: inline-size;
+            }
+            .cv-preview-col {
+              --preview-col-w: clamp(460px, calc(100dvh * 0.7071), 48vw);
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              flex-shrink: 0;
+              width: var(--preview-col-w);
+              height: 100%;
+              background: var(--ff-sunken);
+              border-left: 1px solid var(--ff-line);
+              overflow: hidden;
+            }
+            /* Toolbar slides in from above on hover or keyboard focus. */
+            .cv-preview-tools {
+              transform: translateY(-100%);
+              opacity: 0;
+              transition: transform 180ms ease, opacity 180ms ease;
+            }
+            .cv-preview-col:hover .cv-preview-tools,
+            .cv-preview-col:focus-within .cv-preview-tools {
+              transform: none;
+              opacity: 1;
+            }
+            /* No visible scrollbar: the sheet's scale derives from the
+               column's clientWidth, and a scrollbar that came and went would
+               re-scale the page. Wheel, touch and keyboard scrolling still
+               work (the region is focusable). */
+            .cv-preview-scroll { scrollbar-width: none; }
+            .cv-preview-scroll::-webkit-scrollbar { display: none; }
+            /* Narrow left column (about 1280-1500px windows): the secondary
+               top-bar buttons drop their labels so the score chip and
+               Download still fit on one row. */
+            @container (max-width: 1040px) {
+              .cv-top-btn-label { display: none; }
+              .cv-top-btn-secondary { padding: 0 12px; }
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .cv-preview-tools { transition: none; }
           }
           .cv-bead-strip::-webkit-scrollbar { display: none; }
         `}</style>

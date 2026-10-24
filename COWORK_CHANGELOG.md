@@ -16,30 +16,41 @@ Format:
 
 ---
 
-## [2026-10-24 18:30] Builder: live preview drawer fills its space
+## [2026-10-24 18:45] Builder: CV preview owns the full right column (split shell)
 
-**Goal:** Founder report 2026-10-24 (deadline 19:00): on a desktop viewport the live preview drawer
-wasted space on every side. Measured at 1920x908: the drawer body was 898px wide but fit-width mode
-capped the sheet scale at 1, so the 794px A4 sheet sat between ~52px sunken gutters; the drawer
-stopped 24px short of the viewport bottom; the footer bar was 61px tall; and the empty-state ghost
-started 170px under the header stub, so the sheet read as mostly blank.
+**Goal:** Founder report 2026-10-24: on desktop the live preview wasted space on every side. A first
+pass (de566a1, same day) only trimmed the old drawer's gutters — wrong reading. What the founder
+wants: the CV owns the whole right-hand column, top of the window to the bottom and out to the right
+edge, with the full page visible at once; the controls that were in the way move out of it
+dynamically (hover slide-in), and the "Untitled CV · saved on this device" text goes so the score
+chip and buttons have the room.
 **Files:**
-- edited: `components/builder/BuilderShell.tsx` — `DrawerPreviewBody`: fit-width scale is now
-  `w / A4_W` with no upper cap (sheet fills the body edge to edge; DOM re-rasterises crisply) and the
-  wrap reserves its scrollbar lane with `scrollbar-gutter: stable` so an appearing/disappearing
-  scrollbar cannot re-scale the page and oscillate. `PreviewDrawer`: `bottom: 0`, no bottom border,
-  no rounded corners (flush to the viewport bottom like it already was to the progress bar); footer
-  padding 12 → 8px vertical.
-- edited: `components/preview/PreviewPanel.tsx` — `PreviewGhost` top 27% → 15% so the sketch starts
-  just under the header stub.
-**Notes / risks / follow-up:** The 24px right gap (`--drawer-gap`) is kept on purpose: it is the lane
-for the form `<main>`'s own scrollbar, which sits at the viewport edge; covering it would hide the
-form's scrollbar. Reclaiming it needs the form column to become its own scroll container (bigger
-layout change, not for a 40-minute window). Fit-page mode is unchanged in behaviour (its scale is
-still bounded by body height / content height). Only xl+ viewports are affected; the mobile
-fullscreen preview is untouched. Verified with a production build; `smoke:builder` not run (no
-blur/layout change on the form side).
-**Suggested commit:** fix(builder): let the live preview sheet fill the drawer (uncapped fit-width scale, drawer flush to bottom, tighter footer, ghost lifted)
+- edited: `components/builder/BuilderShell.tsx` —
+  - Shell root gets `.cv-shell`; TopBar + progress strip + bars + MAIN AREA are wrapped in
+    `.cv-shell-left`. Below xl the wrapper is `display: contents` (DOM-neutral, same flex column as
+    before). At xl+ the shell becomes a row: left column (chrome + scrolling form, its own scrollbar
+    now sits at its right edge) beside a full-height `PreviewColumn`.
+  - `PreviewColumn` replaces `PreviewDrawer` + `DrawerPreviewBody`. Width is
+    `clamp(460px, calc(100dvh * 0.7071), 48vw)` — A4's aspect from the viewport height — so one page
+    fills it exactly with no gutter on any side; scale = `min(w / A4_W, h / A4_H)`; the sheet has
+    `minHeight: A4_H` so short CVs still read as a page; longer CVs scroll inside the column with the
+    scrollbar hidden (`scrollbar-width: none`) so the scale can never oscillate with a scrollbar.
+  - Toolbar (template cycler + Fullscreen) is an absolute strip that slides down on `:hover` /
+    `:focus-within`; reduced-motion disables the transition. The Fit width / Fit page toggle is gone —
+    in an A4-shaped column both modes are the same scale.
+  - TopBar: `cvName` prop and the "· saved on this device" label removed (the storage-full error pill
+    stays); "Match to a job" / "All templates" labels are `.cv-top-btn-label` spans with `aria-label`
+    on the controls, hidden by an `@container (max-width: 1040px)` rule on `.cv-shell-left` so the row
+    still fits beside the preview at 1280px.
+  - Form column at xl+: `max-width: var(--form-max)` only (no more drawer subtraction).
+- edited: `components/preview/PreviewPanel.tsx` — `PreviewGhost` top 27% → 15% (from the first pass;
+  still right: the sketch starts under the header stub).
+**Notes / risks / follow-up:** `--drawer-w` / `--drawer-gap` in globals.css are now unused by the
+builder (kept; harmless). Review step is unchanged (no preview column, left column spans the window).
+Mobile/tablet (< xl) DOM and CSS are unchanged by construction. Verified on a production build at
+1920x908 and 1280x720; `smoke:builder` not run. If the founder wants the preview wider than A4-shaped
+(e.g. a true 50/50 with gutters) that is a one-line change to `--preview-col-w`.
+**Suggested commit:** feat(builder): CV preview owns the full right column — A4-shaped split shell, hover toolbar, subtitle dropped
 
 ## [2026-10-24 18:10] Analytics: reset GTM data-layer parameters on every push
 
