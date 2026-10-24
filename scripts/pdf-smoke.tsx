@@ -152,6 +152,7 @@ const TEMPLATE_IDS = [
   "onyx",
   "sandstone",
   "banner",
+  "gulf-standard",
 ];
 
 async function main() {

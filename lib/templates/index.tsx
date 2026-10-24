@@ -6,6 +6,7 @@ import { ClassicTemplate } from "./classic";
 import { CorpSidebarTemplate } from "./corp-sidebar";
 import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
+import { GulfStandardTemplate } from "./gulf-standard";
 import { ModernTemplate } from "./modern";
 import { OnyxTemplate } from "./onyx";
 import { ProfessionalPhotoTemplate, ProfessionalTemplate } from "./professional";
@@ -111,6 +112,48 @@ const ATSCleanThumb = () => (
       <div className="h-1 w-full rounded bg-slate-200" />
       <div className="h-1 w-5/6 rounded bg-slate-200" />
       <div className="h-1 w-4/6 rounded bg-slate-200" />
+    </div>
+  </div>
+);
+
+const GulfStandardThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Header: name block left, passport-ratio photo top-right */}
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 space-y-1 pt-0.5">
+        <div className="h-2.5 w-20 rounded bg-slate-800" />
+        <div className="h-1.5 w-14 rounded bg-[#1E3A5F]" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+      </div>
+      <div className="h-9 w-7 flex-shrink-0 border border-slate-400 bg-slate-300" />
+    </div>
+    {/* Personal Details: accent heading on a rule, two-column label/value rows */}
+    <div className="mt-2 h-1.5 w-14 rounded bg-[#1E3A5F]" />
+    <div className="mt-1 h-px w-full bg-[#1E3A5F]" />
+    <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1">
+      <div className="flex gap-1">
+        <div className="h-1 w-5 rounded bg-slate-500" />
+        <div className="h-1 flex-1 rounded bg-slate-200" />
+      </div>
+      <div className="flex gap-1">
+        <div className="h-1 w-5 rounded bg-slate-500" />
+        <div className="h-1 flex-1 rounded bg-slate-200" />
+      </div>
+      <div className="flex gap-1">
+        <div className="h-1 w-5 rounded bg-slate-500" />
+        <div className="h-1 flex-1 rounded bg-slate-200" />
+      </div>
+      <div className="flex gap-1">
+        <div className="h-1 w-5 rounded bg-slate-500" />
+        <div className="h-1 flex-1 rounded bg-slate-200" />
+      </div>
+    </div>
+    {/* Profile */}
+    <div className="mt-2 h-1.5 w-10 rounded bg-[#1E3A5F]" />
+    <div className="mt-1 h-px w-full bg-[#1E3A5F]" />
+    <div className="mt-1.5 space-y-1">
+      <div className="h-1 w-full rounded bg-slate-200" />
+      <div className="h-1 w-5/6 rounded bg-slate-200" />
     </div>
   </div>
 );
@@ -318,6 +361,20 @@ export const templates: TemplateDefinition[] = [
     badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
+  },
+  {
+    id: "gulf-standard",
+    name: "Gulf Standard",
+    // Single column, every detail a flex row, DOM order = reading order, so
+    // the ATS badge is honest (template audit 2026-10, shortlist item 1).
+    description:
+      "The UAE format: labelled personal details, passport photo, single column.",
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
+    Thumbnail: GulfStandardThumb,
+    Render: GulfStandardTemplate,
   },
   {
     id: "exec-split",

@@ -30,6 +30,14 @@ import { meaningfulEducation } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
 import { splitSkills } from "../../lib/utils/skills";
 import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
+// Gulf Standard shares its Personal Details rows and degree de-dup rule with
+// the live template so both renderers print identical label/value pairs.
+import {
+  GULF_STANDARD_ACCENT,
+  gulfDegreeTitle,
+  gulfDetailColumns,
+  gulfDetailRows,
+} from "../../lib/templates/gulf-standard";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -3997,6 +4005,385 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   GULF STANDARD PDF LAYOUT (single column, passport photo,
+   labelled Personal Details grid)
+   Mirrors lib/templates/gulf-standard.tsx section by section — same
+   order, same text, same empty-state rules, same photo gating. Sizes are
+   the live px × 0.75. Own heading/experience/education blocks (the shared
+   EducationEntry and "Role | Company" row do not match the Gulf spec).
+   ═══════════════════════════════════════════════════════════ */
+
+const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, GULF_STANDARD_ACCENT);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  // Accent is text/rule only on a white page → the contrast-guarded form.
+  const accent = theme.accentText;
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const summary = data.personal.summary?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const certifications = data.certifications.filter(
+    (cert) => cert.name?.trim() || cert.issuer?.trim(),
+  );
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills.filter((skill) => skill.name?.trim()),
+  );
+  const detailRows = gulfDetailRows(data);
+  const detailColumns = gulfDetailColumns(detailRows);
+
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const roundPhoto = data.settings.photoShape === "round";
+  // 85 × 108 pt passport box (3.5 : 4.5); "round" is an 85 pt circle in both
+  // renderers because a single corner radius cannot draw an ellipse here.
+  const PHOTO_W = 85;
+  const photoHeight = roundPhoto ? PHOTO_W : 108;
+
+  type ContactItem = { text: string; href?: string };
+  const contacts: ContactItem[] = [];
+  const phone = data.personal.phone?.trim() || "";
+  const email = data.personal.email?.trim() || "";
+  const locationText = data.personal.location?.trim() || "";
+  const linkedin = data.personal.linkedin?.trim() || "";
+  const website = data.personal.website?.trim() || "";
+  if (phone) contacts.push({ text: phone, href: `tel:${phone}` });
+  if (email) contacts.push({ text: email, href: `mailto:${email}` });
+  if (locationText) contacts.push({ text: locationText });
+  if (linkedin)
+    contacts.push({ text: shortenDisplayUrl(linkedin), href: normalizeHref(linkedin) });
+  if (website)
+    contacts.push({ text: shortenDisplayUrl(website), href: normalizeHref(website) });
+
+  const hasDetails = detailRows.length > 0;
+  const hasSummary = summary.length > 0;
+  const hasSkills = generalSkills.length > 0 || technicalSkills.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasCertifications = certifications.length > 0;
+  const hasProjects = projects.length > 0;
+
+  // First rendered section gets marginTop 0; spaceScale touches ONLY the
+  // gap between sections (16pt at level 3), never the spacing inside one.
+  const sectionOrder: Array<[string, boolean]> = [
+    ["details", hasDetails],
+    ["profile", hasSummary],
+    ["skills", hasSkills],
+    ["experience", hasExperience],
+    ["education", hasEducation],
+    ["certifications", hasCertifications],
+    ["projects", hasProjects],
+  ];
+  const firstSection = sectionOrder.find(([, present]) => present)?.[0] ?? null;
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const body: Style = { fontSize: 8.6 * fs, lineHeight: 1.45 * ls, color: SLATE_700 };
+  const small: Style = { fontSize: 8.25 * fs, lineHeight: 1.45 * ls, color: SLATE_600 };
+  const dateStyle: Style = {
+    fontSize: 8.25 * fs,
+    lineHeight: 1.45 * ls,
+    color: SLATE_500,
+    textAlign: "right",
+    flexShrink: 0,
+  };
+  const entryTitle: Style = {
+    flex: 1,
+    fontSize: 9 * fs,
+    lineHeight: 1.35 * ls,
+    ...bold,
+    color: SLATE_900,
+  };
+  const entryRow: Style = {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 9,
+  };
+  const detailText: Style = { fontSize: 8.25 * fs, lineHeight: 1.45 * ls };
+  // Spec: 4pt bullet indent (the shared sheet uses 12pt); quieter dot.
+  const bulletStyles: Record<string, Style> = {
+    ...s,
+    bulletList: { ...s.bulletList, paddingLeft: 4, marginTop: 2 },
+    bulletItem: { ...s.bulletItem, marginBottom: 1.5 },
+    bulletDot: { ...s.bulletDot, color: SLATE_500 },
+  };
+
+  // A render helper, not a component declared inside render
+  // (react-hooks/static-components).
+  // 64pt keeps a heading with at least an entry title row and a bullet or
+  // two: at 40pt the PROJECTS heading was orphaned at the foot of page 1
+  // while its first (unwrappable) entry opened page 2.
+  const heading = (id: string, label: string) => (
+    <View
+      minPresenceAhead={64}
+      style={{
+        marginTop: firstSection === id ? 0 : 16 * sp,
+        marginBottom: 5,
+        paddingBottom: 2,
+        borderBottomWidth: 0.75,
+        borderBottomColor: accent,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 8.5 * fs,
+          lineHeight: 1.3 * ls,
+          ...bold,
+          letterSpacing: 0.6,
+          color: accent,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
+  const skillLine = (skills: typeof generalSkills) =>
+    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Sub-labels only when BOTH groups exist (same rule as the live template).
+  const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
+  const skillLabel: Style = { ...small, ...bold, color: SLATE_800 };
+
+  return (
+    <View>
+      {/* ── Header: text block + in-flow passport photo ── */}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 10.5 }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            // Keep the text block at least as tall as the photo so a short
+            // header never leaves the 108pt photo hanging below it.
+            minHeight: showPhoto ? photoHeight : undefined,
+          }}
+        >
+          <Text style={{ fontSize: 20 * fs, lineHeight: 1.15 * ls, ...bold, color: SLATE_900 }}>
+            {name}
+          </Text>
+          {headline ? (
+            <Text style={{ fontSize: 11 * fs, lineHeight: 1.3 * ls, color: accent, marginTop: 1.5 }}>
+              {headline}
+            </Text>
+          ) : null}
+          {contacts.length > 0 ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 4.5 }}>
+              {contacts.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                  {item.href ? (
+                    <Link src={item.href} style={{ ...small, textDecoration: "none" }}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={small}>{item.text}</Text>
+                  )}
+                  {i < contacts.length - 1 ? (
+                    <Text style={{ ...small, color: SLATE_400, marginHorizontal: 4.5 }}>|</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+        {showPhoto && data.personal.photo ? (
+          <Image
+            src={data.personal.photo}
+            style={{
+              width: PHOTO_W,
+              height: photoHeight,
+              objectFit: "cover",
+              borderWidth: 0.75,
+              borderColor: SLATE_300,
+              // react-pdf's shorthand resolver throws on a falsy radius, so
+              // the square frame omits the key instead of passing 0.
+              ...(roundPhoto ? { borderRadius: PHOTO_W / 2 } : {}),
+            }}
+          />
+        ) : null}
+      </View>
+
+      {/* ── Personal Details: one row per label/value pair, column stacks ── */}
+      {hasDetails ? (
+        <View wrap={false}>
+          {heading("details", "PERSONAL DETAILS")}
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            {detailColumns.map((column, ci) => (
+              <View key={ci} style={{ flex: 1 }}>
+                {column.map((row) => (
+                  <View key={row.label} style={{ flexDirection: "row", gap: 6, marginBottom: 2 }}>
+                    <Text style={{ ...detailText, width: "38%", ...bold, color: SLATE_800 }}>
+                      {row.label}
+                    </Text>
+                    <Text style={{ ...detailText, flex: 1, color: SLATE_700 }}>{row.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Sections are fragments, not Views: react-pdf only honours a
+          heading's minPresenceAhead when the heading has previous siblings
+          in the same parent, so headings and entries sit directly under the
+          root View (a heading wrapped as the first child of a section View
+          is always orphaned at a page foot). */}
+      {/* ── Profile ── */}
+      {hasSummary ? (
+        <>
+          {heading("profile", "PROFILE")}
+          <Text style={body}>{summary}</Text>
+        </>
+      ) : null}
+
+      {/* ── Core Skills: text lines under bold sub-labels, no chips ── */}
+      {hasSkills ? (
+        <>
+          {heading("skills", "CORE SKILLS")}
+          {generalSkills.length > 0 ? (
+            <View>
+              {showSkillLabels ? <Text style={skillLabel}>General</Text> : null}
+              <Text style={body}>{skillLine(generalSkills)}</Text>
+            </View>
+          ) : null}
+          {technicalSkills.length > 0 ? (
+            <View style={{ marginTop: generalSkills.length > 0 ? 4 : 0 }}>
+              {showSkillLabels ? <Text style={skillLabel}>Technical</Text> : null}
+              <Text style={body}>{skillLine(technicalSkills)}</Text>
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* ── Work Experience ── */}
+      {hasExperience ? (
+        <>
+          {heading("experience", "WORK EXPERIENCE")}
+          {experience.map((role, i) => {
+            const companyLine = [role.company?.trim(), role.location?.trim()]
+              .filter(Boolean)
+              .join(" | ");
+            return (
+              <View
+                key={role.id}
+                style={{ marginBottom: i < experience.length - 1 ? 9 : 0 }}
+                minPresenceAhead={48}
+              >
+                <View style={entryRow}>
+                  <Text style={entryTitle}>{role.role?.trim() || "Role"}</Text>
+                  <Text style={dateStyle}>
+                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                  </Text>
+                </View>
+                {companyLine ? (
+                  <Text style={{ ...small, marginTop: 0.75 }}>{companyLine}</Text>
+                ) : null}
+                <BulletList bullets={role.bullets ?? []} s={bulletStyles} />
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {/* ── Education ── */}
+      {hasEducation ? (
+        <>
+          {heading("education", "EDUCATION")}
+          {education.map((edu, i) => {
+            const school = edu.school?.trim() || "";
+            const notes = edu.notes?.trim() || "";
+            const attestingBody = edu.attestingBody?.trim() || "";
+            return (
+              <View
+                key={edu.id}
+                style={{ marginBottom: i < education.length - 1 ? 9 : 0 }}
+                wrap={false}
+              >
+                <View style={entryRow}>
+                  <Text style={entryTitle}>
+                    {gulfDegreeTitle(edu)}
+                    {school ? (
+                      <Text style={{ fontFamily: fonts.regular, fontWeight: 400, color: SLATE_700 }}>
+                        {` | ${school}`}
+                      </Text>
+                    ) : null}
+                  </Text>
+                  <Text style={dateStyle}>{formatDateRange(edu.startDate, edu.endDate)}</Text>
+                </View>
+                {notes ? <Text style={{ ...small, marginTop: 0.75 }}>{notes}</Text> : null}
+                {edu.attested && attestingBody ? (
+                  <Text style={{ ...small, marginTop: 0.75 }}>{`Attested — ${attestingBody}`}</Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {/* ── Certifications ── */}
+      {hasCertifications ? (
+        <>
+          {heading("certifications", "CERTIFICATIONS")}
+          {certifications.map((cert, i) => {
+            const certName = cert.name?.trim() || "";
+            const tail = [cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" | ");
+            return (
+              <Text
+                key={cert.id}
+                style={{ ...body, marginBottom: i < certifications.length - 1 ? 2 : 0 }}
+              >
+                <Text style={{ ...bold, color: SLATE_800 }}>{certName || tail}</Text>
+                {certName && tail ? (
+                  <Text style={{ color: SLATE_600 }}>{` | ${tail}`}</Text>
+                ) : null}
+              </Text>
+            );
+          })}
+        </>
+      ) : null}
+
+      {/* ── Projects ── */}
+      {hasProjects ? (
+        <>
+          {heading("projects", "PROJECTS")}
+          {projects.map((project, i) => {
+            const link = project.link?.trim() || "";
+            const showLink = shouldShowProjectLink(link);
+            return (
+              <View
+                key={project.id}
+                style={{ marginBottom: i < projects.length - 1 ? 9 : 0 }}
+                wrap={false}
+              >
+                <Text style={{ ...entryTitle, flex: undefined }}>
+                  {project.name?.trim() || "Project"}
+                </Text>
+                {showLink ? (
+                  <Link
+                    src={normalizeHref(link)}
+                    style={{ ...small, marginTop: 0.75, textDecoration: "underline" }}
+                  >
+                    {shortenDisplayUrl(link)}
+                  </Link>
+                ) : null}
+                <BulletList bullets={project.bullets ?? []} s={bulletStyles} />
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -4035,6 +4422,7 @@ export const CVDocument = ({
     // Banner's band bleeds, but only on page 1 and with negative margins that
     // are themselves scaled by marginScale, so its page padding scales too.
     "banner",
+    "gulf-standard",
   ]);
   const pageStyle = SINGLE_COLUMN.has(templateId)
     ? {
@@ -4068,6 +4456,8 @@ export const CVDocument = ({
         return <SandstonePDFLayout data={data} />;
       case "banner":
         return <BannerPDFLayout data={data} />;
+      case "gulf-standard":
+        return <GulfStandardPDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }
