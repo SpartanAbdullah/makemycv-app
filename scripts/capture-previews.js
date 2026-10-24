@@ -28,13 +28,14 @@ const TEMPLATE_IDS = [
   "corp-sidebar",
   "onyx",
   "sandstone",
+  "banner",
   "professional",
   "professional-photo",
 ];
 // Photo-forward templates additionally captured without their photo
 // (?photo=0) as <id>-nophoto-preview.png, so the marketing site can offer
 // a with/without-photo comparison per template.
-const PHOTO_TEMPLATE_IDS = ["onyx", "sandstone", "professional-photo"];
+const PHOTO_TEMPLATE_IDS = ["onyx", "sandstone", "banner", "professional-photo"];
 const BASE_URL = (
   process.env.PREVIEW_BASE_URL ||
   process.argv[2] ||
