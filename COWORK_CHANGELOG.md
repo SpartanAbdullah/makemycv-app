@@ -16,6 +16,21 @@ Format:
 
 ---
 
+## [2026-10-24 18:10] Analytics: reset GTM data-layer parameters on every push
+
+**Goal:** GTM container version 4 (published 2026-10-24) sends the feedback/engagement events to GA4
+through one tag with Data Layer Variables for `stars`, `surface`, `consent`, `source`, `rail`,
+`context`, `method`, `format`. The live check showed GTM keeps each key's last value across pushes:
+a `tip_click` after a `share_click` reported `method=copy_link`. The transport now resets those keys.
+**Files:**
+- edited: `lib/analytics.ts` — `track()` pushes `{ event, ...PARAM_RESET, ...params }`; `PARAM_KEYS`
+  lists the DLV keys (also `template`, used by the existing cv_export tag).
+**Notes / risks / follow-up:** Same change in makemycv-site/lib/analytics.ts (the two helpers mirror
+each other on purpose). When a new DLV is added in GTM, add its key to both lists.
+**Suggested commit:** fix(analytics): reset data-layer parameter keys on every push
+
+---
+
 ## [2026-10-24 16:30] Feedback routes: log the error behind every `server_error`
 
 **Goal:** First production check of the feedback round: `/api/subscribe` answered 500 `server_error`
