@@ -4,6 +4,13 @@
    are self-hosted through next/font/local in app/fonts/app.ts — see that file
    for why (gstatic build-time URLs are not hermetic). */
 @import "tailwindcss";
+/* Tailwind v4 scans every non-ignored file for class names, including
+   Markdown. A Windows path in docs/template-audit-2026-10.md (\709c06...)
+   parsed as a CSS escape and failed the build (2026-10-24). Prose folders
+   hold no class names, so keep the scanner out of them. */
+@source not "../docs";
+@source not "../_cowork";
+@source not "../artifacts";
 
 /* ─── MakeMyCV Design System v3 — "Focus Flow" ───────────────
    Calm, modern, UAE-rooted CV builder. Single emerald accent
