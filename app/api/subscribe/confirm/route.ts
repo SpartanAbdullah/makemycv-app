@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sbPatch, sbSelect, supabaseConfigured } from "@/lib/server/supabase";
 import { hashToken, newToken } from "@/lib/server/tokens";
 import { SITE_ORIGIN } from "@/lib/server/origins";
+import { logRouteError } from "@/lib/server/logRouteError";
 
 /**
  * Email sign-up, step 2 of 2: the link in the confirmation email. Sets
@@ -37,7 +38,8 @@ export async function GET(request: Request) {
       "id",
     );
     return NextResponse.redirect(`${SITE_ORIGIN}/thanks?subscribed=1`, 302);
-  } catch {
+  } catch (err) {
+    logRouteError("api/subscribe/confirm", err);
     return expired;
   }
 }
