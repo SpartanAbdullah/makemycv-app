@@ -26,7 +26,9 @@ const PreviewGhost = () => (
   <div
     aria-hidden="true"
     className="pointer-events-none absolute inset-x-0"
-    style={{ top: "27%", padding: "0 10%" }}
+    // 15% (was 27%) starts the sketch ~36px under the header stub instead of
+    // leaving a third of the sheet blank above it (founder, 2026-10-24).
+    style={{ top: "15%", padding: "0 10%" }}
   >
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 30 }}>
       <span

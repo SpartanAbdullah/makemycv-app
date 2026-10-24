@@ -16,6 +16,31 @@ Format:
 
 ---
 
+## [2026-10-24 18:30] Builder: live preview drawer fills its space
+
+**Goal:** Founder report 2026-10-24 (deadline 19:00): on a desktop viewport the live preview drawer
+wasted space on every side. Measured at 1920x908: the drawer body was 898px wide but fit-width mode
+capped the sheet scale at 1, so the 794px A4 sheet sat between ~52px sunken gutters; the drawer
+stopped 24px short of the viewport bottom; the footer bar was 61px tall; and the empty-state ghost
+started 170px under the header stub, so the sheet read as mostly blank.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` — `DrawerPreviewBody`: fit-width scale is now
+  `w / A4_W` with no upper cap (sheet fills the body edge to edge; DOM re-rasterises crisply) and the
+  wrap reserves its scrollbar lane with `scrollbar-gutter: stable` so an appearing/disappearing
+  scrollbar cannot re-scale the page and oscillate. `PreviewDrawer`: `bottom: 0`, no bottom border,
+  no rounded corners (flush to the viewport bottom like it already was to the progress bar); footer
+  padding 12 → 8px vertical.
+- edited: `components/preview/PreviewPanel.tsx` — `PreviewGhost` top 27% → 15% so the sketch starts
+  just under the header stub.
+**Notes / risks / follow-up:** The 24px right gap (`--drawer-gap`) is kept on purpose: it is the lane
+for the form `<main>`'s own scrollbar, which sits at the viewport edge; covering it would hide the
+form's scrollbar. Reclaiming it needs the form column to become its own scroll container (bigger
+layout change, not for a 40-minute window). Fit-page mode is unchanged in behaviour (its scale is
+still bounded by body height / content height). Only xl+ viewports are affected; the mobile
+fullscreen preview is untouched. Verified with a production build; `smoke:builder` not run (no
+blur/layout change on the form side).
+**Suggested commit:** fix(builder): let the live preview sheet fill the drawer (uncapped fit-width scale, drawer flush to bottom, tighter footer, ghost lifted)
+
 ## [2026-10-24 18:10] Analytics: reset GTM data-layer parameters on every push
 
 **Goal:** GTM container version 4 (published 2026-10-24) sends the feedback/engagement events to GA4

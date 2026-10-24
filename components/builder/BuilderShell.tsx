@@ -390,16 +390,20 @@ const PreviewDrawer = ({
         position: "absolute",
         right: "var(--drawer-gap)",
         // Flush against the progress-bar line (founder request 2026-07: the
-        // 24px inset above the drawer read as wasted space). The bar's own
-        // bottom border acts as the drawer's top edge, so borderTop is off
-        // and only the bottom corners are rounded.
+        // 24px inset above the drawer read as wasted space) AND against the
+        // viewport bottom (founder request 2026-10-24: the matching inset
+        // below it was the same waste). The bar's own bottom border acts as
+        // the drawer's top edge, so borderTop is off; the viewport edge is
+        // the bottom, so borderBottom is off and nothing is rounded. The
+        // right gap stays — it is the lane for the form's own scrollbar.
         top: 0,
-        bottom: "var(--drawer-gap)",
+        bottom: 0,
         width: "var(--drawer-w)",
         background: "var(--ff-card)",
         border: "1px solid var(--ff-line)",
         borderTop: "none",
-        borderRadius: "0 0 18px 18px",
+        borderBottom: "none",
+        borderRadius: 0,
         boxShadow: "var(--shadow-drawer)",
         display: "flex",
         flexDirection: "column",
@@ -414,10 +418,12 @@ const PreviewDrawer = ({
           faithful to the export. */}
       <DrawerPreviewBody fitMode={fitMode} />
 
-      {/* Drawer footer — template cycler + action buttons. */}
+      {/* Drawer footer — template cycler + action buttons. 8px vertical
+          padding (was 12) gives the sheet above it 8px more; the controls
+          keep their shared 36px height. */}
       <div
         style={{
-          padding: 12,
+          padding: "8px 12px",
           borderTop: "1px solid var(--ff-line)",
           display: "flex",
           gap: 8,
@@ -596,9 +602,11 @@ const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
       const h = wrap.clientHeight;
       const ch = content.scrollHeight;
       if (w <= 0 || h <= 0 || ch <= 0) return;
-      // Cap at 1 so single-page CVs in a generously-sized drawer don't
-      // up-scale and look pixelated.
-      const scaleW = Math.min(w / A4_W, 1);
+      // No upper cap (founder request 2026-10-24): the old min(w / A4_W, 1)
+      // left ~50px of sunken gutter either side of the 794px sheet on wide
+      // drawers, which read as wasted space. The CV is live DOM, not a
+      // raster, so the browser re-rasterises it crisply at any static scale.
+      const scaleW = w / A4_W;
       setScale(fitMode === "page" ? Math.min(scaleW, h / ch) : scaleW);
       setContentHeight(ch);
     };
@@ -630,6 +638,13 @@ const DrawerPreviewBody = ({ fitMode }: { fitMode: PreviewFitMode }) => {
         background: fitWidth ? "var(--ff-sunken, #F1F2F0)" : "white",
         overflowY: fitWidth ? "auto" : "hidden",
         overflowX: "hidden",
+        // Reserve the scrollbar lane permanently in width mode. The scale is
+        // now derived from clientWidth with no cap, so a scrollbar that
+        // appears and disappears would change the width, re-scale the page,
+        // and could oscillate for a CV whose scaled height sits within a
+        // scrollbar-width of the body height. A stable gutter removes the
+        // feedback path entirely.
+        scrollbarGutter: fitWidth ? "stable" : undefined,
         position: "relative",
       }}
     >
