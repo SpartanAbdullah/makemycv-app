@@ -348,6 +348,11 @@ export const CustomizePanel = () => {
         gap: 18,
       }}
     >
+      {/* Founder, 2026-10-24: the card is headed "Your call" and runs in the
+          order a person actually decides things — photo, typeface, colour,
+          then the fine-tuning sliders under their own "Design & Font" label.
+          (It used to open with the four sliders under a "Design & Font"
+          card heading and bury Photo at the bottom.) */}
       <div>
         <div
           style={{
@@ -358,59 +363,70 @@ export const CustomizePanel = () => {
             marginBottom: 2,
           }}
         >
-          Design &amp; Font
+          Your call
         </div>
         <div style={{ fontSize: 12, color: "var(--ff-muted)", lineHeight: 1.5 }}>
           Live preview updates as you tweak.
         </div>
       </div>
 
-      <Group label={`Page margins: ${pageMargins}`}>
-        <StepSlider
-          value={pageMargins}
-          min={1}
-          max={5}
-          onChange={(v) => setSetting("pageMargins", v)}
-          leftLabel="narrow"
-          rightLabel="wide"
-          ariaLabel="Page margins"
+      <Group label="Photo">
+        <Segmented
+          options={PHOTO_SHAPES}
+          value={settings.photoShape ?? "round"}
+          onChange={(v) => setSetting("photoShape", v)}
         />
       </Group>
 
-      <Group label={`Font size: ${fontSize}`}>
-        <StepSlider
-          value={fontSize}
-          min={1}
-          max={5}
-          onChange={(v) => setSetting("fontSize", v)}
-          leftLabel="smaller"
-          rightLabel="larger"
-          ariaLabel="Font size"
-        />
-      </Group>
-
-      <Group label={`Line height: ${lineHeight}`}>
-        <StepSlider
-          value={lineHeight}
-          min={1}
-          max={5}
-          onChange={(v) => setSetting("lineHeight", v)}
-          leftLabel="tight"
-          rightLabel="loose"
-          ariaLabel="Line height"
-        />
-      </Group>
-
-      <Group label={`Section spacing: ${sectionSpacing}`}>
-        <StepSlider
-          value={sectionSpacing}
-          min={1}
-          max={5}
-          onChange={(v) => setSetting("sectionSpacing", v)}
-          leftLabel="compact"
-          rightLabel="airy"
-          ariaLabel="Section spacing"
-        />
+      <Group label="Font style">
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            maxWidth: 240,
+          }}
+        >
+          <select
+            value={settings.fontFamily ?? "sans"}
+            onChange={(e) =>
+              setSetting("fontFamily", e.target.value as CvFontFamily)
+            }
+            aria-label="Font style"
+            style={{
+              appearance: "none",
+              WebkitAppearance: "none",
+              width: "100%",
+              border: "1px solid var(--ff-line)",
+              borderRadius: 10,
+              background: "var(--ff-paper)",
+              padding: "9px 34px 9px 12px",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--ff-ink)",
+              cursor: "pointer",
+            }}
+          >
+            {FONT_FAMILIES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.sample}
+              </option>
+            ))}
+          </select>
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              right: 12,
+              pointerEvents: "none",
+              color: "var(--ff-muted)",
+              display: "inline-flex",
+            }}
+          >
+            <Icon name="chevron-down" size={14} />
+          </span>
+        </div>
       </Group>
 
       <Divider />
@@ -538,64 +554,69 @@ export const CustomizePanel = () => {
 
       <Divider />
 
-      <Group label="Font style">
+      {/* Fine-tuning sliders, grouped under their own label now that the
+          card heading no longer names them. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div
           style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            maxWidth: 240,
+            fontFamily: "var(--font-display)",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--ff-ink)",
+            marginBottom: -6,
           }}
         >
-          <select
-            value={settings.fontFamily ?? "sans"}
-            onChange={(e) =>
-              setSetting("fontFamily", e.target.value as CvFontFamily)
-            }
-            aria-label="Font style"
-            style={{
-              appearance: "none",
-              WebkitAppearance: "none",
-              width: "100%",
-              border: "1px solid var(--ff-line)",
-              borderRadius: 10,
-              background: "var(--ff-paper)",
-              padding: "9px 34px 9px 12px",
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--ff-ink)",
-              cursor: "pointer",
-            }}
-          >
-            {FONT_FAMILIES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.sample}
-              </option>
-            ))}
-          </select>
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              right: 12,
-              pointerEvents: "none",
-              color: "var(--ff-muted)",
-              display: "inline-flex",
-            }}
-          >
-            <Icon name="chevron-down" size={14} />
-          </span>
+          Design &amp; Font
         </div>
-      </Group>
 
-      <Group label="Photo">
-        <Segmented
-          options={PHOTO_SHAPES}
-          value={settings.photoShape ?? "round"}
-          onChange={(v) => setSetting("photoShape", v)}
-        />
-      </Group>
+        <Group label={`Page margins: ${pageMargins}`}>
+          <StepSlider
+            value={pageMargins}
+            min={1}
+            max={5}
+            onChange={(v) => setSetting("pageMargins", v)}
+            leftLabel="narrow"
+            rightLabel="wide"
+            ariaLabel="Page margins"
+          />
+        </Group>
+
+        <Group label={`Font size: ${fontSize}`}>
+          <StepSlider
+            value={fontSize}
+            min={1}
+            max={5}
+            onChange={(v) => setSetting("fontSize", v)}
+            leftLabel="smaller"
+            rightLabel="larger"
+            ariaLabel="Font size"
+          />
+        </Group>
+
+        <Group label={`Line height: ${lineHeight}`}>
+          <StepSlider
+            value={lineHeight}
+            min={1}
+            max={5}
+            onChange={(v) => setSetting("lineHeight", v)}
+            leftLabel="tight"
+            rightLabel="loose"
+            ariaLabel="Line height"
+          />
+        </Group>
+
+        <Group label={`Section spacing: ${sectionSpacing}`}>
+          <StepSlider
+            value={sectionSpacing}
+            min={1}
+            max={5}
+            onChange={(v) => setSetting("sectionSpacing", v)}
+            leftLabel="compact"
+            rightLabel="airy"
+            ariaLabel="Section spacing"
+          />
+        </Group>
+      </div>
     </div>
   );
 };

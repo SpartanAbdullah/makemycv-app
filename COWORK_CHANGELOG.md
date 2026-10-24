@@ -16,6 +16,57 @@ Format:
 
 ---
 
+## [2026-10-24 19:05] Review step: customize card reordered, headed "Your call"
+
+**Goal:** Founder, 2026-10-24 (confirmed in chat before editing): the Review page's customize card
+should run in the order a person decides things — picture, typeface, colour, then the fine-tuning
+sliders — and the card heading should say something warmer than "Design & Font". Chosen heading:
+"Your call".
+**Files:**
+- edited: `components/builder/CustomizePanel.tsx` — card heading "Design & Font" → "Your call"
+  (subtitle unchanged); groups reordered to Photo → Font style → Colours → a "Design & Font"
+  sub-label over the four sliders (page margins, font size, line height, section spacing). No control,
+  label, aria-label or setting key changed; only order and the two headings.
+**Notes / risks / follow-up:** Nothing else keys on the old heading text (grep: only docs/changelog
+prose). Verified on a production build on the Review step at 1920x908.
+**Suggested commit:** feat(review): customize card runs photo → font → colours → sliders under "Your call"
+
+## [2026-10-24 18:45] Builder: CV preview owns the full right column (split shell)
+
+**Goal:** Founder report 2026-10-24: on desktop the live preview wasted space on every side. A first
+pass (de566a1, same day) only trimmed the old drawer's gutters — wrong reading. What the founder
+wants: the CV owns the whole right-hand column, top of the window to the bottom and out to the right
+edge, with the full page visible at once; the controls that were in the way move out of it
+dynamically (hover slide-in), and the "Untitled CV · saved on this device" text goes so the score
+chip and buttons have the room.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` —
+  - Shell root gets `.cv-shell`; TopBar + progress strip + bars + MAIN AREA are wrapped in
+    `.cv-shell-left`. Below xl the wrapper is `display: contents` (DOM-neutral, same flex column as
+    before). At xl+ the shell becomes a row: left column (chrome + scrolling form, its own scrollbar
+    now sits at its right edge) beside a full-height `PreviewColumn`.
+  - `PreviewColumn` replaces `PreviewDrawer` + `DrawerPreviewBody`. Width is
+    `clamp(460px, calc(100dvh * 0.7071), 48vw)` — A4's aspect from the viewport height — so one page
+    fills it exactly with no gutter on any side; scale = `min(w / A4_W, h / A4_H)`; the sheet has
+    `minHeight: A4_H` so short CVs still read as a page; longer CVs scroll inside the column with the
+    scrollbar hidden (`scrollbar-width: none`) so the scale can never oscillate with a scrollbar.
+  - Toolbar (template cycler + Fullscreen) is an absolute strip that slides down on `:hover` /
+    `:focus-within`; reduced-motion disables the transition. The Fit width / Fit page toggle is gone —
+    in an A4-shaped column both modes are the same scale.
+  - TopBar: `cvName` prop and the "· saved on this device" label removed (the storage-full error pill
+    stays); "Match to a job" / "All templates" labels are `.cv-top-btn-label` spans with `aria-label`
+    on the controls, hidden by an `@container (max-width: 1040px)` rule on `.cv-shell-left` so the row
+    still fits beside the preview at 1280px.
+  - Form column at xl+: `max-width: var(--form-max)` only (no more drawer subtraction).
+- edited: `components/preview/PreviewPanel.tsx` — `PreviewGhost` top 27% → 15% (from the first pass;
+  still right: the sketch starts under the header stub).
+**Notes / risks / follow-up:** `--drawer-w` / `--drawer-gap` in globals.css are now unused by the
+builder (kept; harmless). Review step is unchanged (no preview column, left column spans the window).
+Mobile/tablet (< xl) DOM and CSS are unchanged by construction. Verified on a production build at
+1920x908 and 1280x720; `smoke:builder` not run. If the founder wants the preview wider than A4-shaped
+(e.g. a true 50/50 with gutters) that is a one-line change to `--preview-col-w`.
+**Suggested commit:** feat(builder): CV preview owns the full right column — A4-shaped split shell, hover toolbar, subtitle dropped
+
 ## [2026-10-24 18:10] Analytics: reset GTM data-layer parameters on every push
 
 **Goal:** GTM container version 4 (published 2026-10-24) sends the feedback/engagement events to GA4
