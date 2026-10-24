@@ -151,6 +151,7 @@ const TEMPLATE_IDS = [
   "professional-photo",
   "onyx",
   "sandstone",
+  "gulf-standard",
 ];
 
 async function main() {
