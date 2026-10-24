@@ -13,6 +13,11 @@ import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
+import {
+  bannerContactItems,
+  bannerEducationTitle,
+  bannerEssentials,
+} from "../../lib/templates/banner";
 // Opaque tints for the PDF: react-pdf converts alpha colours to 8-digit hex
 // and pdfkit misparses that as solid neon green (audit 2026-10), so every
 // translucent-looking colour is pre-blended with mix() instead. The pdf
@@ -3293,6 +3298,452 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   BANNER PDF LAYOUT (accent band + essentials strip over a
+   single column) — mirrors lib/templates/banner.tsx section by
+   section; px → pt × 0.75 throughout.
+   ═══════════════════════════════════════════════════════════ */
+
+const BannerPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, "#1e5b54");
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const { accent, accentText, accentSoft, onAccent, onAccentMuted } = theme;
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  const m = theme.marginScale;
+  // Opaque blends only — an alpha colour here renders as neon green.
+  const photoRing = mix(onAccent, accent, 0.75);
+  const headingRule = mix(accentSoft, accentText, 0.25);
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
+    "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills,
+  );
+  const essentials = bannerEssentials(data.personal);
+  const contactItems = bannerContactItems(data.personal);
+
+  const hasSummary = Boolean(data.personal.summary?.trim());
+  const hasExperience = experience.length > 0;
+  const hasSkills = generalSkills.length > 0 || technicalSkills.length > 0;
+  const hasLanguages = data.languages.length > 0;
+  const hasCertifications = data.certifications.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const roundPhoto = data.settings.photoShape !== "square";
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const bodyText: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.6 * fs,
+    lineHeight: 1.5 * ls,
+    color: SLATE_700,
+  };
+  const entryTitle: Style = {
+    ...bold,
+    fontSize: 9 * fs,
+    lineHeight: 1.35 * ls,
+    color: SLATE_800,
+  };
+  const entryDate: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.25 * fs,
+    lineHeight: 1.35 * ls,
+    color: SLATE_500,
+    textAlign: "right",
+    flexShrink: 0,
+  };
+  const subLine: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.25 * fs,
+    lineHeight: 1.4 * ls,
+    color: SLATE_600,
+  };
+  const contactStyle: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.25 * fs,
+    lineHeight: 1.6 * ls,
+    color: onAccent,
+  };
+
+  // First visible section has no top gap; every later one gets 16pt × spaceScale.
+  let sectionIndex = 0;
+  const heading = (label: string) => {
+    const isFirst = sectionIndex === 0;
+    sectionIndex += 1;
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginTop: isFirst ? 0 : 16 * sp,
+          marginBottom: 6,
+        }}
+        // Keep the heading with its first entry: education/project entries
+        // are unbreakable (~50pt), so 40pt still left orphan headings.
+        minPresenceAhead={60}
+      >
+        <Text
+          style={{
+            ...bold,
+            fontSize: 9 * fs,
+            lineHeight: 1.2 * ls,
+            color: accentText,
+            letterSpacing: 0.8,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+        <View
+          style={{ flex: 1, height: 1, backgroundColor: headingRule, marginLeft: 8 }}
+        />
+      </View>
+    );
+  };
+
+  const bullets = (items: string[]) => {
+    const list = items.map((b) => b.trim()).filter(Boolean);
+    if (list.length === 0) return null;
+    return (
+      <View style={{ marginTop: 3, paddingLeft: 10 }}>
+        {list.map((bullet, i) => (
+          <View key={i} style={{ flexDirection: "row", marginBottom: 2 }}>
+            <Text style={{ ...bodyText, width: 10, color: SLATE_400 }}>•</Text>
+            <Text style={{ ...bodyText, flex: 1 }}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const skillLine = (skills: typeof generalSkills) =>
+    skills.map((sk) => sk.name.trim()).filter(Boolean).join(" · ");
+  const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
+
+  return (
+    <View>
+      {/* ── Accent band: page 1 only, so the negative-margin bleed is safe.
+          The page padding is 27/24 × marginScale (SINGLE_COLUMN), so the
+          negative margins scale the same way to still reach the edge. ── */}
+      <View
+        style={{
+          backgroundColor: accent,
+          marginTop: -27 * m,
+          marginLeft: -24 * m,
+          marginRight: -24 * m,
+          paddingTop: 20,
+          paddingBottom: 20,
+          paddingLeft: 24 * m,
+          paddingRight: 24 * m,
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        {showPhoto && data.personal.photo && (
+          <Image
+            src={data.personal.photo}
+            style={{
+              width: 96,
+              height: roundPhoto ? 96 : 119,
+              borderRadius: roundPhoto ? 48 : 3,
+              objectFit: "cover",
+              borderWidth: 1.5,
+              borderColor: photoRing,
+              marginRight: 18,
+            }}
+          />
+        )}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              ...bold,
+              fontSize: 22 * fs,
+              lineHeight: 1.15 * ls,
+              color: onAccent,
+              letterSpacing: -0.2,
+            }}
+          >
+            {name}
+          </Text>
+          {headline ? (
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 11 * fs,
+                lineHeight: 1.35 * ls,
+                color: onAccentMuted,
+                marginTop: 3,
+              }}
+            >
+              {headline}
+            </Text>
+          ) : null}
+          {contactItems.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginTop: 7,
+              }}
+            >
+              {contactItems.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                  {item.href ? (
+                    <Link src={item.href} style={{ ...contactStyle, textDecoration: "none" }}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={contactStyle}>{item.text}</Text>
+                  )}
+                  {i < contactItems.length - 1 && (
+                    <Text style={{ ...contactStyle, marginHorizontal: 4 }}>{"·"}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* ── UAE essentials strip (plain text, bold labels, " · " joins) ── */}
+      {essentials.length > 0 && (
+        <View
+          style={{
+            backgroundColor: accentSoft,
+            marginLeft: -24 * m,
+            marginRight: -24 * m,
+            paddingLeft: 24 * m,
+            paddingRight: 24 * m,
+            paddingTop: 4,
+            paddingBottom: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fonts.regular,
+              fontSize: 7.5 * fs,
+              lineHeight: 1.5 * ls,
+              color: accentText,
+            }}
+          >
+            {essentials.map((item, i) => (
+              <Text key={item.label}>
+                {i > 0 ? "  ·  " : ""}
+                <Text style={bold}>{`${item.label}: `}</Text>
+                {item.value}
+              </Text>
+            ))}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Single-column body. Sections are fragments, not Views: react-pdf
+          only honours minPresenceAhead on a node that has previous siblings,
+          so a heading wrapped as the first child of a section View could never
+          move to the next page and was left orphaned at the page foot. ── */}
+      <View style={{ paddingTop: 16 }}>
+        {hasSummary && (
+          <>
+            {heading("Profile")}
+            <Text style={bodyText}>{data.personal.summary?.trim()}</Text>
+          </>
+        )}
+
+        {hasExperience && (
+          <>
+            {heading("Work Experience")}
+            {experience.map((role, idx) => {
+              const company = role.company?.trim();
+              const location = role.location?.trim();
+              return (
+                <View
+                  key={role.id}
+                  style={{ marginBottom: idx < experience.length - 1 ? 8 : 0 }}
+                  minPresenceAhead={48}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ ...entryTitle, flex: 1 }}>
+                      {role.role?.trim() || "Role"}
+                    </Text>
+                    <Text style={entryDate}>
+                      {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+                    </Text>
+                  </View>
+                  {company || location ? (
+                    <Text style={{ ...subLine, marginTop: 1 }}>
+                      {company ? <Text style={{ color: accentText }}>{company}</Text> : null}
+                      {company && location ? " · " : ""}
+                      {location ?? ""}
+                    </Text>
+                  ) : null}
+                  {bullets(role.bullets ?? [])}
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {hasSkills && (
+          <>
+            {heading("Skills")}
+            {generalSkills.length > 0 && (
+              <View style={{ marginBottom: technicalSkills.length > 0 ? 5 : 0 }}>
+                {showSkillLabels && (
+                  <Text style={{ ...subLine, ...bold, color: SLATE_800, marginBottom: 1 }}>
+                    General
+                  </Text>
+                )}
+                <Text style={bodyText}>{skillLine(generalSkills)}</Text>
+              </View>
+            )}
+            {technicalSkills.length > 0 && (
+              <View>
+                {showSkillLabels && (
+                  <Text style={{ ...subLine, ...bold, color: SLATE_800, marginBottom: 1 }}>
+                    Technical
+                  </Text>
+                )}
+                <Text style={bodyText}>{skillLine(technicalSkills)}</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {hasLanguages && (
+          <>
+            {heading("Languages")}
+            {data.languages.map((lang) => (
+              <Text key={lang.id} style={bodyText}>
+                <Text style={{ ...bold, color: SLATE_800 }}>{lang.name.trim()}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+              </Text>
+            ))}
+          </>
+        )}
+
+        {hasCertifications && (
+          <>
+            {heading("Certifications")}
+            {data.certifications.map((cert, idx) => (
+              <Text
+                key={cert.id}
+                style={{
+                  ...bodyText,
+                  marginBottom: idx < data.certifications.length - 1 ? 2 : 0,
+                }}
+              >
+                <Text style={{ ...bold, color: SLATE_800 }}>{cert.name.trim()}</Text>
+                <Text style={{ color: SLATE_500 }}>
+                  {cert.issuer?.trim() ? ` | ${cert.issuer.trim()}` : ""}
+                  {cert.date?.trim() ? ` | ${cert.date.trim()}` : ""}
+                </Text>
+              </Text>
+            ))}
+          </>
+        )}
+
+        {hasEducation && (
+          <>
+            {heading("Education")}
+            {education.map((edu, idx) => {
+              const school = edu.school?.trim();
+              const notes = edu.notes?.trim();
+              const attestingBody = edu.attestingBody?.trim();
+              return (
+                <View
+                  key={edu.id}
+                  style={{ marginBottom: idx < education.length - 1 ? 8 : 0 }}
+                  wrap={false}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ ...entryTitle, flex: 1 }}>
+                      {bannerEducationTitle(edu)}
+                      {school ? (
+                        <Text
+                          style={{
+                            fontFamily: fonts.regular,
+                            fontWeight: 400,
+                            color: SLATE_700,
+                          }}
+                        >
+                          {` | ${school}`}
+                        </Text>
+                      ) : null}
+                    </Text>
+                    <Text style={entryDate}>
+                      {formatDateRange(edu.startDate, edu.endDate)}
+                    </Text>
+                  </View>
+                  {notes ? (
+                    <Text style={{ ...subLine, color: SLATE_500, marginTop: 1 }}>{notes}</Text>
+                  ) : null}
+                  {edu.attested && attestingBody ? (
+                    <Text style={{ ...subLine, marginTop: 1 }}>
+                      {`Attested — ${attestingBody}`}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {hasProjects && (
+          <>
+            {heading("Projects")}
+            {projects.map((project, idx) => {
+              const showLink = shouldShowProjectLink(project.link);
+              return (
+                <View
+                  key={project.id}
+                  style={{ marginBottom: idx < projects.length - 1 ? 8 : 0 }}
+                  wrap={false}
+                >
+                  <Text style={entryTitle}>{project.name?.trim() || "Project"}</Text>
+                  {showLink && project.link ? (
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{ ...subLine, marginTop: 1, textDecoration: "underline" }}
+                    >
+                      {shortenDisplayUrl(project.link)}
+                    </Link>
+                  ) : null}
+                  {bullets(project.bullets ?? [])}
+                </View>
+              );
+            })}
+          </>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -3326,6 +3777,9 @@ export const CVDocument = ({
     "professional",
     "professional-photo",
     "modern",
+    // Banner's band bleeds, but only on page 1 and with negative margins that
+    // are themselves scaled by marginScale, so its page padding scales too.
+    "banner",
   ]);
   const pageStyle = SINGLE_COLUMN.has(templateId)
     ? {
@@ -3357,6 +3811,8 @@ export const CVDocument = ({
         return <OnyxPDFLayout data={data} />;
       case "sandstone":
         return <SandstonePDFLayout data={data} />;
+      case "banner":
+        return <BannerPDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }
