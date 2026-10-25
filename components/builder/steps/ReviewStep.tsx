@@ -17,7 +17,7 @@ import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { downloadCvBackup } from "../../../lib/utils/download";
 import { readCvBackup } from "../../../lib/utils/localStorage";
-import { templates, type TemplateBadge } from "../../../lib/templates";
+import { settingsForTemplate, templates, type TemplateBadge } from "../../../lib/templates";
 import { TemplateRibbon } from "../../templates/TemplateBadges";
 import {
   computeScore,
@@ -232,7 +232,7 @@ export const ReviewStep = ({
   };
 
   const handleTemplateChange = (id: string) => {
-    updateSection("settings", { ...data.settings, templateId: id });
+    updateSection("settings", settingsForTemplate(data.settings, id));
   };
 
   // Only REQUIRED sections may warn (house rule in lib/validation/

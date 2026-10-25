@@ -160,7 +160,7 @@ subscription, because the 500ms debounce is long enough to lose the race.
 
 ## Templates read `cv.skills` directly
 
-Twelve templates under `lib/templates/`, plus `components/pdf/CVDocument.tsx` and
+Fourteen templates under `lib/templates/`, plus `components/pdf/CVDocument.tsx` and
 the DOCX export, read `cv.skills` **directly** — only a few go through
 `splitSkills()`.
 
@@ -254,6 +254,21 @@ npm run build
   from the variable woff2 files with fontTools (`fontkit` cannot read woff2 or
   variable fonts). Regenerate them if `app/fonts/*.woff2` changes;
   `lib/pdf/fonts.ts` falls back to Helvetica when they are not registered.
+- **PDF layouts share primitives** (`components/pdf/CVDocument.tsx`, since
+  2026-10-25): `pt()` for px→pt, `EducationEntry` / `ExperienceEntry` /
+  `PdfChips` / `PdfHeading` driven by a per-layout variant transcribed from
+  the live template, `withTopGap()` for the first-section rule,
+  `safeTracking()` capping letter-spacing at 8% of the size (pdf.js and ATS
+  text layers read wider tracking as spaced letters), and
+  `lib/utils/education.ts` (`educationTitle`, `attestedLabel`) for the words
+  both renderers print. Edge-bleed sidebars paint a `fixed` absolute band and
+  a transparent column pulled over it with `-27×m / -24×m` margins; page
+  padding scales with `marginScale` for every template. A new sidebar
+  template must register its band in `scripts/pdf-ops-check.mjs` (`BANDS`)
+  or the smoke will not guard its page-2 notch. `npm run smoke:pdf` renders
+  every template three times (fixture, tripled experience, density extremes)
+  and `scripts/pdf-ops-check.mjs` fails on alpha colours or a missing band.
+  Verify parity with pdf.js text extraction, not by eye.
 - **Anything that changes layout on blur needs `smoke:builder`.** A helper line
   that appears when a field loses focus moves the Continue button during the
   user's own click and the click is lost (2026-10 audit F01). `FieldError` has a

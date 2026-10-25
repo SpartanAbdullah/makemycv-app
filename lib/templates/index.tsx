@@ -1,12 +1,14 @@
 import type React from "react";
-import type { CvData, PlanTier } from "../types/cv";
+import type { CvData, CvSettings, PlanTier } from "../types/cv";
 import { ATSCleanTemplate } from "./ats-clean";
 import { BannerTemplate } from "./banner";
+import { ChronicleTemplate } from "./chronicle";
 import { ClassicTemplate } from "./classic";
 import { CorpSidebarTemplate } from "./corp-sidebar";
 import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
 import { GulfStandardTemplate } from "./gulf-standard";
+import { HARVARD_DENSITY_DEFAULTS, HarvardTemplate } from "./harvard";
 import { ModernTemplate } from "./modern";
 import { OnyxTemplate } from "./onyx";
 import { ProfessionalPhotoTemplate, ProfessionalTemplate } from "./professional";
@@ -29,21 +31,36 @@ export type TemplateDefinition = {
   name: string;
   description: string;
   badges?: TemplateBadge[];
+  /** The template prints black only — the Design panel hides its Colours group. */
+  ignoresAccent?: boolean;
+  /**
+   * Density levels the template is designed around (Harvard's one-page
+   * graduate sheet: font 2 / spacing 2). settingsForTemplate applies them
+   * when a user switches to the template with those controls still neutral
+   * and reverts them when they switch away with the defaults still in
+   * place, so one template's tuning never leaks into the next.
+   */
+  densityDefaults?: Partial<
+    Pick<CvSettings, "pageMargins" | "fontSize" | "lineHeight" | "sectionSpacing">
+  >;
   Thumbnail: () => React.ReactElement;
   Render: ({ data, plan }: { data: CvData; plan?: PlanTier }) => React.ReactElement;
 };
 
 const ClassicThumb = () => (
   <div className="h-32 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3">
-    <div className="flex items-start justify-between">
-      <div className="space-y-2">
+    {/* Live header: name, headline and a LEFT-aligned contact row, photo top-right */}
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 space-y-1.5">
         <div className="h-3 w-24 rounded bg-slate-300" />
         <div className="h-2 w-20 rounded bg-slate-200" />
+        <div className="flex gap-1">
+          <div className="h-1.5 w-10 rounded bg-slate-200" />
+          <div className="h-1.5 w-8 rounded bg-slate-200" />
+          <div className="h-1.5 w-6 rounded bg-slate-200" />
+        </div>
       </div>
-      <div className="space-y-1 text-right">
-        <div className="h-2 w-16 rounded bg-slate-200" />
-        <div className="h-2 w-12 rounded bg-slate-200" />
-      </div>
+      <div className="h-8 w-8 flex-shrink-0 rounded-full border border-slate-200 bg-slate-300" />
     </div>
     <div className="mt-4 space-y-2">
       <div className="h-2 w-16 rounded bg-slate-300" />
@@ -58,16 +75,28 @@ const ClassicThumb = () => (
 );
 
 const ModernThumb = () => (
-  <div className="h-32 rounded-xl border border-slate-200 bg-gradient-to-br from-emerald-50 to-white p-3">
-    <div className="h-4 w-16 rounded bg-emerald-200" />
-    <div className="mt-3 grid grid-cols-[2fr_1fr] gap-2">
-      <div className="space-y-2">
-        <div className="h-2 w-full rounded bg-slate-200" />
-        <div className="h-2 w-5/6 rounded bg-slate-200" />
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Live header: name + headline over a slate rule — no accent band */}
+    <div className="space-y-1.5 border-b border-slate-200 pb-2">
+      <div className="h-3 w-20 rounded bg-slate-800" />
+      <div className="h-1.5 w-14 rounded bg-slate-300" />
+    </div>
+    {/* 2fr/1fr body: bordered experience card left, education + pills right */}
+    <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
+      <div className="space-y-1.5">
+        <div className="h-1.5 w-10 rounded bg-slate-400" />
+        <div className="space-y-1 rounded-md border border-slate-200 p-1.5">
+          <div className="h-1.5 w-full rounded bg-slate-200" />
+          <div className="h-1.5 w-5/6 rounded bg-slate-200" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <div className="h-2 w-full rounded bg-emerald-100" />
-        <div className="h-2 w-4/6 rounded bg-emerald-100" />
+      <div className="space-y-1.5">
+        <div className="h-1.5 w-8 rounded bg-slate-400" />
+        <div className="flex flex-wrap gap-1">
+          <div className="h-2 w-6 rounded-full bg-slate-100" />
+          <div className="h-2 w-8 rounded-full bg-slate-100" />
+          <div className="h-2 w-5 rounded-full bg-slate-100" />
+        </div>
       </div>
     </div>
   </div>
@@ -317,13 +346,79 @@ const ProfessionalPhotoThumb = () => (
   </div>
 );
 
+const ChronicleThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Header */}
+    <div className="space-y-1">
+      <div className="h-2.5 w-20 rounded bg-slate-800" />
+      <div className="h-1.5 w-14 rounded bg-[#0E7490]" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+    </div>
+    {/* Heading flush left, then timeline rows: date | rail + dot | content */}
+    <div className="mt-2 h-1.5 w-12 rounded bg-[#0E7490]" />
+    <div className="mt-1.5 flex">
+      <div className="w-7 flex-shrink-0 space-y-[9px] pr-1.5 pt-0.5">
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+      </div>
+      <div className="relative w-3 flex-shrink-0">
+        <div className="absolute bottom-1 left-0 top-0 w-px bg-[#0E7490]/40" />
+        <div className="absolute -left-[3px] top-0 h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+        <div className="absolute -left-[3px] top-[13px] h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+        <div className="absolute -left-[3px] top-[26px] h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+      </div>
+      <div className="flex-1 space-y-[5px]">
+        <div className="h-1.5 w-16 rounded bg-slate-700" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+        <div className="h-1.5 w-14 rounded bg-slate-700" />
+        <div className="h-1 w-5/6 rounded bg-slate-200" />
+        <div className="h-1.5 w-12 rounded bg-slate-700" />
+        <div className="h-1 w-4/6 rounded bg-slate-200" />
+      </div>
+    </div>
+  </div>
+);
+
+const HarvardThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Centred serif name over a pipe contact line */}
+    <div className="flex flex-col items-center gap-1">
+      <div className="font-serif text-[13px] leading-none text-black">Name Surname</div>
+      <div className="h-1 w-28 rounded bg-slate-300" />
+    </div>
+    {/* Ruled uppercase headings, tab-stop rows, label lines — black only */}
+    <div className="mt-2.5 h-1.5 w-12 rounded bg-black" />
+    <div className="mt-1 h-px w-full bg-black" />
+    <div className="mt-1.5 flex justify-between">
+      <div className="h-1 w-20 rounded bg-slate-700" />
+      <div className="h-1 w-8 rounded bg-slate-400" />
+    </div>
+    <div className="mt-1 h-1 w-16 rounded bg-slate-300" />
+    <div className="mt-2.5 h-1.5 w-16 rounded bg-black" />
+    <div className="mt-1 h-px w-full bg-black" />
+    <div className="mt-1.5 flex justify-between">
+      <div className="h-1 w-24 rounded bg-slate-700" />
+      <div className="h-1 w-8 rounded bg-slate-400" />
+    </div>
+    <div className="mt-1 h-1 w-full rounded bg-slate-200" />
+  </div>
+);
+
 export const templates: TemplateDefinition[] = [
   /* Badges are an honest ATS-safety signal (audit UI-10): single-column
      text-first layouts get the green "ATS-Friendly" badge; sidebar/two-column
      structures get a quiet "Design-led" badge because older ATS parsers can
      interleave their columns — fine for direct email, riskier for online
      application portals. Exactly ONE template ("Classic", the default) also
-     carries "Recommended" to anchor the indecisive majority. */
+     carries "Recommended" to anchor the indecisive majority.
+
+     The badge speaks to COLUMN STRUCTURE, not to the photo (template audit
+     2026-10 defect 26): an in-flow photo does not change reading order, and
+     ATS Clean / Gulf Standard / Banner already show one while keeping the
+     badge, so Professional Photo carries ATS-Friendly like Professional. The
+     "New" ribbon is additive — the picker shows one badge by priority, so New
+     never displaces the structural badge. */
   {
     id: "classic",
     name: "Classic",
@@ -338,9 +433,11 @@ export const templates: TemplateDefinition[] = [
   {
     id: "modern",
     name: "Modern",
-    // Has a 2fr/1fr two-column body (modern.tsx:154) — NOT ATS-Friendly-badged,
-    // whatever earlier notes claimed. Verified against the template source.
-    description: "Two-column layout with a refined accent section.",
+    // Has a 2fr/1fr two-column body (the grid in modern.tsx) — NOT
+    // ATS-Friendly-badged, whatever earlier notes claimed. The template draws
+    // no accent element: slate headings, emerald essentials chips, slate pills.
+    description:
+      "Two-column layout: experience cards on the left, education and skill pills on the right.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ModernThumb,
     Render: ModernTemplate,
@@ -349,7 +446,7 @@ export const templates: TemplateDefinition[] = [
     id: "executive",
     name: "Executive",
     description:
-      "Navy sidebar, two-column. Best for direct email to a recruiter.",
+      "Left sidebar with stacked name, contact and skills; two-column. For senior profiles sent straight to a hiring manager.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ExecutiveThumb,
     Render: ExecutiveTemplate,
@@ -357,10 +454,29 @@ export const templates: TemplateDefinition[] = [
   {
     id: "ats-clean",
     name: "ATS Clean",
-    description: "Single-column layout engineered for maximum ATS pass rate.",
+    description:
+      "Single-column, text-first layout built for applicant tracking systems.",
     badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
+  },
+  {
+    id: "harvard",
+    name: "Harvard",
+    // Zero-colour serif single column, education first, a Career Objective
+    // and label-prefixed skills lines — the fresh-graduate, one-page format
+    // (template audit 2026-10, shortlist item 4). No photo, no columns, no
+    // graphics, so the ATS badge is honest. The accent is ignored entirely.
+    description:
+      "Plain serif single column, education first — the graduate one-page format.",
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
+    ignoresAccent: true,
+    densityDefaults: HARVARD_DENSITY_DEFAULTS,
+    Thumbnail: HarvardThumb,
+    Render: HarvardTemplate,
   },
   {
     id: "gulf-standard",
@@ -377,6 +493,22 @@ export const templates: TemplateDefinition[] = [
     Render: GulfStandardTemplate,
   },
   {
+    id: "chronicle",
+    name: "Chronicle",
+    // Single-column timeline: dates in a left gutter, an accent rail with a
+    // dot per entry. The one design-forward layout that stays one column
+    // with linear text order (template audit 2026-10, shortlist item 3), so
+    // it carries the ATS badge alongside "New". No photo dependency.
+    description:
+      "Timeline layout: dates in the margin, an accent rail — single column.",
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
+    Thumbnail: ChronicleThumb,
+    Render: ChronicleTemplate,
+  },
+  {
     id: "exec-split",
     name: "Executive Split",
     description: "Dark header with two-column body for senior professionals.",
@@ -388,7 +520,7 @@ export const templates: TemplateDefinition[] = [
     id: "corp-sidebar",
     name: "Corporate",
     description:
-      "Right dark sidebar. Best for direct email to a recruiter.",
+      "Right-hand sidebar carries contact, visa and skills; the main column stays plain. Best emailed direct to a recruiter.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: CorpSidebarThumb,
     Render: CorpSidebarTemplate,
@@ -398,7 +530,10 @@ export const templates: TemplateDefinition[] = [
     name: "Onyx",
     description:
       "Charcoal sidebar with a bold profile photo — modern and confident.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "Design-led", tone: "neutral" },
+    ],
     Thumbnail: OnyxThumb,
     Render: OnyxTemplate,
   },
@@ -407,7 +542,10 @@ export const templates: TemplateDefinition[] = [
     name: "Sandstone",
     description:
       "Warm sidebar with a UAE personal-details panel and profile photo.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "Design-led", tone: "neutral" },
+    ],
     Thumbnail: SandstoneThumb,
     Render: SandstoneTemplate,
   },
@@ -429,7 +567,7 @@ export const templates: TemplateDefinition[] = [
     id: "professional",
     name: "Professional",
     description:
-      "Centered single-column with a clean headline strip. ATS-friendly.",
+      "Centered name, headline and contacts over full-width ruled sections. Conservative and recruiter-safe.",
     badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ProfessionalThumb,
     Render: ProfessionalTemplate,
@@ -439,7 +577,10 @@ export const templates: TemplateDefinition[] = [
     name: "Professional Photo",
     description:
       "The Professional layout with a profile photo — polished and recruiter-ready.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
     Thumbnail: ProfessionalPhotoThumb,
     Render: ProfessionalPhotoTemplate,
   },
@@ -447,3 +588,41 @@ export const templates: TemplateDefinition[] = [
 
 export const getTemplateById = (id: string) =>
   templates.find((template) => template.id === id) ?? templates[0];
+
+
+const DENSITY_KEYS = ["pageMargins", "fontSize", "lineHeight", "sectionSpacing"] as const;
+const NEUTRAL_LEVEL = 3;
+
+/**
+ * The settings to store when the CV switches to `nextId`. Besides setting
+ * templateId it moves template density defaults in and out: leaving a
+ * template whose defaults are still in force resets those keys to neutral,
+ * and entering a template with defaults applies them to keys that are still
+ * neutral (or unset). A level the user changed by hand is never touched, so
+ * Harvard's one-page tuning never leaks into the next template and a user's
+ * own choice survives the switch. Every template-change path in the builder
+ * (Review gallery, drawer chevrons) goes through here.
+ */
+export const settingsForTemplate = (settings: CvSettings, nextId: string): CvSettings => {
+  const next: CvSettings = { ...settings, templateId: nextId };
+  if (settings.templateId === nextId) return next;
+  const leaving = templates.find((t) => t.id === settings.templateId)?.densityDefaults;
+  if (leaving) {
+    for (const key of DENSITY_KEYS) {
+      const level = leaving[key];
+      if (level !== undefined && (settings[key] ?? NEUTRAL_LEVEL) === level) {
+        next[key] = NEUTRAL_LEVEL;
+      }
+    }
+  }
+  const entering = templates.find((t) => t.id === nextId)?.densityDefaults;
+  if (entering) {
+    for (const key of DENSITY_KEYS) {
+      const level = entering[key];
+      if (level !== undefined && (next[key] ?? NEUTRAL_LEVEL) === NEUTRAL_LEVEL) {
+        next[key] = level;
+      }
+    }
+  }
+  return next;
+};

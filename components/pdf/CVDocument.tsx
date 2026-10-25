@@ -9,6 +9,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
+import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
@@ -26,7 +27,12 @@ import { mix } from "../../lib/utils/color";
 import { formatDateRange, normalizeHref } from "../../lib/utils/format";
 import { meaningfulProjects } from "../../lib/utils/projects";
 import { meaningfulExperience } from "../../lib/utils/experience";
-import { meaningfulEducation } from "../../lib/utils/education";
+import {
+  attestedLabel,
+  distinctField,
+  educationTitle,
+  meaningfulEducation,
+} from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
 import { splitSkills } from "../../lib/utils/skills";
 import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
@@ -38,6 +44,32 @@ import {
   gulfDetailColumns,
   gulfDetailRows,
 } from "../../lib/templates/gulf-standard";
+// Chronicle and Harvard share their text rules (contact order, essentials
+// labels, degree de-dup, Harvard's label-prefixed lines) with the live
+// templates so both renderers print identical text.
+import {
+  CHRONICLE_ACCENT,
+  CHRONICLE_DATE_GAP_PT,
+  CHRONICLE_DATE_TRACK_PT,
+  CHRONICLE_DOT_PT,
+  CHRONICLE_DOT_TOP_PT,
+  CHRONICLE_RAIL_TRACK_PT,
+  CHRONICLE_RAIL_WIDTH_PT,
+  chronicleContactItems,
+  chronicleDegreeTitle,
+  chronicleEssentials,
+  chronicleRailColors,
+} from "../../lib/templates/chronicle";
+import {
+  HARVARD_INK,
+  HARVARD_INK_SOFT,
+  HARVARD_PAGE_PADDING_PT,
+  HARVARD_RULE,
+  harvardContactItems,
+  harvardDegreeTitle,
+  harvardEssentials,
+  harvardSkillLines,
+} from "../../lib/templates/harvard";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -78,6 +110,11 @@ const SLATE_500 = "#64748B";
 const SLATE_400 = "#94A3B8";
 const SLATE_300 = "#CBD5E1";
 const SLATE_200 = "#E2E8F0";
+/** Tailwind green-700 — the attestation colour every live template uses. */
+const GREEN_700 = "#15803D";
+
+/** The live templates are written in CSS px (96 DPI); react-pdf is pt (72). */
+const pt = (px: number) => px * 0.75;
 
 /* ─── Styles ──────────────────────────────────────────────── */
 /*
@@ -192,6 +229,9 @@ const BASE_STYLES: Record<string, Style> = {
   },
   entryCompany: {
     fontSize: 9,
+    // Explicit regular face: this style is used as a run INSIDE the bold
+    // entryTitle, and nested Text inherits the parent's font otherwise.
+    fontFamily: "Helvetica",
     color: SLATE_700,
   },
   entryDate: {
@@ -253,49 +293,10 @@ const BASE_STYLES: Record<string, Style> = {
     transform: "rotate(-28deg)",
   },
 
-  /* ── Executive sidebar ──────────────────────────────────── */
-  /* Negative margins extend the panel to the page top/bottom/left edges,
-     escaping the page-level 27pt/24pt padding (matches the live preview).
-     The navy fill itself is NOT here: it is a separate fixed, absolutely
-     positioned band in ExecutivePDFLayout, because a background on this
-     View left a 27pt white notch at the top of page 2+ (react-pdf rebuilds
-     the split continuation with marginTop 0). Width and padding mirror the
-     live template's 200px sidebar with 28px/20px padding. */
-  execSidebar: {
-    width: 150,
-    marginTop: -27,
-    marginBottom: -27,
-    marginLeft: -24,
-    paddingTop: 21,
-    paddingBottom: 21,
-    paddingLeft: 15,
-    paddingRight: 15,
-    flexShrink: 0,
-  },
-  execName: {
-    fontSize: 14,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    lineHeight: 1.2,
-    marginBottom: 2,
-  },
-  execHeadline: {
-    fontSize: 8,
-    color: "#94A3B8",
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 0.5,
-    // Opaque 15%-white-on-navy; overridden per theme at render.
-    borderBottomColor: "#404A65",
-  },
-  execSideLabel: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    color: "#64748B",
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
-  },
+  /* ── Executive / Corporate sidebar text ────────────────── */
+  /* The sidebar column, name block and labels are inline in the layouts
+     (they depend on the theme and the margin scale); only the shared text
+     runs live here. */
   execContactItem: {
     fontSize: 7.5,
     color: "#CBD5E1",
@@ -336,7 +337,8 @@ const BASE_STYLES: Record<string, Style> = {
     fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     color: "#111827",
-    letterSpacing: 0.8,
+    // 8% of the size (live 0.1em): tracking the text layer still reads as a word.
+    letterSpacing: 0.68,
     textTransform: "uppercase",
     paddingBottom: 2,
     borderBottomWidth: 1,
@@ -358,9 +360,10 @@ const BASE_STYLES: Record<string, Style> = {
  */
 const SECTION_GAP_KEYS: Record<string, ReadonlyArray<"marginTop" | "marginBottom">> = {
   section: ["marginTop"],
-  entryBlock: ["marginBottom"],
-  sectionHeadingWrap: ["marginBottom"],
   twoCol: ["marginTop"],
+  // NOT entryBlock / sectionHeadingWrap: the live templates keep the gap
+  // between entries and under a heading fixed (space-y-3 / pb-1 + mt-2) and
+  // scale only the gap between sections (audit 2026-10 defect 37).
   // ATS Clean uses atsSectionHeading itself as the section divider; its
   // marginTop is the gap BETWEEN sections (the first section overrides it to 0
   // inline, which is unaffected).
@@ -381,7 +384,10 @@ const buildStyles = (
     // BASE_STYLES is written against the Helvetica pair; swap in the user's
     // CV face (Inter / Bricolage / Instrument Serif) once registered — see
     // lib/pdf/fonts.ts. Custom families select weight via fontWeight.
-    if (v.fontFamily === "Helvetica") v.fontFamily = fonts.regular;
+    if (v.fontFamily === "Helvetica") {
+      v.fontFamily = fonts.regular;
+      v.fontWeight = 400;
+    }
     if (v.fontFamily === "Helvetica-Bold") {
       v.fontFamily = fonts.bold;
       v.fontWeight = 700;
@@ -403,65 +409,440 @@ const buildStyles = (
 
 /* ─── Shared bullet renderer ──────────────────────────────── */
 
+type BulletStyles = { list?: Style; item?: Style; dot?: Style; text?: Style };
+
 const BulletList = ({
   bullets,
   s,
+  styles,
 }: {
   bullets: string[];
   s: Record<string, Style>;
+  /** Per-layout overrides merged over the Classic sheet (sidebar layouts). */
+  styles?: BulletStyles;
 }) => {
   const items = bullets.map((b) => b.trim()).filter(Boolean);
   if (items.length === 0) return null;
   return (
-    <View style={s.bulletList}>
+    <View style={{ ...s.bulletList, ...styles?.list }}>
       {items.map((bullet, bi) => (
-        <View key={bi} style={s.bulletItem}>
-          <Text style={s.bulletDot}>•</Text>
-          <Text style={s.bulletText}>{bullet}</Text>
+        <View key={bi} style={{ ...s.bulletItem, ...styles?.item }}>
+          <Text style={{ ...s.bulletDot, ...styles?.dot }}>•</Text>
+          <Text style={{ ...s.bulletText, ...styles?.text }}>{bullet}</Text>
         </View>
       ))}
     </View>
   );
 };
 
-/* ─── Education entry (shared fixed layout) ──────────────── */
+/* ─── Experience entry (sidebar layouts) ─────────────────── */
+/*
+ * Executive, Exec Split, Corporate, Onyx and Sandstone draw a role as
+ * "Role ............ dates" over "Company · Location" (or " | "), with the
+ * company in the accent on Onyx and Sandstone. The PDF reused Classic's
+ * "Role | Company" row and pushed the location to a grey third line
+ * (template audit 2026-10 defect 7). Classic and Professional keep the
+ * inline form because their live templates draw it that way; ATS Clean and
+ * Modern already had their own rows.
+ */
+
+type ExperienceVariant = {
+  roleStyle: Style;
+  dateStyle: Style;
+  companyStyle: Style;
+  /** Location run on the company line; defaults to companyStyle. */
+  locationStyle?: Style;
+  /** Between company and location: " · " or " | ". */
+  separator: string;
+  /** Space under the company line before the bullets (Exec Split / Corporate 3px). */
+  companyMarginBottom?: number;
+  /** Bullet text (size, line-height, colour); the marker takes the same colour. */
+  bulletText: Style;
+  /** The live <ul> margin-top and padding-left, in pt. */
+  bulletsMarginTop: number;
+  bulletsPaddingLeft: number;
+  /** Gap between roles (pt), as marginTop on every role after the first. */
+  gap: number;
+};
+
+/** Marker column width: the live disc sits inside the <ul> padding, so the
+ *  text starts exactly `bulletsPaddingLeft` in and the dot takes the last 9pt. */
+const BULLET_DOT_WIDTH = 9;
+
+const ExperienceEntry = ({
+  role,
+  v,
+  index,
+  s,
+}: {
+  role: CvData["experience"][number];
+  v: ExperienceVariant;
+  index: number;
+  s: Record<string, Style>;
+}) => {
+  const company = role.company?.trim() ?? "";
+  const location = role.location?.trim() ?? "";
+  return (
+    <View style={{ marginTop: index > 0 ? v.gap : 0 }} minPresenceAhead={48}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 6,
+        }}
+      >
+        <Text style={{ ...v.roleStyle, flex: 1 }}>{role.role?.trim() || "Role"}</Text>
+        <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
+          {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+        </Text>
+      </View>
+      {company || location ? (
+        <Text
+          style={{
+            ...v.companyStyle,
+            marginTop: 0.75,
+            marginBottom: v.companyMarginBottom ?? 0,
+          }}
+        >
+          {company}
+          {company && location ? v.separator : ""}
+          {location ? (
+            <Text style={v.locationStyle ?? v.companyStyle}>{location}</Text>
+          ) : null}
+        </Text>
+      ) : null}
+      <BulletList
+        bullets={role.bullets}
+        s={s}
+        styles={{
+          list: {
+            marginTop: v.bulletsMarginTop,
+            paddingLeft: Math.max(0, v.bulletsPaddingLeft - BULLET_DOT_WIDTH),
+          },
+          item: { marginBottom: 0 },
+          dot: {
+            width: BULLET_DOT_WIDTH,
+            fontSize: v.bulletText.fontSize,
+            color: v.bulletText.color,
+          },
+          text: v.bulletText,
+        }}
+      />
+    </View>
+  );
+};
+
+/* ─── Education entry (one primitive, one variant per template) ── */
+/*
+ * Every live template draws an education entry differently — Classic puts the
+ * school inline after the degree and the field on the notes line, ATS Clean
+ * says "Degree in Field" with the attestation inline after the school,
+ * Executive and Corporate badge the attestation in a bordered pill, Onyx and
+ * Sandstone colour the school in the accent and print notes under the
+ * attestation. The shared block used to ignore all of that and printed a bare
+ * "Attested" even without an attesting body (template audit 2026-10 defects
+ * 8, 21, 36), so each layout now passes its variant and the download reads
+ * like the preview. Wording comes from lib/utils/education.ts
+ * (educationTitle / attestedLabel) — the same functions the live files call.
+ */
+
+type EducationVariant = {
+  /** Joiner between degree and field on the title line (" · ", " — ", " in "). */
+  joiner: string;
+  /** Classic: the field is not on the title line, it opens the notes line. */
+  fieldOnNotesLine?: boolean;
+  /** Classic / Professional: " | School" inline after the title. */
+  schoolInline?: boolean;
+  titleStyle: Style;
+  dateStyle: Style;
+  /** Style of the school run (inline) or line (block). */
+  schoolStyle: Style;
+  notesStyle: Style;
+  /** Own line under the school, inline after the school, or a bordered pill beside it. */
+  attested: "line" | "inline" | "pill";
+  attestedStyle: Style;
+  /** Pill border colour; defaults to the attestation text colour. */
+  pillBorderColor?: string;
+  /** Classic / Onyx / Sandstone / Professional show nothing without an attesting body. */
+  attestedRequiresBody?: boolean;
+  /** Executive prints "ATTESTED — body". */
+  attestedUppercase?: boolean;
+  /** Onyx / Sandstone print notes after the attestation line. */
+  notesAfterAttested?: boolean;
+  /** Gap between entries (pt), as marginTop on every entry after the first. */
+  gap: number;
+};
 
 const EducationEntry = ({
   edu,
-  headingStyle,
-  s,
-  fontScale,
+  v,
+  index,
 }: {
   edu: CvData["education"][number];
-  headingStyle?: Style;
-  s: Record<string, Style>;
-  fontScale: number;
-}) => (
-  <View style={s.entryBlock} wrap={false}>
-    <View style={s.entryRow}>
-      <Text style={headingStyle ?? s.entryTitle}>
-        {[edu.degree?.trim(), edu.field?.trim()].filter(Boolean).join(" · ") ||
-          "Degree"}
-      </Text>
-      <Text style={s.entryDate}>
-        {formatDateRange(edu.startDate, edu.endDate)}
-      </Text>
+  v: EducationVariant;
+  index: number;
+}) => {
+  const degree = edu.degree?.trim() ?? "";
+  const field = edu.field?.trim() ?? "";
+  const school = edu.school?.trim() ?? "";
+  const notes = edu.notes?.trim() ?? "";
+  const body = edu.attestingBody?.trim() ?? "";
+  const showAttested =
+    Boolean(edu.attested) && (Boolean(body) || !v.attestedRequiresBody);
+  const attestedText = attestedLabel(body, v.attestedUppercase);
+  const title = v.fieldOnNotesLine
+    ? degree || "Degree"
+    : educationTitle(degree, field, v.joiner);
+  const notesLine = v.fieldOnNotesLine
+    ? [distinctField(degree, field), notes].filter(Boolean).join(" | ")
+    : notes;
+  const dates = formatDateRange(edu.startDate, edu.endDate);
+
+  const notesNode = notesLine ? (
+    <Text style={{ ...v.notesStyle, marginTop: 0.75 }}>{notesLine}</Text>
+  ) : null;
+  const attestedLine =
+    v.attested === "line" && showAttested ? (
+      <Text style={{ ...v.attestedStyle, marginTop: 0.75 }}>{attestedText}</Text>
+    ) : null;
+  const hasSchoolLine =
+    !v.schoolInline && (Boolean(school) || (showAttested && v.attested !== "line"));
+
+  return (
+    <View style={{ marginTop: index > 0 ? v.gap : 0 }} wrap={false}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 6,
+        }}
+      >
+        <Text style={{ ...v.titleStyle, flex: 1 }}>
+          {title}
+          {v.schoolInline && school ? (
+            <Text style={v.schoolStyle}>{` | ${school}`}</Text>
+          ) : null}
+        </Text>
+        {dates ? (
+          <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
+            {dates}
+          </Text>
+        ) : null}
+      </View>
+      {hasSchoolLine ? (
+        v.attested === "pill" ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 4.5,
+              marginTop: 0.75,
+            }}
+          >
+            {school ? <Text style={v.schoolStyle}>{school}</Text> : null}
+            {showAttested ? (
+              <View
+                style={{
+                  borderWidth: 0.75,
+                  borderColor: v.pillBorderColor ?? v.attestedStyle.color,
+                  borderRadius: 2.25,
+                  paddingVertical: 0.75,
+                  paddingHorizontal: 3,
+                }}
+              >
+                <Text style={v.attestedStyle}>{attestedText}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={{ ...v.schoolStyle, marginTop: 0.75 }}>
+            {school}
+            {v.attested === "inline" && showAttested ? (
+              <Text style={v.attestedStyle}>
+                {`${school ? "  " : ""}${attestedText}`}
+              </Text>
+            ) : null}
+          </Text>
+        )
+      ) : null}
+      {v.notesAfterAttested ? (
+        <>
+          {attestedLine}
+          {notesNode}
+        </>
+      ) : (
+        <>
+          {notesNode}
+          {attestedLine}
+        </>
+      )}
     </View>
-    {edu.school?.trim() ? (
-      <Text style={s.entrySubtext}>{edu.school.trim()}</Text>
-    ) : null}
-    {edu.notes?.trim() ? (
-      <Text style={{ ...s.entrySubtext, marginTop: 1 }}>
-        {edu.notes.trim()}
-      </Text>
-    ) : null}
-    {edu.attested ? (
-      <Text style={{ fontSize: 7.5 * fontScale, color: "#15803d", marginTop: 2 }}>
-        {edu.attestingBody?.trim()
-          ? `\u2713 Attested \u2014 ${edu.attestingBody.trim()}`
-          : "Attested"}
-      </Text>
-    ) : null}
+  );
+};
+
+/* ─── Chips (skills and UAE essentials) ──────────────────── */
+/*
+ * Exec Split, Corporate, Modern, Professional, Onyx and Sandstone draw skills
+ * and/or the UAE-essentials strip as bordered pills; the PDF flattened most of
+ * them to one joined text line (template audit 2026-10 defect 9). One
+ * primitive, styled per layout from the live file. ATS Clean goes the other
+ * way: its text line is the ATS-safer form, so the preview now draws the line
+ * too (see lib/templates/ats-clean.tsx). An item with a `label` prints it as a
+ * leading run (essentials: "Visa" + "Employment visa").
+ */
+
+type ChipItem = { label?: string; value: string };
+
+type ChipVariant = {
+  fontSize: number;
+  lineHeight?: number;
+  color: string;
+  backgroundColor?: string;
+  /** Border is drawn only when a colour is given (0.75pt = the live 1px). */
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius: number;
+  paddingVertical: number;
+  paddingHorizontal: number;
+  gap: number;
+  letterSpacing?: number;
+  /** Merged over the value style for the leading label run. */
+  labelStyle?: Style;
+  /** Space between label and value (pt). */
+  labelGap?: number;
+};
+
+const PdfChips = ({
+  items,
+  v,
+  style,
+}: {
+  items: ChipItem[];
+  v: ChipVariant;
+  /** Extra style on the wrapping row (marginTop, justifyContent …). */
+  style?: Style;
+}) => {
+  if (items.length === 0) return null;
+  const text: Style = {
+    fontSize: v.fontSize,
+    color: v.color,
+    ...(v.lineHeight !== undefined ? { lineHeight: v.lineHeight } : {}),
+    ...(v.letterSpacing !== undefined ? { letterSpacing: v.letterSpacing } : {}),
+  };
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: v.gap, ...style }}>
+      {items.map((item, i) => (
+        <View
+          key={`${item.label ?? ""}|${item.value}|${i}`}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: v.backgroundColor,
+            ...(v.borderColor
+              ? { borderWidth: v.borderWidth ?? 0.75, borderColor: v.borderColor }
+              : {}),
+            borderRadius: v.borderRadius,
+            paddingVertical: v.paddingVertical,
+            paddingHorizontal: v.paddingHorizontal,
+          }}
+        >
+          {item.label ? (
+            <Text style={{ ...text, ...v.labelStyle, marginRight: v.labelGap ?? 3 }}>
+              {item.label}
+            </Text>
+          ) : null}
+          <Text style={text}>{item.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/* ─── Ruled section heading (main columns) ───────────────── */
+/*
+ * Executive, Exec Split and Corporate draw small uppercase letter-spaced
+ * headings — in the accent on Executive / Exec Split, slate-800 on Corporate —
+ * over a hairline rule, but the PDF reused Classic's 9.4pt title-case slate
+ * heading on a slate-200 rule, so a custom accent coloured the preview and
+ * not the download (template audit 2026-10 defect 11). Each layout passes a
+ * variant transcribed from its live heading component; the caller decides the
+ * top margin (live Executive zeroes the first section, the other two do not).
+ */
+
+/**
+ * pdf.js — and the text-layer parsers ATS portals run — read tracking above
+ * roughly a tenth of the font size as spaces between letters: Exec Split's
+ * 0.12em headings extracted as "E X P E R I E N C E" and the 0.1em sidebar
+ * labels as "C O N TAC T" (template audit 2026-10 defect 39). The PDF caps
+ * heading tracking at 8% of the size; the live headings keep theirs, which is
+ * a visible but deliberate deviation in favour of a parseable download.
+ */
+const MAX_TRACKING_RATIO = 0.08;
+const safeTracking = (letterSpacing: number, fontSize: number) =>
+  Math.min(letterSpacing, MAX_TRACKING_RATIO * fontSize);
+
+/**
+ * Section-gap factory for headings and sidebar labels: `firstKey` is the
+ * first PRESENT section and gets no top gap (live Executive / Onyx /
+ * Sandstone zero their first heading); layouts whose live file keeps the gap
+ * on every heading (Corporate) pass null.
+ */
+const withTopGap =
+  <T extends object>(base: T, gap: number, firstKey: string | null) =>
+  (key: string): T & { marginTop: number } => ({
+    ...base,
+    marginTop: key === firstKey ? 0 : gap,
+  });
+
+type HeadingVariant = {
+  fontSize: number;
+  color: string;
+  letterSpacing: number;
+  uppercase?: boolean;
+  textAlign?: "left" | "center";
+  /** Rule under the heading; none when omitted. */
+  ruleColor?: string;
+  ruleWidth?: number;
+  paddingBottom: number;
+  marginBottom: number;
+  marginTop: number;
+};
+
+const PdfHeading = ({
+  children,
+  v,
+  fonts,
+}: {
+  children: string;
+  v: HeadingVariant;
+  fonts: PdfFontPair;
+}) => (
+  <View
+    style={{
+      marginTop: v.marginTop,
+      marginBottom: v.marginBottom,
+      paddingBottom: v.paddingBottom,
+      ...(v.ruleColor
+        ? { borderBottomWidth: v.ruleWidth ?? 0.75, borderBottomColor: v.ruleColor }
+        : {}),
+    }}
+  >
+    <Text
+      style={{
+        fontSize: v.fontSize,
+        fontFamily: fonts.bold,
+        fontWeight: 700,
+        color: v.color,
+        letterSpacing: safeTracking(v.letterSpacing, v.fontSize),
+        ...(v.uppercase ? { textTransform: "uppercase" } : {}),
+        ...(v.textAlign ? { textAlign: v.textAlign } : {}),
+      }}
+    >
+      {children}
+    </Text>
   </View>
 );
 
@@ -473,6 +854,22 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#1e5b54");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  // classic.tsx education: "Degree | School" (12px semibold / normal), then
+  // "Field | Notes" (11px slate-500), then "Attested — body" (12px green-700)
+  // only when a body was given; entries space-y-3.
+  const eduVariant: EducationVariant = {
+    joiner: " \u00B7 ",
+    fieldOnNotesLine: true,
+    schoolInline: true,
+    titleStyle: s.entryTitle,
+    dateStyle: s.entryDate,
+    schoolStyle: s.entryCompany,
+    notesStyle: s.entrySubtext,
+    attested: "line",
+    attestedStyle: { fontSize: pt(12) * theme.fontScale, color: GREEN_700 },
+    attestedRequiresBody: true,
+    gap: pt(12),
+  };
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
@@ -674,8 +1071,8 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -784,6 +1181,55 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "pill",
+    attestedStyle: {
+      fontSize: pt(8) * fs,
+      color: theme.accentText,
+      lineHeight: 1.4 * theme.lineScale,
+    },
+    attestedUppercase: true,
+    gap: pt(10),
+  };
+  const firstMain = hasSummary
+    ? "summary"
+    : hasExperience
+      ? "experience"
+      : hasEducation
+        ? "education"
+        : hasProjects
+          ? "projects"
+          : null;
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(10) * fs,
+      color: theme.accentText,
+      letterSpacing: 0.08 * pt(10) * fs,
+      uppercase: true,
+      ruleColor: theme.accentText,
+      ruleWidth: 0.75,
+      paddingBottom: pt(3),
+      marginBottom: pt(8),
+    },
+    pt(20) * theme.spaceScale,
+    firstMain,
+  );
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    separator: " | ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(12),
+    gap: pt(12),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -828,6 +1274,42 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
 
+  // executive.tsx sidebar: 22px bold stacked name, 12px headline, a 15%-ink
+  // rule with 16px above/below; 9px bold uppercase labels, each section
+  // 20px*sp below the previous one (the first sits right under the rule).
+  const execName: Style = {
+    fontSize: pt(22) * fs,
+    fontFamily: fonts.bold, fontWeight: 700,
+    color: onAccent,
+    lineHeight: 1.15 * theme.lineScale,
+  };
+  const firstSide =
+    sidebarContacts.length > 0
+      ? "contact"
+      : essentialChips.length > 0
+        ? "personal"
+        : hasSkills
+          ? "skills"
+          : hasLanguages
+            ? "languages"
+            : hasCertifications
+              ? "certifications"
+              : null;
+  const sideLabel = withTopGap<Style>(
+    {
+      fontSize: pt(9) * fs,
+      fontFamily: fonts.bold, fontWeight: 700,
+      color: onAccentMuted,
+      // Live 0.1em; capped so pdf.js / ATS text layers do not read the label
+      // as spaced letters ("C O N TAC T", audit 2026-10 defect 39).
+      letterSpacing: safeTracking(0.1 * pt(9) * fs, pt(9) * fs),
+      textTransform: "uppercase",
+      marginBottom: pt(8),
+    },
+    pt(20) * theme.spaceScale,
+    firstSide,
+  );
+
   return (
     <>
       {/* The navy band is its own fixed, absolutely positioned layer so it
@@ -847,8 +1329,22 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         }}
       />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Sidebar (transparent; the fixed band above is its fill) ── */}
-      <View style={s.execSidebar}>
+      {/* ── Sidebar (transparent; the fixed band above is its fill). Pulled
+          to the page edges with margins that undo the SCALED page padding, so
+          its own padding stays the live 28px/20px whatever the margin level. ── */}
+      <View
+        style={{
+          width: 150,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(28),
+          paddingBottom: pt(28),
+          paddingLeft: pt(20),
+          paddingRight: pt(20),
+          flexShrink: 0,
+        }}
+      >
         {/* Photo */}
         {showPhoto && data.personal.photo && (
           <View style={{ marginBottom: 12 }}>
@@ -867,29 +1363,46 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Name — stacked first/last lines (mirrors live executive) */}
-        {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
-          <>
-            {data.personal.firstName?.trim() ? (
-              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.firstName.trim()}</Text>
-            ) : null}
-            {data.personal.lastName?.trim() ? (
-              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.lastName.trim()}</Text>
-            ) : null}
-          </>
-        ) : (
-          <Text style={{ ...s.execName, color: onAccent }}>Your Name</Text>
-        )}
-
-        {/* Headline */}
-        {data.personal.headline?.trim() ? (
-          <Text style={{ ...s.execHeadline, color: onAccentMuted, borderBottomColor: mix(onAccent, theme.accent, 0.85) }}>{data.personal.headline.trim()}</Text>
-        ) : null}
+        {/* Name block — stacked first/last lines over the headline, closed
+            by the 15%-ink rule (mirrors live executive) */}
+        <View
+          style={{
+            borderBottomWidth: 0.75,
+            borderBottomColor: mix(onAccent, theme.accent, 0.85),
+            paddingBottom: pt(16),
+            marginBottom: pt(16),
+          }}
+        >
+          {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
+            <>
+              {data.personal.firstName?.trim() ? (
+                <Text style={execName}>{data.personal.firstName.trim()}</Text>
+              ) : null}
+              {data.personal.lastName?.trim() ? (
+                <Text style={execName}>{data.personal.lastName.trim()}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text style={execName}>Your Name</Text>
+          )}
+          {data.personal.headline?.trim() ? (
+            <Text
+              style={{
+                fontSize: pt(12) * fs,
+                color: onAccentMuted,
+                marginTop: pt(6),
+                lineHeight: 1.4 * theme.lineScale,
+              }}
+            >
+              {data.personal.headline.trim()}
+            </Text>
+          ) : null}
+        </View>
 
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
+            <Text style={sideLabel("contact")}>Contact</Text>
             {sidebarContacts.map((item, i) =>
               item.href ? (
                 <Link
@@ -923,7 +1436,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
+            <Text style={sideLabel("personal")}>Personal</Text>
             {essentialChips.map((chip) => (
               <Text key={chip.label} style={{ ...s.execContactItem, color: onAccentMuted }}>
                 {chip.label}: {chip.value}
@@ -935,7 +1448,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
+            <Text style={sideLabel("skills")}>Skills</Text>
             {data.skills.map((skill) => (
               <Text key={skill.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
@@ -948,7 +1461,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
+            <Text style={sideLabel("languages")}>Languages</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
@@ -965,7 +1478,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
+            <Text style={sideLabel("certifications")}>Certifications</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
@@ -997,70 +1510,41 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 20 * m }}>
+      {/* ── Main column (live padding 28px*m; top/bottom/right come from the
+          scaled page padding) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(28) * m }}>
         {/* Summary */}
         {hasSummary && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Summary</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>Summary</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {/* Experience */}
         {hasExperience && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Experience</Text>
-            </View>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={s.entryCompany}>
-                        {` | ${role.company.trim()}`}
-                      </Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(
-                      role.startDate,
-                      role.endDate,
-                      role.isCurrent,
-                    )}
-                  </Text>
-                </View>
-                {role.location?.trim() && (
-                  <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                )}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
 
         {/* Education */}
         {hasEducation && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Education</Text>
-            </View>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
 
         {/* Projects */}
         {hasProjects && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Projects</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
@@ -1149,6 +1633,17 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#111827");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " in ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    notesStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
+    attested: "inline",
+    attestedStyle: { fontSize: pt(10) * fs, color: GREEN_700 },
+    gap: pt(10),
+  };
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1188,7 +1683,9 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         {generalSkills.length > 0 && (
           <View>
             <Text style={headingStyle("skills")}>Skills</Text>
-            <Text style={{ ...s.body, color: "#374151" }}>
+            {/* Text line, not chips, in both renderers — the ATS-safer form
+                (template audit 2026-10 defect 9); ats-clean.tsx matches. */}
+            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
               {generalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
@@ -1204,7 +1701,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
             >
               Technical Skills
             </Text>
-            <Text style={{ ...s.body, color: "#374151" }}>
+            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
               {technicalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
@@ -1298,7 +1795,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("experience")}>Experience</Text>
           {experience.map((role) => (
-            <View key={role.id} style={{ marginBottom: 9 * theme.spaceScale }} minPresenceAhead={48}>
+            <View key={role.id} style={{ marginBottom: pt(12) }} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text
                   style={{
@@ -1348,18 +1845,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasEducation && (
         <View>
           <Text style={headingStyle("education")}>Education</Text>
-          {education.map((edu) => (
-            <EducationEntry
-              key={edu.id}
-              edu={edu}
-              s={s}
-              fontScale={theme.fontScale}
-              headingStyle={{
-                fontFamily: fonts.bold, fontWeight: 700,
-                fontSize: 8.6 * theme.fontScale,
-                color: "#111827",
-              }}
-            />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -1413,7 +1900,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
-              <View key={project.id} style={{ marginBottom: 8 * theme.spaceScale }} wrap={false}>
+              <View key={project.id} style={{ marginBottom: pt(10) }} wrap={false}>
                 <Text
                   style={{
                     fontFamily: fonts.bold, fontWeight: 700,
@@ -1482,7 +1969,6 @@ const MODERN_SLATE_100 = "#F1F5F9";
 const MODERN_EMERALD_50 = "#ECFDF5";
 const MODERN_EMERALD_200 = "#A7F3D0";
 const MODERN_EMERALD_700 = "#047857";
-const MODERN_GREEN_700 = "#15803D";
 
 /** list-disc pl-5: text starts 15pt in, the marker sits in that gutter in the
  *  list's own colour, no gap between items (the live <ul> has no space-y). */
@@ -1585,7 +2071,8 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
     lineHeight: (16 / 12) * ls,
     ...bold,
     textTransform: "uppercase",
-    letterSpacing: 0.2 * 9 * fs,
+    // Live tracking-[0.2em]; capped for the text layer (see safeTracking).
+    letterSpacing: safeTracking(0.2 * 9 * fs, 9 * fs),
     color: SLATE_500,
   };
   // text-sm/5 text-slate-700 — paragraphs, bullets, languages, certs
@@ -1689,55 +2176,31 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               )}
             </View>
           )}
-          {essentialChips.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 4.5,
-                marginTop: 3,
-              }}
-            >
-              {essentialChips.map((chip) => (
-                <View
-                  key={chip.label}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 3,
-                    borderWidth: 0.75,
-                    borderColor: MODERN_EMERALD_200,
-                    backgroundColor: MODERN_EMERALD_50,
-                    borderRadius: 999,
-                    paddingHorizontal: 6,
-                    paddingVertical: 1.5,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 6.75 * fs,
-                      lineHeight: 1.375 * ls,
-                      ...bold,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.05 * 6.75 * fs,
-                      color: MODERN_EMERALD_700,
-                    }}
-                  >
-                    {chip.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 7.5 * fs,
-                      lineHeight: 1.375 * ls,
-                      color: SLATE_700,
-                    }}
-                  >
-                    {chip.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* rounded-full border-emerald-200 bg-emerald-50 px-2 py-0.5; label
+              9px semibold uppercase tracking-wider emerald-700, value 10px */}
+          <PdfChips
+            items={essentialChips}
+            v={{
+              fontSize: 7.5 * fs,
+              lineHeight: 1.375 * ls,
+              color: SLATE_700,
+              backgroundColor: MODERN_EMERALD_50,
+              borderColor: MODERN_EMERALD_200,
+              borderRadius: 999,
+              paddingVertical: 1.5,
+              paddingHorizontal: 6,
+              gap: 4.5,
+              labelStyle: {
+                fontSize: 6.75 * fs,
+                ...bold,
+                textTransform: "uppercase",
+                letterSpacing: 0.05 * 6.75 * fs,
+                color: MODERN_EMERALD_700,
+              },
+              labelGap: 3,
+            }}
+            style={{ marginTop: 3 }}
+          />
         </View>
         {showPhoto && data.personal.photo && (
           <Image
@@ -1925,7 +2388,6 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   const attestedBy = edu.attested
                     ? edu.attestingBody?.trim() || ""
                     : "";
-                  const field = edu.field?.trim();
                   return (
                     <View
                       key={edu.id}
@@ -1936,8 +2398,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                         {edu.school?.trim() || "School"}
                       </Text>
                       <Text style={small}>
-                        {edu.degree?.trim() || "Degree"}
-                        {field ? ` - ${field}` : ""}
+                        {educationTitle(edu.degree, edu.field, " - ")}
                       </Text>
                       {dates ? (
                         <Text style={{ ...small, color: SLATE_400 }}>{dates}</Text>
@@ -1946,11 +2407,11 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                         <Text
                           style={{
                             ...small,
-                            color: MODERN_GREEN_700,
+                            color: GREEN_700,
                             marginTop: 1.5,
                           }}
                         >
-                          {`✓ Attested — ${attestedBy}`}
+                          {attestedLabel(attestedBy)}
                         </Text>
                       ) : null}
                     </View>
@@ -1964,31 +2425,20 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             <View style={gapFor(asideOrder, "skills")}>
               <ModernHeading style={heading}>Skills</ModernHeading>
               {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
+              <PdfChips
+                items={data.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: 9 * fs,
+                  lineHeight: (16 / 12) * ls,
+                  color: SLATE_900,
+                  backgroundColor: MODERN_SLATE_100,
+                  borderRadius: 999,
+                  paddingVertical: 3,
+                  paddingHorizontal: 9,
                   gap: 6,
-                  marginTop: 9,
                 }}
-              >
-                {data.skills.map((skill) => (
-                  <Text
-                    key={skill.id}
-                    style={{
-                      fontSize: 9 * fs,
-                      lineHeight: (16 / 12) * ls,
-                      color: SLATE_900,
-                      backgroundColor: MODERN_SLATE_100,
-                      borderRadius: 999,
-                      paddingHorizontal: 9,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    {skill.name}
-                  </Text>
-                ))}
-              </View>
+                style={{ marginTop: 9 }}
+              />
             </View>
           )}
         </View>
@@ -2047,6 +2497,40 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#1B2A4A");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const m = theme.marginScale;
+  const eduVariant: EducationVariant = {
+    joiner: " in ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "inline",
+    attestedStyle: { fontSize: pt(9) * fs, color: GREEN_700 },
+    gap: pt(8),
+  };
+  const heading: HeadingVariant = {
+    fontSize: pt(9.5) * fs,
+    color: theme.accentText,
+    letterSpacing: 0.12 * pt(9.5) * fs,
+    uppercase: true,
+    ruleColor: "#CBD5E1",
+    ruleWidth: 0.75,
+    paddingBottom: pt(3),
+    marginBottom: pt(6),
+    marginTop: pt(16) * theme.spaceScale,
+  };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    separator: " \u00B7 ",
+    companyMarginBottom: pt(3),
+    bulletText: { fontSize: pt(10.5) * fs, lineHeight: 1.5 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: 0,
+    bulletsPaddingLeft: pt(14),
+    gap: pt(10),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -2054,17 +2538,18 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
 
   return (
     <View>
-      {/* ── Dark Header ── */}
+      {/* ── Dark Header — bleeds through the SCALED page padding; live
+          padding 28px 32px*m 24px 32px*m ── */}
       <View
         style={{
           backgroundColor: theme.accent,
-          marginTop: -27,
-          marginLeft: -24,
-          marginRight: -24,
-          paddingTop: 24,
-          paddingBottom: 20,
-          paddingLeft: 30,
-          paddingRight: 30,
+          marginTop: -27 * m,
+          marginLeft: -24 * m,
+          marginRight: -24 * m,
+          paddingTop: pt(28),
+          paddingBottom: pt(24),
+          paddingLeft: pt(32) * m,
+          paddingRight: pt(32) * m,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "flex-start",
@@ -2146,46 +2631,26 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               ))}
             </View>
           )}
-          {essentialChips.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginTop: 5,
-              }}
-            >
-              {essentialChips.map((chip) => (
-                <View
-                  key={chip.label}
-                  style={{
-                    flexDirection: "row",
-                    backgroundColor: mix(theme.onAccent, theme.accent, 0.9),
-                    borderRadius: 8,
-                    paddingTop: 1,
-                    paddingBottom: 1,
-                    paddingLeft: 5,
-                    paddingRight: 6,
-                    marginRight: 4,
-                    marginBottom: 2,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 7 * theme.fontScale,
-                      color: onAccentMuted,
-                      fontFamily: fonts.bold, fontWeight: 700,
-                      marginRight: 3,
-                    }}
-                  >
-                    {chip.label}
-                  </Text>
-                  <Text style={{ fontSize: 7 * theme.fontScale, color: onAccentMuted }}>
-                    {chip.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* exec-split.tsx essentials: 9px pills, 10% ink fill + 18% ink
+              border (opaque via mix), radius 999, 2px 8px, gap 6px */}
+          <PdfChips
+            items={essentialChips}
+            v={{
+              fontSize: pt(9) * fs,
+              lineHeight: 1.5 * theme.lineScale,
+              color: onAccentMuted,
+              backgroundColor: mix(onAccent, theme.accent, 0.9),
+              borderColor: mix(onAccent, theme.accent, 0.82),
+              borderRadius: 999,
+              paddingVertical: pt(2),
+              paddingHorizontal: pt(8),
+              gap: pt(6),
+              letterSpacing: 0.02 * pt(9) * fs,
+              labelStyle: { fontFamily: fonts.bold, fontWeight: 700 },
+              labelGap: pt(4),
+            }}
+            style={{ marginTop: pt(8) }}
+          />
         </View>
         {showPhoto && data.personal.photo && (
           <Image
@@ -2204,59 +2669,32 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Two-column body ── */}
-      <View style={{ flexDirection: "row", marginTop: 14, gap: 18 }}>
+      {/* ── Two-column body — live padding-top 20px*m, column gap 28px,
+          200px right column ── */}
+      <View style={{ flexDirection: "row", marginTop: pt(20) * m, gap: pt(28) }}>
         {/* Left — main */}
         <View style={{ flex: 1 }}>
           {hasExperience && (
             <View>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Experience</Text>
-              </View>
-              {experience.map((role) => (
-                <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                  <View style={s.entryRow}>
-                    <Text style={{ ...s.entryTitle, flex: 1 }}>
-                      {role.role?.trim() || "Role"}
-                      {role.company ? (
-                        <Text style={s.entryCompany}>
-                          {` | ${role.company.trim()}`}
-                        </Text>
-                      ) : null}
-                    </Text>
-                    <Text style={s.entryDate}>
-                      {formatDateRange(
-                        role.startDate,
-                        role.endDate,
-                        role.isCurrent,
-                      )}
-                    </Text>
-                  </View>
-                  {role.location?.trim() && (
-                    <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                  )}
-                  <BulletList bullets={role.bullets} s={s} />
-                </View>
+              <PdfHeading fonts={fonts} v={heading}>Experience</PdfHeading>
+              {experience.map((role, i) => (
+                <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
               ))}
             </View>
           )}
 
           {hasEducation && (
-            <View style={hasExperience ? s.section : undefined}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Education</Text>
-              </View>
-              {education.map((edu) => (
-                <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Education</PdfHeading>
+              {education.map((edu, i) => (
+                <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
               ))}
             </View>
           )}
 
           {hasProjects && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Projects</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Projects</PdfHeading>
               {projects.map((project) => {
                 const showLink = shouldShowProjectLink(project.link);
                 return (
@@ -2288,12 +2726,10 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         </View>
 
         {/* Right — sidebar content */}
-        <View style={{ width: 140, flexShrink: 0 }}>
+        <View style={{ width: pt(200), flexShrink: 0 }}>
           {hasSummary && (
             <View>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Summary</Text>
-              </View>
+              <PdfHeading fonts={fonts} v={heading}>Summary</PdfHeading>
               <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
                 {data.personal.summary?.trim()}
               </Text>
@@ -2301,21 +2737,29 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasSkills && (
-            <View style={hasSummary ? s.section : undefined}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Skills</Text>
-              </View>
-              <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
-                {data.skills.map((sk) => sk.name).join(", ")}
-              </Text>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Skills</PdfHeading>
+              {/* 9.5px accentText on #F1F5F9, 1px #CBD5E1, radius 3, 1px 6px, gap 4px */}
+              <PdfChips
+                items={data.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: pt(9.5) * fs,
+                  lineHeight: 1.5 * theme.lineScale,
+                  color: theme.accentText,
+                  backgroundColor: "#F1F5F9",
+                  borderColor: "#CBD5E1",
+                  borderRadius: pt(3),
+                  paddingVertical: pt(1),
+                  paddingHorizontal: pt(6),
+                  gap: pt(4),
+                }}
+              />
             </View>
           )}
 
           {hasLanguages && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Languages</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Languages</PdfHeading>
               {data.languages.map((lang) => (
                 <Text
                   key={lang.id}
@@ -2333,10 +2777,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasCertifications && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Certifications</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Certifications</PdfHeading>
               {data.certifications.map((cert) => (
                 <View key={cert.id} style={{ marginBottom: 3 }}>
                   <Text
@@ -2434,23 +2876,96 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#0F172A");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    schoolStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    attested: "pill",
+    attestedStyle: {
+      fontSize: pt(8) * fs,
+      color: GREEN_700,
+      lineHeight: 1.4 * theme.lineScale,
+    },
+    pillBorderColor: "#BBF7D0",
+    gap: pt(8),
+  };
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(10) * fs,
+      color: "#1E293B",
+      letterSpacing: 0.08 * pt(10) * fs,
+      uppercase: true,
+      ruleColor: "#E2E8F0",
+      ruleWidth: 0.75,
+      paddingBottom: pt(3),
+      marginBottom: pt(6),
+    },
+    pt(18) * theme.spaceScale,
+    null,
+  );
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    companyStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    separator: " | ",
+    companyMarginBottom: pt(3),
+    bulletText: { fontSize: pt(10.5) * fs, lineHeight: 1.5 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: 0,
+    bulletsPaddingLeft: pt(14),
+    gap: pt(10),
+  };
   const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
+  // corp-sidebar.tsx SidebarHeading: 9px bold uppercase at 50% ink, 18px*sp
+  // above every label (the live file has no first-section exception).
+  const sideLabel = withTopGap<Style>(
+    {
+      fontSize: pt(9) * fs,
+      fontFamily: fonts.bold, fontWeight: 700,
+      color: mix(onAccent, theme.accent, 0.5),
+      letterSpacing: safeTracking(0.1 * pt(9) * fs, pt(9) * fs),
+      textTransform: "uppercase",
+      marginBottom: pt(6),
+    },
+    pt(18) * theme.spaceScale,
+    null,
+  );
+  const SIDEBAR_WIDTH = pt(220);
 
   return (
+    <>
+      {/* Fixed band: reaches the page edges on every page (the sidebar View's
+          own background left white notches at the top of page 2+ and the foot
+          of page 1 — audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: theme.accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Left main content ── */}
-      <View style={{ flex: 1, paddingRight: 14 * m }}>
-        {/* Name header */}
+      {/* ── Left main content (live padding 36px*m 28px*m 36px*m 32px*m; the
+          top/bottom/left come from the scaled page padding) ── */}
+      <View style={{ flex: 1, paddingRight: pt(28) * m }}>
+        {/* Name header — live: 26px name, 12px headline, 2px accent rule 10px
+            below, 16px under the block */}
         <View
           style={{
             borderBottomWidth: 1.5,
-            borderBottomColor: "#0F172A",
-            paddingBottom: 6,
-            marginBottom: 10,
+            borderBottomColor: theme.accentText,
+            paddingBottom: pt(10),
+            marginBottom: pt(16),
           }}
         >
           <Text
@@ -2478,62 +2993,32 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSummary && (
           <View>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Summary</Text>
-            </View>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>Summary</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
-          <View style={hasSummary ? s.section : undefined}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Experience</Text>
-            </View>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={s.entryCompany}>
-                        {` | ${role.company.trim()}`}
-                      </Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(
-                      role.startDate,
-                      role.endDate,
-                      role.isCurrent,
-                    )}
-                  </Text>
-                </View>
-                {role.location?.trim() && (
-                  <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                )}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
 
         {hasEducation && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Education</Text>
-            </View>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
 
         {hasProjects && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Projects</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
@@ -2564,19 +3049,19 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Right dark sidebar ── */}
+      {/* ── Right sidebar (transparent; the fixed band is its fill). Margins
+          undo the scaled page padding so the live 36px/20px padding holds. ── */}
       <View
         style={{
-          width: 155,
+          width: SIDEBAR_WIDTH,
           flexShrink: 0,
-          backgroundColor: theme.accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginRight: -24,
-          paddingTop: 24,
-          paddingBottom: 24,
-          paddingLeft: 14,
-          paddingRight: 14,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginRight: -24 * m,
+          paddingTop: pt(36),
+          paddingBottom: pt(36),
+          paddingLeft: pt(20),
+          paddingRight: pt(20),
         }}
       >
         {/* Photo */}
@@ -2605,7 +3090,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
+            <Text style={sideLabel("contact")}>Contact</Text>
             {sidebarContacts.map((item, i) => (
               <View key={i} style={{ marginBottom: 3 }}>
                 <Text
@@ -2653,7 +3138,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
+            <Text style={sideLabel("personal")}>Personal</Text>
             {essentialChips.map((chip) => (
               <View key={chip.label} style={{ marginBottom: 3 }}>
                 <Text
@@ -2679,23 +3164,27 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
-            <Text
-              style={{
-                fontSize: 7.5 * theme.fontScale,
+            <Text style={sideLabel("skills")}>Skills</Text>
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(9) * fs,
+                lineHeight: 1.5 * theme.lineScale,
                 color: onAccentMuted,
-                lineHeight: 1.6 * theme.lineScale,
+                backgroundColor: mix(onAccent, theme.accent, 0.92),
+                borderRadius: pt(3),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(6),
+                gap: pt(3),
               }}
-            >
-              {data.skills.map((sk) => sk.name).join(", ")}
-            </Text>
+            />
           </View>
         )}
 
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
+            <Text style={sideLabel("languages")}>Languages</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
@@ -2712,7 +3201,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
+            <Text style={sideLabel("certifications")}>Certifications</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
@@ -2744,6 +3233,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -2778,7 +3268,8 @@ const ProPdfHeading = ({
         fontSize: 9 * fontScale,
         fontFamily: fonts.bold, fontWeight: 700,
         color: "#111827",
-        letterSpacing: 1,
+        // Live 0.14em; capped for the text layer (see safeTracking).
+        letterSpacing: safeTracking(1, 9 * fontScale),
         textTransform: "uppercase",
         textAlign: "center",
       }}
@@ -2798,6 +3289,18 @@ const ProfessionalPDFLayout = ({
   const theme = resolveTheme(data.settings, "#1f2937");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const eduVariant: EducationVariant = {
+    joiner: " \u00B7 ",
+    schoolInline: true,
+    titleStyle: s.entryTitle,
+    dateStyle: s.entryDate,
+    schoolStyle: { ...s.entryCompany, color: SLATE_600 },
+    notesStyle: s.entrySubtext,
+    attested: "line",
+    attestedStyle: { fontSize: pt(11) * theme.fontScale, color: GREEN_700 },
+    attestedRequiresBody: true,
+    gap: pt(12),
+  };
   // On a white page, accent is used only as text/border → use the readable form.
   const accent = theme.accentText;
   const name =
@@ -2895,11 +3398,22 @@ const ProfessionalPDFLayout = ({
             {contactBits.join("   •   ")}
           </Text>
         ) : null}
-        {essentialChips.length > 0 ? (
-          <Text style={{ fontSize: 7.5 * theme.fontScale, color: SLATE_600, marginTop: 3, textAlign: "center" }}>
-            {essentialChips.map((c) => `${c.label}: ${c.value}`).join("   ·   ")}
-          </Text>
-        ) : null}
+        <PdfChips
+          items={essentialChips.map((c) => ({ label: `${c.label}:`, value: c.value }))}
+          v={{
+            fontSize: pt(9.5) * theme.fontScale,
+            color: "#374151",
+            backgroundColor: "#F3F4F6",
+            borderColor: "#E5E7EB",
+            borderRadius: 999,
+            paddingVertical: pt(2),
+            paddingHorizontal: pt(9),
+            gap: pt(6),
+            labelStyle: { color: "#6B7280" },
+            labelGap: 2,
+          }}
+          style={{ marginTop: pt(8), alignSelf: "stretch", justifyContent: "center" }}
+        />
       </View>
 
       {hasSummary && (
@@ -2939,8 +3453,8 @@ const ProfessionalPDFLayout = ({
       {hasEducation && (
         <View>
           <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
-          {education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -2983,7 +3497,23 @@ const ProfessionalPDFLayout = ({
           <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
           {projects.map((project) => (
             <View key={project.id} style={s.entryBlock} wrap={false}>
-              <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+              <Text style={s.entryTitle}>
+                {project.name?.trim() || "Project"}
+                {shouldShowProjectLink(project.link) ? (
+                  // Live: 10.5px normal slate-500, 4px after the name.
+                  <Link
+                    src={normalizeHref(project.link)}
+                    style={{
+                      ...s.entryCompany,
+                      fontSize: pt(10.5) * theme.fontScale,
+                      color: SLATE_500,
+                      textDecoration: "none",
+                    }}
+                  >
+                    {` ${shortenDisplayUrl(project.link!.trim())}`}
+                  </Link>
+                ) : null}
+              </Text>
               <BulletList bullets={project.bullets ?? []} s={s} />
             </View>
           ))}
@@ -2997,46 +3527,34 @@ const ProfessionalPDFLayout = ({
    ONYX PDF LAYOUT (charcoal left sidebar + photo)
    ═══════════════════════════════════════════════════════════ */
 
-const OnyxHeading = ({
-  children,
-  accent,
-  fontScale,
-  spaceScale,
-  fonts,
-}: {
-  children: string;
-  accent: string;
-  fontScale: number;
-  spaceScale: number;
-  fonts: PdfFontPair;
-}) => (
-  <View
-    style={{
-      marginTop: 14 * spaceScale,
-      marginBottom: 7,
-      paddingBottom: 3,
-      borderBottomWidth: 1.5,
-      borderBottomColor: accent,
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 9.5 * fontScale,
-        fontFamily: fonts.bold, fontWeight: 700,
-        color: "#1F2937",
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
-      }}
-    >
-      {children}
-    </Text>
-  </View>
-);
-
 const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#262626");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "line",
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedRequiresBody: true,
+    notesAfterAttested: true,
+    gap: pt(10),
+  };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#6B7280" },
+    separator: " \u00B7 ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(14),
+    gap: pt(12),
+  };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   // Opaque equivalent of 18% white / 12% black over the band.
@@ -3084,31 +3602,73 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     contactItems.push({ text, href: normalizeHref(data.personal.website), fontSize: urlSize(text) });
   }
 
+  // onyx.tsx SideLabel: 9px bold uppercase, 7px below; each sidebar section
+  // carries 18px*sp BELOW it (Details, the last, none).
   const sideLabel = {
-    fontSize: 7 * theme.fontScale,
+    fontSize: pt(9) * fs,
     fontFamily: fonts.bold, fontWeight: 700,
     color: onAccentMuted,
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
+    letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
+  const sideSection = { marginBottom: pt(18) * theme.spaceScale };
   const sideText = { fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 };
+  // onyx.tsx MainHeading: 11px bold 0.1em #1f2937 uppercase over a 1.5px
+  // accent rule, pb 3px, mb 9px, mt 18px*sp except the first section.
+  const firstMain = hasExperience
+    ? "experience"
+    : hasEducation
+      ? "education"
+      : hasSkills
+        ? "skills"
+        : hasCertifications
+          ? "certifications"
+          : hasProjects
+            ? "projects"
+            : null;
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(11) * fs,
+      color: "#1F2937",
+      letterSpacing: 0.1 * pt(11) * fs,
+      uppercase: true,
+      ruleColor: accentText,
+      ruleWidth: 1.125,
+      paddingBottom: pt(3),
+      marginBottom: pt(9),
+    },
+    pt(18) * theme.spaceScale,
+    firstMain,
+  );
+  const SIDEBAR_WIDTH = 172;
 
   return (
+    <>
+      {/* Fixed band: edge to edge on every page (audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Charcoal sidebar (edge-bleed) ── */}
+      {/* ── Charcoal sidebar (transparent over the fixed band; live padding 30px 22px) ── */}
       <View
         style={{
-          width: 172,
-          backgroundColor: accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginLeft: -24,
-          paddingTop: 26,
-          paddingBottom: 26,
-          paddingLeft: 16,
-          paddingRight: 16,
+          width: SIDEBAR_WIDTH,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(30),
+          paddingBottom: pt(30),
+          paddingLeft: pt(22),
+          paddingRight: pt(22),
           flexShrink: 0,
         }}
       >
@@ -3138,7 +3698,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
               color: onAccentMuted,
               textAlign: "center",
               marginTop: 3,
-              paddingBottom: 12,
+              paddingBottom: pt(14),
+              marginBottom: pt(14),
               borderBottomWidth: 0.5,
               borderBottomColor: bandBorder,
             }}
@@ -3148,7 +3709,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         ) : null}
 
         {hasSummary && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>ABOUT ME</Text>
             <Text style={{ fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.55 * theme.lineScale }}>
               {data.personal.summary?.trim()}
@@ -3157,7 +3718,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {contactItems.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>CONTACT</Text>
             {contactItems.map((item, i) =>
               item.href ? (
@@ -3178,7 +3739,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {hasLanguages && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={sideText}>
@@ -3202,68 +3763,48 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+      {/* ── Main column (live padding 30px*m) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
         {hasExperience && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
-                  </Text>
-                </View>
-                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
 
         {hasEducation && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
 
         {hasSkills && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              {data.skills.map((skill) => (
-                <Text
-                  key={skill.id}
-                  style={{
-                    fontSize: 8 * theme.fontScale,
-                    color: "#374151",
-                    backgroundColor: "#F3F4F6",
-                    borderWidth: 0.5,
-                    borderColor: "#E5E7EB",
-                    borderRadius: 3,
-                    paddingVertical: 1.5,
-                    paddingHorizontal: 5,
-                  }}
-                >
-                  {skill.name}
-                </Text>
-              ))}
-            </View>
+            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(10.5) * fs,
+                color: "#374151",
+                backgroundColor: "#F3F4F6",
+                borderColor: "#E5E7EB",
+                borderRadius: pt(4),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(9),
+                gap: pt(6),
+              }}
+            />
           </View>
         )}
 
         {hasCertifications && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -3277,10 +3818,27 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {shouldShowProjectLink(project.link) ? (
+                    // Live: 10px normal in the accent, 6px after the name.
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{
+                        fontSize: pt(10) * fs,
+                        fontFamily: fonts.regular,
+                        fontWeight: 400,
+                        color: accentText,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {`  ${shortenDisplayUrl(project.link!.trim())}`}
+                    </Link>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             ))}
@@ -3288,6 +3846,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -3299,6 +3858,30 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#ECE3D2");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    notesStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    attested: "line",
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedRequiresBody: true,
+    notesAfterAttested: true,
+    gap: pt(10),
+  };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#78716C" },
+    separator: " \u00B7 ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#44403C" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(14),
+    gap: pt(12),
+  };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   // Opaque equivalent of 18% white / 10% black over the band.
@@ -3351,30 +3934,73 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
   const SIDE_TEXT = onAccent;
   const SIDE_MUTED = onAccentMuted;
+  // sandstone.tsx SideLabel: 9px bold uppercase, 7px below; Personal Details
+  // and Contact carry 18px*sp below them, Languages (last) none.
   const sideLabel = {
-    fontSize: 7 * theme.fontScale,
+    fontSize: pt(9) * fs,
     fontFamily: fonts.bold, fontWeight: 700,
     color: SIDE_MUTED,
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
+    letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
+  const sideSection = { marginBottom: pt(18) * theme.spaceScale };
+  // sandstone.tsx MainHeading: as Onyx in the stone ink (#292524).
+  const firstMain = hasSummary
+    ? "summary"
+    : hasExperience
+      ? "experience"
+      : hasEducation
+        ? "education"
+        : hasSkills
+          ? "skills"
+          : hasCertifications
+            ? "certifications"
+            : hasProjects
+              ? "projects"
+              : null;
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(11) * fs,
+      color: "#292524",
+      letterSpacing: 0.1 * pt(11) * fs,
+      uppercase: true,
+      ruleColor: accentText,
+      ruleWidth: 1.125,
+      paddingBottom: pt(3),
+      marginBottom: pt(9),
+    },
+    pt(18) * theme.spaceScale,
+    firstMain,
+  );
+  const SIDEBAR_WIDTH = 180;
 
   return (
+    <>
+      {/* Fixed band: edge to edge on every page (audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Warm sidebar (edge-bleed) ── */}
+      {/* ── Warm sidebar (transparent over the fixed band; live padding 30px 22px) ── */}
       <View
         style={{
-          width: 180,
-          backgroundColor: accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginLeft: -24,
-          paddingTop: 26,
-          paddingBottom: 26,
-          paddingLeft: 16,
-          paddingRight: 16,
+          width: SIDEBAR_WIDTH,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(30),
+          paddingBottom: pt(30),
+          paddingLeft: pt(22),
+          paddingRight: pt(22),
           flexShrink: 0,
         }}
       >
@@ -3405,7 +4031,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
               fontFamily: fonts.bold, fontWeight: 700,
               textAlign: "center",
               marginTop: 3,
-              paddingBottom: 12,
+              paddingBottom: pt(14),
+              marginBottom: pt(14),
               borderBottomWidth: 0.5,
               borderBottomColor: bandBorder,
             }}
@@ -3415,7 +4042,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         ) : null}
 
         {personalDetails.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>PERSONAL DETAILS</Text>
             {personalDetails.map((d) => (
               <View key={d.label} style={{ marginBottom: 4 }}>
@@ -3429,7 +4056,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {contactItems.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>CONTACT</Text>
             {contactItems.map((item, i) =>
               item.href ? (
@@ -3462,75 +4089,55 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+      {/* ── Main column (live padding 30px*m) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
         {hasSummary && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>About Me</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>About Me</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
-                  </Text>
-                </View>
-                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Work Experience</PdfHeading>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
 
         {hasEducation && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
 
         {hasSkills && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              {data.skills.map((skill) => (
-                <Text
-                  key={skill.id}
-                  style={{
-                    fontSize: 8 * theme.fontScale,
-                    color: "#44403C",
-                    backgroundColor: "#F5F0E6",
-                    borderWidth: 0.5,
-                    borderColor: "#E2D8C4",
-                    borderRadius: 3,
-                    paddingVertical: 1.5,
-                    paddingHorizontal: 5,
-                  }}
-                >
-                  {skill.name}
-                </Text>
-              ))}
-            </View>
+            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(10.5) * fs,
+                color: "#44403C",
+                backgroundColor: "#F5F0E6",
+                borderColor: "#E2D8C4",
+                borderRadius: pt(4),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(9),
+                gap: pt(6),
+              }}
+            />
           </View>
         )}
 
         {hasCertifications && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -3544,10 +4151,27 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {shouldShowProjectLink(project.link) ? (
+                    // Live: 10px normal in the accent, 6px after the name.
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{
+                        fontSize: pt(10) * fs,
+                        fontFamily: fonts.regular,
+                        fontWeight: 400,
+                        color: accentText,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {`  ${shortenDisplayUrl(project.link!.trim())}`}
+                    </Link>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             ))}
@@ -3555,6 +4179,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -3693,7 +4318,7 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View>
       {/* ── Accent band: page 1 only, so the negative-margin bleed is safe.
-          The page padding is 27/24 × marginScale (SINGLE_COLUMN), so the
+          The page padding is 27/24 × marginScale, so the
           negative margins scale the same way to still reach the edge. ── */}
       <View
         style={{
@@ -4384,6 +5009,694 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   CHRONICLE PDF LAYOUT (single-column timeline: date gutter,
+   per-entry accent rail with a dot, content to the right)
+   Mirrors lib/templates/chronicle.tsx section by section — same order,
+   same text, same empty-state rules, same photo gating. Sizes are the
+   live px × 0.75. The rail is drawn PER ENTRY (a left border on the rail
+   track plus an absolutely positioned dot), never as one full-height
+   element, so it breaks cleanly between entries across pages; the last
+   entry of a section ends its rail at the dot. Short entries carry
+   wrap={false} so a rail gap from a split entry only ever shows on a
+   long one.
+   ═══════════════════════════════════════════════════════════ */
+
+type ChroniclePdfEntry = {
+  key: string;
+  /** Gutter text; empty for undated entries (projects) — the dot still shows. */
+  date: string;
+  title: string;
+  subtitle: ReactNode;
+  lines: ReactNode[];
+  bullets: string[];
+};
+
+const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, CHRONICLE_ACCENT);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  // Accent is text/rail only on a white page → the contrast-guarded form.
+  const accent = theme.accentText;
+  const { dot: dotColor, rail: railColor } = chronicleRailColors(accent);
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const summary = data.personal.summary?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const certifications = data.certifications.filter(
+    (cert) => cert.name?.trim() || cert.issuer?.trim(),
+  );
+  const languages = data.languages.filter((lang) => lang.name?.trim());
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills.filter((skill) => skill.name?.trim()),
+  );
+  const contactItems = chronicleContactItems(data.personal);
+  const essentials = chronicleEssentials(data.personal);
+
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const roundPhoto = data.settings.photoShape !== "square";
+  const PHOTO = 54;
+
+  const hasSummary = summary.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const hasSkills = generalSkills.length > 0 || technicalSkills.length > 0;
+  const hasLanguages = languages.length > 0;
+  const hasCertifications = certifications.length > 0;
+
+  // First rendered section gets marginTop 0; spaceScale touches ONLY the
+  // gap between sections (16pt at level 3), never the spacing inside one.
+  const sectionOrder: Array<[string, boolean]> = [
+    ["profile", hasSummary],
+    ["experience", hasExperience],
+    ["education", hasEducation],
+    ["projects", hasProjects],
+    ["skills", hasSkills],
+    ["languages", hasLanguages],
+    ["certifications", hasCertifications],
+  ];
+  const firstSection = sectionOrder.find(([, present]) => present)?.[0] ?? null;
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const body: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.6 * fs,
+    lineHeight: 1.5 * ls,
+    color: SLATE_700,
+  };
+  const small: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.25 * fs,
+    lineHeight: 1.4 * ls,
+    color: SLATE_600,
+  };
+  const entryTitle: Style = {
+    ...bold,
+    fontSize: 9.5 * fs,
+    lineHeight: 1.35 * ls,
+    color: SLATE_900,
+  };
+  const dateText: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 7.5 * fs,
+    lineHeight: 1.35 * ls,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    color: SLATE_500,
+    textAlign: "right",
+  };
+  // The gutter scales with the font so the uppercase date stays on one line.
+  const dateTrack = CHRONICLE_DATE_TRACK_PT * fs;
+
+  // A render helper, not a component declared inside render
+  // (react-hooks/static-components). 60pt keeps a heading with its first
+  // entry's title row and a bullet or two.
+  const heading = (id: string, label: string) => (
+    <View
+      minPresenceAhead={60}
+      style={{ marginTop: firstSection === id ? 0 : 16 * sp, marginBottom: 6 }}
+    >
+      <Text
+        style={{
+          ...bold,
+          fontSize: 8.5 * fs,
+          lineHeight: 1.3 * ls,
+          // 0.6pt: wider tracking makes pdf.js (and ATS extractors) read the
+          // heading as spaced letters ("P R O F I L E").
+          letterSpacing: 0.6,
+          textTransform: "uppercase",
+          color: accent,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
+  const bullets = (items: string[]) => {
+    const list = items.map((b) => b.trim()).filter(Boolean);
+    if (list.length === 0) return null;
+    return (
+      <View style={{ marginTop: 2, paddingLeft: 10 }}>
+        {list.map((bullet, i) => (
+          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5 }}>
+            <Text style={{ ...body, width: 10, color: SLATE_400 }}>•</Text>
+            <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  /**
+   * One timeline row: date track | rail track | content. The rail is this
+   * row's own left border (or, on the last entry, a stub down to the dot),
+   * and the entry gap lives inside the content track so the row — and the
+   * rail — stretches across it.
+   */
+  const entry = (e: ChroniclePdfEntry, last: boolean) => (
+    <View
+      key={e.key}
+      wrap={e.bullets.length > 6}
+      minPresenceAhead={48}
+      style={{ flexDirection: "row" }}
+    >
+      <View style={{ width: dateTrack, paddingRight: CHRONICLE_DATE_GAP_PT, paddingTop: 1.5 }}>
+        <Text style={dateText}>{e.date}</Text>
+      </View>
+      <View
+        style={{
+          width: CHRONICLE_RAIL_TRACK_PT,
+          ...(last
+            ? {}
+            : { borderLeftWidth: CHRONICLE_RAIL_WIDTH_PT, borderLeftColor: railColor }),
+        }}
+      >
+        {last ? (
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: CHRONICLE_RAIL_WIDTH_PT,
+              height: CHRONICLE_DOT_TOP_PT + CHRONICLE_DOT_PT / 2,
+              backgroundColor: railColor,
+            }}
+          />
+        ) : null}
+        <View
+          style={{
+            position: "absolute",
+            top: CHRONICLE_DOT_TOP_PT,
+            left: CHRONICLE_RAIL_WIDTH_PT / 2 - CHRONICLE_DOT_PT / 2,
+            width: CHRONICLE_DOT_PT,
+            height: CHRONICLE_DOT_PT,
+            borderRadius: CHRONICLE_DOT_PT / 2,
+            backgroundColor: dotColor,
+          }}
+        />
+      </View>
+      <View style={{ flex: 1, paddingBottom: last ? 0 : 9 }}>
+        <Text style={entryTitle}>{e.title}</Text>
+        {e.subtitle}
+        {e.lines}
+        {bullets(e.bullets)}
+      </View>
+    </View>
+  );
+
+  const timeline = (entries: ChroniclePdfEntry[]) =>
+    entries.map((e, i) => entry(e, i === entries.length - 1));
+
+  const companyLine = (company: string, location: string): ReactNode =>
+    company || location ? (
+      <Text style={{ ...small, marginTop: 0.75 }}>
+        {company ? <Text style={{ color: accent }}>{company}</Text> : null}
+        {company && location ? " · " : ""}
+        {location}
+      </Text>
+    ) : null;
+
+  const experienceEntries: ChroniclePdfEntry[] = experience.map((role) => ({
+    key: role.id,
+    date: formatDateRange(role.startDate, role.endDate, role.isCurrent),
+    title: role.role?.trim() || "Role",
+    subtitle: companyLine(role.company?.trim() ?? "", role.location?.trim() ?? ""),
+    lines: [],
+    bullets: role.bullets ?? [],
+  }));
+
+  const educationEntries: ChroniclePdfEntry[] = education.map((edu) => {
+    const notes = edu.notes?.trim() || "";
+    const attestingBody = edu.attestingBody?.trim() || "";
+    const lines: ReactNode[] = [];
+    if (notes)
+      lines.push(
+        <Text key="notes" style={{ ...small, marginTop: 0.75 }}>
+          {notes}
+        </Text>,
+      );
+    if (edu.attested && attestingBody)
+      lines.push(
+        <Text key="attested" style={{ ...small, marginTop: 0.75 }}>
+          {`Attested — ${attestingBody}`}
+        </Text>,
+      );
+    return {
+      key: edu.id,
+      date: formatDateRange(edu.startDate, edu.endDate),
+      title: chronicleDegreeTitle(edu),
+      subtitle: companyLine(edu.school?.trim() ?? "", ""),
+      lines,
+      bullets: [],
+    };
+  });
+
+  const projectEntries: ChroniclePdfEntry[] = projects.map((project) => {
+    const link = project.link?.trim() || "";
+    const lines: ReactNode[] = [];
+    if (shouldShowProjectLink(link))
+      lines.push(
+        <Link
+          key="link"
+          src={normalizeHref(link)}
+          style={{ ...small, marginTop: 0.75, textDecoration: "underline" }}
+        >
+          {shortenDisplayUrl(link)}
+        </Link>,
+      );
+    return {
+      key: project.id,
+      date: "",
+      title: project.name?.trim() || "Project",
+      subtitle: null,
+      lines,
+      bullets: project.bullets ?? [],
+    };
+  });
+
+  const skillLine = (skills: typeof generalSkills) =>
+    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Sub-labels only when BOTH groups exist (same rule as the live template).
+  const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
+  const skillLabel: Style = { ...small, ...bold, color: SLATE_800 };
+
+  return (
+    <View>
+      {/* ── Header: name / headline / contact / essentials + optional photo ── */}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 13.5 }}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              ...bold,
+              fontSize: 22 * fs,
+              lineHeight: 1.15 * ls,
+              letterSpacing: -0.2,
+              color: SLATE_900,
+            }}
+          >
+            {name}
+          </Text>
+          {headline ? (
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 10.5 * fs,
+                lineHeight: 1.3 * ls,
+                color: accent,
+                marginTop: 2,
+              }}
+            >
+              {headline}
+            </Text>
+          ) : null}
+          {contactItems.length > 0 ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
+              {contactItems.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                  {item.href ? (
+                    <Link src={item.href} style={{ ...small, textDecoration: "none" }}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={small}>{item.text}</Text>
+                  )}
+                  {i < contactItems.length - 1 ? (
+                    <Text style={{ ...small, color: SLATE_400, marginHorizontal: 4.5 }}>|</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {essentials.length > 0 ? (
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 7.5 * fs,
+                lineHeight: 1.45 * ls,
+                color: SLATE_600,
+                marginTop: 2,
+              }}
+            >
+              {essentials.map((item, i) => (
+                <Text key={item.label}>
+                  {i > 0 ? " · " : ""}
+                  <Text style={bold}>{`${item.label}: `}</Text>
+                  {item.value}
+                </Text>
+              ))}
+            </Text>
+          ) : null}
+        </View>
+        {showPhoto && data.personal.photo ? (
+          <Image
+            src={data.personal.photo}
+            style={{
+              width: PHOTO,
+              height: PHOTO,
+              objectFit: "cover",
+              borderWidth: 0.75,
+              borderColor: SLATE_300,
+              borderRadius: roundPhoto ? PHOTO / 2 : 3,
+            }}
+          />
+        ) : null}
+      </View>
+
+      {/* Sections are fragments, not Views: react-pdf only honours a
+          heading's minPresenceAhead when the heading has previous siblings
+          in the same parent (a heading wrapped as the first child of a
+          section View is always orphaned at a page foot). */}
+      {hasSummary ? (
+        <>
+          {heading("profile", "Profile")}
+          <Text style={body}>{summary}</Text>
+        </>
+      ) : null}
+
+      {hasExperience ? (
+        <>
+          {heading("experience", "Experience")}
+          {timeline(experienceEntries)}
+        </>
+      ) : null}
+
+      {hasEducation ? (
+        <>
+          {heading("education", "Education")}
+          {timeline(educationEntries)}
+        </>
+      ) : null}
+
+      {hasProjects ? (
+        <>
+          {heading("projects", "Projects")}
+          {timeline(projectEntries)}
+        </>
+      ) : null}
+
+      {hasSkills ? (
+        <>
+          {heading("skills", "Skills")}
+          {generalSkills.length > 0 ? (
+            <View>
+              {showSkillLabels ? <Text style={skillLabel}>General</Text> : null}
+              <Text style={body}>{skillLine(generalSkills)}</Text>
+            </View>
+          ) : null}
+          {technicalSkills.length > 0 ? (
+            <View style={{ marginTop: generalSkills.length > 0 ? 4 : 0 }}>
+              {showSkillLabels ? <Text style={skillLabel}>Technical</Text> : null}
+              <Text style={body}>{skillLine(technicalSkills)}</Text>
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {hasLanguages ? (
+        <>
+          {heading("languages", "Languages")}
+          {languages.map((lang) => (
+            <Text key={lang.id} style={body}>
+              <Text style={{ ...bold, color: SLATE_800 }}>{lang.name.trim()}</Text>
+              {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+            </Text>
+          ))}
+        </>
+      ) : null}
+
+      {hasCertifications ? (
+        <>
+          {heading("certifications", "Certifications")}
+          {certifications.map((cert, i) => {
+            const certName = cert.name?.trim() || "";
+            const tail = [cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" | ");
+            return (
+              <Text
+                key={cert.id}
+                style={{ ...body, marginBottom: i < certifications.length - 1 ? 2 : 0 }}
+              >
+                <Text style={{ ...bold, color: SLATE_800 }}>{certName || tail}</Text>
+                {certName && tail ? <Text style={{ color: SLATE_600 }}>{` | ${tail}`}</Text> : null}
+              </Text>
+            );
+          })}
+        </>
+      ) : null}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   HARVARD PDF LAYOUT (zero-colour serif single column, centred
+   header, education first, label-prefixed skills lines, no photo)
+   Mirrors lib/templates/harvard.tsx section by section. Sizes are the
+   live px × 0.75 on a 22/20pt sheet (CVDocument applies that padding).
+   Serif = the embedded Instrument Serif once fonts are registered, else
+   the PDF-standard Times pair (Node smoke); the body is the user's face.
+   Instrument Serif has no bold cut, so hierarchy is size and caps only.
+   ═══════════════════════════════════════════════════════════ */
+
+const HarvardPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings);
+  const ready = pdfFontsReady();
+  const fonts = pdfFontPair(data.settings.fontFamily, ready);
+  const serif: Style = ready ? { fontFamily: PDF_FAMILY.serif } : { fontFamily: "Times-Roman" };
+  const serifItalic: Style = ready
+    ? { fontFamily: PDF_FAMILY.serif, fontStyle: "italic" }
+    : { fontFamily: "Times-Italic" };
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const summary = data.personal.summary?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const contactItems = harvardContactItems(data.personal);
+  const essentials = harvardEssentials(data.personal);
+  const skillLines = harvardSkillLines(data);
+
+  const hasObjective = summary.length > 0;
+  const hasEducation = education.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasProjects = projects.length > 0;
+  const hasSkills = skillLines.length > 0;
+
+  // Education-first; an empty education list falls through to experience
+  // first. First rendered section gets marginTop 0; later ones 10pt × sp.
+  const sectionOrder: Array<[string, boolean]> = [
+    ["objective", hasObjective],
+    ["education", hasEducation],
+    ["experience", hasExperience],
+    ["projects", hasProjects],
+    ["skills", hasSkills],
+  ];
+  const firstSection = sectionOrder.find(([, present]) => present)?.[0] ?? null;
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const body: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 10 * fs,
+    lineHeight: 1.35 * ls,
+    color: HARVARD_INK,
+  };
+  const boldText: Style = { ...body, ...bold };
+  // Serif italic is the only true italic both renderers can draw; a touch
+  // larger than the sans body because Instrument Serif's x-height is smaller.
+  const italic: Style = { ...serifItalic, fontSize: 10.5 * fs, lineHeight: 1.3 * ls, color: HARVARD_INK };
+  const right: Style = { ...body, textAlign: "right", flexShrink: 0 };
+  const row: Style = {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 9,
+  };
+  const soft: Style = { fontFamily: fonts.regular, color: HARVARD_INK_SOFT };
+
+  const heading = (id: string, label: string) => (
+    <View
+      minPresenceAhead={56}
+      style={{
+        marginTop: firstSection === id ? 0 : 10 * sp,
+        marginBottom: 4.5,
+        paddingBottom: 1.5,
+        borderBottomWidth: 0.5,
+        borderBottomColor: HARVARD_RULE,
+      }}
+    >
+      <Text style={{ ...serif, fontSize: 9 * fs, lineHeight: 1.25 * ls, letterSpacing: 0.5, color: HARVARD_INK }}>
+        {label}
+      </Text>
+    </View>
+  );
+
+  const bullets = (items: string[]) => {
+    const list = items.map((b) => b.trim()).filter(Boolean);
+    if (list.length === 0) return null;
+    return (
+      <View style={{ marginTop: 1.5, paddingLeft: 12 }}>
+        {list.map((bullet, i) => (
+          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75 }}>
+            <Text style={{ ...body, width: 9 }}>•</Text>
+            <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const bar = <Text style={{ ...soft, color: "#999999" }}>{"  |  "}</Text>;
+
+  return (
+    <View>
+      {/* ── Header, all centred: serif name, pipe contact line, essentials ── */}
+      <View style={{ alignItems: "center", marginBottom: 9 }}>
+        <Text style={{ ...serif, fontSize: 20 * fs, lineHeight: 1.15 * ls, color: HARVARD_INK, textAlign: "center" }}>
+          {name}
+        </Text>
+        {contactItems.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", marginTop: 3 }}>
+            {contactItems.map((item, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                {i > 0 ? <Text style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls, color: "#999999", marginHorizontal: 4.5 }}>|</Text> : null}
+                {item.href ? (
+                  <Link src={item.href} style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls, textDecoration: "none" }}>
+                    {item.text}
+                  </Link>
+                ) : (
+                  <Text style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls }}>{item.text}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {essentials.length > 0 ? (
+          <Text style={{ ...soft, fontSize: 7.5 * fs, lineHeight: 1.45 * ls, textAlign: "center", marginTop: 1.5 }}>
+            {essentials.map((item, i) => (
+              <Text key={item.label}>
+                {i > 0 ? bar : null}
+                {`${item.label}: ${item.value}`}
+              </Text>
+            ))}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Sections are fragments so headings honour minPresenceAhead. */}
+      {hasObjective ? (
+        <>
+          {heading("objective", "CAREER OBJECTIVE")}
+          <Text style={body}>{summary}</Text>
+        </>
+      ) : null}
+
+      {hasEducation ? (
+        <>
+          {heading("education", "EDUCATION")}
+          {education.map((edu, i) => {
+            const school = edu.school?.trim() || "";
+            const notes = edu.notes?.trim() || "";
+            const attestingBody = edu.attestingBody?.trim() || "";
+            return (
+              <View key={edu.id} style={{ marginBottom: i < education.length - 1 ? 5 : 0 }} wrap={false}>
+                <View style={row}>
+                  <Text style={{ ...boldText, flex: 1 }}>{harvardDegreeTitle(edu)}</Text>
+                  <Text style={right}>{formatDateRange(edu.startDate, edu.endDate)}</Text>
+                </View>
+                {school ? <Text style={italic}>{school}</Text> : null}
+                {notes ? <Text style={body}>{notes}</Text> : null}
+                {edu.attested && attestingBody ? (
+                  <Text style={body}>{`Attested — ${attestingBody}`}</Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasExperience ? (
+        <>
+          {heading("experience", "EXPERIENCE & INTERNSHIPS")}
+          {experience.map((role, i) => {
+            const company = role.company?.trim() || "";
+            const location = role.location?.trim() || "";
+            const title = role.role?.trim() || "";
+            const dates = formatDateRange(role.startDate, role.endDate, role.isCurrent);
+            return (
+              <View
+                key={role.id}
+                style={{ marginBottom: i < experience.length - 1 ? 5 : 0 }}
+                minPresenceAhead={48}
+              >
+                <View style={row}>
+                  <Text style={{ ...boldText, flex: 1 }}>{company || title || "Role"}</Text>
+                  {location ? <Text style={right}>{location}</Text> : null}
+                </View>
+                {company && (title || dates) ? (
+                  <View style={row}>
+                    <Text style={{ ...italic, flex: 1 }}>{title}</Text>
+                    {dates ? <Text style={right}>{dates}</Text> : null}
+                  </View>
+                ) : dates ? (
+                  <View style={row}>
+                    <View style={{ flex: 1 }} />
+                    <Text style={right}>{dates}</Text>
+                  </View>
+                ) : null}
+                {bullets(role.bullets ?? [])}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasProjects ? (
+        <>
+          {heading("projects", "PROJECTS")}
+          {projects.map((project, i) => {
+            const link = project.link?.trim() || "";
+            return (
+              <View key={project.id} style={{ marginBottom: i < projects.length - 1 ? 5 : 0 }} wrap={false}>
+                <Text style={boldText}>{project.name?.trim() || "Project"}</Text>
+                {shouldShowProjectLink(link) ? (
+                  <Link src={normalizeHref(link)} style={{ ...body, color: HARVARD_INK_SOFT, textDecoration: "underline" }}>
+                    {shortenDisplayUrl(link)}
+                  </Link>
+                ) : null}
+                {bullets(project.bullets ?? [])}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasSkills ? (
+        <>
+          {heading("skills", "SKILLS & INTERESTS")}
+          {skillLines.map((line, i) => (
+            <Text key={line.label} style={{ ...body, marginBottom: i < skillLines.length - 1 ? 1.5 : 0 }}>
+              <Text style={bold}>{`${line.label}: `}</Text>
+              {line.value}
+            </Text>
+          ))}
+        </>
+      ) : null}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -4398,41 +5711,31 @@ export const CVDocument = ({
   plan = "free",
   templateId = "classic",
 }: Props) => {
-  // Page Margins (theme.marginScale) scales the shared page padding — but ONLY
-  // for single-column templates, whose content sits directly under s.page. The
-  // two-column/sidebar layouts bleed to the page edge with hardcoded negative
-  // margins tied to s.page's 24/27, so scaling their page padding would break
-  // the bleed; their main-column margins land in the next pass.
+  // Page Margins (theme.marginScale) scales the page padding for EVERY
+  // template (audit 2026-10 defect 19 — it used to skip the sidebar layouts).
+  // The edge-bleed sidebars (executive / corp-sidebar / onyx / sandstone)
+  // paint their band as a fixed, absolutely positioned layer that reaches the
+  // physical page edges on every page, and pull a transparent column over it
+  // with negative margins that are themselves scaled, so the band keeps its
+  // fixed inner padding (as live) while the main column's margins breathe.
+  // Exec Split's page-1 header bleeds the same way.
   const theme = resolveTheme(data.settings);
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const marginScale = theme.marginScale;
-  // Templates whose content sits directly under s.page (no edge-bleed) — their
-  // page padding scales with margins. Modern belongs here even though its BODY
-  // is two-column (main column + 150pt aside, see ModernPDFLayout): it is a
-  // padded page like the live template's 36px/32px padding, not a bleed
-  // sidebar. The true edge-bleed sidebars (executive/exec-split/corp-sidebar/
-  // onyx/sandstone) instead scale their MAIN-COLUMN padding.
-  const SINGLE_COLUMN = new Set([
-    "classic",
-    "ats-clean",
-    "professional",
-    "professional-photo",
-    "modern",
-    // Banner's band bleeds, but only on page 1 and with negative margins that
-    // are themselves scaled by marginScale, so its page padding scales too.
-    "banner",
-    "gulf-standard",
-  ]);
-  const pageStyle = SINGLE_COLUMN.has(templateId)
-    ? {
-        ...s.page,
-        paddingTop: 27 * marginScale,
-        paddingBottom: 27 * marginScale,
-        paddingLeft: 24 * marginScale,
-        paddingRight: 24 * marginScale,
-      }
-    : s.page;
+  // Harvard runs a tighter sheet (22pt top/bottom, 20pt sides) than the
+  // shared 27/24 — the one-page graduate format (template audit 2026-10).
+  const pagePadding =
+    templateId === "harvard"
+      ? HARVARD_PAGE_PADDING_PT
+      : { vertical: 27, horizontal: 24 };
+  const pageStyle = {
+    ...s.page,
+    paddingTop: pagePadding.vertical * marginScale,
+    paddingBottom: pagePadding.vertical * marginScale,
+    paddingLeft: pagePadding.horizontal * marginScale,
+    paddingRight: pagePadding.horizontal * marginScale,
+  };
 
   const renderLayout = () => {
     switch (templateId) {
@@ -4458,6 +5761,10 @@ export const CVDocument = ({
         return <BannerPDFLayout data={data} />;
       case "gulf-standard":
         return <GulfStandardPDFLayout data={data} />;
+      case "chronicle":
+        return <ChroniclePDFLayout data={data} />;
+      case "harvard":
+        return <HarvardPDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }

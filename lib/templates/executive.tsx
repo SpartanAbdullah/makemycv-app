@@ -4,7 +4,11 @@ import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -551,8 +555,7 @@ export const ExecutiveTemplate = ({
                         color: "#111827",
                       }}
                     >
-                      {edu.degree?.trim() || "Degree"}
-                      {edu.field?.trim() ? ` — ${edu.field.trim()}` : ""}
+                      {educationTitle(edu.degree, edu.field, " — ")}
                     </span>
                     <span
                       style={{
@@ -589,9 +592,7 @@ export const ExecutiveTemplate = ({
                           flexShrink: 0,
                         }}
                       >
-                        {edu.attestingBody?.trim()
-                          ? `\u2713 ATTESTED — ${edu.attestingBody.trim()}`
-                          : "ATTESTED"}
+                        {attestedLabel(edu.attestingBody, true)}
                       </span>
                     )}
                   </div>

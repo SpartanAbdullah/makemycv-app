@@ -16,6 +16,338 @@ Format:
 
 ---
 
+## [2026-10-26 00:10] Chronicle and Harvard degree titles use the shared educationTitle
+
+**Goal:** Follow-up agreed with the Chronicle/Harvard session: their templates landed before the shared
+`educationTitle` helper existed and carried their own copies of the same de-dup rule. One rule, one place.
+**Files:**
+- edited: `lib/templates/chronicle.tsx`, `lib/templates/harvard.tsx` — `chronicleDegreeTitle` /
+  `harvardDegreeTitle` are thin wrappers over `educationTitle(degree, field, " · ")` (exports kept; the PDF
+  layouts call them unchanged). Same pattern as `gulfDegreeTitle` / `bannerEducationTitle`.
+**Notes / risks / follow-up:** identical output by construction (same rule, same joiner); tsc, lint and the
+smoke re-run on the merged tree.
+**Suggested commit:** refactor(templates): Chronicle and Harvard degree titles via the shared educationTitle
+
+## [2026-10-25 23:40] Templates 7/7: registry badges and copy honesty; CLAUDE.md notes the PDF primitives
+
+**Goal:** Template audit 2026-10 defect 26 (medium) and the registry-copy findings. Onyx and Sandstone are
+two-column sidebar templates but carried only "New", so their users got no "Design-led" ATS caveat;
+Professional Photo is structurally identical to Professional (ATS-Friendly) but carried only "New";
+Executive and Corporate shared one sentence and described a colour the accent control changes; Modern
+promised "a refined accent section" it never renders; ATS Clean claimed an unmeasured "maximum ATS pass
+rate"; Professional promised a "headline strip" that was never built. The ATS promise depends on these
+signals being accurate.
+**Files:**
+- edited: `lib/templates/index.tsx` — Onyx and Sandstone: `[New, Design-led]`. Professional Photo:
+  `[New, ATS-Friendly]`; the registry comment records the decision: the badge speaks to column structure,
+  an in-flow photo does not change reading order, and ATS Clean / Gulf Standard / Banner already show one
+  while keeping the badge. Descriptions: Modern ("Two-column layout: experience cards on the left,
+  education and skill pills on the right."), Executive ("Left sidebar with stacked name, contact and
+  skills; two-column. For senior profiles sent straight to a hiring manager."), Corporate ("Right-hand
+  sidebar carries contact, visa and skills; the main column stays plain. Best emailed direct to a
+  recruiter."), ATS Clean ("Single-column, text-first layout built for applicant tracking systems."),
+  Professional ("Centered name, headline and contacts over full-width ruled sections. Conservative and
+  recruiter-safe."). Modern's stale `modern.tsx:154` comment reference removed. ClassicThumb redrawn with
+  the live left-aligned contact row and top-right photo slot; ModernThumb without the emerald band it
+  never had (slate rule, bordered card, slate pills).
+- edited: `CLAUDE.md` — a "PDF layouts share primitives" bullet under Checks: the primitives, the band
+  pattern, the `BANDS` registration a new sidebar template needs, the three smoke passes, and "verify
+  parity with pdf.js text extraction, not by eye".
+**Notes / risks / follow-up:**
+- Nothing in the app renders the registry `Thumbnail` field today (the gallery in ReviewStep uses live
+  previews), so the thumbnail redraws are documentation of the design, not a visible change.
+- Deferred, audit defect 13: Sandstone (and every template with a signature fallback accent) renders in
+  the store's seeded #1e5b54 because a template switch writes only `templateId`; the beige identity exists
+  only in the marketing PNG. Whether switching template should reset the accent to the template's
+  signature is a product decision (it would recolour a CV the user already tuned) — founder call, not a
+  primitive fix. Sandstone's description still says "Warm sidebar" pending that call.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings.
+**Suggested commit:** fix(templates): registry badges and copy honesty; CLAUDE.md notes the PDF primitives
+
+## [2026-10-25 23:30] PDF parity 6/7: density scales on the bleed sidebars, fixed bands, first-section margins, tracking cap
+
+**Goal:** Template audit 2026-10 defects 19, 20 and 37 (medium/low) plus 39 (low) where it fell out of the
+same code. The Page-margins slider skipped every sidebar PDF (the router scaled page padding only for a
+"single-column" set; Exec Split ignored it in both renderers), the Section-spacing slider scaled per-entry
+gaps and heading padding that the live templates keep fixed, the first section of Executive / Onyx /
+Sandstone carried a full between-section margin so the two columns started misaligned, the Corporate
+sidebar labels were Executive's, and — found while fixing — the Onyx / Sandstone / Corporate bands left the
+same white notch at the top of page 2+ and the foot of page 1 that the Executive fix removed on 2026-10-24.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx`
+  - Router: page padding is `27/24pt × marginScale` for EVERY template; the `SINGLE_COLUMN` set is gone.
+  - Executive / Corporate / Onyx / Sandstone: the band is a `fixed` absolutely positioned layer (0/0/0,
+    edge to edge on every page) and the sidebar is a transparent column pulled over it with
+    `-27×m / -24×m` margins, so the live inner padding (28/20px, 36/20px, 30/22px) holds at every margin
+    level while the main column's padding (28px×m, 28px×m, 30px×m) and the page edges breathe. Corporate's
+    band is now the live 220px (165pt) and its header rule takes `theme.accentText` (was hardcoded navy).
+  - Exec Split: `m` scales the header bleed and padding (32px×m) and the body top margin (20px×m); column
+    gap 28px and the right column 200px as live.
+  - First-section rule through one `withTopGap(base, gap, firstKey)` factory: Executive main headings and
+    sidebar labels, Onyx and Sandstone main headings (`PdfHeading`, 11px / 0.1em / 1.5px accent rule /
+    18px×sp; `OnyxHeading` removed) zero the first present section as their live files do; Corporate passes
+    `null` and keeps 18px×sp on every heading and label as its live file does.
+  - Sidebar labels rebuilt from each live file: Executive 9px / mb 8px with the live name block (22px
+    stacked name, 12px headline, 15%-ink rule 16px above and below); Corporate 9px at 50% ink; Onyx and
+    Sandstone 9px / mb 7px with 18px×sp carried BELOW each section (the last one none). Unused
+    `execSidebar`, `execName`, `execHeadline`, `execSideLabel` base styles removed.
+  - `SECTION_GAP_KEYS` trimmed to `section` / `twoCol` / `atsSectionHeading` (defect 37); ATS Clean's
+    per-entry gaps are fixed 12px / 10px.
+  - Tracking cap (defect 39): `safeTracking()` caps letter-spacing at 8% of the size on `PdfHeading`, the
+    sidebar labels, Modern's h2 (live 0.2em), Professional's centred headings and ATS Clean's headings.
+    pdf.js read Exec Split's 0.12em headings as "E X P E R I E N C E", Modern's as "P R O F I L E",
+    Professional's as "S U M M A RY" and the 0.1em labels as "C O N TAC T"; a text-layer ATS parser would
+    miss those section names. The live headings keep their tracking — a visible but deliberate deviation
+    in favour of a parseable download.
+- edited: `lib/templates/exec-split.tsx` — `m = theme.marginScale` scales header/body horizontal padding
+  and the body's vertical padding (the slider did nothing on this template).
+- edited: `lib/templates/sandstone.tsx` — the two sidebar section gaps scale with Section spacing like
+  Onyx's (they were the only unscaled 18px in the sidebar templates; the PDF scales them too).
+- edited: `scripts/pdf-ops-check.mjs` — band check generalised: Executive 150 / Onyx 172 / Sandstone 180
+  left, Corporate 165 right; every page must carry a full-height band flush with its edge, else FAIL.
+- edited: `scripts/pdf-smoke.tsx` — third pass `<id>-airy.pdf` (page margins level 1, font / line /
+  section spacing level 5) so the scaled padding, bands and gaps are exercised away from the 1.0 neutral.
+**Notes / risks / follow-up:**
+- Evidence: ops check `bandPages=N/N` for all 12 sidebar renders (default, -long, -airy); before this pass
+  the Onyx / Sandstone / Corporate band rectangles measured 814.9pt on page 1 and 787.9pt on page 2 of
+  841.9. Extraction: EXPERIENCE / SUMMARY / SKILLS / CONTACT / ABOUT ME / PERSONAL DETAILS / PROFILE read
+  as words in every PDF; a scan for any four-letter spaced run finds nothing in the 36 files (it found
+  Modern and Professional before the cap). classic-airy's text starts at x=17pt (24 × 0.7) against 24 at
+  the default; onyx-airy's main heading at 188pt (172 + 22.5 × 0.7). Page counts dropped for the long
+  renders (executive-long 3→2, onyx-long 3→2) because bullets no longer carry Classic's 3pt gap — the
+  live sidebar templates have none.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings, `npm run smoke:pdf` 36/36 + ops check green.
+- Not done here: the sidebar TEXT sizes of Onyx / Sandstone (7.8pt vs the live 7.5pt) and Executive's
+  contact lines were left as tuned in October; only margins, labels, headings and bands changed.
+- Defect 13 (Sandstone is never beige because the store seeds #1e5b54 and a template switch keeps the
+  accent) is a store/UX decision, not a PDF primitive — deferred, see the registry entry.
+**Suggested commit:** fix(pdf): density scales on bleed sidebars, fixed bands on every page, first-section margins
+
+## [2026-10-25 22:50] PDF parity 5/7: Executive, Exec Split and Corporate main-column headings match live
+
+**Goal:** Template audit 2026-10 defect 11 (medium, verified). The three layouts reused Classic's
+`s.sectionHeading` (9.4pt bold title-case slate-800 over a slate-200 rule) while their live templates draw
+small uppercase letter-spaced headings — in `theme.accentText` with an accent rule (Executive), in
+`accentText` over a #CBD5E1 rule (Exec Split), in #1E293B over a #E2E8F0 rule (Corporate). With a custom
+accent the preview showed coloured headings and the download showed slate.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `PdfHeading` primitive (`HeadingVariant`: size, colour,
+  letter-spacing, uppercase, optional rule colour/width, padding-bottom, margin-bottom, margin-top).
+  Executive defines `mainHeading(key)` from `executive.tsx` RightHeading (10px, 0.08em, accent rule, mt 0
+  for the first present section else 20px × sectionSpacing); Corporate from `MainHeading` (10px, #1E293B,
+  #E2E8F0 rule, mt 18px × sp on every heading — the live file has no first-section exception); Exec Split
+  one `heading` variant for both columns from `SectionHeading` (9.5px, 0.12em, #CBD5E1 rule, mt 16px × sp).
+  The `s.section` wrappers in those layouts are gone: the heading now owns the gap, as live.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): executive prints SUMMARY / EXPERIENCE / EDUCATION / PROJECTS, corp-sidebar
+  SUMMARY / EXPERIENCE / EDUCATION / PROJECTS, exec-split EXPERIENCE / EDUCATION / PROJECTS and SUMMARY /
+  SKILLS / LANGUAGES / CERTIFICATIONS, all uppercase; `s.sectionHeading` remains only in Classic (8 uses).
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- Onyx / Sandstone headings and the sidebar labels of all four sidebar layouts move to the density pass
+  (next entry) because their margins and the first-section rule are the defect there.
+**Suggested commit:** fix(pdf): Executive, Exec Split and Corporate headings take the live uppercase ruled style
+
+## [2026-10-25 22:35] PDF parity 4/7: project links restored in Onyx, Sandstone, Professional; nested runs print regular
+
+**Goal:** Template audit 2026-10 defect 10 (medium, verified). The three 2026-10 layouts rendered only
+`project.name` + bullets and silently dropped the link the preview shows, so a candidate's portfolio /
+GitHub URL never reached the file they submit. While wiring the link run I found that a `<Text>` nested
+inside the bold title inherits the parent's font in react-pdf, so Classic's and Professional's "| Company"
+and "| School" runs (and the old project-link runs) were printing bold although the preview shows them
+normal — fixed at the style level.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — Onyx / Sandstone: `<Link src={normalizeHref(link)}>` with
+  `shortenDisplayUrl(link)` in the accent (10px normal, after the name) when `shouldShowProjectLink`;
+  Professional / Professional Photo: same in slate-500 at 10.5px. `entryCompany` now carries the regular
+  face explicitly and `buildStyles` pins `fontWeight: 400` on every regular-face style, so a regular run
+  inside a bold run stays regular with Helvetica and with the embedded Inter / Bricolage.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): onyx / sandstone / professional / professional-photo print
+  "Hisaab usehisaab.com" and "Long Link Stress Test github.com/abdullah"; classic's "| Interior360 General
+  Trading LLC" and "| Virtual University of Pakistan" runs now use the regular font object (same object as
+  body text), where before they shared the bold title's.
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- The live Onyx / Sandstone / Professional project URL is a plain `<span>` (not an `<a>`); the PDF link is
+  clickable. Left as is — the preview is not the deliverable.
+**Suggested commit:** fix(pdf): project links in Onyx, Sandstone and Professional; nested runs print regular
+
+## [2026-10-25 22:30] Templates: Chronicle and Harvard added (13th and 14th)
+
+**Goal:** The remaining two candidates from the 2026-10 template audit
+(`docs/template-audit-2026-10.md`, "Shortlist of templates to add", items 3 and 4), built to their
+layoutSpec and buildNotes after Gulf Standard and Banner shipped on 2026-10-24. Chronicle is the
+catalogue's first design-forward template that can honestly wear the ATS-Friendly badge (single column,
+no photo dependency); Harvard captures the fresh-graduate / "just make it plain" search intent with an
+education-first one-page serif format.
+**Files:**
+- created: `lib/templates/chronicle.tsx` — single-column reverse-chronological timeline. Header: name,
+  headline in accent, contact row with ` | ` separators and real links, a quiet essentials row (full
+  labels, plus the date of birth when set), optional 54pt photo top-right as an in-flow flex sibling
+  (default off; gated on `personal.photo && showPhoto && theme.photoVisible`, round/square). Then
+  Profile → Experience → Education → Projects (three-track rows: 90pt × fontScale date gutter with
+  uppercase `MMM YYYY – MMM YYYY` right-aligned to the rail, 14pt rail track with a 1.25pt line and a
+  6pt accent dot per entry, content flex 1) → Skills (text lines under bold sub-labels) → Languages →
+  Certifications. The rail is drawn per entry and the last entry of a section ends it at the dot; the
+  entry gap lives inside the content track so the rail stretches across it. Dot = `theme.accentText`,
+  rail = that mixed 30 % toward white (opaque hex), so a pale preset still shows. Fallback accent
+  `#0E7490`. Exports the track geometry constants and `chronicleContactItems` / `chronicleEssentials` /
+  `chronicleDegreeTitle` / `chronicleRailColors` for the PDF twin.
+- created: `lib/templates/harvard.tsx` — zero-colour serif single column. Centred header (serif Title
+  Case name, `location | phone | email | linkedin` with real links, `Nationality: X | Visa: Y |
+  Available: Z`), then CAREER OBJECTIVE (the summary) → EDUCATION (degree bold left / date right,
+  school in serif italic, notes line, "Attested — body") → EXPERIENCE & INTERNSHIPS (organisation bold
+  / location right, role italic / dates right, bullets) → PROJECTS → SKILLS & INTERESTS as
+  label-prefixed lines (`Technical:`, `Skills:`, `Languages: Arabic (Native), English (C2)`,
+  `Certifications: name (issuer, year)`). Headings 9pt uppercase serif over a 0.5pt black rule, 10pt
+  / 1.35 body, 22/20pt page padding, no photo slot, accent ignored. Exports the text rules for the PDF.
+- edited: `components/pdf/CVDocument.tsx` — `ChroniclePDFLayout` and `HarvardPDFLayout` mirroring the
+  live renders section by section (px × 0.75, all four density scales, no alpha colours, own
+  heading/experience/education blocks, sections as fragments so headings honour `minPresenceAhead`).
+  Chronicle's rail is a per-entry `borderLeft` plus an absolutely positioned dot (a stub to the dot on
+  the last entry); short entries carry `wrap={false}`. Harvard's serif is `PDF_FAMILY.serif` once
+  registered, else the Times pair. Both ids in `SINGLE_COLUMN`; Harvard's page padding is 22/20pt ×
+  marginScale via `HARVARD_PAGE_PADDING_PT`.
+- edited: `lib/templates/index.tsx` — registry entries (Harvard after ATS Clean, Chronicle after Gulf
+  Standard), both badged New + ATS-Friendly, hand-drawn thumbnails. `TemplateDefinition` gains
+  `ignoresAccent` (Harvard) and `densityDefaults` (Harvard: font 2 / spacing 2), and a new
+  `settingsForTemplate(settings, nextId)` helper applies a template's density defaults when the user
+  switches to it with those controls still neutral and reverts them when switching away with the
+  defaults still in place — a level the user set by hand is never touched.
+- edited: `components/builder/steps/ReviewStep.tsx`, `components/builder/BuilderShell.tsx` — both
+  template-change paths go through `settingsForTemplate`.
+- edited: `components/builder/CustomizePanel.tsx` — the Colours group (and its divider) hide when the
+  current template `ignoresAccent`, so Harvard shows no dead colour picker.
+- edited: `lib/data/preview-profiles.ts` — personas `priyaChronicle` (Priya Nair, Engineering Manager —
+  Payments, Indian, Dubai; four roles across India and the UAE, degree/field distinct) and
+  `mariamHarvard` (Mariam Al-Suwaidi, 2026 UAEU Computer Engineering graduate; internship, TA term,
+  capstone, GPA line; settings at the template's font 2 / spacing 2).
+- edited: `app/preview/[templateId]/page.tsx` — `?density=1..5` sets all four density controls for
+  review captures at the extremes (chrome-less route, noindexed; default unchanged).
+- edited: `lib/pdf/fonts.ts` — `registerPdfFontsFromDir(dir)` (Node twin of `registerPdfFonts`, same
+  three faces from local TTFs) and the shared `registerFrom` body.
+- edited: `scripts/pdf-smoke.tsx` — ids added; registers the real faces from `public/fonts/pdf` so the
+  smoke renders with Inter / Bricolage / Instrument Serif metrics instead of Helvetica; also renders
+  `chronicle-persona.pdf` and `harvard-persona.pdf` from the preview personas.
+- edited: `scripts/pdf-ops-check.mjs` — check 4: `harvard-persona.pdf` must be one page.
+- edited: `scripts/capture-previews.js` — ids added.
+- added: `artifacts/template-previews/{chronicle,harvard}-preview.png`.
+- edited: `ROADMAP.md` (14 shipped), `CLAUDE.md` (template count).
+**Notes / risks / follow-up:**
+- Spec deviations, both deliberate: the Chronicle date gutter is 90pt (spec 72pt) because
+  `SEP 2019 – PRESENT` at 7.5pt uppercase measures ~82pt at level 3 and ~89pt at level 5 — the spec's
+  own density-5 test cannot pass in 72pt; and the heading letter-spacing is 0.6pt (spec 1pt) because at
+  1pt pdf.js extracts `P R O F I L E`, which an ATS would not recognise as a section.
+- Harvard's serif is Instrument Serif (weight 400 only, as the audit warned): hierarchy is size and
+  caps, the italic sub-lines use the serif italic because Inter has no italic cut in either renderer,
+  and the body stays in the user's face. No new font was added to `public/fonts/pdf`.
+- `scripts/capture-previews.js` still cannot launch here (playwright-core 1.61.1 wants Chromium build
+  1228; the cache holds 1234). The PNGs were captured with an equivalent script through the system
+  Chrome channel (same 794×1123 @2x viewport and readiness waits); `npx playwright install chromium`
+  restores the pipeline.
+- Chronicle has no `-nophoto` capture because its persona carries no photo (the template's default);
+  the site card therefore has no with/without toggle.
+- Built in a worktree (`feat/templates-chronicle-harvard`) because the stagingmmc checkout was mid-edit
+  by the audit-fix session; its `educationTitle` helper in `lib/utils/education.ts` can absorb
+  `chronicleDegreeTitle` / `harvardDegreeTitle` once both land.
+- DOCX export is template-agnostic and untouched (Chronicle's gutter collapses to the generic
+  "dates — role" line, as the audit expected).
+- Marketing site: `content/templates/{chronicle,harvard}.mdx` + `public/templates/*` on `staging`.
+**Suggested commit:** feat(templates): add Chronicle and Harvard
+
+## [2026-10-25 22:20] PDF parity 3/7: one chip primitive for skills and UAE essentials; ATS Clean keeps text
+
+**Goal:** Template audit 2026-10 defect 9 (medium, verified). The preview drew skills and the UAE-essentials
+strip as bordered pills (Exec Split, Corporate, Modern, Professional, Onyx, Sandstone, ATS Clean) while the
+PDF flattened most of them to one joined text line, so the download did not look like what the user
+approved. Decision per template: every design-led template gets real chips in the PDF; ATS Clean goes the
+other way — the " · " text line the PDF has always printed is the ATS-safer form, so its preview now draws
+the line too.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `PdfChips` primitive (`ChipItem` = value with an optional
+  leading label; `ChipVariant` = size, line-height, colour, fill, border, radius, padding, gap, label style).
+  Used for: Exec Split header essentials (opaque `mix()` fill/border, radius 999) and right-column skill
+  chips (accentText on #F1F5F9); Corporate sidebar skills (8% ink fill via `mix()`); Professional essentials
+  ("Label:" in #6B7280 on #F3F4F6 pills, centred); Modern essentials and skill pills (same look as before,
+  now through the primitive); Onyx and Sandstone skill pills (now at the live 10.5px / 1px / 2px 9px / gap 6px
+  instead of the earlier 8pt / 0.5pt approximation). ATS Clean's skills line takes the live 1.55 line-height.
+- edited: `lib/templates/ats-clean.tsx` — `renderSkillChips` → `renderSkillLine`: a " · "-separated
+  paragraph (11.5px, #374151, lh 1.55) replaces the bordered chips, matching the PDF. Comment records why.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): skill names and "Visa … Nationality …" present in exec-split, corp-sidebar,
+  professional, onyx, sandstone and modern; ats-clean prints "JavaScript · PostgreSQL · …".
+- No `rgba()` anywhere: all translucent-looking fills are pre-blended with `mix()`; the smoke source check
+  and the operator check (no neon green) pass. `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24.
+- The ATS Clean preview PNG in `artifacts/template-previews/` now shows chips the template no longer draws;
+  recapture with the rest when the Playwright pipeline is back.
+- Exec Split / Corporate / Modern essentials chips print the label without a colon ("Visa Employment visa"
+  in extraction) exactly as the live chips do; Professional and ATS Clean keep "Visa:".
+**Suggested commit:** fix(pdf): shared chip primitive for skills and UAE essentials; ATS Clean keeps the text line
+
+## [2026-10-25 22:05] PDF parity 2/7: sidebar layouts print role + dates, then "Company · Location"
+
+**Goal:** Template audit 2026-10 defect 7 (medium, verified). Executive, Exec Split, Corporate, Onyx and
+Sandstone PDFs reused Classic's experience row — "Role | Company" inline with the location pushed to a
+grey third line — while every one of those live templates draws role + dates on line 1 and
+"Company · Location" (Exec Split / Onyx / Sandstone) or "Company | Location" (Executive / Corporate) on
+line 2, with the company in the accent colour on Onyx and Sandstone. Visible on every role of every
+download from those five templates.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `ExperienceEntry` primitive driven by an
+  `ExperienceVariant` (role / date / company / location styles, separator, company-line margin, bullet
+  text + `<ul>` margin/padding, inter-role gap). `BulletList` accepts per-call `styles` overrides so each
+  layout's bullets take the live size, line-height and colour (the marker takes the text colour, as a
+  CSS disc does). The five sidebar layouts define their variant from their live file (px × 0.75) and
+  render roles through the primitive; Classic and Professional keep the inline "Role | Company" form
+  because their live templates draw it that way; ATS Clean and Modern already had their own rows.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js text extraction): executive/corp-sidebar print "Interior360 General Trading LLC | Dubai",
+  exec-split/onyx/sandstone "Interior360 General Trading LLC · Dubai", each on the line under the role;
+  classic still prints "Odoo Administrator | Interior360 General Trading LLC".
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- Seen in the same extraction and left for the heading pass: Corporate's sidebar labels extract as
+  "C O N TAC T" (audit defect 39, letter-spacing).
+**Suggested commit:** fix(pdf): sidebar layouts print role + dates over company · location
+
+## [2026-10-25 21:50] PDF parity 1/7: education entry mirrors each live template, tick glyph dropped
+
+**Goal:** Template audit 2026-10 defects 8, 21 and 36 (all medium). The shared PDF `EducationEntry`
+printed "Degree · Field" bold, the school as grey subtext, notes, then a bare "Attested" even with no
+attesting body — while every live template differs (Classic "Degree | School" + "Field | Notes", ATS
+Clean "Degree in Field" with the attestation inline, Executive/Corporate a bordered pill, Onyx/Sandstone
+an accent-coloured school with notes under the attestation). The "✓" (U+2713) in front of "Attested" has
+no glyph in any embedded PDF face, so every download printed a notdef box; and "BSc Finance" + "Finance"
+printed the field twice in both paths. The PDF is the file people submit, so the download must read like
+the preview the user approved.
+**Files:**
+- edited: `lib/utils/education.ts` — new shared `distinctField` (field unless the degree already names it),
+  `educationTitle(degree, field, joiner)` and `attestedLabel(body, uppercase?)` ("Attested — body" / "Attested",
+  no glyph). Both renderers call the same three functions, so the words cannot drift again.
+- edited: `components/pdf/CVDocument.tsx` — `EducationEntry` is now variant-driven (`EducationVariant`:
+  joiner, school inline or on its own line, attestation as line / inline / pill, `attestedRequiresBody`,
+  `notesAfterAttested`, per-entry gap, every style). Each of the eight layouts that used the shared block
+  passes its own variant transcribed from its live file (px × 0.75). Modern's aside uses the same helpers.
+  Added a `pt()` px→pt helper and `GREEN_700`; removed the Modern-only green constant.
+- edited: `lib/templates/{classic,modern,executive,ats-clean,exec-split,corp-sidebar,onyx,sandstone,professional}.tsx`
+  — education titles go through `educationTitle` (de-dup), attestation text through `attestedLabel`
+  (tick removed; ATS Clean / Exec Split "(Attested)" → "Attested"; Corporate pill "✓ body" → "Attested — body").
+  Nothing else in the live files changed.
+- edited: `lib/templates/gulf-standard.tsx`, `lib/templates/banner.tsx` — their local degree de-dup
+  helpers now delegate to `educationTitle`.
+- edited: `scripts/pdf-smoke.tsx` — fixture gains a second education entry (degree "BSc Finance",
+  field "Finance", attested with no body) so the smoke exercises both rules.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js text extraction of `.smoke-pdfs/*.pdf`): "BSc Finance" prints once in all 12 templates;
+  a bare "Attested" appears only in Executive ("ATTESTED"), ATS Clean, Exec Split and Corporate — exactly
+  the four whose live templates print one; Classic/Modern/Onyx/Sandstone/Professional/Banner/Gulf print
+  nothing without a body. No "✓" or notdef in any PDF.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings (cap), `npm run smoke:pdf` 24/24 + ops check green.
+- The live preview PNGs in `artifacts/template-previews/` still show the tick; recapture when the
+  Playwright pipeline is restored (`npx playwright install chromium`, see 2026-10-24 entry).
+- Not changed: the DOCX exporter never printed the glyph; live ATS Clean languages use ", " where the PDF
+  uses " · " (out of this pass's scope).
+**Suggested commit:** fix(pdf): education entry mirrors each live template, drop the tick glyph
+
+
 ## [2026-10-24 22:30] Templates: Gulf Standard and Banner added (11th and 12th)
 
 **Goal:** Founder ask 2026-10-24: review every template and add at least two popular ones. The audit

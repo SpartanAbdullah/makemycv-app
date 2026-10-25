@@ -4,7 +4,11 @@ import { getFullName } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -354,8 +358,7 @@ export const CorpSidebarTemplate = ({
                         color: "#0F172A",
                       }}
                     >
-                      {edu.degree?.trim() || "Degree"}
-                      {edu.field?.trim() ? ` \u2014 ${edu.field.trim()}` : ""}
+                      {educationTitle(edu.degree, edu.field, " \u2014 ")}
                     </span>
                     <span
                       style={{
@@ -397,9 +400,7 @@ export const CorpSidebarTemplate = ({
                           flexShrink: 0,
                         }}
                       >
-                        {edu.attestingBody?.trim()
-                          ? `\u2713 ${edu.attestingBody.trim()}`
-                          : "\u2713 Attested"}
+                        {attestedLabel(edu.attestingBody)}
                       </span>
                     )}
                   </div>
