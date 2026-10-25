@@ -4,7 +4,11 @@ import { getFullName } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -403,8 +407,7 @@ export const ExecSplitTemplate = ({
                           color: "#111827",
                         }}
                       >
-                        {edu.degree?.trim() || "Degree"}
-                        {edu.field?.trim() ? ` in ${edu.field.trim()}` : ""}
+                        {educationTitle(edu.degree, edu.field, " in ")}
                       </span>
                       <span
                         style={{
@@ -434,9 +437,7 @@ export const ExecSplitTemplate = ({
                             marginLeft: "8px",
                           }}
                         >
-                          {edu.attestingBody?.trim()
-                            ? `\u2713 Attested \u2014 ${edu.attestingBody.trim()}`
-                            : "(Attested)"}
+                          {attestedLabel(edu.attestingBody)}
                         </span>
                       )}
                     </div>

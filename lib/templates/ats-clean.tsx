@@ -5,7 +5,11 @@ import { getFullName } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
 import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
@@ -509,8 +513,7 @@ export const ATSCleanTemplate = ({
                       color: "#111827",
                     }}
                   >
-                    {edu.degree?.trim() || "Degree"}
-                    {edu.field?.trim() ? ` in ${edu.field.trim()}` : ""}
+                    {educationTitle(edu.degree, edu.field, " in ")}
                   </span>
                   <span
                     style={{
@@ -542,9 +545,7 @@ export const ATSCleanTemplate = ({
                         marginLeft: "8px",
                       }}
                     >
-                      {edu.attestingBody?.trim()
-                        ? `\u2713 Attested — ${edu.attestingBody.trim()}`
-                        : "(Attested)"}
+                      {attestedLabel(edu.attestingBody)}
                     </span>
                   )}
                 </div>

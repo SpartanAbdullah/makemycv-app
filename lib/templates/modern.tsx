@@ -3,7 +3,11 @@ import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { getFullName } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
@@ -348,15 +352,14 @@ export const ModernTemplate = ({
                       {edu.school || "School"}
                     </div>
                     <div className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-500">
-                      {edu.degree || "Degree"}
-                      {edu.field ? ` - ${edu.field}` : ""}
+                      {educationTitle(edu.degree, edu.field, " - ")}
                     </div>
                     <div className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] text-slate-400">
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </div>
                     {edu.attested && edu.attestingBody?.trim() && (
                       <p className="mt-0.5 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-medium text-green-700">
-                        {"\u2713"} Attested — {edu.attestingBody.trim()}
+                        {attestedLabel(edu.attestingBody)}
                       </p>
                     )}
                   </div>

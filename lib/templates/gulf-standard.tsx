@@ -5,7 +5,7 @@ import { getFullName } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import { educationTitle, meaningfulEducation } from "../utils/education";
 import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
@@ -66,15 +66,8 @@ const shouldShowProjectLink = (value?: string): boolean => {
  * printed once; "Bachelor of Business Administration" + "Supply Chain
  * Management" is printed as "… · Supply Chain Management").
  */
-export const gulfDegreeTitle = (edu: CvEducation): string => {
-  const degree = edu.degree?.trim() ?? "";
-  const field = edu.field?.trim() ?? "";
-  if (!degree) return field || "Degree";
-  if (!field) return degree;
-  return degree.toLowerCase().includes(field.toLowerCase())
-    ? degree
-    : `${degree} · ${field}`;
-};
+export const gulfDegreeTitle = (edu: CvEducation): string =>
+  educationTitle(edu.degree, edu.field, " · ");
 
 export type GulfDetailRow = { label: string; value: string };
 

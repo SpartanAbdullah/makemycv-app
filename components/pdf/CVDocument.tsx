@@ -26,7 +26,12 @@ import { mix } from "../../lib/utils/color";
 import { formatDateRange, normalizeHref } from "../../lib/utils/format";
 import { meaningfulProjects } from "../../lib/utils/projects";
 import { meaningfulExperience } from "../../lib/utils/experience";
-import { meaningfulEducation } from "../../lib/utils/education";
+import {
+  attestedLabel,
+  distinctField,
+  educationTitle,
+  meaningfulEducation,
+} from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
 import { splitSkills } from "../../lib/utils/skills";
 import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
@@ -78,6 +83,11 @@ const SLATE_500 = "#64748B";
 const SLATE_400 = "#94A3B8";
 const SLATE_300 = "#CBD5E1";
 const SLATE_200 = "#E2E8F0";
+/** Tailwind green-700 — the attestation colour every live template uses. */
+const GREEN_700 = "#15803D";
+
+/** The live templates are written in CSS px (96 DPI); react-pdf is pt (72). */
+const pt = (px: number) => px * 0.75;
 
 /* ─── Styles ──────────────────────────────────────────────── */
 /*
@@ -424,46 +434,155 @@ const BulletList = ({
   );
 };
 
-/* ─── Education entry (shared fixed layout) ──────────────── */
+/* ─── Education entry (one primitive, one variant per template) ── */
+/*
+ * Every live template draws an education entry differently — Classic puts the
+ * school inline after the degree and the field on the notes line, ATS Clean
+ * says "Degree in Field" with the attestation inline after the school,
+ * Executive and Corporate badge the attestation in a bordered pill, Onyx and
+ * Sandstone colour the school in the accent and print notes under the
+ * attestation. The shared block used to ignore all of that and printed a bare
+ * "Attested" even without an attesting body (template audit 2026-10 defects
+ * 8, 21, 36), so each layout now passes its variant and the download reads
+ * like the preview. Wording comes from lib/utils/education.ts
+ * (educationTitle / attestedLabel) — the same functions the live files call.
+ */
+
+type EducationVariant = {
+  /** Joiner between degree and field on the title line (" · ", " — ", " in "). */
+  joiner: string;
+  /** Classic: the field is not on the title line, it opens the notes line. */
+  fieldOnNotesLine?: boolean;
+  /** Classic / Professional: " | School" inline after the title. */
+  schoolInline?: boolean;
+  titleStyle: Style;
+  dateStyle: Style;
+  /** Style of the school run (inline) or line (block). */
+  schoolStyle: Style;
+  notesStyle: Style;
+  /** Own line under the school, inline after the school, or a bordered pill beside it. */
+  attested: "line" | "inline" | "pill";
+  attestedStyle: Style;
+  /** Pill border colour; defaults to the attestation text colour. */
+  pillBorderColor?: string;
+  /** Classic / Onyx / Sandstone / Professional show nothing without an attesting body. */
+  attestedRequiresBody?: boolean;
+  /** Executive prints "ATTESTED — body". */
+  attestedUppercase?: boolean;
+  /** Onyx / Sandstone print notes after the attestation line. */
+  notesAfterAttested?: boolean;
+  /** Gap between entries (pt), as marginTop on every entry after the first. */
+  gap: number;
+};
 
 const EducationEntry = ({
   edu,
-  headingStyle,
-  s,
-  fontScale,
+  v,
+  index,
 }: {
   edu: CvData["education"][number];
-  headingStyle?: Style;
-  s: Record<string, Style>;
-  fontScale: number;
-}) => (
-  <View style={s.entryBlock} wrap={false}>
-    <View style={s.entryRow}>
-      <Text style={headingStyle ?? s.entryTitle}>
-        {[edu.degree?.trim(), edu.field?.trim()].filter(Boolean).join(" · ") ||
-          "Degree"}
-      </Text>
-      <Text style={s.entryDate}>
-        {formatDateRange(edu.startDate, edu.endDate)}
-      </Text>
+  v: EducationVariant;
+  index: number;
+}) => {
+  const degree = edu.degree?.trim() ?? "";
+  const field = edu.field?.trim() ?? "";
+  const school = edu.school?.trim() ?? "";
+  const notes = edu.notes?.trim() ?? "";
+  const body = edu.attestingBody?.trim() ?? "";
+  const showAttested =
+    Boolean(edu.attested) && (Boolean(body) || !v.attestedRequiresBody);
+  const attestedText = attestedLabel(body, v.attestedUppercase);
+  const title = v.fieldOnNotesLine
+    ? degree || "Degree"
+    : educationTitle(degree, field, v.joiner);
+  const notesLine = v.fieldOnNotesLine
+    ? [distinctField(degree, field), notes].filter(Boolean).join(" | ")
+    : notes;
+  const dates = formatDateRange(edu.startDate, edu.endDate);
+
+  const notesNode = notesLine ? (
+    <Text style={{ ...v.notesStyle, marginTop: 0.75 }}>{notesLine}</Text>
+  ) : null;
+  const attestedLine =
+    v.attested === "line" && showAttested ? (
+      <Text style={{ ...v.attestedStyle, marginTop: 0.75 }}>{attestedText}</Text>
+    ) : null;
+  const hasSchoolLine =
+    !v.schoolInline && (Boolean(school) || (showAttested && v.attested !== "line"));
+
+  return (
+    <View style={{ marginTop: index > 0 ? v.gap : 0 }} wrap={false}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 6,
+        }}
+      >
+        <Text style={{ ...v.titleStyle, flex: 1 }}>
+          {title}
+          {v.schoolInline && school ? (
+            <Text style={v.schoolStyle}>{` | ${school}`}</Text>
+          ) : null}
+        </Text>
+        {dates ? (
+          <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
+            {dates}
+          </Text>
+        ) : null}
+      </View>
+      {hasSchoolLine ? (
+        v.attested === "pill" ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 4.5,
+              marginTop: 0.75,
+            }}
+          >
+            {school ? <Text style={v.schoolStyle}>{school}</Text> : null}
+            {showAttested ? (
+              <View
+                style={{
+                  borderWidth: 0.75,
+                  borderColor: v.pillBorderColor ?? v.attestedStyle.color,
+                  borderRadius: 2.25,
+                  paddingVertical: 0.75,
+                  paddingHorizontal: 3,
+                }}
+              >
+                <Text style={v.attestedStyle}>{attestedText}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={{ ...v.schoolStyle, marginTop: 0.75 }}>
+            {school}
+            {v.attested === "inline" && showAttested ? (
+              <Text style={v.attestedStyle}>
+                {`${school ? "  " : ""}${attestedText}`}
+              </Text>
+            ) : null}
+          </Text>
+        )
+      ) : null}
+      {v.notesAfterAttested ? (
+        <>
+          {attestedLine}
+          {notesNode}
+        </>
+      ) : (
+        <>
+          {notesNode}
+          {attestedLine}
+        </>
+      )}
     </View>
-    {edu.school?.trim() ? (
-      <Text style={s.entrySubtext}>{edu.school.trim()}</Text>
-    ) : null}
-    {edu.notes?.trim() ? (
-      <Text style={{ ...s.entrySubtext, marginTop: 1 }}>
-        {edu.notes.trim()}
-      </Text>
-    ) : null}
-    {edu.attested ? (
-      <Text style={{ fontSize: 7.5 * fontScale, color: "#15803d", marginTop: 2 }}>
-        {edu.attestingBody?.trim()
-          ? `\u2713 Attested \u2014 ${edu.attestingBody.trim()}`
-          : "Attested"}
-      </Text>
-    ) : null}
-  </View>
-);
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════
    CLASSIC PDF LAYOUT
@@ -473,6 +592,22 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#1e5b54");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  // classic.tsx education: "Degree | School" (12px semibold / normal), then
+  // "Field | Notes" (11px slate-500), then "Attested — body" (12px green-700)
+  // only when a body was given; entries space-y-3.
+  const eduVariant: EducationVariant = {
+    joiner: " \u00B7 ",
+    fieldOnNotesLine: true,
+    schoolInline: true,
+    titleStyle: s.entryTitle,
+    dateStyle: s.entryDate,
+    schoolStyle: s.entryCompany,
+    notesStyle: s.entrySubtext,
+    attested: "line",
+    attestedStyle: { fontSize: pt(12) * theme.fontScale, color: GREEN_700 },
+    attestedRequiresBody: true,
+    gap: pt(12),
+  };
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
@@ -674,8 +809,8 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
           <View style={s.sectionHeadingWrap}>
             <Text style={s.sectionHeading}>Education</Text>
           </View>
-          {education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -784,6 +919,22 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "pill",
+    attestedStyle: {
+      fontSize: pt(8) * fs,
+      color: theme.accentText,
+      lineHeight: 1.4 * theme.lineScale,
+    },
+    attestedUppercase: true,
+    gap: pt(10),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -1049,8 +1200,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
@@ -1149,6 +1300,17 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#111827");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " in ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    notesStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
+    attested: "inline",
+    attestedStyle: { fontSize: pt(10) * fs, color: GREEN_700 },
+    gap: pt(10),
+  };
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
@@ -1348,18 +1510,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {hasEducation && (
         <View>
           <Text style={headingStyle("education")}>Education</Text>
-          {education.map((edu) => (
-            <EducationEntry
-              key={edu.id}
-              edu={edu}
-              s={s}
-              fontScale={theme.fontScale}
-              headingStyle={{
-                fontFamily: fonts.bold, fontWeight: 700,
-                fontSize: 8.6 * theme.fontScale,
-                color: "#111827",
-              }}
-            />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -1482,7 +1634,6 @@ const MODERN_SLATE_100 = "#F1F5F9";
 const MODERN_EMERALD_50 = "#ECFDF5";
 const MODERN_EMERALD_200 = "#A7F3D0";
 const MODERN_EMERALD_700 = "#047857";
-const MODERN_GREEN_700 = "#15803D";
 
 /** list-disc pl-5: text starts 15pt in, the marker sits in that gutter in the
  *  list's own colour, no gap between items (the live <ul> has no space-y). */
@@ -1925,7 +2076,6 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   const attestedBy = edu.attested
                     ? edu.attestingBody?.trim() || ""
                     : "";
-                  const field = edu.field?.trim();
                   return (
                     <View
                       key={edu.id}
@@ -1936,8 +2086,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                         {edu.school?.trim() || "School"}
                       </Text>
                       <Text style={small}>
-                        {edu.degree?.trim() || "Degree"}
-                        {field ? ` - ${field}` : ""}
+                        {educationTitle(edu.degree, edu.field, " - ")}
                       </Text>
                       {dates ? (
                         <Text style={{ ...small, color: SLATE_400 }}>{dates}</Text>
@@ -1946,11 +2095,11 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                         <Text
                           style={{
                             ...small,
-                            color: MODERN_GREEN_700,
+                            color: GREEN_700,
                             marginTop: 1.5,
                           }}
                         >
-                          {`✓ Attested — ${attestedBy}`}
+                          {attestedLabel(attestedBy)}
                         </Text>
                       ) : null}
                     </View>
@@ -2047,6 +2196,17 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#1B2A4A");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " in ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "inline",
+    attestedStyle: { fontSize: pt(9) * fs, color: GREEN_700 },
+    gap: pt(8),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -2246,8 +2406,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Education</Text>
               </View>
-              {education.map((edu) => (
-                <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+              {education.map((edu, i) => (
+                <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
               ))}
             </View>
           )}
@@ -2434,6 +2594,22 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#0F172A");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    schoolStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    notesStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    attested: "pill",
+    attestedStyle: {
+      fontSize: pt(8) * fs,
+      color: GREEN_700,
+      lineHeight: 1.4 * theme.lineScale,
+    },
+    pillBorderColor: "#BBF7D0",
+    gap: pt(8),
+  };
   const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
@@ -2523,8 +2699,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Education</Text>
             </View>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
@@ -2798,6 +2974,18 @@ const ProfessionalPDFLayout = ({
   const theme = resolveTheme(data.settings, "#1f2937");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const eduVariant: EducationVariant = {
+    joiner: " \u00B7 ",
+    schoolInline: true,
+    titleStyle: s.entryTitle,
+    dateStyle: s.entryDate,
+    schoolStyle: { ...s.entryCompany, color: SLATE_600 },
+    notesStyle: s.entrySubtext,
+    attested: "line",
+    attestedStyle: { fontSize: pt(11) * theme.fontScale, color: GREEN_700 },
+    attestedRequiresBody: true,
+    gap: pt(12),
+  };
   // On a white page, accent is used only as text/border → use the readable form.
   const accent = theme.accentText;
   const name =
@@ -2939,8 +3127,8 @@ const ProfessionalPDFLayout = ({
       {hasEducation && (
         <View>
           <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
-          {education.map((edu) => (
-            <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+          {education.map((edu, i) => (
+            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
         </View>
       )}
@@ -3037,6 +3225,19 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#262626");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    attested: "line",
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedRequiresBody: true,
+    notesAfterAttested: true,
+    gap: pt(10),
+  };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   // Opaque equivalent of 18% white / 12% black over the band.
@@ -3230,8 +3431,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasEducation && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}
@@ -3299,6 +3500,19 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#ECE3D2");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const eduVariant: EducationVariant = {
+    joiner: " \u2014 ",
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    notesStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    attested: "line",
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedRequiresBody: true,
+    notesAfterAttested: true,
+    gap: pt(10),
+  };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   // Opaque equivalent of 18% white / 10% black over the band.
@@ -3497,8 +3711,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasEducation && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
-            {education.map((edu) => (
-              <EducationEntry key={edu.id} edu={edu} s={s} fontScale={theme.fontScale} />
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
           </View>
         )}

@@ -2,7 +2,11 @@ import type { CvData, PlanTier } from "../types/cv";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  distinctField,
+  meaningfulEducation,
+} from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
 import { splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
@@ -313,16 +317,16 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
                       {formatDateRange(edu.startDate, edu.endDate)}
                     </span>
                   </div>
-                  {(edu.field || edu.notes) && (
+                  {(distinctField(edu.degree, edu.field) || edu.notes?.trim()) && (
                     <div className="mt-1 text-[calc(11px*var(--fs))] text-slate-500">
-                      {edu.field ? <span>{edu.field.trim()}</span> : null}
-                      {edu.field && edu.notes ? <span> | </span> : null}
-                      {edu.notes ? <span>{edu.notes.trim()}</span> : null}
+                      {[distinctField(edu.degree, edu.field), edu.notes?.trim()]
+                        .filter(Boolean)
+                        .join(" | ")}
                     </div>
                   )}
                   {edu.attested && edu.attestingBody?.trim() && (
                     <p className="mt-0.5 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-medium text-green-700">
-                      {"\u2713"} Attested — {edu.attestingBody.trim()}
+                      {attestedLabel(edu.attestingBody)}
                     </p>
                   )}
                 </div>

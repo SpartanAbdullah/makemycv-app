@@ -4,7 +4,7 @@ import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
@@ -78,15 +78,7 @@ export const bannerEssentials = (
 export const bannerEducationTitle = (edu: {
   degree?: string;
   field?: string;
-}): string => {
-  const degree = edu.degree?.trim() ?? "";
-  const field = edu.field?.trim() ?? "";
-  if (!degree) return field || "Degree";
-  if (field && !degree.toLowerCase().includes(field.toLowerCase())) {
-    return `${degree} · ${field}`;
-  }
-  return degree;
-};
+}): string => educationTitle(edu.degree, edu.field, " · ");
 
 export type BannerContactItem = { text: string; href?: string };
 

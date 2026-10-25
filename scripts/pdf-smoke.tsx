@@ -91,6 +91,17 @@ const fixture: CvData = {
       attested: true,
       attestingBody: "MOFA – UAE Ministry of Foreign Affairs",
     },
+    {
+      // Field already named in the degree (must print once) and attested
+      // without a body (prints "Attested" only where the live template does).
+      id: "edu2",
+      school: "University of the Punjab",
+      degree: "BSc Finance",
+      field: "Finance",
+      startDate: "2013",
+      endDate: "2017",
+      attested: true,
+    },
   ],
   skills: [
     { id: "s1", name: "JavaScript" },

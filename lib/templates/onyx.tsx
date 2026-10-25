@@ -4,7 +4,11 @@ import { formatLanguageLevel } from "../language";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -333,8 +337,7 @@ export const OnyxTemplate = ({
                 <div key={edu.id} style={{ pageBreakInside: "avoid" as const, breakInside: "avoid" as const }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <span style={{ fontSize: `${11.5 * theme.fontScale}px`, fontWeight: 700, color: "#111827" }}>
-                      {edu.degree?.trim() || "Degree"}
-                      {edu.field?.trim() ? ` — ${edu.field.trim()}` : ""}
+                      {educationTitle(edu.degree, edu.field, " — ")}
                     </span>
                     <span style={{ fontSize: `${10 * theme.fontScale}px`, color: "#6B7280", whiteSpace: "nowrap" as const, marginLeft: "8px", flexShrink: 0 }}>
                       {formatDateRange(edu.startDate, edu.endDate)}
@@ -347,7 +350,7 @@ export const OnyxTemplate = ({
                   )}
                   {edu.attested && edu.attestingBody?.trim() && (
                     <div style={{ fontSize: `${9.5 * theme.fontScale}px`, color: "#15803d", marginTop: "1px" }}>
-                      {"✓"} Attested — {edu.attestingBody.trim()}
+                      {attestedLabel(edu.attestingBody)}
                     </div>
                   )}
                   {edu.notes?.trim() && (

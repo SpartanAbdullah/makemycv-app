@@ -16,6 +16,45 @@ Format:
 
 ---
 
+## [2026-10-25 21:50] PDF parity 1/7: education entry mirrors each live template, tick glyph dropped
+
+**Goal:** Template audit 2026-10 defects 8, 21 and 36 (all medium). The shared PDF `EducationEntry`
+printed "Degree · Field" bold, the school as grey subtext, notes, then a bare "Attested" even with no
+attesting body — while every live template differs (Classic "Degree | School" + "Field | Notes", ATS
+Clean "Degree in Field" with the attestation inline, Executive/Corporate a bordered pill, Onyx/Sandstone
+an accent-coloured school with notes under the attestation). The "✓" (U+2713) in front of "Attested" has
+no glyph in any embedded PDF face, so every download printed a notdef box; and "BSc Finance" + "Finance"
+printed the field twice in both paths. The PDF is the file people submit, so the download must read like
+the preview the user approved.
+**Files:**
+- edited: `lib/utils/education.ts` — new shared `distinctField` (field unless the degree already names it),
+  `educationTitle(degree, field, joiner)` and `attestedLabel(body, uppercase?)` ("Attested — body" / "Attested",
+  no glyph). Both renderers call the same three functions, so the words cannot drift again.
+- edited: `components/pdf/CVDocument.tsx` — `EducationEntry` is now variant-driven (`EducationVariant`:
+  joiner, school inline or on its own line, attestation as line / inline / pill, `attestedRequiresBody`,
+  `notesAfterAttested`, per-entry gap, every style). Each of the eight layouts that used the shared block
+  passes its own variant transcribed from its live file (px × 0.75). Modern's aside uses the same helpers.
+  Added a `pt()` px→pt helper and `GREEN_700`; removed the Modern-only green constant.
+- edited: `lib/templates/{classic,modern,executive,ats-clean,exec-split,corp-sidebar,onyx,sandstone,professional}.tsx`
+  — education titles go through `educationTitle` (de-dup), attestation text through `attestedLabel`
+  (tick removed; ATS Clean / Exec Split "(Attested)" → "Attested"; Corporate pill "✓ body" → "Attested — body").
+  Nothing else in the live files changed.
+- edited: `lib/templates/gulf-standard.tsx`, `lib/templates/banner.tsx` — their local degree de-dup
+  helpers now delegate to `educationTitle`.
+- edited: `scripts/pdf-smoke.tsx` — fixture gains a second education entry (degree "BSc Finance",
+  field "Finance", attested with no body) so the smoke exercises both rules.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js text extraction of `.smoke-pdfs/*.pdf`): "BSc Finance" prints once in all 12 templates;
+  a bare "Attested" appears only in Executive ("ATTESTED"), ATS Clean, Exec Split and Corporate — exactly
+  the four whose live templates print one; Classic/Modern/Onyx/Sandstone/Professional/Banner/Gulf print
+  nothing without a body. No "✓" or notdef in any PDF.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings (cap), `npm run smoke:pdf` 24/24 + ops check green.
+- The live preview PNGs in `artifacts/template-previews/` still show the tick; recapture when the
+  Playwright pipeline is restored (`npx playwright install chromium`, see 2026-10-24 entry).
+- Not changed: the DOCX exporter never printed the glyph; live ATS Clean languages use ", " where the PDF
+  uses " · " (out of this pass's scope).
+**Suggested commit:** fix(pdf): education entry mirrors each live template, drop the tick glyph
+
 ## [2026-10-24 22:30] Templates: Gulf Standard and Banner added (11th and 12th)
 
 **Goal:** Founder ask 2026-10-24: review every template and add at least two popular ones. The audit

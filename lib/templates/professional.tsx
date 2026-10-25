@@ -5,7 +5,11 @@ import { getFullName } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import {
+  attestedLabel,
+  educationTitle,
+  meaningfulEducation,
+} from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
 import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
@@ -320,7 +324,7 @@ const ProfessionalBase = ({
               <div key={edu.id} className="avoid-break [break-inside:avoid]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-[calc(12px*var(--fs))] font-semibold text-slate-800">
-                    {[edu.degree?.trim(), edu.field?.trim()].filter(Boolean).join(" · ") || "Degree"}
+                    {educationTitle(edu.degree, edu.field, " · ")}
                     <span className="font-normal text-slate-600">
                       {edu.school ? ` | ${edu.school.trim()}` : ""}
                     </span>
@@ -332,7 +336,7 @@ const ProfessionalBase = ({
                 {edu.notes && <div className="mt-0.5 text-[calc(11px*var(--fs))] text-slate-500">{edu.notes.trim()}</div>}
                 {edu.attested && edu.attestingBody?.trim() && (
                   <p className="mt-0.5 text-[calc(11px*var(--fs))] font-medium text-green-700">
-                    {"✓"} Attested — {edu.attestingBody.trim()}
+                    {attestedLabel(edu.attestingBody)}
                   </p>
                 )}
               </div>
