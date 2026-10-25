@@ -23,21 +23,38 @@ export default async function TemplatePreviewPage({
   searchParams,
 }: {
   params: Promise<{ templateId: string }>;
-  searchParams: Promise<{ photo?: string }>;
+  searchParams: Promise<{ photo?: string; density?: string }>;
 }) {
   const { templateId } = await params;
-  const { photo } = await searchParams;
+  const { photo, density } = await searchParams;
   const template = getTemplateById(templateId);
   const profile = getPreviewProfile(template.id);
   // ?photo=0 renders the same template without its photo — the marketing
   // site shows both variants so users can compare with/without.
-  const data =
+  const withPhoto =
     photo === "0"
       ? {
           ...profile,
           personal: { ...profile.personal, photo: undefined, showPhoto: false },
         }
       : profile;
+  // ?density=1..5 sets all four density controls to that level — review
+  // tooling for template captures at the extremes (default: the persona's
+  // own levels).
+  const level = density ? Number(density) : NaN;
+  const data =
+    Number.isInteger(level) && level >= 1 && level <= 5
+      ? {
+          ...withPhoto,
+          settings: {
+            ...withPhoto.settings,
+            pageMargins: level,
+            fontSize: level,
+            lineHeight: level,
+            sectionSpacing: level,
+          },
+        }
+      : withPhoto;
 
   return (
     <>

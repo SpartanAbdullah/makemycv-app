@@ -25,6 +25,8 @@ const TEMPLATE_IDS = [
   "executive",
   "ats-clean",
   "gulf-standard",
+  "chronicle",
+  "harvard",
   "exec-split",
   "corp-sidebar",
   "onyx",

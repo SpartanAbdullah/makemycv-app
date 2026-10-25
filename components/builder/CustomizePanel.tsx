@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
+import { getTemplateById } from "../../lib/templates";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
 import { onColor } from "../../lib/utils/color";
 import { Icon } from "./Icon";
@@ -306,6 +307,9 @@ export const CustomizePanel = () => {
   };
 
   const accentColor = settings.accentColor ?? "#1e5b54";
+  // Harvard prints black only (template audit 2026-10): a colour picker
+  // whose choice never shows up would be a dead control, so the group hides.
+  const showColours = !getTemplateById(settings.templateId).ignoresAccent;
   const isCustomColor = !ACCENT_SWATCHES.some(
     (sw) => sw.hex.toLowerCase() === accentColor.toLowerCase(),
   );
@@ -429,6 +433,8 @@ export const CustomizePanel = () => {
         </div>
       </Group>
 
+      {showColours ? (
+      <>
       <Divider />
 
       <Group label="Colours">
@@ -551,6 +557,8 @@ export const CustomizePanel = () => {
           </div>
         )}
       </Group>
+      </>
+      ) : null}
 
       <Divider />
 

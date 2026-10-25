@@ -724,6 +724,250 @@ const rashidGulf: CvData = {
   settings: { ...baseSettings("gulf-standard", "#1E3A5F"), photoShape: "square" },
 };
 
+/**
+ * chronicle — mid-career expat persona for the timeline (template audit
+ * 2026-10, shortlist item 3): an Indian engineering manager in Dubai payments
+ * with FOUR roles across two countries so the rail and dots read as a career
+ * line, a degree whose field is not repeated inside the degree text, three
+ * languages and two certifications. No photo (Chronicle's default).
+ */
+const priyaChronicle: CvData = {
+  personal: {
+    firstName: "Priya",
+    lastName: "Nair",
+    headline: "Engineering Manager — Payments Platforms",
+    email: "priya.nair@email.ae",
+    phone: "+971 50 8XX XXXX",
+    location: "Dubai, UAE",
+    website: "",
+    linkedin: "linkedin.com/in/priya-nair-payments",
+    summary:
+      "Engineering manager with 12 years in payments and fintech, the last six " +
+      "in Dubai. Leads two squads (14 engineers) building card-processing and " +
+      "settlement services that clear 9M transactions a day across the GCC. " +
+      "Known for calm incident command, predictable delivery and growing senior " +
+      "engineers out of mid-level hires.",
+    nationality: "Indian",
+    visaStatus: "UAE Residence Visa",
+    availability: "2 months notice",
+    drivingLicense: "UAE Light Vehicle",
+  },
+  experience: [
+    {
+      id: "priya-exp-1",
+      company: "Network International",
+      role: "Engineering Manager",
+      location: "Dubai, UAE",
+      startDate: "2022-04",
+      endDate: "",
+      isCurrent: true,
+      bullets: [
+        "Lead two squads (14 engineers) owning the card-authorisation and settlement services behind 9M daily transactions across the GCC",
+        "Cut Sev-1 incidents from 11 to 3 a year by introducing error budgets, on-call rotations and blameless post-mortems",
+        "Delivered the Apple Pay and Samsung Pay tokenisation programme for 6 UAE issuing banks on schedule",
+        "Hired 9 engineers and promoted 4 to senior in two years; attrition held under 8%",
+      ],
+    },
+    {
+      id: "priya-exp-2",
+      company: "Careem",
+      role: "Senior Software Engineer",
+      location: "Dubai, UAE",
+      startDate: "2019-09",
+      endDate: "2022-03",
+      isCurrent: false,
+      bullets: [
+        "Built the wallet ledger service (Kotlin, Kafka, PostgreSQL) that moved Careem Pay to double-entry accounting",
+        "Reduced p99 payment-authorisation latency from 1.8s to 420ms by re-platforming onto AWS EKS",
+        "Mentored 5 engineers and ran the backend interview loop for the Dubai office",
+      ],
+    },
+    {
+      id: "priya-exp-3",
+      company: "Infosys",
+      role: "Software Engineer",
+      location: "Bengaluru, India",
+      startDate: "2015-07",
+      endDate: "2019-08",
+      isCurrent: false,
+      bullets: [
+        "Developed core-banking integration services in Java and Spring for two European retail banks",
+        "Automated regression suites that cut release testing from 5 days to 1",
+        "Led a 6-person offshore team through PSD2 open-banking API delivery",
+      ],
+    },
+    {
+      id: "priya-exp-4",
+      company: "Tata Consultancy Services",
+      role: "Graduate Engineer Trainee",
+      location: "Chennai, India",
+      startDate: "2013-07",
+      endDate: "2015-06",
+      isCurrent: false,
+      bullets: [
+        "Maintained batch settlement jobs for a US card issuer, clearing a 3-month defect backlog",
+        "Completed TCS's 12-week engineering foundation programme in the top 5% of the cohort",
+      ],
+    },
+  ],
+  education: [
+    {
+      id: "priya-edu-1",
+      school: "Anna University",
+      degree: "Bachelor of Technology",
+      // Not contained in the degree text: Chronicle prints "Bachelor of
+      // Technology · Computer Science and Engineering".
+      field: "Computer Science and Engineering",
+      startDate: "2009",
+      endDate: "2013",
+      notes: "First Class with Distinction",
+    },
+  ],
+  skills: [
+    { id: "priya-sk-1", name: "Engineering Leadership" },
+    { id: "priya-sk-2", name: "Agile Delivery" },
+    { id: "priya-sk-3", name: "Incident Management" },
+    { id: "priya-sk-4", name: "Stakeholder Management" },
+    { id: "priya-sk-5", name: "Hiring & Mentoring" },
+    { id: "priya-sk-6", name: "Java & Spring Boot", category: "technical" },
+    { id: "priya-sk-7", name: "Kotlin", category: "technical" },
+    { id: "priya-sk-8", name: "AWS (EKS, RDS)", category: "technical" },
+    { id: "priya-sk-9", name: "Kafka", category: "technical" },
+    { id: "priya-sk-10", name: "PostgreSQL", category: "technical" },
+    { id: "priya-sk-11", name: "Terraform", category: "technical" },
+  ],
+  languages: [
+    { id: "priya-lang-1", name: "English", level: "full_professional" },
+    { id: "priya-lang-2", name: "Malayalam", level: "native" },
+    { id: "priya-lang-3", name: "Hindi", level: "professional" },
+  ],
+  certifications: [
+    {
+      id: "priya-cert-1",
+      name: "AWS Certified Solutions Architect — Associate",
+      issuer: "Amazon Web Services",
+      date: "2023",
+    },
+    {
+      id: "priya-cert-2",
+      name: "Certified ScrumMaster (CSM)",
+      issuer: "Scrum Alliance",
+      date: "2020",
+    },
+  ],
+  projects: [],
+  settings: baseSettings("chronicle", "#0E7490"),
+};
+
+/**
+ * harvard — fresh UAE graduate persona for the one-page serif format
+ * (template audit 2026-10, shortlist item 4): a 2026 United Arab Emirates
+ * University computer-engineering graduate with a summer internship, a
+ * teaching-assistant term, a capstone project and a GPA line. Degree
+ * ("Bachelor of Science") and field ("Computer Engineering") are distinct so
+ * the title prints both. Density is the template's default (font 2,
+ * spacing 2) so the sheet is one page; no photo — Harvard has no slot.
+ */
+const mariamHarvard: CvData = {
+  personal: {
+    firstName: "Mariam",
+    lastName: "Al-Suwaidi",
+    headline: "Computer Engineering Graduate",
+    email: "mariam.alsuwaidi@email.ae",
+    phone: "+971 54 2XX XXXX",
+    location: "Abu Dhabi, UAE",
+    website: "",
+    linkedin: "linkedin.com/in/mariam-alsuwaidi",
+    summary:
+      "Computer engineering graduate (GPA 3.6) from United Arab Emirates " +
+      "University with a software internship at e& and a capstone IoT project " +
+      "deployed on campus. Seeking a graduate software developer role in Abu " +
+      "Dhabi or Dubai where strong Python, Java and embedded-systems skills can " +
+      "contribute from the first month.",
+    nationality: "Emirati",
+    visaStatus: "UAE National",
+    availability: "Immediately",
+  },
+  experience: [
+    {
+      id: "mariam-exp-1",
+      company: "e& (Etisalat)",
+      role: "Software Engineering Intern",
+      location: "Abu Dhabi, UAE",
+      startDate: "2025-06",
+      endDate: "2025-08",
+      isCurrent: false,
+      bullets: [
+        "Built a Python service that reconciles 40K daily SIM-activation records between two billing systems, replacing a manual spreadsheet check",
+        "Wrote unit and integration tests that took the team's API coverage from 55% to 80%",
+        "Presented the internship project to the digital-platforms leadership team; adopted into the Q4 backlog",
+      ],
+    },
+    {
+      id: "mariam-exp-2",
+      company: "United Arab Emirates University",
+      role: "Teaching Assistant — Introduction to Programming",
+      location: "Al Ain, UAE",
+      startDate: "2025-09",
+      endDate: "2026-01",
+      isCurrent: false,
+      bullets: [
+        "Ran weekly Python lab sessions for 60 first-year students and graded 400+ assignments",
+        "Wrote a debugging checklist that cut repeat questions in office hours by about a third",
+      ],
+    },
+  ],
+  education: [
+    {
+      id: "mariam-edu-1",
+      school: "United Arab Emirates University",
+      degree: "Bachelor of Science",
+      field: "Computer Engineering",
+      startDate: "2022",
+      endDate: "2026",
+      notes:
+        "GPA 3.6 / 4.0 — Dean's List (3 semesters). Key modules: Data Structures, " +
+        "Embedded Systems, Machine Learning, Computer Networks",
+    },
+  ],
+  skills: [
+    { id: "mariam-sk-1", name: "Problem Solving" },
+    { id: "mariam-sk-2", name: "Teamwork" },
+    { id: "mariam-sk-3", name: "Technical Writing" },
+    { id: "mariam-sk-4", name: "Presentation" },
+    { id: "mariam-sk-5", name: "Python", category: "technical" },
+    { id: "mariam-sk-6", name: "Java", category: "technical" },
+    { id: "mariam-sk-7", name: "C", category: "technical" },
+    { id: "mariam-sk-8", name: "SQL", category: "technical" },
+    { id: "mariam-sk-9", name: "Git", category: "technical" },
+    { id: "mariam-sk-10", name: "Arduino & Raspberry Pi", category: "technical" },
+    { id: "mariam-sk-11", name: "TensorFlow (basic)", category: "technical" },
+  ],
+  languages: [
+    { id: "mariam-lang-1", name: "Arabic", level: "native" },
+    { id: "mariam-lang-2", name: "English", level: "full_professional" },
+  ],
+  certifications: [
+    {
+      id: "mariam-cert-1",
+      name: "CCNA: Introduction to Networks",
+      issuer: "Cisco Networking Academy",
+      date: "2025",
+    },
+  ],
+  projects: [
+    {
+      id: "mariam-proj-1",
+      name: "Capstone: Smart Parking Sensor Network",
+      bullets: [
+        "Designed a 24-node LoRaWAN occupancy sensor network for the campus car park with a Raspberry Pi gateway and a Flask dashboard",
+        "Graded A; 94% detection accuracy over a two-week pilot, presented to the College of Engineering panel",
+      ],
+    },
+  ],
+  settings: { ...baseSettings("harvard"), fontSize: 2, sectionSpacing: 2 },
+};
+
 /** Profiles keyed by the template id they are designed for. */
 export const previewProfiles: Record<string, CvData> = {
   classic: omarClassic,
@@ -733,6 +977,9 @@ export const previewProfiles: Record<string, CvData> = {
   "gulf-standard": forTemplate(rashidGulf, "gulf-standard", "#1E3A5F", {
     withPhoto: true,
   }),
+  // Chronicle's default is no photo; Harvard has no photo slot at all.
+  chronicle: priyaChronicle,
+  harvard: mariamHarvard,
   // Derived variants — persona chosen to fit each template's positioning:
   // navy/charcoal executive layouts get Layla (COO), corporate single/sidebar
   // layouts get Omar (finance), warm/photo-forward layouts get Sara
