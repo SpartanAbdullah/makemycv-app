@@ -16,6 +16,18 @@ Format:
 
 ---
 
+## [2026-10-26 00:10] Chronicle and Harvard degree titles use the shared educationTitle
+
+**Goal:** Follow-up agreed with the Chronicle/Harvard session: their templates landed before the shared
+`educationTitle` helper existed and carried their own copies of the same de-dup rule. One rule, one place.
+**Files:**
+- edited: `lib/templates/chronicle.tsx`, `lib/templates/harvard.tsx` — `chronicleDegreeTitle` /
+  `harvardDegreeTitle` are thin wrappers over `educationTitle(degree, field, " · ")` (exports kept; the PDF
+  layouts call them unchanged). Same pattern as `gulfDegreeTitle` / `bannerEducationTitle`.
+**Notes / risks / follow-up:** identical output by construction (same rule, same joiner); tsc, lint and the
+smoke re-run on the merged tree.
+**Suggested commit:** refactor(templates): Chronicle and Harvard degree titles via the shared educationTitle
+
 ## [2026-10-25 23:40] Templates 7/7: registry badges and copy honesty; CLAUDE.md notes the PDF primitives
 
 **Goal:** Template audit 2026-10 defect 26 (medium) and the registry-copy findings. Onyx and Sandstone are
