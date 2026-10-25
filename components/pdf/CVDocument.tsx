@@ -413,23 +413,126 @@ const buildStyles = (
 
 /* ─── Shared bullet renderer ──────────────────────────────── */
 
+type BulletStyles = { list?: Style; item?: Style; dot?: Style; text?: Style };
+
 const BulletList = ({
   bullets,
   s,
+  styles,
 }: {
   bullets: string[];
   s: Record<string, Style>;
+  /** Per-layout overrides merged over the Classic sheet (sidebar layouts). */
+  styles?: BulletStyles;
 }) => {
   const items = bullets.map((b) => b.trim()).filter(Boolean);
   if (items.length === 0) return null;
   return (
-    <View style={s.bulletList}>
+    <View style={{ ...s.bulletList, ...styles?.list }}>
       {items.map((bullet, bi) => (
-        <View key={bi} style={s.bulletItem}>
-          <Text style={s.bulletDot}>•</Text>
-          <Text style={s.bulletText}>{bullet}</Text>
+        <View key={bi} style={{ ...s.bulletItem, ...styles?.item }}>
+          <Text style={{ ...s.bulletDot, ...styles?.dot }}>•</Text>
+          <Text style={{ ...s.bulletText, ...styles?.text }}>{bullet}</Text>
         </View>
       ))}
+    </View>
+  );
+};
+
+/* ─── Experience entry (sidebar layouts) ─────────────────── */
+/*
+ * Executive, Exec Split, Corporate, Onyx and Sandstone draw a role as
+ * "Role ............ dates" over "Company · Location" (or " | "), with the
+ * company in the accent on Onyx and Sandstone. The PDF reused Classic's
+ * "Role | Company" row and pushed the location to a grey third line
+ * (template audit 2026-10 defect 7). Classic and Professional keep the
+ * inline form because their live templates draw it that way; ATS Clean and
+ * Modern already had their own rows.
+ */
+
+type ExperienceVariant = {
+  roleStyle: Style;
+  dateStyle: Style;
+  companyStyle: Style;
+  /** Location run on the company line; defaults to companyStyle. */
+  locationStyle?: Style;
+  /** Between company and location: " · " or " | ". */
+  separator: string;
+  /** Space under the company line before the bullets (Exec Split / Corporate 3px). */
+  companyMarginBottom?: number;
+  /** Bullet text (size, line-height, colour); the marker takes the same colour. */
+  bulletText: Style;
+  /** The live <ul> margin-top and padding-left, in pt. */
+  bulletsMarginTop: number;
+  bulletsPaddingLeft: number;
+  /** Gap between roles (pt), as marginTop on every role after the first. */
+  gap: number;
+};
+
+/** Marker column width: the live disc sits inside the <ul> padding, so the
+ *  text starts exactly `bulletsPaddingLeft` in and the dot takes the last 9pt. */
+const BULLET_DOT_WIDTH = 9;
+
+const ExperienceEntry = ({
+  role,
+  v,
+  index,
+  s,
+}: {
+  role: CvData["experience"][number];
+  v: ExperienceVariant;
+  index: number;
+  s: Record<string, Style>;
+}) => {
+  const company = role.company?.trim() ?? "";
+  const location = role.location?.trim() ?? "";
+  return (
+    <View style={{ marginTop: index > 0 ? v.gap : 0 }} minPresenceAhead={48}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 6,
+        }}
+      >
+        <Text style={{ ...v.roleStyle, flex: 1 }}>{role.role?.trim() || "Role"}</Text>
+        <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
+          {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
+        </Text>
+      </View>
+      {company || location ? (
+        <Text
+          style={{
+            ...v.companyStyle,
+            marginTop: 0.75,
+            marginBottom: v.companyMarginBottom ?? 0,
+          }}
+        >
+          {company}
+          {company && location ? v.separator : ""}
+          {location ? (
+            <Text style={v.locationStyle ?? v.companyStyle}>{location}</Text>
+          ) : null}
+        </Text>
+      ) : null}
+      <BulletList
+        bullets={role.bullets}
+        s={s}
+        styles={{
+          list: {
+            marginTop: v.bulletsMarginTop,
+            paddingLeft: Math.max(0, v.bulletsPaddingLeft - BULLET_DOT_WIDTH),
+          },
+          item: { marginBottom: 0 },
+          dot: {
+            width: BULLET_DOT_WIDTH,
+            fontSize: v.bulletText.fontSize,
+            color: v.bulletText.color,
+          },
+          text: v.bulletText,
+        }}
+      />
     </View>
   );
 };
@@ -935,6 +1038,16 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
     attestedUppercase: true,
     gap: pt(10),
   };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    separator: " | ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(12),
+    gap: pt(12),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -1166,30 +1279,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={s.entryCompany}>
-                        {` | ${role.company.trim()}`}
-                      </Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(
-                      role.startDate,
-                      role.endDate,
-                      role.isCurrent,
-                    )}
-                  </Text>
-                </View>
-                {role.location?.trim() && (
-                  <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                )}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
@@ -2207,6 +2298,17 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
     attestedStyle: { fontSize: pt(9) * fs, color: GREEN_700 },
     gap: pt(8),
   };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    separator: " \u00B7 ",
+    companyMarginBottom: pt(3),
+    bulletText: { fontSize: pt(10.5) * fs, lineHeight: 1.5 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: 0,
+    bulletsPaddingLeft: pt(14),
+    gap: pt(10),
+  };
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
@@ -2373,30 +2475,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Experience</Text>
               </View>
-              {experience.map((role) => (
-                <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                  <View style={s.entryRow}>
-                    <Text style={{ ...s.entryTitle, flex: 1 }}>
-                      {role.role?.trim() || "Role"}
-                      {role.company ? (
-                        <Text style={s.entryCompany}>
-                          {` | ${role.company.trim()}`}
-                        </Text>
-                      ) : null}
-                    </Text>
-                    <Text style={s.entryDate}>
-                      {formatDateRange(
-                        role.startDate,
-                        role.endDate,
-                        role.isCurrent,
-                      )}
-                    </Text>
-                  </View>
-                  {role.location?.trim() && (
-                    <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                  )}
-                  <BulletList bullets={role.bullets} s={s} />
-                </View>
+              {experience.map((role, i) => (
+                <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
               ))}
             </View>
           )}
@@ -2610,6 +2690,17 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     pillBorderColor: "#BBF7D0",
     gap: pt(8),
   };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
+    companyStyle: { fontSize: pt(10.5) * fs, color: "#475569" },
+    separator: " | ",
+    companyMarginBottom: pt(3),
+    bulletText: { fontSize: pt(10.5) * fs, lineHeight: 1.5 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: 0,
+    bulletsPaddingLeft: pt(14),
+    gap: pt(10),
+  };
   const m = theme.marginScale;
   const { onAccent, onAccentMuted } = theme;
   const showPhoto = Boolean(
@@ -2666,30 +2757,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
             <View style={s.sectionHeadingWrap}>
               <Text style={s.sectionHeading}>Experience</Text>
             </View>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={s.entryCompany}>
-                        {` | ${role.company.trim()}`}
-                      </Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(
-                      role.startDate,
-                      role.endDate,
-                      role.isCurrent,
-                    )}
-                  </Text>
-                </View>
-                {role.location?.trim() && (
-                  <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-                )}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
@@ -3238,6 +3307,17 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     notesAfterAttested: true,
     gap: pt(10),
   };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#6B7280" },
+    separator: " \u00B7 ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(14),
+    gap: pt(12),
+  };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
   // Opaque equivalent of 18% white / 12% black over the band.
@@ -3408,22 +3488,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasExperience && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
-                  </Text>
-                </View>
-                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}
@@ -3512,6 +3578,17 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
     attestedRequiresBody: true,
     notesAfterAttested: true,
     gap: pt(10),
+  };
+  const expVariant: ExperienceVariant = {
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#78716C" },
+    separator: " \u00B7 ",
+    bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#44403C" },
+    bulletsMarginTop: pt(4),
+    bulletsPaddingLeft: pt(14),
+    gap: pt(12),
   };
   const m = theme.marginScale;
   const { accent, accentText, onAccent, onAccentMuted } = theme;
@@ -3688,22 +3765,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasExperience && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
-            {experience.map((role) => (
-              <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-                <View style={s.entryRow}>
-                  <Text style={{ ...s.entryTitle, flex: 1 }}>
-                    {role.role?.trim() || "Role"}
-                    {role.company ? (
-                      <Text style={{ ...s.entryCompany, color: accentText }}>{` | ${role.company.trim()}`}</Text>
-                    ) : null}
-                  </Text>
-                  <Text style={s.entryDate}>
-                    {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
-                  </Text>
-                </View>
-                {role.location?.trim() ? <Text style={s.entrySubtext}>{role.location.trim()}</Text> : null}
-                <BulletList bullets={role.bullets} s={s} />
-              </View>
+            {experience.map((role, i) => (
+              <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
           </View>
         )}

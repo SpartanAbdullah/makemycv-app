@@ -16,6 +16,31 @@ Format:
 
 ---
 
+## [2026-10-25 22:05] PDF parity 2/7: sidebar layouts print role + dates, then "Company · Location"
+
+**Goal:** Template audit 2026-10 defect 7 (medium, verified). Executive, Exec Split, Corporate, Onyx and
+Sandstone PDFs reused Classic's experience row — "Role | Company" inline with the location pushed to a
+grey third line — while every one of those live templates draws role + dates on line 1 and
+"Company · Location" (Exec Split / Onyx / Sandstone) or "Company | Location" (Executive / Corporate) on
+line 2, with the company in the accent colour on Onyx and Sandstone. Visible on every role of every
+download from those five templates.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `ExperienceEntry` primitive driven by an
+  `ExperienceVariant` (role / date / company / location styles, separator, company-line margin, bullet
+  text + `<ul>` margin/padding, inter-role gap). `BulletList` accepts per-call `styles` overrides so each
+  layout's bullets take the live size, line-height and colour (the marker takes the text colour, as a
+  CSS disc does). The five sidebar layouts define their variant from their live file (px × 0.75) and
+  render roles through the primitive; Classic and Professional keep the inline "Role | Company" form
+  because their live templates draw it that way; ATS Clean and Modern already had their own rows.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js text extraction): executive/corp-sidebar print "Interior360 General Trading LLC | Dubai",
+  exec-split/onyx/sandstone "Interior360 General Trading LLC · Dubai", each on the line under the role;
+  classic still prints "Odoo Administrator | Interior360 General Trading LLC".
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- Seen in the same extraction and left for the heading pass: Corporate's sidebar labels extract as
+  "C O N TAC T" (audit defect 39, letter-spacing).
+**Suggested commit:** fix(pdf): sidebar layouts print role + dates over company · location
+
 ## [2026-10-25 21:50] PDF parity 1/7: education entry mirrors each live template, tick glyph dropped
 
 **Goal:** Template audit 2026-10 defects 8, 21 and 36 (all medium). The shared PDF `EducationEntry`
