@@ -9,6 +9,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
+import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
@@ -43,6 +44,32 @@ import {
   gulfDetailColumns,
   gulfDetailRows,
 } from "../../lib/templates/gulf-standard";
+// Chronicle and Harvard share their text rules (contact order, essentials
+// labels, degree de-dup, Harvard's label-prefixed lines) with the live
+// templates so both renderers print identical text.
+import {
+  CHRONICLE_ACCENT,
+  CHRONICLE_DATE_GAP_PT,
+  CHRONICLE_DATE_TRACK_PT,
+  CHRONICLE_DOT_PT,
+  CHRONICLE_DOT_TOP_PT,
+  CHRONICLE_RAIL_TRACK_PT,
+  CHRONICLE_RAIL_WIDTH_PT,
+  chronicleContactItems,
+  chronicleDegreeTitle,
+  chronicleEssentials,
+  chronicleRailColors,
+} from "../../lib/templates/chronicle";
+import {
+  HARVARD_INK,
+  HARVARD_INK_SOFT,
+  HARVARD_PAGE_PADDING_PT,
+  HARVARD_RULE,
+  harvardContactItems,
+  harvardDegreeTitle,
+  harvardEssentials,
+  harvardSkillLines,
+} from "../../lib/templates/harvard";
 
 // Disable react-pdf's default en-US hyphenator — it inserted real "-" glyphs into names/emails, corrupting ATS text extraction.
 Font.registerHyphenationCallback((word) => [word]);
@@ -4291,7 +4318,7 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
   return (
     <View>
       {/* ── Accent band: page 1 only, so the negative-margin bleed is safe.
-          The page padding is 27/24 × marginScale (SINGLE_COLUMN), so the
+          The page padding is 27/24 × marginScale, so the
           negative margins scale the same way to still reach the edge. ── */}
       <View
         style={{
@@ -4982,6 +5009,694 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   CHRONICLE PDF LAYOUT (single-column timeline: date gutter,
+   per-entry accent rail with a dot, content to the right)
+   Mirrors lib/templates/chronicle.tsx section by section — same order,
+   same text, same empty-state rules, same photo gating. Sizes are the
+   live px × 0.75. The rail is drawn PER ENTRY (a left border on the rail
+   track plus an absolutely positioned dot), never as one full-height
+   element, so it breaks cleanly between entries across pages; the last
+   entry of a section ends its rail at the dot. Short entries carry
+   wrap={false} so a rail gap from a split entry only ever shows on a
+   long one.
+   ═══════════════════════════════════════════════════════════ */
+
+type ChroniclePdfEntry = {
+  key: string;
+  /** Gutter text; empty for undated entries (projects) — the dot still shows. */
+  date: string;
+  title: string;
+  subtitle: ReactNode;
+  lines: ReactNode[];
+  bullets: string[];
+};
+
+const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings, CHRONICLE_ACCENT);
+  const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  // Accent is text/rail only on a white page → the contrast-guarded form.
+  const accent = theme.accentText;
+  const { dot: dotColor, rail: railColor } = chronicleRailColors(accent);
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const headline = data.personal.headline?.trim() || "";
+  const summary = data.personal.summary?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const certifications = data.certifications.filter(
+    (cert) => cert.name?.trim() || cert.issuer?.trim(),
+  );
+  const languages = data.languages.filter((lang) => lang.name?.trim());
+  const { general: generalSkills, technical: technicalSkills } = splitSkills(
+    data.skills.filter((skill) => skill.name?.trim()),
+  );
+  const contactItems = chronicleContactItems(data.personal);
+  const essentials = chronicleEssentials(data.personal);
+
+  const showPhoto = Boolean(
+    data.personal.photo && data.personal.showPhoto && theme.photoVisible,
+  );
+  const roundPhoto = data.settings.photoShape !== "square";
+  const PHOTO = 54;
+
+  const hasSummary = summary.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasEducation = education.length > 0;
+  const hasProjects = projects.length > 0;
+  const hasSkills = generalSkills.length > 0 || technicalSkills.length > 0;
+  const hasLanguages = languages.length > 0;
+  const hasCertifications = certifications.length > 0;
+
+  // First rendered section gets marginTop 0; spaceScale touches ONLY the
+  // gap between sections (16pt at level 3), never the spacing inside one.
+  const sectionOrder: Array<[string, boolean]> = [
+    ["profile", hasSummary],
+    ["experience", hasExperience],
+    ["education", hasEducation],
+    ["projects", hasProjects],
+    ["skills", hasSkills],
+    ["languages", hasLanguages],
+    ["certifications", hasCertifications],
+  ];
+  const firstSection = sectionOrder.find(([, present]) => present)?.[0] ?? null;
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const body: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.6 * fs,
+    lineHeight: 1.5 * ls,
+    color: SLATE_700,
+  };
+  const small: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 8.25 * fs,
+    lineHeight: 1.4 * ls,
+    color: SLATE_600,
+  };
+  const entryTitle: Style = {
+    ...bold,
+    fontSize: 9.5 * fs,
+    lineHeight: 1.35 * ls,
+    color: SLATE_900,
+  };
+  const dateText: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 7.5 * fs,
+    lineHeight: 1.35 * ls,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    color: SLATE_500,
+    textAlign: "right",
+  };
+  // The gutter scales with the font so the uppercase date stays on one line.
+  const dateTrack = CHRONICLE_DATE_TRACK_PT * fs;
+
+  // A render helper, not a component declared inside render
+  // (react-hooks/static-components). 60pt keeps a heading with its first
+  // entry's title row and a bullet or two.
+  const heading = (id: string, label: string) => (
+    <View
+      minPresenceAhead={60}
+      style={{ marginTop: firstSection === id ? 0 : 16 * sp, marginBottom: 6 }}
+    >
+      <Text
+        style={{
+          ...bold,
+          fontSize: 8.5 * fs,
+          lineHeight: 1.3 * ls,
+          // 0.6pt: wider tracking makes pdf.js (and ATS extractors) read the
+          // heading as spaced letters ("P R O F I L E").
+          letterSpacing: 0.6,
+          textTransform: "uppercase",
+          color: accent,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
+  const bullets = (items: string[]) => {
+    const list = items.map((b) => b.trim()).filter(Boolean);
+    if (list.length === 0) return null;
+    return (
+      <View style={{ marginTop: 2, paddingLeft: 10 }}>
+        {list.map((bullet, i) => (
+          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5 }}>
+            <Text style={{ ...body, width: 10, color: SLATE_400 }}>•</Text>
+            <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  /**
+   * One timeline row: date track | rail track | content. The rail is this
+   * row's own left border (or, on the last entry, a stub down to the dot),
+   * and the entry gap lives inside the content track so the row — and the
+   * rail — stretches across it.
+   */
+  const entry = (e: ChroniclePdfEntry, last: boolean) => (
+    <View
+      key={e.key}
+      wrap={e.bullets.length > 6}
+      minPresenceAhead={48}
+      style={{ flexDirection: "row" }}
+    >
+      <View style={{ width: dateTrack, paddingRight: CHRONICLE_DATE_GAP_PT, paddingTop: 1.5 }}>
+        <Text style={dateText}>{e.date}</Text>
+      </View>
+      <View
+        style={{
+          width: CHRONICLE_RAIL_TRACK_PT,
+          ...(last
+            ? {}
+            : { borderLeftWidth: CHRONICLE_RAIL_WIDTH_PT, borderLeftColor: railColor }),
+        }}
+      >
+        {last ? (
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: CHRONICLE_RAIL_WIDTH_PT,
+              height: CHRONICLE_DOT_TOP_PT + CHRONICLE_DOT_PT / 2,
+              backgroundColor: railColor,
+            }}
+          />
+        ) : null}
+        <View
+          style={{
+            position: "absolute",
+            top: CHRONICLE_DOT_TOP_PT,
+            left: CHRONICLE_RAIL_WIDTH_PT / 2 - CHRONICLE_DOT_PT / 2,
+            width: CHRONICLE_DOT_PT,
+            height: CHRONICLE_DOT_PT,
+            borderRadius: CHRONICLE_DOT_PT / 2,
+            backgroundColor: dotColor,
+          }}
+        />
+      </View>
+      <View style={{ flex: 1, paddingBottom: last ? 0 : 9 }}>
+        <Text style={entryTitle}>{e.title}</Text>
+        {e.subtitle}
+        {e.lines}
+        {bullets(e.bullets)}
+      </View>
+    </View>
+  );
+
+  const timeline = (entries: ChroniclePdfEntry[]) =>
+    entries.map((e, i) => entry(e, i === entries.length - 1));
+
+  const companyLine = (company: string, location: string): ReactNode =>
+    company || location ? (
+      <Text style={{ ...small, marginTop: 0.75 }}>
+        {company ? <Text style={{ color: accent }}>{company}</Text> : null}
+        {company && location ? " · " : ""}
+        {location}
+      </Text>
+    ) : null;
+
+  const experienceEntries: ChroniclePdfEntry[] = experience.map((role) => ({
+    key: role.id,
+    date: formatDateRange(role.startDate, role.endDate, role.isCurrent),
+    title: role.role?.trim() || "Role",
+    subtitle: companyLine(role.company?.trim() ?? "", role.location?.trim() ?? ""),
+    lines: [],
+    bullets: role.bullets ?? [],
+  }));
+
+  const educationEntries: ChroniclePdfEntry[] = education.map((edu) => {
+    const notes = edu.notes?.trim() || "";
+    const attestingBody = edu.attestingBody?.trim() || "";
+    const lines: ReactNode[] = [];
+    if (notes)
+      lines.push(
+        <Text key="notes" style={{ ...small, marginTop: 0.75 }}>
+          {notes}
+        </Text>,
+      );
+    if (edu.attested && attestingBody)
+      lines.push(
+        <Text key="attested" style={{ ...small, marginTop: 0.75 }}>
+          {`Attested — ${attestingBody}`}
+        </Text>,
+      );
+    return {
+      key: edu.id,
+      date: formatDateRange(edu.startDate, edu.endDate),
+      title: chronicleDegreeTitle(edu),
+      subtitle: companyLine(edu.school?.trim() ?? "", ""),
+      lines,
+      bullets: [],
+    };
+  });
+
+  const projectEntries: ChroniclePdfEntry[] = projects.map((project) => {
+    const link = project.link?.trim() || "";
+    const lines: ReactNode[] = [];
+    if (shouldShowProjectLink(link))
+      lines.push(
+        <Link
+          key="link"
+          src={normalizeHref(link)}
+          style={{ ...small, marginTop: 0.75, textDecoration: "underline" }}
+        >
+          {shortenDisplayUrl(link)}
+        </Link>,
+      );
+    return {
+      key: project.id,
+      date: "",
+      title: project.name?.trim() || "Project",
+      subtitle: null,
+      lines,
+      bullets: project.bullets ?? [],
+    };
+  });
+
+  const skillLine = (skills: typeof generalSkills) =>
+    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Sub-labels only when BOTH groups exist (same rule as the live template).
+  const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
+  const skillLabel: Style = { ...small, ...bold, color: SLATE_800 };
+
+  return (
+    <View>
+      {/* ── Header: name / headline / contact / essentials + optional photo ── */}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 13.5 }}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              ...bold,
+              fontSize: 22 * fs,
+              lineHeight: 1.15 * ls,
+              letterSpacing: -0.2,
+              color: SLATE_900,
+            }}
+          >
+            {name}
+          </Text>
+          {headline ? (
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 10.5 * fs,
+                lineHeight: 1.3 * ls,
+                color: accent,
+                marginTop: 2,
+              }}
+            >
+              {headline}
+            </Text>
+          ) : null}
+          {contactItems.length > 0 ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
+              {contactItems.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                  {item.href ? (
+                    <Link src={item.href} style={{ ...small, textDecoration: "none" }}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <Text style={small}>{item.text}</Text>
+                  )}
+                  {i < contactItems.length - 1 ? (
+                    <Text style={{ ...small, color: SLATE_400, marginHorizontal: 4.5 }}>|</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {essentials.length > 0 ? (
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 7.5 * fs,
+                lineHeight: 1.45 * ls,
+                color: SLATE_600,
+                marginTop: 2,
+              }}
+            >
+              {essentials.map((item, i) => (
+                <Text key={item.label}>
+                  {i > 0 ? " · " : ""}
+                  <Text style={bold}>{`${item.label}: `}</Text>
+                  {item.value}
+                </Text>
+              ))}
+            </Text>
+          ) : null}
+        </View>
+        {showPhoto && data.personal.photo ? (
+          <Image
+            src={data.personal.photo}
+            style={{
+              width: PHOTO,
+              height: PHOTO,
+              objectFit: "cover",
+              borderWidth: 0.75,
+              borderColor: SLATE_300,
+              borderRadius: roundPhoto ? PHOTO / 2 : 3,
+            }}
+          />
+        ) : null}
+      </View>
+
+      {/* Sections are fragments, not Views: react-pdf only honours a
+          heading's minPresenceAhead when the heading has previous siblings
+          in the same parent (a heading wrapped as the first child of a
+          section View is always orphaned at a page foot). */}
+      {hasSummary ? (
+        <>
+          {heading("profile", "Profile")}
+          <Text style={body}>{summary}</Text>
+        </>
+      ) : null}
+
+      {hasExperience ? (
+        <>
+          {heading("experience", "Experience")}
+          {timeline(experienceEntries)}
+        </>
+      ) : null}
+
+      {hasEducation ? (
+        <>
+          {heading("education", "Education")}
+          {timeline(educationEntries)}
+        </>
+      ) : null}
+
+      {hasProjects ? (
+        <>
+          {heading("projects", "Projects")}
+          {timeline(projectEntries)}
+        </>
+      ) : null}
+
+      {hasSkills ? (
+        <>
+          {heading("skills", "Skills")}
+          {generalSkills.length > 0 ? (
+            <View>
+              {showSkillLabels ? <Text style={skillLabel}>General</Text> : null}
+              <Text style={body}>{skillLine(generalSkills)}</Text>
+            </View>
+          ) : null}
+          {technicalSkills.length > 0 ? (
+            <View style={{ marginTop: generalSkills.length > 0 ? 4 : 0 }}>
+              {showSkillLabels ? <Text style={skillLabel}>Technical</Text> : null}
+              <Text style={body}>{skillLine(technicalSkills)}</Text>
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {hasLanguages ? (
+        <>
+          {heading("languages", "Languages")}
+          {languages.map((lang) => (
+            <Text key={lang.id} style={body}>
+              <Text style={{ ...bold, color: SLATE_800 }}>{lang.name.trim()}</Text>
+              {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+            </Text>
+          ))}
+        </>
+      ) : null}
+
+      {hasCertifications ? (
+        <>
+          {heading("certifications", "Certifications")}
+          {certifications.map((cert, i) => {
+            const certName = cert.name?.trim() || "";
+            const tail = [cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" | ");
+            return (
+              <Text
+                key={cert.id}
+                style={{ ...body, marginBottom: i < certifications.length - 1 ? 2 : 0 }}
+              >
+                <Text style={{ ...bold, color: SLATE_800 }}>{certName || tail}</Text>
+                {certName && tail ? <Text style={{ color: SLATE_600 }}>{` | ${tail}`}</Text> : null}
+              </Text>
+            );
+          })}
+        </>
+      ) : null}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   HARVARD PDF LAYOUT (zero-colour serif single column, centred
+   header, education first, label-prefixed skills lines, no photo)
+   Mirrors lib/templates/harvard.tsx section by section. Sizes are the
+   live px × 0.75 on a 22/20pt sheet (CVDocument applies that padding).
+   Serif = the embedded Instrument Serif once fonts are registered, else
+   the PDF-standard Times pair (Node smoke); the body is the user's face.
+   Instrument Serif has no bold cut, so hierarchy is size and caps only.
+   ═══════════════════════════════════════════════════════════ */
+
+const HarvardPDFLayout = ({ data }: { data: CvData }) => {
+  const theme = resolveTheme(data.settings);
+  const ready = pdfFontsReady();
+  const fonts = pdfFontPair(data.settings.fontFamily, ready);
+  const serif: Style = ready ? { fontFamily: PDF_FAMILY.serif } : { fontFamily: "Times-Roman" };
+  const serifItalic: Style = ready
+    ? { fontFamily: PDF_FAMILY.serif, fontStyle: "italic" }
+    : { fontFamily: "Times-Italic" };
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+
+  const name =
+    `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
+  const summary = data.personal.summary?.trim() || "";
+  const experience = meaningfulExperience(data.experience);
+  const education = meaningfulEducation(data.education);
+  const projects = meaningfulProjects(data.projects);
+  const contactItems = harvardContactItems(data.personal);
+  const essentials = harvardEssentials(data.personal);
+  const skillLines = harvardSkillLines(data);
+
+  const hasObjective = summary.length > 0;
+  const hasEducation = education.length > 0;
+  const hasExperience = experience.length > 0;
+  const hasProjects = projects.length > 0;
+  const hasSkills = skillLines.length > 0;
+
+  // Education-first; an empty education list falls through to experience
+  // first. First rendered section gets marginTop 0; later ones 10pt × sp.
+  const sectionOrder: Array<[string, boolean]> = [
+    ["objective", hasObjective],
+    ["education", hasEducation],
+    ["experience", hasExperience],
+    ["projects", hasProjects],
+    ["skills", hasSkills],
+  ];
+  const firstSection = sectionOrder.find(([, present]) => present)?.[0] ?? null;
+
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const body: Style = {
+    fontFamily: fonts.regular,
+    fontSize: 10 * fs,
+    lineHeight: 1.35 * ls,
+    color: HARVARD_INK,
+  };
+  const boldText: Style = { ...body, ...bold };
+  // Serif italic is the only true italic both renderers can draw; a touch
+  // larger than the sans body because Instrument Serif's x-height is smaller.
+  const italic: Style = { ...serifItalic, fontSize: 10.5 * fs, lineHeight: 1.3 * ls, color: HARVARD_INK };
+  const right: Style = { ...body, textAlign: "right", flexShrink: 0 };
+  const row: Style = {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 9,
+  };
+  const soft: Style = { fontFamily: fonts.regular, color: HARVARD_INK_SOFT };
+
+  const heading = (id: string, label: string) => (
+    <View
+      minPresenceAhead={56}
+      style={{
+        marginTop: firstSection === id ? 0 : 10 * sp,
+        marginBottom: 4.5,
+        paddingBottom: 1.5,
+        borderBottomWidth: 0.5,
+        borderBottomColor: HARVARD_RULE,
+      }}
+    >
+      <Text style={{ ...serif, fontSize: 9 * fs, lineHeight: 1.25 * ls, letterSpacing: 0.5, color: HARVARD_INK }}>
+        {label}
+      </Text>
+    </View>
+  );
+
+  const bullets = (items: string[]) => {
+    const list = items.map((b) => b.trim()).filter(Boolean);
+    if (list.length === 0) return null;
+    return (
+      <View style={{ marginTop: 1.5, paddingLeft: 12 }}>
+        {list.map((bullet, i) => (
+          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75 }}>
+            <Text style={{ ...body, width: 9 }}>•</Text>
+            <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const bar = <Text style={{ ...soft, color: "#999999" }}>{"  |  "}</Text>;
+
+  return (
+    <View>
+      {/* ── Header, all centred: serif name, pipe contact line, essentials ── */}
+      <View style={{ alignItems: "center", marginBottom: 9 }}>
+        <Text style={{ ...serif, fontSize: 20 * fs, lineHeight: 1.15 * ls, color: HARVARD_INK, textAlign: "center" }}>
+          {name}
+        </Text>
+        {contactItems.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", marginTop: 3 }}>
+            {contactItems.map((item, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                {i > 0 ? <Text style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls, color: "#999999", marginHorizontal: 4.5 }}>|</Text> : null}
+                {item.href ? (
+                  <Link src={item.href} style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls, textDecoration: "none" }}>
+                    {item.text}
+                  </Link>
+                ) : (
+                  <Text style={{ ...soft, fontSize: 8.25 * fs, lineHeight: 1.45 * ls }}>{item.text}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {essentials.length > 0 ? (
+          <Text style={{ ...soft, fontSize: 7.5 * fs, lineHeight: 1.45 * ls, textAlign: "center", marginTop: 1.5 }}>
+            {essentials.map((item, i) => (
+              <Text key={item.label}>
+                {i > 0 ? bar : null}
+                {`${item.label}: ${item.value}`}
+              </Text>
+            ))}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Sections are fragments so headings honour minPresenceAhead. */}
+      {hasObjective ? (
+        <>
+          {heading("objective", "CAREER OBJECTIVE")}
+          <Text style={body}>{summary}</Text>
+        </>
+      ) : null}
+
+      {hasEducation ? (
+        <>
+          {heading("education", "EDUCATION")}
+          {education.map((edu, i) => {
+            const school = edu.school?.trim() || "";
+            const notes = edu.notes?.trim() || "";
+            const attestingBody = edu.attestingBody?.trim() || "";
+            return (
+              <View key={edu.id} style={{ marginBottom: i < education.length - 1 ? 5 : 0 }} wrap={false}>
+                <View style={row}>
+                  <Text style={{ ...boldText, flex: 1 }}>{harvardDegreeTitle(edu)}</Text>
+                  <Text style={right}>{formatDateRange(edu.startDate, edu.endDate)}</Text>
+                </View>
+                {school ? <Text style={italic}>{school}</Text> : null}
+                {notes ? <Text style={body}>{notes}</Text> : null}
+                {edu.attested && attestingBody ? (
+                  <Text style={body}>{`Attested — ${attestingBody}`}</Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasExperience ? (
+        <>
+          {heading("experience", "EXPERIENCE & INTERNSHIPS")}
+          {experience.map((role, i) => {
+            const company = role.company?.trim() || "";
+            const location = role.location?.trim() || "";
+            const title = role.role?.trim() || "";
+            const dates = formatDateRange(role.startDate, role.endDate, role.isCurrent);
+            return (
+              <View
+                key={role.id}
+                style={{ marginBottom: i < experience.length - 1 ? 5 : 0 }}
+                minPresenceAhead={48}
+              >
+                <View style={row}>
+                  <Text style={{ ...boldText, flex: 1 }}>{company || title || "Role"}</Text>
+                  {location ? <Text style={right}>{location}</Text> : null}
+                </View>
+                {company && (title || dates) ? (
+                  <View style={row}>
+                    <Text style={{ ...italic, flex: 1 }}>{title}</Text>
+                    {dates ? <Text style={right}>{dates}</Text> : null}
+                  </View>
+                ) : dates ? (
+                  <View style={row}>
+                    <View style={{ flex: 1 }} />
+                    <Text style={right}>{dates}</Text>
+                  </View>
+                ) : null}
+                {bullets(role.bullets ?? [])}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasProjects ? (
+        <>
+          {heading("projects", "PROJECTS")}
+          {projects.map((project, i) => {
+            const link = project.link?.trim() || "";
+            return (
+              <View key={project.id} style={{ marginBottom: i < projects.length - 1 ? 5 : 0 }} wrap={false}>
+                <Text style={boldText}>{project.name?.trim() || "Project"}</Text>
+                {shouldShowProjectLink(link) ? (
+                  <Link src={normalizeHref(link)} style={{ ...body, color: HARVARD_INK_SOFT, textDecoration: "underline" }}>
+                    {shortenDisplayUrl(link)}
+                  </Link>
+                ) : null}
+                {bullets(project.bullets ?? [])}
+              </View>
+            );
+          })}
+        </>
+      ) : null}
+
+      {hasSkills ? (
+        <>
+          {heading("skills", "SKILLS & INTERESTS")}
+          {skillLines.map((line, i) => (
+            <Text key={line.label} style={{ ...body, marginBottom: i < skillLines.length - 1 ? 1.5 : 0 }}>
+              <Text style={bold}>{`${line.label}: `}</Text>
+              {line.value}
+            </Text>
+          ))}
+        </>
+      ) : null}
+    </View>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN ROUTER — CVDocument
    ═══════════════════════════════════════════════════════════ */
 
@@ -5008,12 +5723,18 @@ export const CVDocument = ({
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const marginScale = theme.marginScale;
+  // Harvard runs a tighter sheet (22pt top/bottom, 20pt sides) than the
+  // shared 27/24 — the one-page graduate format (template audit 2026-10).
+  const pagePadding =
+    templateId === "harvard"
+      ? HARVARD_PAGE_PADDING_PT
+      : { vertical: 27, horizontal: 24 };
   const pageStyle = {
     ...s.page,
-    paddingTop: 27 * marginScale,
-    paddingBottom: 27 * marginScale,
-    paddingLeft: 24 * marginScale,
-    paddingRight: 24 * marginScale,
+    paddingTop: pagePadding.vertical * marginScale,
+    paddingBottom: pagePadding.vertical * marginScale,
+    paddingLeft: pagePadding.horizontal * marginScale,
+    paddingRight: pagePadding.horizontal * marginScale,
   };
 
   const renderLayout = () => {
@@ -5040,6 +5761,10 @@ export const CVDocument = ({
         return <BannerPDFLayout data={data} />;
       case "gulf-standard":
         return <GulfStandardPDFLayout data={data} />;
+      case "chronicle":
+        return <ChroniclePDFLayout data={data} />;
+      case "harvard":
+        return <HarvardPDFLayout data={data} />;
       default:
         return <ClassicPDFLayout data={data} />;
     }

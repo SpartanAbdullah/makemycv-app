@@ -19,6 +19,8 @@ import { join } from "node:path";
 import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
 import { CVDocument } from "../components/pdf/CVDocument";
+import { previewProfiles } from "../lib/data/preview-profiles";
+import { registerPdfFontsFromDir } from "../lib/pdf/fonts";
 import type { CvData } from "../lib/types/cv";
 
 const fixture: CvData = {
@@ -164,7 +166,14 @@ const TEMPLATE_IDS = [
   "sandstone",
   "banner",
   "gulf-standard",
+  "chronicle",
+  "harvard",
 ];
+
+// The 2026-10 personas render as their own PDFs (<id>-persona.pdf):
+// Chronicle's four-role timeline, and Harvard's graduate sheet, which
+// scripts/pdf-ops-check.mjs asserts stays on ONE page.
+const PERSONA_IDS = ["chronicle", "harvard"];
 
 async function main() {
   // react-pdf turns rgba() into 8-digit hex that pdfkit misparses as solid
@@ -181,6 +190,17 @@ async function main() {
   }
   const outDir = join(process.cwd(), ".smoke-pdfs");
   mkdirSync(outDir, { recursive: true });
+  // Embed the real faces (Inter / Bricolage / Instrument Serif) from
+  // public/fonts/pdf as the browser does, so metrics — and therefore line
+  // breaks and page counts — match the download instead of Helvetica's.
+  const fontsReady = registerPdfFontsFromDir(
+    join(process.cwd(), "public", "fonts", "pdf"),
+  );
+  console.log(
+    fontsReady
+      ? "fonts: embedded from public/fonts/pdf"
+      : "fonts: registration failed, Helvetica fallback",
+  );
   // Every template renders three times: the fixture as is; with the
   // experience list tripled (<id>-long.pdf) so each layout also crosses a
   // page break — audit 2026-10: the Executive band left a white notch on
@@ -216,6 +236,15 @@ async function main() {
       await ReactPDF.renderToFile(doc as any, file);
       console.log(`rendered ${file}`);
     }
+  }
+  for (const templateId of PERSONA_IDS) {
+    const persona = previewProfiles[templateId];
+    if (!persona) throw new Error(`no preview persona for ${templateId}`);
+    const doc = createElement(CVDocument, { data: persona, plan: "pro", templateId });
+    const file = join(outDir, `${templateId}-persona.pdf`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await ReactPDF.renderToFile(doc as any, file);
+    console.log(`rendered ${file}`);
   }
 }
 

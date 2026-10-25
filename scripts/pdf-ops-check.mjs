@@ -7,7 +7,9 @@
 //     flush with its page edge on EVERY page — the Executive band used to
 //     start 27pt down on page 2+, and the other three left the same notch at
 //     the top of page 2+ and the foot of page 1 until 2026-10-25;
-//  3. page counts, for the log.
+//  3. page counts, for the log;
+//  4. the Harvard graduate persona (harvard-persona.pdf) is ONE page — the
+//     template's whole point (template audit 2026-10, shortlist item 4).
 // Plain ESM on purpose: pdfjs-dist ships ESM and the smoke script is compiled
 // to CommonJS.
 import fs from 'node:fs';
@@ -72,8 +74,10 @@ for (const f of files) {
     }
   }
   const bandOk = band ? pagesWithBand.size === doc.numPages : true;
-  if (report.neon > 0 || !bandOk) failures++;
-  console.log(`${report.neon > 0 || !bandOk ? 'FAIL' : 'ok  '} ${f}: pages=${report.pages} neonColourOps=${report.neon}${band ? ` bandPages=${pagesWithBand.size}/${doc.numPages}` : ''}`);
+  const onePageOk = f === 'harvard-persona.pdf' ? doc.numPages === 1 : true;
+  const ok = report.neon === 0 && bandOk && onePageOk;
+  if (!ok) failures++;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${f}: pages=${report.pages} neonColourOps=${report.neon}${band ? ` bandPages=${pagesWithBand.size}/${doc.numPages}` : ''}${onePageOk ? '' : ' (expected one page)'}`);
 }
 console.log(failures ? `FAILURES: ${failures}` : 'ALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);

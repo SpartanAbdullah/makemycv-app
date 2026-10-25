@@ -1,12 +1,14 @@
 import type React from "react";
-import type { CvData, PlanTier } from "../types/cv";
+import type { CvData, CvSettings, PlanTier } from "../types/cv";
 import { ATSCleanTemplate } from "./ats-clean";
 import { BannerTemplate } from "./banner";
+import { ChronicleTemplate } from "./chronicle";
 import { ClassicTemplate } from "./classic";
 import { CorpSidebarTemplate } from "./corp-sidebar";
 import { ExecSplitTemplate } from "./exec-split";
 import { ExecutiveTemplate } from "./executive";
 import { GulfStandardTemplate } from "./gulf-standard";
+import { HARVARD_DENSITY_DEFAULTS, HarvardTemplate } from "./harvard";
 import { ModernTemplate } from "./modern";
 import { OnyxTemplate } from "./onyx";
 import { ProfessionalPhotoTemplate, ProfessionalTemplate } from "./professional";
@@ -29,6 +31,18 @@ export type TemplateDefinition = {
   name: string;
   description: string;
   badges?: TemplateBadge[];
+  /** The template prints black only — the Design panel hides its Colours group. */
+  ignoresAccent?: boolean;
+  /**
+   * Density levels the template is designed around (Harvard's one-page
+   * graduate sheet: font 2 / spacing 2). settingsForTemplate applies them
+   * when a user switches to the template with those controls still neutral
+   * and reverts them when they switch away with the defaults still in
+   * place, so one template's tuning never leaks into the next.
+   */
+  densityDefaults?: Partial<
+    Pick<CvSettings, "pageMargins" | "fontSize" | "lineHeight" | "sectionSpacing">
+  >;
   Thumbnail: () => React.ReactElement;
   Render: ({ data, plan }: { data: CvData; plan?: PlanTier }) => React.ReactElement;
 };
@@ -332,6 +346,65 @@ const ProfessionalPhotoThumb = () => (
   </div>
 );
 
+const ChronicleThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Header */}
+    <div className="space-y-1">
+      <div className="h-2.5 w-20 rounded bg-slate-800" />
+      <div className="h-1.5 w-14 rounded bg-[#0E7490]" />
+      <div className="h-1 w-full rounded bg-slate-200" />
+    </div>
+    {/* Heading flush left, then timeline rows: date | rail + dot | content */}
+    <div className="mt-2 h-1.5 w-12 rounded bg-[#0E7490]" />
+    <div className="mt-1.5 flex">
+      <div className="w-7 flex-shrink-0 space-y-[9px] pr-1.5 pt-0.5">
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+        <div className="ml-auto h-1 w-5 rounded bg-slate-400" />
+      </div>
+      <div className="relative w-3 flex-shrink-0">
+        <div className="absolute bottom-1 left-0 top-0 w-px bg-[#0E7490]/40" />
+        <div className="absolute -left-[3px] top-0 h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+        <div className="absolute -left-[3px] top-[13px] h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+        <div className="absolute -left-[3px] top-[26px] h-[7px] w-[7px] rounded-full bg-[#0E7490]" />
+      </div>
+      <div className="flex-1 space-y-[5px]">
+        <div className="h-1.5 w-16 rounded bg-slate-700" />
+        <div className="h-1 w-full rounded bg-slate-200" />
+        <div className="h-1.5 w-14 rounded bg-slate-700" />
+        <div className="h-1 w-5/6 rounded bg-slate-200" />
+        <div className="h-1.5 w-12 rounded bg-slate-700" />
+        <div className="h-1 w-4/6 rounded bg-slate-200" />
+      </div>
+    </div>
+  </div>
+);
+
+const HarvardThumb = () => (
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Centred serif name over a pipe contact line */}
+    <div className="flex flex-col items-center gap-1">
+      <div className="font-serif text-[13px] leading-none text-black">Name Surname</div>
+      <div className="h-1 w-28 rounded bg-slate-300" />
+    </div>
+    {/* Ruled uppercase headings, tab-stop rows, label lines — black only */}
+    <div className="mt-2.5 h-1.5 w-12 rounded bg-black" />
+    <div className="mt-1 h-px w-full bg-black" />
+    <div className="mt-1.5 flex justify-between">
+      <div className="h-1 w-20 rounded bg-slate-700" />
+      <div className="h-1 w-8 rounded bg-slate-400" />
+    </div>
+    <div className="mt-1 h-1 w-16 rounded bg-slate-300" />
+    <div className="mt-2.5 h-1.5 w-16 rounded bg-black" />
+    <div className="mt-1 h-px w-full bg-black" />
+    <div className="mt-1.5 flex justify-between">
+      <div className="h-1 w-24 rounded bg-slate-700" />
+      <div className="h-1 w-8 rounded bg-slate-400" />
+    </div>
+    <div className="mt-1 h-1 w-full rounded bg-slate-200" />
+  </div>
+);
+
 export const templates: TemplateDefinition[] = [
   /* Badges are an honest ATS-safety signal (audit UI-10): single-column
      text-first layouts get the green "ATS-Friendly" badge; sidebar/two-column
@@ -388,6 +461,24 @@ export const templates: TemplateDefinition[] = [
     Render: ATSCleanTemplate,
   },
   {
+    id: "harvard",
+    name: "Harvard",
+    // Zero-colour serif single column, education first, a Career Objective
+    // and label-prefixed skills lines — the fresh-graduate, one-page format
+    // (template audit 2026-10, shortlist item 4). No photo, no columns, no
+    // graphics, so the ATS badge is honest. The accent is ignored entirely.
+    description:
+      "Plain serif single column, education first — the graduate one-page format.",
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
+    ignoresAccent: true,
+    densityDefaults: HARVARD_DENSITY_DEFAULTS,
+    Thumbnail: HarvardThumb,
+    Render: HarvardTemplate,
+  },
+  {
     id: "gulf-standard",
     name: "Gulf Standard",
     // Single column, every detail a flex row, DOM order = reading order, so
@@ -400,6 +491,22 @@ export const templates: TemplateDefinition[] = [
     ],
     Thumbnail: GulfStandardThumb,
     Render: GulfStandardTemplate,
+  },
+  {
+    id: "chronicle",
+    name: "Chronicle",
+    // Single-column timeline: dates in a left gutter, an accent rail with a
+    // dot per entry. The one design-forward layout that stays one column
+    // with linear text order (template audit 2026-10, shortlist item 3), so
+    // it carries the ATS badge alongside "New". No photo dependency.
+    description:
+      "Timeline layout: dates in the margin, an accent rail — single column.",
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
+    Thumbnail: ChronicleThumb,
+    Render: ChronicleTemplate,
   },
   {
     id: "exec-split",
@@ -481,3 +588,41 @@ export const templates: TemplateDefinition[] = [
 
 export const getTemplateById = (id: string) =>
   templates.find((template) => template.id === id) ?? templates[0];
+
+
+const DENSITY_KEYS = ["pageMargins", "fontSize", "lineHeight", "sectionSpacing"] as const;
+const NEUTRAL_LEVEL = 3;
+
+/**
+ * The settings to store when the CV switches to `nextId`. Besides setting
+ * templateId it moves template density defaults in and out: leaving a
+ * template whose defaults are still in force resets those keys to neutral,
+ * and entering a template with defaults applies them to keys that are still
+ * neutral (or unset). A level the user changed by hand is never touched, so
+ * Harvard's one-page tuning never leaks into the next template and a user's
+ * own choice survives the switch. Every template-change path in the builder
+ * (Review gallery, drawer chevrons) goes through here.
+ */
+export const settingsForTemplate = (settings: CvSettings, nextId: string): CvSettings => {
+  const next: CvSettings = { ...settings, templateId: nextId };
+  if (settings.templateId === nextId) return next;
+  const leaving = templates.find((t) => t.id === settings.templateId)?.densityDefaults;
+  if (leaving) {
+    for (const key of DENSITY_KEYS) {
+      const level = leaving[key];
+      if (level !== undefined && (settings[key] ?? NEUTRAL_LEVEL) === level) {
+        next[key] = NEUTRAL_LEVEL;
+      }
+    }
+  }
+  const entering = templates.find((t) => t.id === nextId)?.densityDefaults;
+  if (entering) {
+    for (const key of DENSITY_KEYS) {
+      const level = entering[key];
+      if (level !== undefined && (next[key] ?? NEUTRAL_LEVEL) === NEUTRAL_LEVEL) {
+        next[key] = level;
+      }
+    }
+  }
+  return next;
+};

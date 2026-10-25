@@ -40,8 +40,21 @@ let registered = false;
 export function registerPdfFonts(): boolean {
   if (registered) return true;
   if (typeof window === "undefined") return false;
+  return registerFrom(`${window.location.origin}/fonts/pdf`);
+}
+
+/**
+ * Node-side twin for scripts (scripts/pdf-smoke.tsx): the same three faces
+ * from a local directory of TTFs, so a script render embeds the real metrics
+ * instead of Helvetica. Never called from browser code.
+ */
+export function registerPdfFontsFromDir(dir: string): boolean {
+  if (registered) return true;
+  return registerFrom(dir.replace(/[\\/]+$/, ""));
+}
+
+function registerFrom(base: string): boolean {
   try {
-    const base = `${window.location.origin}/fonts/pdf`;
     Font.register({
       family: PDF_FAMILY.sans,
       fonts: [
