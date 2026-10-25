@@ -16,6 +16,65 @@ Format:
 
 ---
 
+## [2026-10-25 23:30] PDF parity 6/7: density scales on the bleed sidebars, fixed bands, first-section margins, tracking cap
+
+**Goal:** Template audit 2026-10 defects 19, 20 and 37 (medium/low) plus 39 (low) where it fell out of the
+same code. The Page-margins slider skipped every sidebar PDF (the router scaled page padding only for a
+"single-column" set; Exec Split ignored it in both renderers), the Section-spacing slider scaled per-entry
+gaps and heading padding that the live templates keep fixed, the first section of Executive / Onyx /
+Sandstone carried a full between-section margin so the two columns started misaligned, the Corporate
+sidebar labels were Executive's, and — found while fixing — the Onyx / Sandstone / Corporate bands left the
+same white notch at the top of page 2+ and the foot of page 1 that the Executive fix removed on 2026-10-24.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx`
+  - Router: page padding is `27/24pt × marginScale` for EVERY template; the `SINGLE_COLUMN` set is gone.
+  - Executive / Corporate / Onyx / Sandstone: the band is a `fixed` absolutely positioned layer (0/0/0,
+    edge to edge on every page) and the sidebar is a transparent column pulled over it with
+    `-27×m / -24×m` margins, so the live inner padding (28/20px, 36/20px, 30/22px) holds at every margin
+    level while the main column's padding (28px×m, 28px×m, 30px×m) and the page edges breathe. Corporate's
+    band is now the live 220px (165pt) and its header rule takes `theme.accentText` (was hardcoded navy).
+  - Exec Split: `m` scales the header bleed and padding (32px×m) and the body top margin (20px×m); column
+    gap 28px and the right column 200px as live.
+  - First-section rule through one `withTopGap(base, gap, firstKey)` factory: Executive main headings and
+    sidebar labels, Onyx and Sandstone main headings (`PdfHeading`, 11px / 0.1em / 1.5px accent rule /
+    18px×sp; `OnyxHeading` removed) zero the first present section as their live files do; Corporate passes
+    `null` and keeps 18px×sp on every heading and label as its live file does.
+  - Sidebar labels rebuilt from each live file: Executive 9px / mb 8px with the live name block (22px
+    stacked name, 12px headline, 15%-ink rule 16px above and below); Corporate 9px at 50% ink; Onyx and
+    Sandstone 9px / mb 7px with 18px×sp carried BELOW each section (the last one none). Unused
+    `execSidebar`, `execName`, `execHeadline`, `execSideLabel` base styles removed.
+  - `SECTION_GAP_KEYS` trimmed to `section` / `twoCol` / `atsSectionHeading` (defect 37); ATS Clean's
+    per-entry gaps are fixed 12px / 10px.
+  - Tracking cap (defect 39): `safeTracking()` caps letter-spacing at 8% of the size on `PdfHeading`, the
+    sidebar labels, Modern's h2 (live 0.2em), Professional's centred headings and ATS Clean's headings.
+    pdf.js read Exec Split's 0.12em headings as "E X P E R I E N C E", Modern's as "P R O F I L E",
+    Professional's as "S U M M A RY" and the 0.1em labels as "C O N TAC T"; a text-layer ATS parser would
+    miss those section names. The live headings keep their tracking — a visible but deliberate deviation
+    in favour of a parseable download.
+- edited: `lib/templates/exec-split.tsx` — `m = theme.marginScale` scales header/body horizontal padding
+  and the body's vertical padding (the slider did nothing on this template).
+- edited: `lib/templates/sandstone.tsx` — the two sidebar section gaps scale with Section spacing like
+  Onyx's (they were the only unscaled 18px in the sidebar templates; the PDF scales them too).
+- edited: `scripts/pdf-ops-check.mjs` — band check generalised: Executive 150 / Onyx 172 / Sandstone 180
+  left, Corporate 165 right; every page must carry a full-height band flush with its edge, else FAIL.
+- edited: `scripts/pdf-smoke.tsx` — third pass `<id>-airy.pdf` (page margins level 1, font / line /
+  section spacing level 5) so the scaled padding, bands and gaps are exercised away from the 1.0 neutral.
+**Notes / risks / follow-up:**
+- Evidence: ops check `bandPages=N/N` for all 12 sidebar renders (default, -long, -airy); before this pass
+  the Onyx / Sandstone / Corporate band rectangles measured 814.9pt on page 1 and 787.9pt on page 2 of
+  841.9. Extraction: EXPERIENCE / SUMMARY / SKILLS / CONTACT / ABOUT ME / PERSONAL DETAILS / PROFILE read
+  as words in every PDF; a scan for any four-letter spaced run finds nothing in the 36 files (it found
+  Modern and Professional before the cap). classic-airy's text starts at x=17pt (24 × 0.7) against 24 at
+  the default; onyx-airy's main heading at 188pt (172 + 22.5 × 0.7). Page counts dropped for the long
+  renders (executive-long 3→2, onyx-long 3→2) because bullets no longer carry Classic's 3pt gap — the
+  live sidebar templates have none.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings, `npm run smoke:pdf` 36/36 + ops check green.
+- Not done here: the sidebar TEXT sizes of Onyx / Sandstone (7.8pt vs the live 7.5pt) and Executive's
+  contact lines were left as tuned in October; only margins, labels, headings and bands changed.
+- Defect 13 (Sandstone is never beige because the store seeds #1e5b54 and a template switch keeps the
+  accent) is a store/UX decision, not a PDF primitive — deferred, see the registry entry.
+**Suggested commit:** fix(pdf): density scales on bleed sidebars, fixed bands on every page, first-section margins
+
 ## [2026-10-25 22:50] PDF parity 5/7: Executive, Exec Split and Corporate main-column headings match live
 
 **Goal:** Template audit 2026-10 defect 11 (medium, verified). The three layouts reused Classic's

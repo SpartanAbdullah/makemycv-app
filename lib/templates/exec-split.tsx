@@ -78,6 +78,10 @@ export const ExecSplitTemplate = ({
   const headline = data.personal.headline?.trim() || "";
   const theme = resolveTheme(data.settings, "#1B2A4A");
   const { onAccent, onAccentMuted } = theme;
+  // Page-margins slider: header and body horizontal padding and the body's
+  // vertical padding scale with it (audit 2026-10 defect 19 — this template
+  // ignored the slider in both renderers).
+  const m = theme.marginScale;
 
   const contactItems = [
     data.personal.email?.trim()
@@ -146,7 +150,7 @@ export const ExecSplitTemplate = ({
       <div
         style={{
           backgroundColor: theme.accent,
-          padding: "28px 32px 24px 32px",
+          padding: `28px ${32 * m}px 24px ${32 * m}px`,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
@@ -271,7 +275,7 @@ export const ExecSplitTemplate = ({
       <div
         style={{
           display: "flex",
-          padding: "20px 32px 40px 32px",
+          padding: `${20 * m}px ${32 * m}px ${40 * m}px ${32 * m}px`,
           gap: "28px",
         }}
       >

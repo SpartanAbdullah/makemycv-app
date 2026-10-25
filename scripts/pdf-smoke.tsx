@@ -181,13 +181,25 @@ async function main() {
   }
   const outDir = join(process.cwd(), ".smoke-pdfs");
   mkdirSync(outDir, { recursive: true });
-  // Every template renders twice: the fixture as is, and with the
+  // Every template renders three times: the fixture as is; with the
   // experience list tripled (<id>-long.pdf) so each layout also crosses a
   // page break — audit 2026-10: the Executive band left a white notch on
-  // page 2 that a one-page render could never show. scripts/pdf-ops-check.mjs
+  // page 2 that a one-page render could never show; and at the density
+  // extremes (<id>-airy.pdf: page margins level 1, everything else level 5)
+  // so the scaled page padding, bleed bands and section gaps are exercised
+  // away from the neutral 1.0 multipliers. scripts/pdf-ops-check.mjs
   // (chained after this in `npm run smoke:pdf`) inspects the output.
-  for (const long of [false, true]) {
-    const experience = long
+  const passes: Array<{ suffix: string; long: boolean; settings?: Partial<CvData["settings"]> }> = [
+    { suffix: "", long: false },
+    { suffix: "-long", long: true },
+    {
+      suffix: "-airy",
+      long: false,
+      settings: { fontSize: 5, lineHeight: 5, sectionSpacing: 5, pageMargins: 1 },
+    },
+  ];
+  for (const pass of passes) {
+    const experience = pass.long
       ? [0, 1, 2].flatMap((n) =>
           fixture.experience.map((e) => ({ ...e, id: `${e.id}-p${n}` })),
         )
@@ -196,10 +208,10 @@ async function main() {
       const data: CvData = {
         ...fixture,
         experience,
-        settings: { ...fixture.settings, templateId },
+        settings: { ...fixture.settings, ...pass.settings, templateId },
       };
       const doc = createElement(CVDocument, { data, plan: "pro", templateId });
-      const file = join(outDir, `${templateId}${long ? "-long" : ""}.pdf`);
+      const file = join(outDir, `${templateId}${pass.suffix}.pdf`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ReactPDF.renderToFile(doc as any, file);
       console.log(`rendered ${file}`);

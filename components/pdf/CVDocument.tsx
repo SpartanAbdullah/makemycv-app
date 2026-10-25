@@ -266,49 +266,10 @@ const BASE_STYLES: Record<string, Style> = {
     transform: "rotate(-28deg)",
   },
 
-  /* ── Executive sidebar ──────────────────────────────────── */
-  /* Negative margins extend the panel to the page top/bottom/left edges,
-     escaping the page-level 27pt/24pt padding (matches the live preview).
-     The navy fill itself is NOT here: it is a separate fixed, absolutely
-     positioned band in ExecutivePDFLayout, because a background on this
-     View left a 27pt white notch at the top of page 2+ (react-pdf rebuilds
-     the split continuation with marginTop 0). Width and padding mirror the
-     live template's 200px sidebar with 28px/20px padding. */
-  execSidebar: {
-    width: 150,
-    marginTop: -27,
-    marginBottom: -27,
-    marginLeft: -24,
-    paddingTop: 21,
-    paddingBottom: 21,
-    paddingLeft: 15,
-    paddingRight: 15,
-    flexShrink: 0,
-  },
-  execName: {
-    fontSize: 14,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    lineHeight: 1.2,
-    marginBottom: 2,
-  },
-  execHeadline: {
-    fontSize: 8,
-    color: "#94A3B8",
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 0.5,
-    // Opaque 15%-white-on-navy; overridden per theme at render.
-    borderBottomColor: "#404A65",
-  },
-  execSideLabel: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    color: "#64748B",
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
-  },
+  /* ── Executive / Corporate sidebar text ────────────────── */
+  /* The sidebar column, name block and labels are inline in the layouts
+     (they depend on the theme and the margin scale); only the shared text
+     runs live here. */
   execContactItem: {
     fontSize: 7.5,
     color: "#CBD5E1",
@@ -349,7 +310,8 @@ const BASE_STYLES: Record<string, Style> = {
     fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     color: "#111827",
-    letterSpacing: 0.8,
+    // 8% of the size (live 0.1em): tracking the text layer still reads as a word.
+    letterSpacing: 0.68,
     textTransform: "uppercase",
     paddingBottom: 2,
     borderBottomWidth: 1,
@@ -371,9 +333,10 @@ const BASE_STYLES: Record<string, Style> = {
  */
 const SECTION_GAP_KEYS: Record<string, ReadonlyArray<"marginTop" | "marginBottom">> = {
   section: ["marginTop"],
-  entryBlock: ["marginBottom"],
-  sectionHeadingWrap: ["marginBottom"],
   twoCol: ["marginTop"],
+  // NOT entryBlock / sectionHeadingWrap: the live templates keep the gap
+  // between entries and under a heading fixed (space-y-3 / pb-1 + mt-2) and
+  // scale only the gap between sections (audit 2026-10 defect 37).
   // ATS Clean uses atsSectionHeading itself as the section divider; its
   // marginTop is the gap BETWEEN sections (the first section overrides it to 0
   // inline, which is unaffected).
@@ -782,6 +745,31 @@ const PdfChips = ({
  * top margin (live Executive zeroes the first section, the other two do not).
  */
 
+/**
+ * pdf.js — and the text-layer parsers ATS portals run — read tracking above
+ * roughly a tenth of the font size as spaces between letters: Exec Split's
+ * 0.12em headings extracted as "E X P E R I E N C E" and the 0.1em sidebar
+ * labels as "C O N TAC T" (template audit 2026-10 defect 39). The PDF caps
+ * heading tracking at 8% of the size; the live headings keep theirs, which is
+ * a visible but deliberate deviation in favour of a parseable download.
+ */
+const MAX_TRACKING_RATIO = 0.08;
+const safeTracking = (letterSpacing: number, fontSize: number) =>
+  Math.min(letterSpacing, MAX_TRACKING_RATIO * fontSize);
+
+/**
+ * Section-gap factory for headings and sidebar labels: `firstKey` is the
+ * first PRESENT section and gets no top gap (live Executive / Onyx /
+ * Sandstone zero their first heading); layouts whose live file keeps the gap
+ * on every heading (Corporate) pass null.
+ */
+const withTopGap =
+  <T extends object>(base: T, gap: number, firstKey: string | null) =>
+  (key: string): T & { marginTop: number } => ({
+    ...base,
+    marginTop: key === firstKey ? 0 : gap,
+  });
+
 type HeadingVariant = {
   fontSize: number;
   color: string;
@@ -821,7 +809,7 @@ const PdfHeading = ({
         fontFamily: fonts.bold,
         fontWeight: 700,
         color: v.color,
-        letterSpacing: v.letterSpacing,
+        letterSpacing: safeTracking(v.letterSpacing, v.fontSize),
         ...(v.uppercase ? { textTransform: "uppercase" } : {}),
         ...(v.textAlign ? { textAlign: v.textAlign } : {}),
       }}
@@ -1191,17 +1179,20 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         : hasProjects
           ? "projects"
           : null;
-  const mainHeading = (key: string): HeadingVariant => ({
-    fontSize: pt(10) * fs,
-    color: theme.accentText,
-    letterSpacing: 0.08 * pt(10) * fs,
-    uppercase: true,
-    ruleColor: theme.accentText,
-    ruleWidth: 0.75,
-    paddingBottom: pt(3),
-    marginBottom: pt(8),
-    marginTop: key === firstMain ? 0 : pt(20) * theme.spaceScale,
-  });
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(10) * fs,
+      color: theme.accentText,
+      letterSpacing: 0.08 * pt(10) * fs,
+      uppercase: true,
+      ruleColor: theme.accentText,
+      ruleWidth: 0.75,
+      paddingBottom: pt(3),
+      marginBottom: pt(8),
+    },
+    pt(20) * theme.spaceScale,
+    firstMain,
+  );
   const expVariant: ExperienceVariant = {
     roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
     dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
@@ -1256,6 +1247,42 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
   const essentialChips = getEssentialChips(data.personal);
 
+  // executive.tsx sidebar: 22px bold stacked name, 12px headline, a 15%-ink
+  // rule with 16px above/below; 9px bold uppercase labels, each section
+  // 20px*sp below the previous one (the first sits right under the rule).
+  const execName: Style = {
+    fontSize: pt(22) * fs,
+    fontFamily: fonts.bold, fontWeight: 700,
+    color: onAccent,
+    lineHeight: 1.15 * theme.lineScale,
+  };
+  const firstSide =
+    sidebarContacts.length > 0
+      ? "contact"
+      : essentialChips.length > 0
+        ? "personal"
+        : hasSkills
+          ? "skills"
+          : hasLanguages
+            ? "languages"
+            : hasCertifications
+              ? "certifications"
+              : null;
+  const sideLabel = withTopGap<Style>(
+    {
+      fontSize: pt(9) * fs,
+      fontFamily: fonts.bold, fontWeight: 700,
+      color: onAccentMuted,
+      // Live 0.1em; capped so pdf.js / ATS text layers do not read the label
+      // as spaced letters ("C O N TAC T", audit 2026-10 defect 39).
+      letterSpacing: safeTracking(0.1 * pt(9) * fs, pt(9) * fs),
+      textTransform: "uppercase",
+      marginBottom: pt(8),
+    },
+    pt(20) * theme.spaceScale,
+    firstSide,
+  );
+
   return (
     <>
       {/* The navy band is its own fixed, absolutely positioned layer so it
@@ -1275,8 +1302,22 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         }}
       />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Sidebar (transparent; the fixed band above is its fill) ── */}
-      <View style={s.execSidebar}>
+      {/* ── Sidebar (transparent; the fixed band above is its fill). Pulled
+          to the page edges with margins that undo the SCALED page padding, so
+          its own padding stays the live 28px/20px whatever the margin level. ── */}
+      <View
+        style={{
+          width: 150,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(28),
+          paddingBottom: pt(28),
+          paddingLeft: pt(20),
+          paddingRight: pt(20),
+          flexShrink: 0,
+        }}
+      >
         {/* Photo */}
         {showPhoto && data.personal.photo && (
           <View style={{ marginBottom: 12 }}>
@@ -1295,29 +1336,46 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Name — stacked first/last lines (mirrors live executive) */}
-        {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
-          <>
-            {data.personal.firstName?.trim() ? (
-              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.firstName.trim()}</Text>
-            ) : null}
-            {data.personal.lastName?.trim() ? (
-              <Text style={{ ...s.execName, color: onAccent }}>{data.personal.lastName.trim()}</Text>
-            ) : null}
-          </>
-        ) : (
-          <Text style={{ ...s.execName, color: onAccent }}>Your Name</Text>
-        )}
-
-        {/* Headline */}
-        {data.personal.headline?.trim() ? (
-          <Text style={{ ...s.execHeadline, color: onAccentMuted, borderBottomColor: mix(onAccent, theme.accent, 0.85) }}>{data.personal.headline.trim()}</Text>
-        ) : null}
+        {/* Name block — stacked first/last lines over the headline, closed
+            by the 15%-ink rule (mirrors live executive) */}
+        <View
+          style={{
+            borderBottomWidth: 0.75,
+            borderBottomColor: mix(onAccent, theme.accent, 0.85),
+            paddingBottom: pt(16),
+            marginBottom: pt(16),
+          }}
+        >
+          {data.personal.firstName?.trim() || data.personal.lastName?.trim() ? (
+            <>
+              {data.personal.firstName?.trim() ? (
+                <Text style={execName}>{data.personal.firstName.trim()}</Text>
+              ) : null}
+              {data.personal.lastName?.trim() ? (
+                <Text style={execName}>{data.personal.lastName.trim()}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text style={execName}>Your Name</Text>
+          )}
+          {data.personal.headline?.trim() ? (
+            <Text
+              style={{
+                fontSize: pt(12) * fs,
+                color: onAccentMuted,
+                marginTop: pt(6),
+                lineHeight: 1.4 * theme.lineScale,
+              }}
+            >
+              {data.personal.headline.trim()}
+            </Text>
+          ) : null}
+        </View>
 
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
+            <Text style={sideLabel("contact")}>Contact</Text>
             {sidebarContacts.map((item, i) =>
               item.href ? (
                 <Link
@@ -1351,7 +1409,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
+            <Text style={sideLabel("personal")}>Personal</Text>
             {essentialChips.map((chip) => (
               <Text key={chip.label} style={{ ...s.execContactItem, color: onAccentMuted }}>
                 {chip.label}: {chip.value}
@@ -1363,7 +1421,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
+            <Text style={sideLabel("skills")}>Skills</Text>
             {data.skills.map((skill) => (
               <Text key={skill.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
@@ -1376,7 +1434,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
+            <Text style={sideLabel("languages")}>Languages</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
@@ -1393,7 +1451,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
+            <Text style={sideLabel("certifications")}>Certifications</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
@@ -1425,8 +1483,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 20 * m }}>
+      {/* ── Main column (live padding 28px*m; top/bottom/right come from the
+          scaled page padding) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(28) * m }}>
         {/* Summary */}
         {hasSummary && (
           <View>
@@ -1709,7 +1768,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         <View>
           <Text style={headingStyle("experience")}>Experience</Text>
           {experience.map((role) => (
-            <View key={role.id} style={{ marginBottom: 9 * theme.spaceScale }} minPresenceAhead={48}>
+            <View key={role.id} style={{ marginBottom: pt(12) }} minPresenceAhead={48}>
               <View style={s.entryRow}>
                 <Text
                   style={{
@@ -1814,7 +1873,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           {projects.map((project) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
-              <View key={project.id} style={{ marginBottom: 8 * theme.spaceScale }} wrap={false}>
+              <View key={project.id} style={{ marginBottom: pt(10) }} wrap={false}>
                 <Text
                   style={{
                     fontFamily: fonts.bold, fontWeight: 700,
@@ -1985,7 +2044,8 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
     lineHeight: (16 / 12) * ls,
     ...bold,
     textTransform: "uppercase",
-    letterSpacing: 0.2 * 9 * fs,
+    // Live tracking-[0.2em]; capped for the text layer (see safeTracking).
+    letterSpacing: safeTracking(0.2 * 9 * fs, 9 * fs),
     color: SLATE_500,
   };
   // text-sm/5 text-slate-700 — paragraphs, bullets, languages, certs
@@ -2411,6 +2471,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const fs = theme.fontScale;
+  const m = theme.marginScale;
   const eduVariant: EducationVariant = {
     joiner: " in ",
     titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
@@ -2450,17 +2511,18 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
 
   return (
     <View>
-      {/* ── Dark Header ── */}
+      {/* ── Dark Header — bleeds through the SCALED page padding; live
+          padding 28px 32px*m 24px 32px*m ── */}
       <View
         style={{
           backgroundColor: theme.accent,
-          marginTop: -27,
-          marginLeft: -24,
-          marginRight: -24,
-          paddingTop: 24,
-          paddingBottom: 20,
-          paddingLeft: 30,
-          paddingRight: 30,
+          marginTop: -27 * m,
+          marginLeft: -24 * m,
+          marginRight: -24 * m,
+          paddingTop: pt(28),
+          paddingBottom: pt(24),
+          paddingLeft: pt(32) * m,
+          paddingRight: pt(32) * m,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "flex-start",
@@ -2580,8 +2642,9 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Two-column body ── */}
-      <View style={{ flexDirection: "row", marginTop: 14, gap: 18 }}>
+      {/* ── Two-column body — live padding-top 20px*m, column gap 28px,
+          200px right column ── */}
+      <View style={{ flexDirection: "row", marginTop: pt(20) * m, gap: pt(28) }}>
         {/* Left — main */}
         <View style={{ flex: 1 }}>
           {hasExperience && (
@@ -2636,7 +2699,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         </View>
 
         {/* Right — sidebar content */}
-        <View style={{ width: 140, flexShrink: 0 }}>
+        <View style={{ width: pt(200), flexShrink: 0 }}>
           {hasSummary && (
             <View>
               <PdfHeading fonts={fonts} v={heading}>Summary</PdfHeading>
@@ -2802,17 +2865,20 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     pillBorderColor: "#BBF7D0",
     gap: pt(8),
   };
-  const mainHeading = (_key: string): HeadingVariant => ({
-    fontSize: pt(10) * fs,
-    color: "#1E293B",
-    letterSpacing: 0.08 * pt(10) * fs,
-    uppercase: true,
-    ruleColor: "#E2E8F0",
-    ruleWidth: 0.75,
-    paddingBottom: pt(3),
-    marginBottom: pt(6),
-    marginTop: pt(18) * theme.spaceScale,
-  });
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(10) * fs,
+      color: "#1E293B",
+      letterSpacing: 0.08 * pt(10) * fs,
+      uppercase: true,
+      ruleColor: "#E2E8F0",
+      ruleWidth: 0.75,
+      paddingBottom: pt(3),
+      marginBottom: pt(6),
+    },
+    pt(18) * theme.spaceScale,
+    null,
+  );
   const expVariant: ExperienceVariant = {
     roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
     dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
@@ -2829,18 +2895,50 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
+  // corp-sidebar.tsx SidebarHeading: 9px bold uppercase at 50% ink, 18px*sp
+  // above every label (the live file has no first-section exception).
+  const sideLabel = withTopGap<Style>(
+    {
+      fontSize: pt(9) * fs,
+      fontFamily: fonts.bold, fontWeight: 700,
+      color: mix(onAccent, theme.accent, 0.5),
+      letterSpacing: safeTracking(0.1 * pt(9) * fs, pt(9) * fs),
+      textTransform: "uppercase",
+      marginBottom: pt(6),
+    },
+    pt(18) * theme.spaceScale,
+    null,
+  );
+  const SIDEBAR_WIDTH = pt(220);
 
   return (
+    <>
+      {/* Fixed band: reaches the page edges on every page (the sidebar View's
+          own background left white notches at the top of page 2+ and the foot
+          of page 1 — audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: theme.accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Left main content ── */}
-      <View style={{ flex: 1, paddingRight: 14 * m }}>
-        {/* Name header */}
+      {/* ── Left main content (live padding 36px*m 28px*m 36px*m 32px*m; the
+          top/bottom/left come from the scaled page padding) ── */}
+      <View style={{ flex: 1, paddingRight: pt(28) * m }}>
+        {/* Name header — live: 26px name, 12px headline, 2px accent rule 10px
+            below, 16px under the block */}
         <View
           style={{
             borderBottomWidth: 1.5,
-            borderBottomColor: "#0F172A",
-            paddingBottom: 6,
-            marginBottom: 10,
+            borderBottomColor: theme.accentText,
+            paddingBottom: pt(10),
+            marginBottom: pt(16),
           }}
         >
           <Text
@@ -2924,19 +3022,19 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Right dark sidebar ── */}
+      {/* ── Right sidebar (transparent; the fixed band is its fill). Margins
+          undo the scaled page padding so the live 36px/20px padding holds. ── */}
       <View
         style={{
-          width: 155,
+          width: SIDEBAR_WIDTH,
           flexShrink: 0,
-          backgroundColor: theme.accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginRight: -24,
-          paddingTop: 24,
-          paddingBottom: 24,
-          paddingLeft: 14,
-          paddingRight: 14,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginRight: -24 * m,
+          paddingTop: pt(36),
+          paddingBottom: pt(36),
+          paddingLeft: pt(20),
+          paddingRight: pt(20),
         }}
       >
         {/* Photo */}
@@ -2965,7 +3063,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Contact */}
         {sidebarContacts.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CONTACT</Text>
+            <Text style={sideLabel("contact")}>Contact</Text>
             {sidebarContacts.map((item, i) => (
               <View key={i} style={{ marginBottom: 3 }}>
                 <Text
@@ -3013,7 +3111,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Personal */}
         {essentialChips.length > 0 && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>PERSONAL</Text>
+            <Text style={sideLabel("personal")}>Personal</Text>
             {essentialChips.map((chip) => (
               <View key={chip.label} style={{ marginBottom: 3 }}>
                 <Text
@@ -3039,7 +3137,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Skills */}
         {hasSkills && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
+            <Text style={sideLabel("skills")}>Skills</Text>
             <PdfChips
               items={data.skills.map((sk) => ({ value: sk.name }))}
               v={{
@@ -3059,7 +3157,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Languages */}
         {hasLanguages && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>LANGUAGES</Text>
+            <Text style={sideLabel("languages")}>Languages</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
@@ -3076,7 +3174,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {/* Certifications */}
         {hasCertifications && (
           <View>
-            <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>CERTIFICATIONS</Text>
+            <Text style={sideLabel("certifications")}>Certifications</Text>
             {data.certifications.map((cert) => (
               <View key={cert.id} style={{ marginBottom: 4 }}>
                 <Text
@@ -3108,6 +3206,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -3142,7 +3241,8 @@ const ProPdfHeading = ({
         fontSize: 9 * fontScale,
         fontFamily: fonts.bold, fontWeight: 700,
         color: "#111827",
-        letterSpacing: 1,
+        // Live 0.14em; capped for the text layer (see safeTracking).
+        letterSpacing: safeTracking(1, 9 * fontScale),
         textTransform: "uppercase",
         textAlign: "center",
       }}
@@ -3400,42 +3500,6 @@ const ProfessionalPDFLayout = ({
    ONYX PDF LAYOUT (charcoal left sidebar + photo)
    ═══════════════════════════════════════════════════════════ */
 
-const OnyxHeading = ({
-  children,
-  accent,
-  fontScale,
-  spaceScale,
-  fonts,
-}: {
-  children: string;
-  accent: string;
-  fontScale: number;
-  spaceScale: number;
-  fonts: PdfFontPair;
-}) => (
-  <View
-    style={{
-      marginTop: 14 * spaceScale,
-      marginBottom: 7,
-      paddingBottom: 3,
-      borderBottomWidth: 1.5,
-      borderBottomColor: accent,
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 9.5 * fontScale,
-        fontFamily: fonts.bold, fontWeight: 700,
-        color: "#1F2937",
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
-      }}
-    >
-      {children}
-    </Text>
-  </View>
-);
-
 const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const theme = resolveTheme(data.settings, "#262626");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
@@ -3511,31 +3575,73 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     contactItems.push({ text, href: normalizeHref(data.personal.website), fontSize: urlSize(text) });
   }
 
+  // onyx.tsx SideLabel: 9px bold uppercase, 7px below; each sidebar section
+  // carries 18px*sp BELOW it (Details, the last, none).
   const sideLabel = {
-    fontSize: 7 * theme.fontScale,
+    fontSize: pt(9) * fs,
     fontFamily: fonts.bold, fontWeight: 700,
     color: onAccentMuted,
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
+    letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
+  const sideSection = { marginBottom: pt(18) * theme.spaceScale };
   const sideText = { fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 };
+  // onyx.tsx MainHeading: 11px bold 0.1em #1f2937 uppercase over a 1.5px
+  // accent rule, pb 3px, mb 9px, mt 18px*sp except the first section.
+  const firstMain = hasExperience
+    ? "experience"
+    : hasEducation
+      ? "education"
+      : hasSkills
+        ? "skills"
+        : hasCertifications
+          ? "certifications"
+          : hasProjects
+            ? "projects"
+            : null;
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(11) * fs,
+      color: "#1F2937",
+      letterSpacing: 0.1 * pt(11) * fs,
+      uppercase: true,
+      ruleColor: accentText,
+      ruleWidth: 1.125,
+      paddingBottom: pt(3),
+      marginBottom: pt(9),
+    },
+    pt(18) * theme.spaceScale,
+    firstMain,
+  );
+  const SIDEBAR_WIDTH = 172;
 
   return (
+    <>
+      {/* Fixed band: edge to edge on every page (audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Charcoal sidebar (edge-bleed) ── */}
+      {/* ── Charcoal sidebar (transparent over the fixed band; live padding 30px 22px) ── */}
       <View
         style={{
-          width: 172,
-          backgroundColor: accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginLeft: -24,
-          paddingTop: 26,
-          paddingBottom: 26,
-          paddingLeft: 16,
-          paddingRight: 16,
+          width: SIDEBAR_WIDTH,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(30),
+          paddingBottom: pt(30),
+          paddingLeft: pt(22),
+          paddingRight: pt(22),
           flexShrink: 0,
         }}
       >
@@ -3565,7 +3671,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
               color: onAccentMuted,
               textAlign: "center",
               marginTop: 3,
-              paddingBottom: 12,
+              paddingBottom: pt(14),
+              marginBottom: pt(14),
               borderBottomWidth: 0.5,
               borderBottomColor: bandBorder,
             }}
@@ -3575,7 +3682,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         ) : null}
 
         {hasSummary && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>ABOUT ME</Text>
             <Text style={{ fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.55 * theme.lineScale }}>
               {data.personal.summary?.trim()}
@@ -3584,7 +3691,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {contactItems.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>CONTACT</Text>
             {contactItems.map((item, i) =>
               item.href ? (
@@ -3605,7 +3712,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {hasLanguages && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>LANGUAGES</Text>
             {data.languages.map((lang) => (
               <Text key={lang.id} style={sideText}>
@@ -3629,11 +3736,11 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+      {/* ── Main column (live padding 30px*m) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
         {hasExperience && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
             {experience.map((role, i) => (
               <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
@@ -3642,7 +3749,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
             {education.map((edu, i) => (
               <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
@@ -3651,7 +3758,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
             <PdfChips
               items={data.skills.map((sk) => ({ value: sk.name }))}
               v={{
@@ -3670,7 +3777,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -3684,7 +3791,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>
@@ -3712,6 +3819,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -3799,30 +3907,73 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
   const SIDE_TEXT = onAccent;
   const SIDE_MUTED = onAccentMuted;
+  // sandstone.tsx SideLabel: 9px bold uppercase, 7px below; Personal Details
+  // and Contact carry 18px*sp below them, Languages (last) none.
   const sideLabel = {
-    fontSize: 7 * theme.fontScale,
+    fontSize: pt(9) * fs,
     fontFamily: fonts.bold, fontWeight: 700,
     color: SIDE_MUTED,
-    letterSpacing: 0.8,
-    marginBottom: 5,
-    marginTop: 14,
+    letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
+  const sideSection = { marginBottom: pt(18) * theme.spaceScale };
+  // sandstone.tsx MainHeading: as Onyx in the stone ink (#292524).
+  const firstMain = hasSummary
+    ? "summary"
+    : hasExperience
+      ? "experience"
+      : hasEducation
+        ? "education"
+        : hasSkills
+          ? "skills"
+          : hasCertifications
+            ? "certifications"
+            : hasProjects
+              ? "projects"
+              : null;
+  const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
+    {
+      fontSize: pt(11) * fs,
+      color: "#292524",
+      letterSpacing: 0.1 * pt(11) * fs,
+      uppercase: true,
+      ruleColor: accentText,
+      ruleWidth: 1.125,
+      paddingBottom: pt(3),
+      marginBottom: pt(9),
+    },
+    pt(18) * theme.spaceScale,
+    firstMain,
+  );
+  const SIDEBAR_WIDTH = 180;
 
   return (
+    <>
+      {/* Fixed band: edge to edge on every page (audit 2026-10 defect 19). */}
+      <View
+        fixed
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: SIDEBAR_WIDTH,
+          backgroundColor: accent,
+        }}
+      />
     <View style={{ flexDirection: "row", flex: 1 }}>
-      {/* ── Warm sidebar (edge-bleed) ── */}
+      {/* ── Warm sidebar (transparent over the fixed band; live padding 30px 22px) ── */}
       <View
         style={{
-          width: 180,
-          backgroundColor: accent,
-          marginTop: -27,
-          marginBottom: -27,
-          marginLeft: -24,
-          paddingTop: 26,
-          paddingBottom: 26,
-          paddingLeft: 16,
-          paddingRight: 16,
+          width: SIDEBAR_WIDTH,
+          marginTop: -27 * m,
+          marginBottom: -27 * m,
+          marginLeft: -24 * m,
+          paddingTop: pt(30),
+          paddingBottom: pt(30),
+          paddingLeft: pt(22),
+          paddingRight: pt(22),
           flexShrink: 0,
         }}
       >
@@ -3853,7 +4004,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
               fontFamily: fonts.bold, fontWeight: 700,
               textAlign: "center",
               marginTop: 3,
-              paddingBottom: 12,
+              paddingBottom: pt(14),
+              marginBottom: pt(14),
               borderBottomWidth: 0.5,
               borderBottomColor: bandBorder,
             }}
@@ -3863,7 +4015,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         ) : null}
 
         {personalDetails.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>PERSONAL DETAILS</Text>
             {personalDetails.map((d) => (
               <View key={d.label} style={{ marginBottom: 4 }}>
@@ -3877,7 +4029,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {contactItems.length > 0 && (
-          <View>
+          <View style={sideSection}>
             <Text style={sideLabel}>CONTACT</Text>
             {contactItems.map((item, i) =>
               item.href ? (
@@ -3910,18 +4062,18 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column ── */}
-      <View style={{ flex: 1, paddingLeft: 18 * m }}>
+      {/* ── Main column (live padding 30px*m) ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
         {hasSummary && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>About Me</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>About Me</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Work Experience</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Work Experience</PdfHeading>
             {experience.map((role, i) => (
               <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
@@ -3930,7 +4082,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasEducation && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
             {education.map((edu, i) => (
               <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
@@ -3939,7 +4091,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSkills && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
             <PdfChips
               items={data.skills.map((sk) => ({ value: sk.name }))}
               v={{
@@ -3958,7 +4110,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasCertifications && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
             {data.certifications.map((cert) => (
               <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
@@ -3972,7 +4124,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
 
         {hasProjects && (
           <View>
-            <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
                 <Text style={s.entryTitle}>
@@ -4000,6 +4152,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
     </View>
+    </>
   );
 };
 
@@ -4843,41 +4996,25 @@ export const CVDocument = ({
   plan = "free",
   templateId = "classic",
 }: Props) => {
-  // Page Margins (theme.marginScale) scales the shared page padding — but ONLY
-  // for single-column templates, whose content sits directly under s.page. The
-  // two-column/sidebar layouts bleed to the page edge with hardcoded negative
-  // margins tied to s.page's 24/27, so scaling their page padding would break
-  // the bleed; their main-column margins land in the next pass.
+  // Page Margins (theme.marginScale) scales the page padding for EVERY
+  // template (audit 2026-10 defect 19 — it used to skip the sidebar layouts).
+  // The edge-bleed sidebars (executive / corp-sidebar / onyx / sandstone)
+  // paint their band as a fixed, absolutely positioned layer that reaches the
+  // physical page edges on every page, and pull a transparent column over it
+  // with negative margins that are themselves scaled, so the band keeps its
+  // fixed inner padding (as live) while the main column's margins breathe.
+  // Exec Split's page-1 header bleeds the same way.
   const theme = resolveTheme(data.settings);
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const marginScale = theme.marginScale;
-  // Templates whose content sits directly under s.page (no edge-bleed) — their
-  // page padding scales with margins. Modern belongs here even though its BODY
-  // is two-column (main column + 150pt aside, see ModernPDFLayout): it is a
-  // padded page like the live template's 36px/32px padding, not a bleed
-  // sidebar. The true edge-bleed sidebars (executive/exec-split/corp-sidebar/
-  // onyx/sandstone) instead scale their MAIN-COLUMN padding.
-  const SINGLE_COLUMN = new Set([
-    "classic",
-    "ats-clean",
-    "professional",
-    "professional-photo",
-    "modern",
-    // Banner's band bleeds, but only on page 1 and with negative margins that
-    // are themselves scaled by marginScale, so its page padding scales too.
-    "banner",
-    "gulf-standard",
-  ]);
-  const pageStyle = SINGLE_COLUMN.has(templateId)
-    ? {
-        ...s.page,
-        paddingTop: 27 * marginScale,
-        paddingBottom: 27 * marginScale,
-        paddingLeft: 24 * marginScale,
-        paddingRight: 24 * marginScale,
-      }
-    : s.page;
+  const pageStyle = {
+    ...s.page,
+    paddingTop: 27 * marginScale,
+    paddingBottom: 27 * marginScale,
+    paddingLeft: 24 * marginScale,
+    paddingRight: 24 * marginScale,
+  };
 
   const renderLayout = () => {
     switch (templateId) {

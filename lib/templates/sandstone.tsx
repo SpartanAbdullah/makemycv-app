@@ -226,7 +226,7 @@ export const SandstoneTemplate = ({
         )}
 
         {personalDetails.length > 0 && (
-          <div style={{ marginBottom: "18px" }}>
+          <div style={{ marginBottom: `${18 * sp}px` }}>
             <SideLabel color={onAccentMuted} fontScale={fs}>Personal Details</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {personalDetails.map((d) => (
@@ -242,7 +242,7 @@ export const SandstoneTemplate = ({
         )}
 
         {contactItems.length > 0 && (
-          <div style={{ marginBottom: "18px" }}>
+          <div style={{ marginBottom: `${18 * sp}px` }}>
             <SideLabel color={onAccentMuted} fontScale={fs}>Contact</SideLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {contactItems.map((item, i) =>
