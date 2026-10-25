@@ -16,6 +16,89 @@ Format:
 
 ---
 
+## [2026-10-25 22:30] Templates: Chronicle and Harvard added (13th and 14th)
+
+**Goal:** The remaining two candidates from the 2026-10 template audit
+(`docs/template-audit-2026-10.md`, "Shortlist of templates to add", items 3 and 4), built to their
+layoutSpec and buildNotes after Gulf Standard and Banner shipped on 2026-10-24. Chronicle is the
+catalogue's first design-forward template that can honestly wear the ATS-Friendly badge (single column,
+no photo dependency); Harvard captures the fresh-graduate / "just make it plain" search intent with an
+education-first one-page serif format.
+**Files:**
+- created: `lib/templates/chronicle.tsx` — single-column reverse-chronological timeline. Header: name,
+  headline in accent, contact row with ` | ` separators and real links, a quiet essentials row (full
+  labels, plus the date of birth when set), optional 54pt photo top-right as an in-flow flex sibling
+  (default off; gated on `personal.photo && showPhoto && theme.photoVisible`, round/square). Then
+  Profile → Experience → Education → Projects (three-track rows: 90pt × fontScale date gutter with
+  uppercase `MMM YYYY – MMM YYYY` right-aligned to the rail, 14pt rail track with a 1.25pt line and a
+  6pt accent dot per entry, content flex 1) → Skills (text lines under bold sub-labels) → Languages →
+  Certifications. The rail is drawn per entry and the last entry of a section ends it at the dot; the
+  entry gap lives inside the content track so the rail stretches across it. Dot = `theme.accentText`,
+  rail = that mixed 30 % toward white (opaque hex), so a pale preset still shows. Fallback accent
+  `#0E7490`. Exports the track geometry constants and `chronicleContactItems` / `chronicleEssentials` /
+  `chronicleDegreeTitle` / `chronicleRailColors` for the PDF twin.
+- created: `lib/templates/harvard.tsx` — zero-colour serif single column. Centred header (serif Title
+  Case name, `location | phone | email | linkedin` with real links, `Nationality: X | Visa: Y |
+  Available: Z`), then CAREER OBJECTIVE (the summary) → EDUCATION (degree bold left / date right,
+  school in serif italic, notes line, "Attested — body") → EXPERIENCE & INTERNSHIPS (organisation bold
+  / location right, role italic / dates right, bullets) → PROJECTS → SKILLS & INTERESTS as
+  label-prefixed lines (`Technical:`, `Skills:`, `Languages: Arabic (Native), English (C2)`,
+  `Certifications: name (issuer, year)`). Headings 9pt uppercase serif over a 0.5pt black rule, 10pt
+  / 1.35 body, 22/20pt page padding, no photo slot, accent ignored. Exports the text rules for the PDF.
+- edited: `components/pdf/CVDocument.tsx` — `ChroniclePDFLayout` and `HarvardPDFLayout` mirroring the
+  live renders section by section (px × 0.75, all four density scales, no alpha colours, own
+  heading/experience/education blocks, sections as fragments so headings honour `minPresenceAhead`).
+  Chronicle's rail is a per-entry `borderLeft` plus an absolutely positioned dot (a stub to the dot on
+  the last entry); short entries carry `wrap={false}`. Harvard's serif is `PDF_FAMILY.serif` once
+  registered, else the Times pair. Both ids in `SINGLE_COLUMN`; Harvard's page padding is 22/20pt ×
+  marginScale via `HARVARD_PAGE_PADDING_PT`.
+- edited: `lib/templates/index.tsx` — registry entries (Harvard after ATS Clean, Chronicle after Gulf
+  Standard), both badged New + ATS-Friendly, hand-drawn thumbnails. `TemplateDefinition` gains
+  `ignoresAccent` (Harvard) and `densityDefaults` (Harvard: font 2 / spacing 2), and a new
+  `settingsForTemplate(settings, nextId)` helper applies a template's density defaults when the user
+  switches to it with those controls still neutral and reverts them when switching away with the
+  defaults still in place — a level the user set by hand is never touched.
+- edited: `components/builder/steps/ReviewStep.tsx`, `components/builder/BuilderShell.tsx` — both
+  template-change paths go through `settingsForTemplate`.
+- edited: `components/builder/CustomizePanel.tsx` — the Colours group (and its divider) hide when the
+  current template `ignoresAccent`, so Harvard shows no dead colour picker.
+- edited: `lib/data/preview-profiles.ts` — personas `priyaChronicle` (Priya Nair, Engineering Manager —
+  Payments, Indian, Dubai; four roles across India and the UAE, degree/field distinct) and
+  `mariamHarvard` (Mariam Al-Suwaidi, 2026 UAEU Computer Engineering graduate; internship, TA term,
+  capstone, GPA line; settings at the template's font 2 / spacing 2).
+- edited: `app/preview/[templateId]/page.tsx` — `?density=1..5` sets all four density controls for
+  review captures at the extremes (chrome-less route, noindexed; default unchanged).
+- edited: `lib/pdf/fonts.ts` — `registerPdfFontsFromDir(dir)` (Node twin of `registerPdfFonts`, same
+  three faces from local TTFs) and the shared `registerFrom` body.
+- edited: `scripts/pdf-smoke.tsx` — ids added; registers the real faces from `public/fonts/pdf` so the
+  smoke renders with Inter / Bricolage / Instrument Serif metrics instead of Helvetica; also renders
+  `chronicle-persona.pdf` and `harvard-persona.pdf` from the preview personas.
+- edited: `scripts/pdf-ops-check.mjs` — check 4: `harvard-persona.pdf` must be one page.
+- edited: `scripts/capture-previews.js` — ids added.
+- added: `artifacts/template-previews/{chronicle,harvard}-preview.png`.
+- edited: `ROADMAP.md` (14 shipped), `CLAUDE.md` (template count).
+**Notes / risks / follow-up:**
+- Spec deviations, both deliberate: the Chronicle date gutter is 90pt (spec 72pt) because
+  `SEP 2019 – PRESENT` at 7.5pt uppercase measures ~82pt at level 3 and ~89pt at level 5 — the spec's
+  own density-5 test cannot pass in 72pt; and the heading letter-spacing is 0.6pt (spec 1pt) because at
+  1pt pdf.js extracts `P R O F I L E`, which an ATS would not recognise as a section.
+- Harvard's serif is Instrument Serif (weight 400 only, as the audit warned): hierarchy is size and
+  caps, the italic sub-lines use the serif italic because Inter has no italic cut in either renderer,
+  and the body stays in the user's face. No new font was added to `public/fonts/pdf`.
+- `scripts/capture-previews.js` still cannot launch here (playwright-core 1.61.1 wants Chromium build
+  1228; the cache holds 1234). The PNGs were captured with an equivalent script through the system
+  Chrome channel (same 794×1123 @2x viewport and readiness waits); `npx playwright install chromium`
+  restores the pipeline.
+- Chronicle has no `-nophoto` capture because its persona carries no photo (the template's default);
+  the site card therefore has no with/without toggle.
+- Built in a worktree (`feat/templates-chronicle-harvard`) because the stagingmmc checkout was mid-edit
+  by the audit-fix session; its `educationTitle` helper in `lib/utils/education.ts` can absorb
+  `chronicleDegreeTitle` / `harvardDegreeTitle` once both land.
+- DOCX export is template-agnostic and untouched (Chronicle's gutter collapses to the generic
+  "dates — role" line, as the audit expected).
+- Marketing site: `content/templates/{chronicle,harvard}.mdx` + `public/templates/*` on `staging`.
+**Suggested commit:** feat(templates): add Chronicle and Harvard
+
 ## [2026-10-24 22:30] Templates: Gulf Standard and Banner added (11th and 12th)
 
 **Goal:** Founder ask 2026-10-24: review every template and add at least two popular ones. The audit

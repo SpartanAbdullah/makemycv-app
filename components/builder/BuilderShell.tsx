@@ -40,7 +40,7 @@ const MappingReview = dynamic(
   { ssr: false },
 );
 import type { CvData } from "../../lib/types/cv";
-import { templates, getTemplateById } from "../../lib/templates";
+import { templates, getTemplateById, settingsForTemplate } from "../../lib/templates";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
@@ -966,10 +966,7 @@ export const BuilderShell = ({
     const nextIdx =
       (((idx >= 0 ? idx : 0) + direction) % templates.length + templates.length) %
       templates.length;
-    updateSection("settings", {
-      ...data.settings,
-      templateId: templates[nextIdx].id,
-    });
+    updateSection("settings", settingsForTemplate(data.settings, templates[nextIdx].id));
   };
 
   // ---- Download (TopBar + ReviewStep + TemplatePreviewModal) ----

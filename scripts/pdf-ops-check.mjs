@@ -4,7 +4,9 @@
 //     that react-pdf wrote as 8-digit hex and pdfkit misparsed as [0,255,38];
 //  2. the Executive band is a full-height 150pt rectangle at the page edge on
 //     EVERY page (it used to start 27pt down on page 2+);
-//  3. page counts, for the log.
+//  3. page counts, for the log;
+//  4. the Harvard graduate persona (harvard-persona.pdf) is ONE page — the
+//     template's whole point (template audit 2026-10, shortlist item 4).
 // Plain ESM on purpose: pdfjs-dist ships ESM and the smoke script is compiled
 // to CommonJS.
 import fs from 'node:fs';
@@ -49,8 +51,10 @@ for (const f of files) {
     }
   }
   const execOk = f.startsWith('executive') ? report.bands.length >= doc.numPages && report.bands.every((b) => Math.abs(b.x) < 0.5 && (Math.abs(b.y) < 0.5 || Math.abs(Math.abs(b.y) - Math.abs(b.h)) < 0.5)) : true;
-  if (report.neon > 0 || !execOk) failures++;
-  console.log(`${report.neon > 0 || !execOk ? 'FAIL' : 'ok  '} ${f}: pages=${report.pages} neonColourOps=${report.neon}${f.startsWith('executive') ? ' bands=' + JSON.stringify(report.bands) : ''}`);
+  const onePageOk = f === 'harvard-persona.pdf' ? doc.numPages === 1 : true;
+  const ok = report.neon === 0 && execOk && onePageOk;
+  if (!ok) failures++;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${f}: pages=${report.pages} neonColourOps=${report.neon}${f.startsWith('executive') ? ' bands=' + JSON.stringify(report.bands) : ''}${onePageOk ? '' : ' (expected one page)'}`);
 }
 console.log(failures ? `FAILURES: ${failures}` : 'ALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);
