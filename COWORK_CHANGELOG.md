@@ -16,6 +16,42 @@ Format:
 
 ---
 
+## [2026-10-25 23:40] Templates 7/7: registry badges and copy honesty; CLAUDE.md notes the PDF primitives
+
+**Goal:** Template audit 2026-10 defect 26 (medium) and the registry-copy findings. Onyx and Sandstone are
+two-column sidebar templates but carried only "New", so their users got no "Design-led" ATS caveat;
+Professional Photo is structurally identical to Professional (ATS-Friendly) but carried only "New";
+Executive and Corporate shared one sentence and described a colour the accent control changes; Modern
+promised "a refined accent section" it never renders; ATS Clean claimed an unmeasured "maximum ATS pass
+rate"; Professional promised a "headline strip" that was never built. The ATS promise depends on these
+signals being accurate.
+**Files:**
+- edited: `lib/templates/index.tsx` — Onyx and Sandstone: `[New, Design-led]`. Professional Photo:
+  `[New, ATS-Friendly]`; the registry comment records the decision: the badge speaks to column structure,
+  an in-flow photo does not change reading order, and ATS Clean / Gulf Standard / Banner already show one
+  while keeping the badge. Descriptions: Modern ("Two-column layout: experience cards on the left,
+  education and skill pills on the right."), Executive ("Left sidebar with stacked name, contact and
+  skills; two-column. For senior profiles sent straight to a hiring manager."), Corporate ("Right-hand
+  sidebar carries contact, visa and skills; the main column stays plain. Best emailed direct to a
+  recruiter."), ATS Clean ("Single-column, text-first layout built for applicant tracking systems."),
+  Professional ("Centered name, headline and contacts over full-width ruled sections. Conservative and
+  recruiter-safe."). Modern's stale `modern.tsx:154` comment reference removed. ClassicThumb redrawn with
+  the live left-aligned contact row and top-right photo slot; ModernThumb without the emerald band it
+  never had (slate rule, bordered card, slate pills).
+- edited: `CLAUDE.md` — a "PDF layouts share primitives" bullet under Checks: the primitives, the band
+  pattern, the `BANDS` registration a new sidebar template needs, the three smoke passes, and "verify
+  parity with pdf.js text extraction, not by eye".
+**Notes / risks / follow-up:**
+- Nothing in the app renders the registry `Thumbnail` field today (the gallery in ReviewStep uses live
+  previews), so the thumbnail redraws are documentation of the design, not a visible change.
+- Deferred, audit defect 13: Sandstone (and every template with a signature fallback accent) renders in
+  the store's seeded #1e5b54 because a template switch writes only `templateId`; the beige identity exists
+  only in the marketing PNG. Whether switching template should reset the accent to the template's
+  signature is a product decision (it would recolour a CV the user already tuned) — founder call, not a
+  primitive fix. Sandstone's description still says "Warm sidebar" pending that call.
+- `npx tsc --noEmit` clean, `npm run lint` 11 warnings.
+**Suggested commit:** fix(templates): registry badges and copy honesty; CLAUDE.md notes the PDF primitives
+
 ## [2026-10-25 23:30] PDF parity 6/7: density scales on the bleed sidebars, fixed bands, first-section margins, tracking cap
 
 **Goal:** Template audit 2026-10 defects 19, 20 and 37 (medium/low) plus 39 (low) where it fell out of the

@@ -35,15 +35,18 @@ export type TemplateDefinition = {
 
 const ClassicThumb = () => (
   <div className="h-32 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3">
-    <div className="flex items-start justify-between">
-      <div className="space-y-2">
+    {/* Live header: name, headline and a LEFT-aligned contact row, photo top-right */}
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 space-y-1.5">
         <div className="h-3 w-24 rounded bg-slate-300" />
         <div className="h-2 w-20 rounded bg-slate-200" />
+        <div className="flex gap-1">
+          <div className="h-1.5 w-10 rounded bg-slate-200" />
+          <div className="h-1.5 w-8 rounded bg-slate-200" />
+          <div className="h-1.5 w-6 rounded bg-slate-200" />
+        </div>
       </div>
-      <div className="space-y-1 text-right">
-        <div className="h-2 w-16 rounded bg-slate-200" />
-        <div className="h-2 w-12 rounded bg-slate-200" />
-      </div>
+      <div className="h-8 w-8 flex-shrink-0 rounded-full border border-slate-200 bg-slate-300" />
     </div>
     <div className="mt-4 space-y-2">
       <div className="h-2 w-16 rounded bg-slate-300" />
@@ -58,16 +61,28 @@ const ClassicThumb = () => (
 );
 
 const ModernThumb = () => (
-  <div className="h-32 rounded-xl border border-slate-200 bg-gradient-to-br from-emerald-50 to-white p-3">
-    <div className="h-4 w-16 rounded bg-emerald-200" />
-    <div className="mt-3 grid grid-cols-[2fr_1fr] gap-2">
-      <div className="space-y-2">
-        <div className="h-2 w-full rounded bg-slate-200" />
-        <div className="h-2 w-5/6 rounded bg-slate-200" />
+  <div className="h-32 rounded-xl border border-slate-200 bg-white p-3">
+    {/* Live header: name + headline over a slate rule — no accent band */}
+    <div className="space-y-1.5 border-b border-slate-200 pb-2">
+      <div className="h-3 w-20 rounded bg-slate-800" />
+      <div className="h-1.5 w-14 rounded bg-slate-300" />
+    </div>
+    {/* 2fr/1fr body: bordered experience card left, education + pills right */}
+    <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
+      <div className="space-y-1.5">
+        <div className="h-1.5 w-10 rounded bg-slate-400" />
+        <div className="space-y-1 rounded-md border border-slate-200 p-1.5">
+          <div className="h-1.5 w-full rounded bg-slate-200" />
+          <div className="h-1.5 w-5/6 rounded bg-slate-200" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <div className="h-2 w-full rounded bg-emerald-100" />
-        <div className="h-2 w-4/6 rounded bg-emerald-100" />
+      <div className="space-y-1.5">
+        <div className="h-1.5 w-8 rounded bg-slate-400" />
+        <div className="flex flex-wrap gap-1">
+          <div className="h-2 w-6 rounded-full bg-slate-100" />
+          <div className="h-2 w-8 rounded-full bg-slate-100" />
+          <div className="h-2 w-5 rounded-full bg-slate-100" />
+        </div>
       </div>
     </div>
   </div>
@@ -323,7 +338,14 @@ export const templates: TemplateDefinition[] = [
      structures get a quiet "Design-led" badge because older ATS parsers can
      interleave their columns — fine for direct email, riskier for online
      application portals. Exactly ONE template ("Classic", the default) also
-     carries "Recommended" to anchor the indecisive majority. */
+     carries "Recommended" to anchor the indecisive majority.
+
+     The badge speaks to COLUMN STRUCTURE, not to the photo (template audit
+     2026-10 defect 26): an in-flow photo does not change reading order, and
+     ATS Clean / Gulf Standard / Banner already show one while keeping the
+     badge, so Professional Photo carries ATS-Friendly like Professional. The
+     "New" ribbon is additive — the picker shows one badge by priority, so New
+     never displaces the structural badge. */
   {
     id: "classic",
     name: "Classic",
@@ -338,9 +360,11 @@ export const templates: TemplateDefinition[] = [
   {
     id: "modern",
     name: "Modern",
-    // Has a 2fr/1fr two-column body (modern.tsx:154) — NOT ATS-Friendly-badged,
-    // whatever earlier notes claimed. Verified against the template source.
-    description: "Two-column layout with a refined accent section.",
+    // Has a 2fr/1fr two-column body (the grid in modern.tsx) — NOT
+    // ATS-Friendly-badged, whatever earlier notes claimed. The template draws
+    // no accent element: slate headings, emerald essentials chips, slate pills.
+    description:
+      "Two-column layout: experience cards on the left, education and skill pills on the right.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ModernThumb,
     Render: ModernTemplate,
@@ -349,7 +373,7 @@ export const templates: TemplateDefinition[] = [
     id: "executive",
     name: "Executive",
     description:
-      "Navy sidebar, two-column. Best for direct email to a recruiter.",
+      "Left sidebar with stacked name, contact and skills; two-column. For senior profiles sent straight to a hiring manager.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: ExecutiveThumb,
     Render: ExecutiveTemplate,
@@ -357,7 +381,8 @@ export const templates: TemplateDefinition[] = [
   {
     id: "ats-clean",
     name: "ATS Clean",
-    description: "Single-column layout engineered for maximum ATS pass rate.",
+    description:
+      "Single-column, text-first layout built for applicant tracking systems.",
     badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ATSCleanThumb,
     Render: ATSCleanTemplate,
@@ -388,7 +413,7 @@ export const templates: TemplateDefinition[] = [
     id: "corp-sidebar",
     name: "Corporate",
     description:
-      "Right dark sidebar. Best for direct email to a recruiter.",
+      "Right-hand sidebar carries contact, visa and skills; the main column stays plain. Best emailed direct to a recruiter.",
     badges: [{ label: "Design-led", tone: "neutral" }],
     Thumbnail: CorpSidebarThumb,
     Render: CorpSidebarTemplate,
@@ -398,7 +423,10 @@ export const templates: TemplateDefinition[] = [
     name: "Onyx",
     description:
       "Charcoal sidebar with a bold profile photo — modern and confident.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "Design-led", tone: "neutral" },
+    ],
     Thumbnail: OnyxThumb,
     Render: OnyxTemplate,
   },
@@ -407,7 +435,10 @@ export const templates: TemplateDefinition[] = [
     name: "Sandstone",
     description:
       "Warm sidebar with a UAE personal-details panel and profile photo.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "Design-led", tone: "neutral" },
+    ],
     Thumbnail: SandstoneThumb,
     Render: SandstoneTemplate,
   },
@@ -429,7 +460,7 @@ export const templates: TemplateDefinition[] = [
     id: "professional",
     name: "Professional",
     description:
-      "Centered single-column with a clean headline strip. ATS-friendly.",
+      "Centered name, headline and contacts over full-width ruled sections. Conservative and recruiter-safe.",
     badges: [{ label: "ATS-Friendly", tone: "ats" }],
     Thumbnail: ProfessionalThumb,
     Render: ProfessionalTemplate,
@@ -439,7 +470,10 @@ export const templates: TemplateDefinition[] = [
     name: "Professional Photo",
     description:
       "The Professional layout with a profile photo — polished and recruiter-ready.",
-    badges: [{ label: "New", tone: "new" }],
+    badges: [
+      { label: "New", tone: "new" },
+      { label: "ATS-Friendly", tone: "ats" },
+    ],
     Thumbnail: ProfessionalPhotoThumb,
     Render: ProfessionalPhotoTemplate,
   },
