@@ -771,6 +771,66 @@ const PdfChips = ({
   );
 };
 
+/* ─── Ruled section heading (main columns) ───────────────── */
+/*
+ * Executive, Exec Split and Corporate draw small uppercase letter-spaced
+ * headings — in the accent on Executive / Exec Split, slate-800 on Corporate —
+ * over a hairline rule, but the PDF reused Classic's 9.4pt title-case slate
+ * heading on a slate-200 rule, so a custom accent coloured the preview and
+ * not the download (template audit 2026-10 defect 11). Each layout passes a
+ * variant transcribed from its live heading component; the caller decides the
+ * top margin (live Executive zeroes the first section, the other two do not).
+ */
+
+type HeadingVariant = {
+  fontSize: number;
+  color: string;
+  letterSpacing: number;
+  uppercase?: boolean;
+  textAlign?: "left" | "center";
+  /** Rule under the heading; none when omitted. */
+  ruleColor?: string;
+  ruleWidth?: number;
+  paddingBottom: number;
+  marginBottom: number;
+  marginTop: number;
+};
+
+const PdfHeading = ({
+  children,
+  v,
+  fonts,
+}: {
+  children: string;
+  v: HeadingVariant;
+  fonts: PdfFontPair;
+}) => (
+  <View
+    style={{
+      marginTop: v.marginTop,
+      marginBottom: v.marginBottom,
+      paddingBottom: v.paddingBottom,
+      ...(v.ruleColor
+        ? { borderBottomWidth: v.ruleWidth ?? 0.75, borderBottomColor: v.ruleColor }
+        : {}),
+    }}
+  >
+    <Text
+      style={{
+        fontSize: v.fontSize,
+        fontFamily: fonts.bold,
+        fontWeight: 700,
+        color: v.color,
+        letterSpacing: v.letterSpacing,
+        ...(v.uppercase ? { textTransform: "uppercase" } : {}),
+        ...(v.textAlign ? { textAlign: v.textAlign } : {}),
+      }}
+    >
+      {children}
+    </Text>
+  </View>
+);
+
 /* ═══════════════════════════════════════════════════════════
    CLASSIC PDF LAYOUT
    ═══════════════════════════════════════════════════════════ */
@@ -1122,6 +1182,26 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
     attestedUppercase: true,
     gap: pt(10),
   };
+  const firstMain = hasSummary
+    ? "summary"
+    : hasExperience
+      ? "experience"
+      : hasEducation
+        ? "education"
+        : hasProjects
+          ? "projects"
+          : null;
+  const mainHeading = (key: string): HeadingVariant => ({
+    fontSize: pt(10) * fs,
+    color: theme.accentText,
+    letterSpacing: 0.08 * pt(10) * fs,
+    uppercase: true,
+    ruleColor: theme.accentText,
+    ruleWidth: 0.75,
+    paddingBottom: pt(3),
+    marginBottom: pt(8),
+    marginTop: key === firstMain ? 0 : pt(20) * theme.spaceScale,
+  });
   const expVariant: ExperienceVariant = {
     roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
     dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
@@ -1349,20 +1429,16 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       <View style={{ flex: 1, paddingLeft: 20 * m }}>
         {/* Summary */}
         {hasSummary && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Summary</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>Summary</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {/* Experience */}
         {hasExperience && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Experience</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
             {experience.map((role, i) => (
               <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
@@ -1371,10 +1447,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
         {/* Education */}
         {hasEducation && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Education</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
             {education.map((edu, i) => (
               <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
@@ -1383,10 +1457,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
 
         {/* Projects */}
         {hasProjects && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Projects</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
@@ -2349,6 +2421,17 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
     attestedStyle: { fontSize: pt(9) * fs, color: GREEN_700 },
     gap: pt(8),
   };
+  const heading: HeadingVariant = {
+    fontSize: pt(9.5) * fs,
+    color: theme.accentText,
+    letterSpacing: 0.12 * pt(9.5) * fs,
+    uppercase: true,
+    ruleColor: "#CBD5E1",
+    ruleWidth: 0.75,
+    paddingBottom: pt(3),
+    marginBottom: pt(6),
+    marginTop: pt(16) * theme.spaceScale,
+  };
   const expVariant: ExperienceVariant = {
     roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
     dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
@@ -2503,9 +2586,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         <View style={{ flex: 1 }}>
           {hasExperience && (
             <View>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Experience</Text>
-              </View>
+              <PdfHeading fonts={fonts} v={heading}>Experience</PdfHeading>
               {experience.map((role, i) => (
                 <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
               ))}
@@ -2513,10 +2594,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasEducation && (
-            <View style={hasExperience ? s.section : undefined}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Education</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Education</PdfHeading>
               {education.map((edu, i) => (
                 <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
               ))}
@@ -2524,10 +2603,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasProjects && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Projects</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Projects</PdfHeading>
               {projects.map((project) => {
                 const showLink = shouldShowProjectLink(project.link);
                 return (
@@ -2562,9 +2639,7 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
         <View style={{ width: 140, flexShrink: 0 }}>
           {hasSummary && (
             <View>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Summary</Text>
-              </View>
+              <PdfHeading fonts={fonts} v={heading}>Summary</PdfHeading>
               <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
                 {data.personal.summary?.trim()}
               </Text>
@@ -2572,10 +2647,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasSkills && (
-            <View style={hasSummary ? s.section : undefined}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Skills</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Skills</PdfHeading>
               {/* 9.5px accentText on #F1F5F9, 1px #CBD5E1, radius 3, 1px 6px, gap 4px */}
               <PdfChips
                 items={data.skills.map((sk) => ({ value: sk.name }))}
@@ -2595,10 +2668,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasLanguages && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Languages</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Languages</PdfHeading>
               {data.languages.map((lang) => (
                 <Text
                   key={lang.id}
@@ -2616,10 +2687,8 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
           )}
 
           {hasCertifications && (
-            <View style={s.section}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Certifications</Text>
-              </View>
+            <View>
+              <PdfHeading fonts={fonts} v={heading}>Certifications</PdfHeading>
               {data.certifications.map((cert) => (
                 <View key={cert.id} style={{ marginBottom: 3 }}>
                   <Text
@@ -2733,6 +2802,17 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
     pillBorderColor: "#BBF7D0",
     gap: pt(8),
   };
+  const mainHeading = (_key: string): HeadingVariant => ({
+    fontSize: pt(10) * fs,
+    color: "#1E293B",
+    letterSpacing: 0.08 * pt(10) * fs,
+    uppercase: true,
+    ruleColor: "#E2E8F0",
+    ruleWidth: 0.75,
+    paddingBottom: pt(3),
+    marginBottom: pt(6),
+    marginTop: pt(18) * theme.spaceScale,
+  });
   const expVariant: ExperienceVariant = {
     roleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#0F172A" },
     dateStyle: { fontSize: pt(10) * fs, color: "#64748B" },
@@ -2788,18 +2868,14 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
 
         {hasSummary && (
           <View>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Summary</Text>
-            </View>
+            <PdfHeading fonts={fonts} v={mainHeading("summary")}>Summary</PdfHeading>
             <Text style={s.body}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
         {hasExperience && (
-          <View style={hasSummary ? s.section : undefined}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Experience</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
             {experience.map((role, i) => (
               <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
             ))}
@@ -2807,10 +2883,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {hasEducation && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Education</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("education")}>Education</PdfHeading>
             {education.map((edu, i) => (
               <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
             ))}
@@ -2818,10 +2892,8 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         )}
 
         {hasProjects && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Projects</Text>
-            </View>
+          <View>
+            <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
             {projects.map((project) => {
               const showLink = shouldShowProjectLink(project.link);
               return (

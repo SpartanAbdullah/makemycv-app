@@ -16,6 +16,30 @@ Format:
 
 ---
 
+## [2026-10-25 22:50] PDF parity 5/7: Executive, Exec Split and Corporate main-column headings match live
+
+**Goal:** Template audit 2026-10 defect 11 (medium, verified). The three layouts reused Classic's
+`s.sectionHeading` (9.4pt bold title-case slate-800 over a slate-200 rule) while their live templates draw
+small uppercase letter-spaced headings — in `theme.accentText` with an accent rule (Executive), in
+`accentText` over a #CBD5E1 rule (Exec Split), in #1E293B over a #E2E8F0 rule (Corporate). With a custom
+accent the preview showed coloured headings and the download showed slate.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `PdfHeading` primitive (`HeadingVariant`: size, colour,
+  letter-spacing, uppercase, optional rule colour/width, padding-bottom, margin-bottom, margin-top).
+  Executive defines `mainHeading(key)` from `executive.tsx` RightHeading (10px, 0.08em, accent rule, mt 0
+  for the first present section else 20px × sectionSpacing); Corporate from `MainHeading` (10px, #1E293B,
+  #E2E8F0 rule, mt 18px × sp on every heading — the live file has no first-section exception); Exec Split
+  one `heading` variant for both columns from `SectionHeading` (9.5px, 0.12em, #CBD5E1 rule, mt 16px × sp).
+  The `s.section` wrappers in those layouts are gone: the heading now owns the gap, as live.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): executive prints SUMMARY / EXPERIENCE / EDUCATION / PROJECTS, corp-sidebar
+  SUMMARY / EXPERIENCE / EDUCATION / PROJECTS, exec-split EXPERIENCE / EDUCATION / PROJECTS and SUMMARY /
+  SKILLS / LANGUAGES / CERTIFICATIONS, all uppercase; `s.sectionHeading` remains only in Classic (8 uses).
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- Onyx / Sandstone headings and the sidebar labels of all four sidebar layouts move to the density pass
+  (next entry) because their margins and the first-section rule are the defect there.
+**Suggested commit:** fix(pdf): Executive, Exec Split and Corporate headings take the live uppercase ruled style
+
 ## [2026-10-25 22:35] PDF parity 4/7: project links restored in Onyx, Sandstone, Professional; nested runs print regular
 
 **Goal:** Template audit 2026-10 defect 10 (medium, verified). The three 2026-10 layouts rendered only
