@@ -16,6 +16,35 @@ Format:
 
 ---
 
+## [2026-10-25 22:20] PDF parity 3/7: one chip primitive for skills and UAE essentials; ATS Clean keeps text
+
+**Goal:** Template audit 2026-10 defect 9 (medium, verified). The preview drew skills and the UAE-essentials
+strip as bordered pills (Exec Split, Corporate, Modern, Professional, Onyx, Sandstone, ATS Clean) while the
+PDF flattened most of them to one joined text line, so the download did not look like what the user
+approved. Decision per template: every design-led template gets real chips in the PDF; ATS Clean goes the
+other way — the " · " text line the PDF has always printed is the ATS-safer form, so its preview now draws
+the line too.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — new `PdfChips` primitive (`ChipItem` = value with an optional
+  leading label; `ChipVariant` = size, line-height, colour, fill, border, radius, padding, gap, label style).
+  Used for: Exec Split header essentials (opaque `mix()` fill/border, radius 999) and right-column skill
+  chips (accentText on #F1F5F9); Corporate sidebar skills (8% ink fill via `mix()`); Professional essentials
+  ("Label:" in #6B7280 on #F3F4F6 pills, centred); Modern essentials and skill pills (same look as before,
+  now through the primitive); Onyx and Sandstone skill pills (now at the live 10.5px / 1px / 2px 9px / gap 6px
+  instead of the earlier 8pt / 0.5pt approximation). ATS Clean's skills line takes the live 1.55 line-height.
+- edited: `lib/templates/ats-clean.tsx` — `renderSkillChips` → `renderSkillLine`: a " · "-separated
+  paragraph (11.5px, #374151, lh 1.55) replaces the bordered chips, matching the PDF. Comment records why.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): skill names and "Visa … Nationality …" present in exec-split, corp-sidebar,
+  professional, onyx, sandstone and modern; ats-clean prints "JavaScript · PostgreSQL · …".
+- No `rgba()` anywhere: all translucent-looking fills are pre-blended with `mix()`; the smoke source check
+  and the operator check (no neon green) pass. `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24.
+- The ATS Clean preview PNG in `artifacts/template-previews/` now shows chips the template no longer draws;
+  recapture with the rest when the Playwright pipeline is back.
+- Exec Split / Corporate / Modern essentials chips print the label without a colon ("Visa Employment visa"
+  in extraction) exactly as the live chips do; Professional and ATS Clean keep "Visa:".
+**Suggested commit:** fix(pdf): shared chip primitive for skills and UAE essentials; ATS Clean keeps the text line
+
 ## [2026-10-25 22:05] PDF parity 2/7: sidebar layouts print role + dates, then "Company · Location"
 
 **Goal:** Template audit 2026-10 defect 7 (medium, verified). Executive, Exec Split, Corporate, Onyx and

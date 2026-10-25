@@ -687,6 +687,84 @@ const EducationEntry = ({
   );
 };
 
+/* ─── Chips (skills and UAE essentials) ──────────────────── */
+/*
+ * Exec Split, Corporate, Modern, Professional, Onyx and Sandstone draw skills
+ * and/or the UAE-essentials strip as bordered pills; the PDF flattened most of
+ * them to one joined text line (template audit 2026-10 defect 9). One
+ * primitive, styled per layout from the live file. ATS Clean goes the other
+ * way: its text line is the ATS-safer form, so the preview now draws the line
+ * too (see lib/templates/ats-clean.tsx). An item with a `label` prints it as a
+ * leading run (essentials: "Visa" + "Employment visa").
+ */
+
+type ChipItem = { label?: string; value: string };
+
+type ChipVariant = {
+  fontSize: number;
+  lineHeight?: number;
+  color: string;
+  backgroundColor?: string;
+  /** Border is drawn only when a colour is given (0.75pt = the live 1px). */
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius: number;
+  paddingVertical: number;
+  paddingHorizontal: number;
+  gap: number;
+  letterSpacing?: number;
+  /** Merged over the value style for the leading label run. */
+  labelStyle?: Style;
+  /** Space between label and value (pt). */
+  labelGap?: number;
+};
+
+const PdfChips = ({
+  items,
+  v,
+  style,
+}: {
+  items: ChipItem[];
+  v: ChipVariant;
+  /** Extra style on the wrapping row (marginTop, justifyContent …). */
+  style?: Style;
+}) => {
+  if (items.length === 0) return null;
+  const text: Style = {
+    fontSize: v.fontSize,
+    color: v.color,
+    ...(v.lineHeight !== undefined ? { lineHeight: v.lineHeight } : {}),
+    ...(v.letterSpacing !== undefined ? { letterSpacing: v.letterSpacing } : {}),
+  };
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: v.gap, ...style }}>
+      {items.map((item, i) => (
+        <View
+          key={`${item.label ?? ""}|${item.value}|${i}`}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: v.backgroundColor,
+            ...(v.borderColor
+              ? { borderWidth: v.borderWidth ?? 0.75, borderColor: v.borderColor }
+              : {}),
+            borderRadius: v.borderRadius,
+            paddingVertical: v.paddingVertical,
+            paddingHorizontal: v.paddingHorizontal,
+          }}
+        >
+          {item.label ? (
+            <Text style={{ ...text, ...v.labelStyle, marginRight: v.labelGap ?? 3 }}>
+              {item.label}
+            </Text>
+          ) : null}
+          <Text style={text}>{item.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 /* ═══════════════════════════════════════════════════════════
    CLASSIC PDF LAYOUT
    ═══════════════════════════════════════════════════════════ */
@@ -1441,7 +1519,9 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         {generalSkills.length > 0 && (
           <View>
             <Text style={headingStyle("skills")}>Skills</Text>
-            <Text style={{ ...s.body, color: "#374151" }}>
+            {/* Text line, not chips, in both renderers — the ATS-safer form
+                (template audit 2026-10 defect 9); ats-clean.tsx matches. */}
+            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
               {generalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
@@ -1457,7 +1537,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
             >
               Technical Skills
             </Text>
-            <Text style={{ ...s.body, color: "#374151" }}>
+            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
               {technicalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
@@ -1931,55 +2011,31 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
               )}
             </View>
           )}
-          {essentialChips.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 4.5,
-                marginTop: 3,
-              }}
-            >
-              {essentialChips.map((chip) => (
-                <View
-                  key={chip.label}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 3,
-                    borderWidth: 0.75,
-                    borderColor: MODERN_EMERALD_200,
-                    backgroundColor: MODERN_EMERALD_50,
-                    borderRadius: 999,
-                    paddingHorizontal: 6,
-                    paddingVertical: 1.5,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 6.75 * fs,
-                      lineHeight: 1.375 * ls,
-                      ...bold,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.05 * 6.75 * fs,
-                      color: MODERN_EMERALD_700,
-                    }}
-                  >
-                    {chip.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 7.5 * fs,
-                      lineHeight: 1.375 * ls,
-                      color: SLATE_700,
-                    }}
-                  >
-                    {chip.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* rounded-full border-emerald-200 bg-emerald-50 px-2 py-0.5; label
+              9px semibold uppercase tracking-wider emerald-700, value 10px */}
+          <PdfChips
+            items={essentialChips}
+            v={{
+              fontSize: 7.5 * fs,
+              lineHeight: 1.375 * ls,
+              color: SLATE_700,
+              backgroundColor: MODERN_EMERALD_50,
+              borderColor: MODERN_EMERALD_200,
+              borderRadius: 999,
+              paddingVertical: 1.5,
+              paddingHorizontal: 6,
+              gap: 4.5,
+              labelStyle: {
+                fontSize: 6.75 * fs,
+                ...bold,
+                textTransform: "uppercase",
+                letterSpacing: 0.05 * 6.75 * fs,
+                color: MODERN_EMERALD_700,
+              },
+              labelGap: 3,
+            }}
+            style={{ marginTop: 3 }}
+          />
         </View>
         {showPhoto && data.personal.photo && (
           <Image
@@ -2204,31 +2260,20 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             <View style={gapFor(asideOrder, "skills")}>
               <ModernHeading style={heading}>Skills</ModernHeading>
               {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
+              <PdfChips
+                items={data.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: 9 * fs,
+                  lineHeight: (16 / 12) * ls,
+                  color: SLATE_900,
+                  backgroundColor: MODERN_SLATE_100,
+                  borderRadius: 999,
+                  paddingVertical: 3,
+                  paddingHorizontal: 9,
                   gap: 6,
-                  marginTop: 9,
                 }}
-              >
-                {data.skills.map((skill) => (
-                  <Text
-                    key={skill.id}
-                    style={{
-                      fontSize: 9 * fs,
-                      lineHeight: (16 / 12) * ls,
-                      color: SLATE_900,
-                      backgroundColor: MODERN_SLATE_100,
-                      borderRadius: 999,
-                      paddingHorizontal: 9,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    {skill.name}
-                  </Text>
-                ))}
-              </View>
+                style={{ marginTop: 9 }}
+              />
             </View>
           )}
         </View>
@@ -2408,46 +2453,26 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               ))}
             </View>
           )}
-          {essentialChips.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginTop: 5,
-              }}
-            >
-              {essentialChips.map((chip) => (
-                <View
-                  key={chip.label}
-                  style={{
-                    flexDirection: "row",
-                    backgroundColor: mix(theme.onAccent, theme.accent, 0.9),
-                    borderRadius: 8,
-                    paddingTop: 1,
-                    paddingBottom: 1,
-                    paddingLeft: 5,
-                    paddingRight: 6,
-                    marginRight: 4,
-                    marginBottom: 2,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 7 * theme.fontScale,
-                      color: onAccentMuted,
-                      fontFamily: fonts.bold, fontWeight: 700,
-                      marginRight: 3,
-                    }}
-                  >
-                    {chip.label}
-                  </Text>
-                  <Text style={{ fontSize: 7 * theme.fontScale, color: onAccentMuted }}>
-                    {chip.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* exec-split.tsx essentials: 9px pills, 10% ink fill + 18% ink
+              border (opaque via mix), radius 999, 2px 8px, gap 6px */}
+          <PdfChips
+            items={essentialChips}
+            v={{
+              fontSize: pt(9) * fs,
+              lineHeight: 1.5 * theme.lineScale,
+              color: onAccentMuted,
+              backgroundColor: mix(onAccent, theme.accent, 0.9),
+              borderColor: mix(onAccent, theme.accent, 0.82),
+              borderRadius: 999,
+              paddingVertical: pt(2),
+              paddingHorizontal: pt(8),
+              gap: pt(6),
+              letterSpacing: 0.02 * pt(9) * fs,
+              labelStyle: { fontFamily: fonts.bold, fontWeight: 700 },
+              labelGap: pt(4),
+            }}
+            style={{ marginTop: pt(8) }}
+          />
         </View>
         {showPhoto && data.personal.photo && (
           <Image
@@ -2545,9 +2570,21 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
               <View style={s.sectionHeadingWrap}>
                 <Text style={s.sectionHeading}>Skills</Text>
               </View>
-              <Text style={{ ...s.body, fontSize: 8 * theme.fontScale }}>
-                {data.skills.map((sk) => sk.name).join(", ")}
-              </Text>
+              {/* 9.5px accentText on #F1F5F9, 1px #CBD5E1, radius 3, 1px 6px, gap 4px */}
+              <PdfChips
+                items={data.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: pt(9.5) * fs,
+                  lineHeight: 1.5 * theme.lineScale,
+                  color: theme.accentText,
+                  backgroundColor: "#F1F5F9",
+                  borderColor: "#CBD5E1",
+                  borderRadius: pt(3),
+                  paddingVertical: pt(1),
+                  paddingHorizontal: pt(6),
+                  gap: pt(4),
+                }}
+              />
             </View>
           )}
 
@@ -2925,15 +2962,19 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
         {hasSkills && (
           <View>
             <Text style={{ ...s.execSideLabel, color: onAccentMuted }}>SKILLS</Text>
-            <Text
-              style={{
-                fontSize: 7.5 * theme.fontScale,
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(9) * fs,
+                lineHeight: 1.5 * theme.lineScale,
                 color: onAccentMuted,
-                lineHeight: 1.6 * theme.lineScale,
+                backgroundColor: mix(onAccent, theme.accent, 0.92),
+                borderRadius: pt(3),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(6),
+                gap: pt(3),
               }}
-            >
-              {data.skills.map((sk) => sk.name).join(", ")}
-            </Text>
+            />
           </View>
         )}
 
@@ -3152,11 +3193,22 @@ const ProfessionalPDFLayout = ({
             {contactBits.join("   •   ")}
           </Text>
         ) : null}
-        {essentialChips.length > 0 ? (
-          <Text style={{ fontSize: 7.5 * theme.fontScale, color: SLATE_600, marginTop: 3, textAlign: "center" }}>
-            {essentialChips.map((c) => `${c.label}: ${c.value}`).join("   ·   ")}
-          </Text>
-        ) : null}
+        <PdfChips
+          items={essentialChips.map((c) => ({ label: `${c.label}:`, value: c.value }))}
+          v={{
+            fontSize: pt(9.5) * theme.fontScale,
+            color: "#374151",
+            backgroundColor: "#F3F4F6",
+            borderColor: "#E5E7EB",
+            borderRadius: 999,
+            paddingVertical: pt(2),
+            paddingHorizontal: pt(9),
+            gap: pt(6),
+            labelStyle: { color: "#6B7280" },
+            labelGap: 2,
+          }}
+          style={{ marginTop: pt(8), alignSelf: "stretch", justifyContent: "center" }}
+        />
       </View>
 
       {hasSummary && (
@@ -3506,25 +3558,19 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasSkills && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              {data.skills.map((skill) => (
-                <Text
-                  key={skill.id}
-                  style={{
-                    fontSize: 8 * theme.fontScale,
-                    color: "#374151",
-                    backgroundColor: "#F3F4F6",
-                    borderWidth: 0.5,
-                    borderColor: "#E5E7EB",
-                    borderRadius: 3,
-                    paddingVertical: 1.5,
-                    paddingHorizontal: 5,
-                  }}
-                >
-                  {skill.name}
-                </Text>
-              ))}
-            </View>
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(10.5) * fs,
+                color: "#374151",
+                backgroundColor: "#F3F4F6",
+                borderColor: "#E5E7EB",
+                borderRadius: pt(4),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(9),
+                gap: pt(6),
+              }}
+            />
           </View>
         )}
 
@@ -3783,25 +3829,19 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasSkills && (
           <View>
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</OnyxHeading>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              {data.skills.map((skill) => (
-                <Text
-                  key={skill.id}
-                  style={{
-                    fontSize: 8 * theme.fontScale,
-                    color: "#44403C",
-                    backgroundColor: "#F5F0E6",
-                    borderWidth: 0.5,
-                    borderColor: "#E2D8C4",
-                    borderRadius: 3,
-                    paddingVertical: 1.5,
-                    paddingHorizontal: 5,
-                  }}
-                >
-                  {skill.name}
-                </Text>
-              ))}
-            </View>
+            <PdfChips
+              items={data.skills.map((sk) => ({ value: sk.name }))}
+              v={{
+                fontSize: pt(10.5) * fs,
+                color: "#44403C",
+                backgroundColor: "#F5F0E6",
+                borderColor: "#E2D8C4",
+                borderRadius: pt(4),
+                paddingVertical: pt(2),
+                paddingHorizontal: pt(9),
+                gap: pt(6),
+              }}
+            />
           </View>
         )}
 

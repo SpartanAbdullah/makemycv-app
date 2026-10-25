@@ -176,33 +176,20 @@ export const ATSCleanTemplate = ({
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
-  const renderSkillChips = (list: typeof data.skills) => (
-    <div
+  // One " · "-separated text line, not bordered chips: the plainer form is
+  // the ATS-safer one and it is what the PDF has always printed, so the
+  // preview now matches the download (template audit 2026-10 defect 9).
+  const renderSkillLine = (list: typeof data.skills) => (
+    <p
       style={{
-        display: "flex",
-        flexWrap: "wrap" as const,
-        gap: "6px",
+        fontSize: `${11.5 * theme.fontScale}px`,
+        color: "#374151",
+        lineHeight: 1.55 * theme.lineScale,
+        margin: 0,
       }}
     >
-      {list.map((skill) => (
-        <span
-          key={skill.id}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            fontSize: `${10.5 * theme.fontScale}px`,
-            color: "#111827",
-            border: "1px solid #D1D5DB",
-            borderRadius: "4px",
-            padding: "2px 8px",
-            backgroundColor: "#F9FAFB",
-            lineHeight: 1.5 * theme.lineScale,
-          }}
-        >
-          {skill.name}
-        </span>
-      ))}
-    </div>
+      {list.map((skill) => skill.name).join(" \u00B7 ")}
+    </p>
   );
   const skillsSection = hasSkills ? (
     <>
@@ -215,7 +202,7 @@ export const ATSCleanTemplate = ({
           >
             Skills
           </SectionHeading>
-          {renderSkillChips(generalSkills)}
+          {renderSkillLine(generalSkills)}
         </section>
       )}
       {technicalSkills.length > 0 && (
@@ -227,7 +214,7 @@ export const ATSCleanTemplate = ({
           >
             Technical Skills
           </SectionHeading>
-          {renderSkillChips(technicalSkills)}
+          {renderSkillLine(technicalSkills)}
         </section>
       )}
     </>
