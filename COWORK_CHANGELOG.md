@@ -16,6 +16,30 @@ Format:
 
 ---
 
+## [2026-10-25 22:35] PDF parity 4/7: project links restored in Onyx, Sandstone, Professional; nested runs print regular
+
+**Goal:** Template audit 2026-10 defect 10 (medium, verified). The three 2026-10 layouts rendered only
+`project.name` + bullets and silently dropped the link the preview shows, so a candidate's portfolio /
+GitHub URL never reached the file they submit. While wiring the link run I found that a `<Text>` nested
+inside the bold title inherits the parent's font in react-pdf, so Classic's and Professional's "| Company"
+and "| School" runs (and the old project-link runs) were printing bold although the preview shows them
+normal — fixed at the style level.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — Onyx / Sandstone: `<Link src={normalizeHref(link)}>` with
+  `shortenDisplayUrl(link)` in the accent (10px normal, after the name) when `shouldShowProjectLink`;
+  Professional / Professional Photo: same in slate-500 at 10.5px. `entryCompany` now carries the regular
+  face explicitly and `buildStyles` pins `fontWeight: 400` on every regular-face style, so a regular run
+  inside a bold run stays regular with Helvetica and with the embedded Inter / Bricolage.
+**Notes / risks / follow-up:**
+- Evidence (pdf.js extraction): onyx / sandstone / professional / professional-photo print
+  "Hisaab usehisaab.com" and "Long Link Stress Test github.com/abdullah"; classic's "| Interior360 General
+  Trading LLC" and "| Virtual University of Pakistan" runs now use the regular font object (same object as
+  body text), where before they shared the bold title's.
+- `npx tsc --noEmit` clean, `npm run smoke:pdf` 24/24 + ops check green.
+- The live Onyx / Sandstone / Professional project URL is a plain `<span>` (not an `<a>`); the PDF link is
+  clickable. Left as is — the preview is not the deliverable.
+**Suggested commit:** fix(pdf): project links in Onyx, Sandstone and Professional; nested runs print regular
+
 ## [2026-10-25 22:20] PDF parity 3/7: one chip primitive for skills and UAE essentials; ATS Clean keeps text
 
 **Goal:** Template audit 2026-10 defect 9 (medium, verified). The preview drew skills and the UAE-essentials

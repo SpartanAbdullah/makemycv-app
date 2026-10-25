@@ -202,6 +202,9 @@ const BASE_STYLES: Record<string, Style> = {
   },
   entryCompany: {
     fontSize: 9,
+    // Explicit regular face: this style is used as a run INSIDE the bold
+    // entryTitle, and nested Text inherits the parent's font otherwise.
+    fontFamily: "Helvetica",
     color: SLATE_700,
   },
   entryDate: {
@@ -391,7 +394,10 @@ const buildStyles = (
     // BASE_STYLES is written against the Helvetica pair; swap in the user's
     // CV face (Inter / Bricolage / Instrument Serif) once registered — see
     // lib/pdf/fonts.ts. Custom families select weight via fontWeight.
-    if (v.fontFamily === "Helvetica") v.fontFamily = fonts.regular;
+    if (v.fontFamily === "Helvetica") {
+      v.fontFamily = fonts.regular;
+      v.fontWeight = 400;
+    }
     if (v.fontFamily === "Helvetica-Bold") {
       v.fontFamily = fonts.bold;
       v.fontWeight = 700;
@@ -3292,7 +3298,23 @@ const ProfessionalPDFLayout = ({
           <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
           {projects.map((project) => (
             <View key={project.id} style={s.entryBlock} wrap={false}>
-              <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+              <Text style={s.entryTitle}>
+                {project.name?.trim() || "Project"}
+                {shouldShowProjectLink(project.link) ? (
+                  // Live: 10.5px normal slate-500, 4px after the name.
+                  <Link
+                    src={normalizeHref(project.link)}
+                    style={{
+                      ...s.entryCompany,
+                      fontSize: pt(10.5) * theme.fontScale,
+                      color: SLATE_500,
+                      textDecoration: "none",
+                    }}
+                  >
+                    {` ${shortenDisplayUrl(project.link!.trim())}`}
+                  </Link>
+                ) : null}
+              </Text>
               <BulletList bullets={project.bullets ?? []} s={s} />
             </View>
           ))}
@@ -3593,7 +3615,24 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {shouldShowProjectLink(project.link) ? (
+                    // Live: 10px normal in the accent, 6px after the name.
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{
+                        fontSize: pt(10) * fs,
+                        fontFamily: fonts.regular,
+                        fontWeight: 400,
+                        color: accentText,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {`  ${shortenDisplayUrl(project.link!.trim())}`}
+                    </Link>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             ))}
@@ -3864,7 +3903,24 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
             <OnyxHeading fonts={fonts} accent={accentText} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</OnyxHeading>
             {projects.map((project) => (
               <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>{project.name?.trim() || "Project"}</Text>
+                <Text style={s.entryTitle}>
+                  {project.name?.trim() || "Project"}
+                  {shouldShowProjectLink(project.link) ? (
+                    // Live: 10px normal in the accent, 6px after the name.
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{
+                        fontSize: pt(10) * fs,
+                        fontFamily: fonts.regular,
+                        fontWeight: 400,
+                        color: accentText,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {`  ${shortenDisplayUrl(project.link!.trim())}`}
+                    </Link>
+                  ) : null}
+                </Text>
                 <BulletList bullets={project.bullets ?? []} s={s} />
               </View>
             ))}
