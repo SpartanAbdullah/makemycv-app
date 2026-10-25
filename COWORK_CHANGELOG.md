@@ -16,6 +16,58 @@ Format:
 
 ---
 
+## [2026-10-24 22:30] Templates: Gulf Standard and Banner added (11th and 12th)
+
+**Goal:** Founder ask 2026-10-24: review every template and add at least two popular ones. The audit
+(`docs/template-audit-2026-10.md`) researched what UAE job seekers actually use through three lenses
+and shortlisted four candidates; founder picked the two recommended ones. Built by two subagents in
+parallel worktrees against the corrected PDF primitives (same-day fix PR), merged here.
+**Files:**
+- created: `lib/templates/gulf-standard.tsx` — the traditional UAE/Gulf expat CV: single column,
+  passport-ratio photo top-right as an in-flow flex sibling (no reserved gutter when hidden), a
+  labelled two-column PERSONAL DETAILS grid under the header (Nationality, Date of birth, Visa status,
+  Availability, Driving licence, Languages — each row a flex row of bold label + value so extractors
+  keep them together; collapses to one column with ≤2 rows), then Profile, Core Skills (text lines,
+  no chips), Work Experience, Education (degree · field only when the degree text does not already
+  contain it; "Attested — body" only with a body), Certifications, Projects. Accent only on headline,
+  headings and rules; fallback accent navy `#1E3A5F`. Exports `gulfDetailRows` / `gulfDetailColumns`
+  / `gulfDegreeTitle` so the PDF prints identical label/value pairs.
+- created: `lib/templates/banner.tsx` — full-width accent header band (page 1 only) with a large
+  square portrait and name / headline / contact row in onAccent ink, an essentials strip on
+  `accentSoft` under it, then a single-column body: Profile, Work Experience, Skills, Languages,
+  Certifications, Education, Projects. Band bleed is done with an unpadded `.cv-print` root and
+  re-added body padding (robust against the print block's `padding: 0 !important`). Exports
+  `bannerEssentials` / `bannerContactItems` / `bannerEducationTitle` for the PDF.
+- edited: `components/pdf/CVDocument.tsx` — `GulfStandardPDFLayout` and `BannerPDFLayout` mirroring
+  the live renders section by section (px × 0.75, all density scales, no alpha colours, own
+  heading/experience/education blocks). Both in the `SINGLE_COLUMN` padding set. Sections are
+  fragments with `minPresenceAhead` on headings because react-pdf ignores it on a first child, which
+  orphaned a heading at a page foot in testing.
+- edited: `lib/templates/index.tsx` — registry entries (Gulf Standard after ATS Clean, Banner after
+  Sandstone), both badged New + ATS-Friendly (single column, in-flow photo, text-only chips), and
+  hand-drawn thumbnails.
+- edited: `lib/data/preview-profiles.ts` — personas `rashidGulf` (Rashida Khan, Senior Procurement
+  Officer, Pakistani, Dubai; renamed from Rashid because the shared headshot is a woman) and
+  `nadiaHospitality` (Nadia Haddad, Guest Relations Executive, Lebanese); registered with photo.
+- edited: `scripts/capture-previews.js`, `scripts/pdf-smoke.tsx` — ids added (both photo-forward).
+- added: `artifacts/template-previews/{gulf-standard,banner}[-nophoto]-preview.png`.
+- edited: `ROADMAP.md` (12 shipped), `CLAUDE.md` (template count).
+**Notes / risks / follow-up:**
+- `scripts/capture-previews.js` cannot launch on this machine: playwright-core 1.61.1 wants
+  `chromium_headless_shell-1228` and only build 1234 is in the cache. The PNGs were captured with an
+  equivalent direct-Playwright script through the system Chrome channel (same viewport, scale and
+  readiness waits). `npx playwright install chromium` restores the pipeline.
+- Builder default `photoShape` is "round", so a user who picks Gulf Standard gets a circle until they
+  choose Square; the passport frame that defines the template needs "square". Consider a per-template
+  default photo shape (small store/registry change).
+- DOCX export is template-agnostic and untouched: no band, no two-column details block. Gulf
+  Standard's DOCX therefore prints the essentials the generic way.
+- The line-based ATS extractor sees two label/value pairs per line in Gulf Standard's two-column
+  details grid; each label is still immediately followed by its own value.
+- Marketing site: pages + images land in makemycv-site (`content/templates/{gulf-standard,banner}.mdx`,
+  `public/templates/*`, new `scripts/import-template-previews.mjs`), on `staging`.
+**Suggested commit:** feat(templates): add Gulf Standard and Banner
+
 ## [2026-10-24 21:40] PDF export: six verified download defects fixed, operator-level smoke checks
 
 **Goal:** The 2026-10-24 template audit (`docs/template-audit-2026-10.md`, 56 prioritised defects from

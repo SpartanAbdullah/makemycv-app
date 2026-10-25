@@ -436,6 +436,123 @@ const aishaGraduate: CvData = {
 };
 
 /**
+ * banner — hospitality persona (Guest Relations Executive, five-star Dubai
+ * hotel). Hospitality is where a photo-led, colour-branded CV is the norm and
+ * CVs go straight to hotel HR by email, so the persona carries the full UAE
+ * essentials set, three languages and two certifications. photoShape is
+ * "square" so the capture shows Banner's signature square portrait (the
+ * store default "round" renders a circle instead).
+ */
+const nadiaHospitality: CvData = {
+  personal: {
+    firstName: "Nadia",
+    lastName: "Haddad",
+    headline: "Guest Relations Executive",
+    email: "nadia.haddad@email.ae",
+    phone: "+971 52 3XX XXXX",
+    location: "Dubai, UAE",
+    website: "",
+    linkedin: "linkedin.com/in/nadia-haddad-dxb",
+    summary:
+      "Guest Relations Executive with 7 years in five-star Dubai hotels, " +
+      "looking after VIP arrivals, loyalty members and long-stay guests. " +
+      "Known for turning complaints into return bookings and for coaching " +
+      "front-office teams on service standards. Trilingual in Arabic, English " +
+      "and French.",
+    nationality: "Lebanese",
+    visaStatus: "UAE Residence Visa",
+    availability: "1 month notice",
+    drivingLicense: "UAE Light Vehicle",
+  },
+  experience: [
+    {
+      id: "nadia-exp-1",
+      company: "Address Downtown",
+      role: "Guest Relations Executive",
+      location: "Dubai, UAE",
+      startDate: "2022-03",
+      endDate: "",
+      isCurrent: true,
+      bullets: [
+        "Own the VIP and suite-guest journey for a 220-key luxury hotel, from pre-arrival preferences to farewell follow-up",
+        "Lifted the hotel's guest-satisfaction score from 86 to 93 in 18 months by rebuilding the complaint-recovery routine",
+        "Coordinate daily with housekeeping, F&B and concierge on 40+ arrivals a day during peak season",
+        "Train new front-office colleagues on brand standards and the loyalty programme; 12 onboarded to date",
+      ],
+    },
+    {
+      id: "nadia-exp-2",
+      company: "Atlantis The Palm",
+      role: "Front Office Agent",
+      location: "Dubai, UAE",
+      startDate: "2019-06",
+      endDate: "2022-02",
+      isCurrent: false,
+      bullets: [
+        "Handled check-in, check-out and cashiering for up to 300 guests a shift in a 1,500-room resort",
+        "Upsold room categories and experiences worth AED 1.2M over three years",
+        "Served as Arabic- and French-speaking point of contact for GCC and European tour groups",
+      ],
+    },
+    {
+      id: "nadia-exp-3",
+      company: "Rotana Hotels",
+      role: "Guest Service Trainee",
+      location: "Abu Dhabi, UAE",
+      startDate: "2018-07",
+      endDate: "2019-05",
+      isCurrent: false,
+      bullets: [
+        "Rotated through reception, concierge and guest relations in a 400-room city hotel",
+        "Maintained guest-profile data in Opera and prepared daily arrivals reports for the duty manager",
+      ],
+    },
+  ],
+  education: [
+    {
+      id: "nadia-edu-1",
+      school: "Lebanese American University",
+      degree: "BA Hospitality & Tourism Management",
+      // Same text as the degree: Banner drops a field the degree already names.
+      field: "Hospitality & Tourism Management",
+      startDate: "2014",
+      endDate: "2018",
+    },
+  ],
+  skills: [
+    { id: "nadia-sk-1", name: "Guest Relations" },
+    { id: "nadia-sk-2", name: "VIP & Loyalty Handling" },
+    { id: "nadia-sk-3", name: "Complaint Resolution" },
+    { id: "nadia-sk-4", name: "Upselling" },
+    { id: "nadia-sk-5", name: "Team Coaching" },
+    { id: "nadia-sk-6", name: "Opera Cloud PMS", category: "technical" },
+    { id: "nadia-sk-7", name: "Microsoft Office", category: "technical" },
+    { id: "nadia-sk-8", name: "TrustYou", category: "technical" },
+  ],
+  languages: [
+    { id: "nadia-lang-1", name: "Arabic", level: "native" },
+    { id: "nadia-lang-2", name: "English", level: "full_professional" },
+    { id: "nadia-lang-3", name: "French", level: "professional" },
+  ],
+  certifications: [
+    {
+      id: "nadia-cert-1",
+      name: "Certified Guest Service Professional (CGSP)",
+      issuer: "AHLEI",
+      date: "2021",
+    },
+    {
+      id: "nadia-cert-2",
+      name: "First Aid & CPR Certificate",
+      issuer: "Dubai Corporation for Ambulance Services",
+      date: "2024",
+    },
+  ],
+  projects: [],
+  settings: { ...baseSettings("banner"), photoShape: "square" },
+};
+
+/**
  * Generic flat-style avatar for photo-forward templates (professional-photo,
  * onyx, sandstone). A neutral bust silhouette in warm greys on a light
  * background — deliberately NOT a real person's photo, embedded as an SVG
@@ -485,12 +602,137 @@ const forTemplate = (
   settings: { ...base.settings, templateId, accentColor },
 });
 
+/**
+ * gulf-standard — mid-career expat persona for the traditional Gulf CV
+ * (template audit 2026-10, shortlist item 1): a Pakistani Senior Procurement
+ * Officer in Dubai construction with every Personal Details row populated
+ * (nationality, date of birth, visa status, availability, driving licence,
+ * two languages), a degree whose field is NOT repeated inside the degree
+ * text (exercises the de-dup rule), an attested degree, three roles and two
+ * certifications. Square photo so the capture shows the passport frame that
+ * defines the template.
+ */
+const rashidGulf: CvData = {
+  personal: {
+    firstName: "Rashida",
+    lastName: "Khan",
+    headline: "Senior Procurement Officer — Construction",
+    email: "rashida.khan@email.ae",
+    phone: "+971 52 3XX XXXX",
+    location: "Dubai, UAE",
+    website: "",
+    linkedin: "linkedin.com/in/rashida-khan-procurement",
+    summary:
+      "Senior procurement officer with 14 years in construction supply chains, " +
+      "12 of them in the UAE, buying for high-rise, infrastructure and fit-out " +
+      "projects worth AED 180M a year. Runs tendering, subcontract negotiation " +
+      "and vendor pre-qualification end to end, with a record of saving 9% " +
+      "against budget and halving purchase-order cycle times on Oracle Fusion.",
+    nationality: "Pakistani",
+    dateOfBirth: "14 March 1988",
+    drivingLicense: "Light Vehicle",
+    visaStatus: "Employment visa",
+    availability: "30 days notice",
+  },
+  experience: [
+    {
+      id: "rashid-exp-1",
+      company: "ALEC Engineering & Contracting",
+      role: "Senior Procurement Officer",
+      location: "Dubai, UAE",
+      startDate: "2019-05",
+      endDate: "",
+      isCurrent: true,
+      bullets: [
+        "Manage AED 180M of annual procurement across MEP, facade and fit-out packages for three high-rise projects",
+        "Negotiated framework agreements with 40+ subcontractors and suppliers, saving 9% against tender budgets",
+        "Cut average purchase-order cycle time from 12 to 6 days by moving approvals onto the Oracle Fusion workflow",
+        "Lead a team of 4 buyers; own vendor pre-qualification and quarterly supplier performance scorecards",
+      ],
+    },
+    {
+      id: "rashid-exp-2",
+      company: "Khansaheb Civil Engineering",
+      role: "Procurement Officer",
+      location: "Dubai, UAE",
+      startDate: "2014-09",
+      endDate: "2019-04",
+      isCurrent: false,
+      bullets: [
+        "Sourced civil and structural materials for 6 residential and infrastructure projects worth AED 400M combined",
+        "Built a 300-vendor approved supplier list with documented quality and HSE pre-qualification",
+        "Reconciled site deliveries against purchase orders and invoices, cutting payment disputes by a third",
+      ],
+    },
+    {
+      id: "rashid-exp-3",
+      company: "Descon Engineering",
+      role: "Assistant Buyer",
+      location: "Lahore, Pakistan",
+      startDate: "2010-08",
+      endDate: "2014-07",
+      isCurrent: false,
+      bullets: [
+        "Processed 120+ purchase orders a month for structural steel and fabrication consumables",
+        "Maintained price histories and lead-time records that fed the annual sourcing plan",
+      ],
+    },
+  ],
+  education: [
+    {
+      id: "rashid-edu-1",
+      school: "University of the Punjab",
+      degree: "Bachelor of Business Administration",
+      field: "Supply Chain Management",
+      startDate: "2006",
+      endDate: "2010",
+      attested: true,
+      attestingBody: "UAE Ministry of Foreign Affairs (MOFA)",
+    },
+  ],
+  skills: [
+    { id: "rashid-sk-1", name: "Strategic Sourcing" },
+    { id: "rashid-sk-2", name: "Contract Negotiation" },
+    { id: "rashid-sk-3", name: "Vendor Management" },
+    { id: "rashid-sk-4", name: "Tender Evaluation" },
+    { id: "rashid-sk-5", name: "Cost Control" },
+    { id: "rashid-sk-6", name: "FIDIC Subcontracts" },
+    { id: "rashid-sk-7", name: "Oracle Fusion Procurement", category: "technical" },
+    { id: "rashid-sk-8", name: "SAP MM", category: "technical" },
+    { id: "rashid-sk-9", name: "Aconex", category: "technical" },
+    { id: "rashid-sk-10", name: "Advanced Excel", category: "technical" },
+  ],
+  languages: [
+    { id: "rashid-lang-1", name: "English", level: "full_professional" },
+    { id: "rashid-lang-2", name: "Urdu", level: "native" },
+  ],
+  certifications: [
+    {
+      id: "rashid-cert-1",
+      name: "CIPS Level 4 Diploma in Procurement and Supply",
+      issuer: "Chartered Institute of Procurement & Supply",
+      date: "2018",
+    },
+    {
+      id: "rashid-cert-2",
+      name: "Certified Professional in Supply Management (CPSM)",
+      issuer: "Institute for Supply Management",
+      date: "2022",
+    },
+  ],
+  projects: [],
+  settings: { ...baseSettings("gulf-standard", "#1E3A5F"), photoShape: "square" },
+};
+
 /** Profiles keyed by the template id they are designed for. */
 export const previewProfiles: Record<string, CvData> = {
   classic: omarClassic,
   modern: saraModern,
   executive: laylaExecutive,
   "ats-clean": aishaGraduate,
+  "gulf-standard": forTemplate(rashidGulf, "gulf-standard", "#1E3A5F", {
+    withPhoto: true,
+  }),
   // Derived variants — persona chosen to fit each template's positioning:
   // navy/charcoal executive layouts get Layla (COO), corporate single/sidebar
   // layouts get Omar (finance), warm/photo-forward layouts get Sara
@@ -499,6 +741,9 @@ export const previewProfiles: Record<string, CvData> = {
   "corp-sidebar": forTemplate(omarClassic, "corp-sidebar", "#0F172A"),
   onyx: forTemplate(laylaExecutive, "onyx", "#262626", { withPhoto: true }),
   sandstone: forTemplate(saraModern, "sandstone", "#ECE3D2", {
+    withPhoto: true,
+  }),
+  banner: forTemplate(nadiaHospitality, "banner", "#1e5b54", {
     withPhoto: true,
   }),
   professional: forTemplate(omarClassic, "professional", "#1f2937"),

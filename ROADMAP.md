@@ -47,7 +47,7 @@ These cannot start until auth exists; auth itself is unscheduled.
 
 ## 📚 Long-term strategic backlog
 
-- [ ] 11th CV template (10 shipped)
+- [x] 2026-10-24 — 11th and 12th CV templates: Gulf Standard (UAE format: labelled personal details, passport photo) and Banner (accent header band, photo, single column); 12 shipped
 - [ ] Arabic / RTL support for UAE-market CVs
 
 ---

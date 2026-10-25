@@ -160,7 +160,7 @@ subscription, because the 500ms debounce is long enough to lose the race.
 
 ## Templates read `cv.skills` directly
 
-Nine templates under `lib/templates/`, plus `components/pdf/CVDocument.tsx` and
+Twelve templates under `lib/templates/`, plus `components/pdf/CVDocument.tsx` and
 the DOCX export, read `cv.skills` **directly** — only a few go through
 `splitSkills()`.
 
