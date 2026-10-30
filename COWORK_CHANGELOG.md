@@ -16,6 +16,27 @@ Format:
 
 ---
 
+## [2026-10-31 03:10] Funnel events template_selected / cv_export_started / cv_preview_viewed / cv_section_completed; PARAM_KEYS covers every pushed key
+
+**Goal:** GA4 code audit 2026-10-31 (docs/ai-mission/GA4_AUDIT.md in the parent folder). The builder funnel
+had `builder_start` → `builder_step` → `cv_export` and nothing in between, so template choice, preview
+engagement, section completion and failed exports were invisible. Separately, `track()` reset only the
+nine container-v4 keys while the app pushes twelve more (`step_id`, `file_type`, `outcome`, …), so a
+value from one event could ride along on the next.
+**Files:**
+- edited: `lib/analytics.ts` — `PARAM_KEYS` extended to the full key union pushed by either surface
+  (mirrors the same change in `makemycv-site/lib/analytics.ts`).
+- edited: `components/builder/BuilderShell.tsx` — `template_selected` (effect on
+  `data.settings.templateId` after hydration; baseline value is not a selection), `cv_preview_viewed`
+  (once per session per surface: fullscreen overlay, mobile Preview toggle), `cv_export_started`
+  (before the export await; JSON backups excluded like `cv_export`), `cv_section_completed` (inside the
+  existing incomplete→complete effect, once per session via `trackOncePerSession`).
+**Notes / risks / follow-up:** nothing reaches GA4 until the owner publishes Custom Event triggers + GA4
+tags for the four names in GTM-5H2LMVJT and registers `step_id` as an event-scoped dimension
+(docs/ai-mission/BLOCKERS.md B07). No PII: params are template ids, formats, surfaces and step ids.
+tsc, lint (11/11) and `npm test` (191 assertions) pass.
+**Suggested commit:** feat(analytics): template_selected, cv_export_started, cv_preview_viewed, cv_section_completed; reset every dataLayer key
+
 ## [2026-10-26 00:10] Chronicle and Harvard degree titles use the shared educationTitle
 
 **Goal:** Follow-up agreed with the Chronicle/Harvard session: their templates landed before the shared

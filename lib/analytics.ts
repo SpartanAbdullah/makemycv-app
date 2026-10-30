@@ -54,7 +54,14 @@ export function track(
  * data layer model and the GA4 tag omits the parameter. Add a key here when
  * a new DLV is created in the container.
  */
-const PARAM_KEYS = ["stars", "surface", "consent", "source", "rail", "context", "method", "format", "template"] as const;
+const PARAM_KEYS = [
+  // container v4 Data Layer Variables (2026-10-24)
+  "stars", "surface", "consent", "source", "rail", "context", "method", "format", "template",
+  // every other key either surface pushes (2026-10-31 audit) — reset too, so a
+  // value from one event can never ride along on the next
+  "step_number", "step_id", "file_type", "error_reason", "merge_mode", "sections_filled",
+  "outcome", "with_job_text", "placeholders", "cta_location", "template_id", "cups",
+] as const;
 const PARAM_RESET: Record<(typeof PARAM_KEYS)[number], undefined> = Object.fromEntries(
   PARAM_KEYS.map((k) => [k, undefined]),
 ) as Record<(typeof PARAM_KEYS)[number], undefined>;

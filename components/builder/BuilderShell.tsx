@@ -852,6 +852,36 @@ export const BuilderShell = ({
     trackOncePerSession("mmcv_evt_builder_start", "builder_start");
   }, [data, hydrated]);
 
+  // template_selected: every change of template after hydration, whichever
+  // surface made it (Review gallery, preview modal, drawer chevrons, import).
+  // The first post-hydration value is the baseline, not a selection.
+  const templateBaselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    const id = data.settings.templateId ?? "classic";
+    if (templateBaselineRef.current === null) {
+      templateBaselineRef.current = id;
+      return;
+    }
+    if (id === templateBaselineRef.current) return;
+    templateBaselineRef.current = id;
+    track("template_selected", { template: id });
+  }, [data.settings.templateId, hydrated]);
+
+  // cv_preview_viewed: once per session per surface — the fullscreen overlay
+  // on desktop, the Preview toggle on mobile. The always-visible desktop
+  // column is not a deliberate view and is not counted.
+  useEffect(() => {
+    if (previewOpen) {
+      trackOncePerSession("mmcv_evt_preview_fullscreen", "cv_preview_viewed", { surface: "fullscreen" });
+    }
+  }, [previewOpen]);
+  useEffect(() => {
+    if (mobileView === "preview") {
+      trackOncePerSession("mmcv_evt_preview_mobile", "cv_preview_viewed", { surface: "mobile" });
+    }
+  }, [mobileView]);
+
   // No step is ever "locked" any more (audit UX-1/UX-2): the old gating made
   // skipped steps unreachable except by walking Back N times. Beads show
   // honest state and navigate freely. Guided-feedback layering (2026-06):
@@ -922,6 +952,11 @@ export const BuilderShell = ({
     for (const step of builderSteps) {
       if (step.id === "review") continue; // derived — would be noise
       if (!prev[step.id] && completionMap[step.id]) {
+        // Funnel: the section flipped to complete in this session. Same
+        // once-per-session rule as builder_step so a reload cannot recount.
+        trackOncePerSession(`mmcv_evt_section_${step.id}`, "cv_section_completed", {
+          step_id: step.id,
+        });
         try {
           const key = `mmcv_done_toast_${step.id}`;
           if (window.sessionStorage.getItem(key)) continue;
@@ -979,6 +1014,15 @@ export const BuilderShell = ({
     // Re-arm: a card dismissed after the last export must come back for
     // this one. "Every successful export" is the agreed frequency.
     setSupportCardOpen(false);
+    // Attempt counter for the export funnel: cv_export_started → cv_export.
+    // The gap between the two is the render-failure rate. Backups excluded
+    // for the same reason as below.
+    if (kind !== "json") {
+      track("cv_export_started", {
+        format: kind,
+        template: data.settings.templateId ?? "classic",
+      });
+    }
     try {
       if (kind === "json") {
         downloadCvBackup(data);
