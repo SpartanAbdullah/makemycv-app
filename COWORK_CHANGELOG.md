@@ -16,6 +16,25 @@ Format:
 
 ---
 
+## [2026-10-31 05:40] Security: next 16.4.3, @sentry/nextjs 10.78.0, audit fixes
+
+**Goal:** `npm audit` (2026-10-31) listed 39 advisories against the pinned `next@16.1.6`, three critical
+(unauthenticated RCE in the Image Optimization API with SVG, GHSA-2464-fhr4-w9xw; RCE in `use cache` typed
+arrays, GHSA-673q-mjm6-r5xr; RCE on Windows hosts, GHSA-p293-qw3h-jr36), the Middleware/Proxy bypass family
+(this app runs `proxy.ts`), Server-Action DoS and SSRF items; plus a critical middleware bypass in
+`@sentry/nextjs` 10.69.0 (GHSA-mchm-gjx6-7h55). The site got the same upgrade (makemycv-site `07f3ed0`).
+**Files:**
+- edited: `package.json`, `package-lock.json` — next 16.1.6 → 16.4.3 (first clean release, not a
+  semver-major), @sentry/nextjs 10.69.0 → 10.78.0; `npm audit fix` lifted nanoid 5.1.16, @xmldom/xmldom
+  0.8.15 (docx export), postcss 8.5.23, fast-uri, brace-expansion, browserslist, source-map-js. React stays
+  19.2.3.
+**Notes / risks / follow-up:** tsc clean, lint 11/11, `npm test` all suites, `next build`, and
+`smoke:builder` 28/28 against `next start -p 3200` from the upgraded build (PDF 16,485 B, DOCX 9,098 B,
+funnel events present). One high advisory remains that needs a breaking change (left alone; see
+docs/ai-mission/SECURITY_REVIEW.md). Owner: merge `stagingmmc → main` promptly (BLOCKERS B10). Gotcha:
+`npm audit fix --omit=dev` prunes devDependencies — run plain `npm install` afterwards.
+**Suggested commit:** chore(deps): next 16.4.3, @sentry/nextjs 10.78.0, audit fixes
+
 ## [2026-10-31 04:05] smoke:builder covers persistence, DOCX, template/fullscreen and the funnel events; runs in CI (non-blocking)
 
 **Goal:** Phase 2/11 of the autonomous mission: a repeatable browser regression for the journeys the
