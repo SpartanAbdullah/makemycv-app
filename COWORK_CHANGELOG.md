@@ -16,6 +16,28 @@ Format:
 
 ---
 
+## [2026-10-31 04:05] smoke:builder covers persistence, DOCX, template/fullscreen and the funnel events; runs in CI (non-blocking)
+
+**Goal:** Phase 2/11 of the autonomous mission: a repeatable browser regression for the journeys the
+October audit could only catch by hand. The old smoke proved Continue clicks and one PDF; it said
+nothing about the CV surviving a reload (the worst possible builder defect), the DOCX path (its own
+renderer), or whether the analytics funnel actually emits.
+**Files:**
+- edited: `scripts/builder-smoke.mjs` — reload-persistence check after the Contact step; Next
+  template + Fullscreen (via `dispatchEvent`, the drawer controls sit below the fold at 1440×900);
+  DOCX export (`Export .docx`); a context init script that mirrors every `dataLayer` event name into
+  `sessionStorage` so the end-of-run assertion sees the whole session across the deliberate reload;
+  asserts `builder_step`, `builder_start`, `template_selected`, `cv_preview_viewed`,
+  `cv_section_completed`, `cv_export_started`, `cv_export`; axe now also excludes `.cv-print` (the
+  rendered CV document — its colours are a template decision per CLAUDE.md, same rule as the
+  `[inert]` thumbnails; without this the live preview column's `text-slate-400` dates fail
+  color-contrast on every builder step).
+- edited: `.github/workflows/ci.yml` — new non-blocking `e2e` job: playwright chromium, `next build`,
+  `next start`, `smoke:builder`.
+**Notes / risks / follow-up:** 28/28 PASS locally against `next start -p 3000` from a production build
+(2026-10-31 04:00). CI minutes: the e2e job adds ~6–8 min per push; it is `continue-on-error`.
+**Suggested commit:** test(smoke): persistence, DOCX, template/fullscreen and funnel-event asserts; e2e job in CI
+
 ## [2026-10-31 03:10] Funnel events template_selected / cv_export_started / cv_preview_viewed / cv_section_completed; PARAM_KEYS covers every pushed key
 
 **Goal:** GA4 code audit 2026-10-31 (docs/ai-mission/GA4_AUDIT.md in the parent folder). The builder funnel

@@ -76,3 +76,33 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run smoke:pdf
+
+  # Also non-blocking: the browser journey (fill every step with a field still
+  # focused → persistence across reload → template + fullscreen preview →
+  # PDF + DOCX export → funnel events in the dataLayer → axe). It needs a
+  # production build and a running server, so it is the slowest job here;
+  # it exists because the 2026-10 audit's P1 defects were only visible in a
+  # real browser. Failures show up on the run, they do not block a merge.
+  e2e:
+    name: builder browser smoke (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start server
+        run: |
+          npx next start -p 3000 > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/builder > /dev/null && break
+            sleep 2
+          done
+      - run: SMOKE_BASE=http://localhost:3000 npm run smoke:builder

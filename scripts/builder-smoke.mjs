@@ -52,6 +52,26 @@ async function continueOnce(page, name, expectStep) {
 
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+// window.dataLayer is per-document, and this journey reloads the page on
+// purpose (persistence check). Mirror every event name into sessionStorage
+// before any app script runs, so the funnel assertion at the end sees the
+// whole session, not just the last document.
+await ctx.addInitScript(() => {
+  const arr = [];
+  const orig = arr.push.bind(arr);
+  arr.push = (...items) => {
+    try {
+      const key = "__smoke_events";
+      const seen = JSON.parse(window.sessionStorage.getItem(key) || "[]");
+      for (const it of items) if (it && it.event) seen.push(it.event);
+      window.sessionStorage.setItem(key, JSON.stringify(seen));
+    } catch {
+      /* storage unavailable — the in-memory array still works */
+    }
+    return orig(...items);
+  };
+  window.dataLayer = arr;
+});
 const page = await ctx.newPage();
 page.on("pageerror", (e) => fail("page error", String(e).slice(0, 160)));
 
@@ -70,6 +90,29 @@ await page.getByLabel(/First name/).fill("Smoke");
 await page.getByLabel(/Last name/).fill("Test");
 await page.getByLabel(/Email/).fill("smoke.test@example.com");
 await continueOnce(page, "Continue →", "uaeEssentials");
+
+// Persistence (2026-10-31): the debounced localStorage save must survive a
+// reload. A CV that vanishes on refresh is the single worst builder defect
+// and nothing else in the pipeline exercises it.
+await page.waitForTimeout(900);
+await page.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(800);
+const persistedFirst = await page.getByLabel(/First name/).inputValue().catch(() => "");
+if (persistedFirst === "Smoke") ok("CV persists across a reload");
+else fail("CV persists across a reload", `first name is "${persistedFirst}"`);
+
+// Template cycling from the preview column, then the fullscreen preview —
+// both must fire their funnel events (template_selected, cv_preview_viewed).
+// dispatchEvent rather than click: the drawer controls sit below the fold of
+// the preview column at 1440×900 and Playwright refuses to click off-screen.
+await page.getByRole("button", { name: "Next template" }).first().dispatchEvent("click");
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: "Fullscreen" }).first().dispatchEvent("click");
+await page.waitForTimeout(600);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+await page.goto(`${BASE}/builder?step=uaeEssentials`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(500);
 
 await page.getByLabel("Visa status").selectOption({ label: "Employment visa" });
 await continueOnce(page, "Continue →", "summary");
@@ -121,6 +164,47 @@ try {
   fail("PDF export", String(e).slice(0, 160));
 }
 
+// DOCX export produces a file too (second export path, own renderer).
+try {
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 45000 }),
+    page.getByRole("button", { name: "Export .docx" }).click(),
+  ]);
+  const file = path.join(tmp, download.suggestedFilename());
+  await download.saveAs(file);
+  const size = fs.statSync(file).size;
+  if (size > 1000 && /\.docx$/i.test(file)) ok(`DOCX export (${size} bytes)`);
+  else fail("DOCX export", `${size} bytes, ${path.basename(file)}`);
+} catch (e) {
+  fail("DOCX export", String(e).slice(0, 160));
+}
+
+// Funnel events (2026-10-31): every push lands in window.dataLayer whether or
+// not GTM is present, so the events can be asserted without a container.
+// Persisted sessionStorage keys make the once-per-session events survive the
+// reload above; the list below is what one complete journey must emit.
+const dl = await page.evaluate(() => {
+  let seen = [];
+  try {
+    seen = JSON.parse(window.sessionStorage.getItem("__smoke_events") || "[]");
+  } catch {
+    /* fall through to the live array */
+  }
+  return seen.concat((window.dataLayer || []).filter((e) => e && e.event).map((e) => e.event));
+});
+for (const name of [
+  "builder_step",
+  "builder_start",
+  "template_selected",
+  "cv_preview_viewed",
+  "cv_section_completed",
+  "cv_export_started",
+  "cv_export",
+]) {
+  if (dl.includes(name)) ok(`dataLayer has ${name}`);
+  else fail(`dataLayer has ${name}`, `events seen: ${[...new Set(dl)].join(", ")}`);
+}
+
 // At most two toasts visible at once
 const toasts = await page.locator('[role="status"]').count();
 if (toasts <= 3) ok(`toast cap (${toasts} status regions incl. support card)`);
@@ -144,7 +228,10 @@ for (const [p, label] of axePages) {
     // [inert] = the template-gallery thumbnails: scaled renders of the CV
       // document itself, decorative here. Their colours belong to the CV
       // templates (deliberately untouched), not to the app chrome under test.
-      const r = await window.axe.run({ exclude: [["[inert]"]] }, { resultTypes: ["violations"] });
+      // .cv-print = the rendered CV document itself (live preview column,
+      // JD Match preview). Its colours are a template design decision kept
+      // out of a11y fixes (CLAUDE.md), the same rule as the thumbnails.
+      const r = await window.axe.run({ exclude: [["[inert]"], [".cv-print"]] }, { resultTypes: ["violations"] });
     return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, n: v.nodes.length, target: v.nodes[0]?.target?.[0] ?? "" }));
   });
   const serious = result.filter((v) => v.impact === "serious" || v.impact === "critical");
