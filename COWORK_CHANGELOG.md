@@ -16,6 +16,33 @@ Format:
 
 ---
 
+## [2026-10-31 06:15] PDF fidelity harness (preview vs PDF, 14 × 3) + Professional name/headline overprint fix
+
+**Goal:** Phase 3 of the autonomous mission: a repeatable preview-vs-PDF comparison instead of eyeballing,
+and the first defect it found fixed. The harness rendered 42 cases (14 templates × natural/compact/dense
+personas from `getPreviewProfile`): text parity 98.5–100 % everywhere, page counts agree in 41/42, and one
+real layout defect — in Professional and Professional Photo the headline printed across the name in every
+PDF (text layer read "mahmouddigital"). Report: `docs/ai-mission/PDF_FIDELITY.md` in the parent folder;
+composites in `_cowork/pdf-fidelity-2026-10-31/`.
+**Files:**
+- created: `scripts/pdf-fidelity.mjs` — serves pdf.js + PDFs from node_modules over `node:http`, screenshots
+  `/preview/<id>?density=N` with the system Chrome, rasterises PDF pages with pdf.js at 794 px, compares
+  words (innerText vs text layer), page count and a luminance block diff; writes composites + results.json.
+  Flags `--only=`, `--skip-render`; env `PREVIEW_BASE_URL`, `FIDELITY_OUT`, `FIDELITY_TOL`.
+- created: `scripts/pdf-fidelity-render.tsx` — renders every template × density from the same transform
+  as the `/preview` route, real fonts embedded, into `.fidelity-pdfs/`.
+- edited: `components/pdf/CVDocument.tsx` (ProfessionalPDFLayout name `<Text>`) — explicit
+  `lineHeight: 1.15 * theme.lineScale`. Without it the 20 pt name inherited the page's 8.6 pt × 1.45 line
+  box and the headline printed over it. Mirrors `professional.tsx`.
+- edited: `.gitignore` — `.fidelity-pdfs/`, `.pdf-fidelity-build/`.
+**Notes / risks / follow-up:** re-run on the two templates after the fix: headline sits below the name in
+both; block-diff numbers barely move because the remaining Professional drift is section spacing (see
+report ranks 2–7: ATS Clean bullet pitch, Onyx/Sandstone sidebar widths, Exec Split chips — not fixed,
+documented with file/line). The harness needs a prod server on :3000 (`PREVIEW_BASE_URL` to change). The
+third content case ("long experience") cannot be previewed by `/preview`, so the content axis is
+persona × density. `smoke:pdf` re-run after the fix (see commit).
+**Suggested commit:** fix(pdf): Professional name line height; add preview-vs-PDF fidelity harness
+
 ## [2026-10-31 05:40] Security: next 16.4.3, @sentry/nextjs 10.78.0, audit fixes
 
 **Goal:** `npm audit` (2026-10-31) listed 39 advisories against the pinned `next@16.1.6`, three critical

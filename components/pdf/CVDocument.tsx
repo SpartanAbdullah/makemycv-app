@@ -3380,6 +3380,11 @@ const ProfessionalPDFLayout = ({
         <Text
           style={{
             fontSize: 20 * theme.fontScale,
+            // Explicit line height: without it the name inherits the page's
+            // 8.6pt × 1.45 ≈ 12.5pt line box, so the 20pt glyphs overflow it
+            // and the headline below prints across the name (fidelity run
+            // 2026-10-31). Mirrors professional.tsx (1.15 × lineScale).
+            lineHeight: 1.15 * theme.lineScale,
             fontFamily: fonts.bold, fontWeight: 700,
             color: "#111827",
             letterSpacing: 1,
