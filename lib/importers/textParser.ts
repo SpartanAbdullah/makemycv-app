@@ -376,6 +376,71 @@ function looksLikeCompany(text: string): boolean {
   );
 }
 
+/** A header line with its dates and "present" token removed. Collapses 3+
+ *  whitespace to 2 so the DOCX-style two-space field separator survives for
+ *  splitHeaderParts. */
+function stripHeaderDates(line: string): string {
+  return line
+    .replace(DATE_TOKEN_RE, " ")
+    .replace(PRESENT_RE, " ")
+    .replace(/[ \t]{3,}/g, "  ")
+    .trim();
+}
+
+/** A header part with something readable in it — drops the "-" / "(" debris a
+ *  stripped date range can leave between separators. */
+function hasWordChar(part: string): boolean {
+  return /[A-Za-z0-9À-ɏ؀-ۿ]/.test(part);
+}
+
+/**
+ * D1 (session 5): fold a dated line into the role above it when that role is
+ * still only a title — no dates, no bullets yet. The line is then the tail of
+ * the header ("Company · City · Mar 2021 - Present" or "City | dates"), so
+ * its dates go onto the role, a place goes to `location`, and the rest fills
+ * an empty `company`. Returns false (caller starts a new entry as before)
+ * when the line carries something that cannot be placed — a second role
+ * title, more names than there are empty fields, or a sentence.
+ */
+function mergeDatedTail(entry: ParsedExperience, line: string): boolean {
+  if (!(entry.role?.trim() || entry.company?.trim())) return false;
+  if (entry.startDate || entry.endDate || entry.isCurrent) return false;
+  if (entry.bullets && entry.bullets.length > 0) return false;
+  const dates = extractDates(line);
+  if (dates.length === 0) return false;
+
+  const parts = splitHeaderParts(trimTrailingSeparator(stripHeaderDates(line))).filter(
+    hasWordChar,
+  );
+  const places: string[] = [];
+  const names: string[] = [];
+  for (const p of parts) (looksLikeLocation(p) ? places : names).push(p);
+  // A job title in the tail means this line opens the next role.
+  if (names.some((p) => looksLikeRole(p) && !looksLikeCompany(p))) return false;
+  if (names.some((p) => p.length > 70 || /[.!?]$/.test(p))) return false;
+
+  let company = entry.company?.trim() ? entry.company : undefined;
+  let location = entry.location?.trim() ? entry.location : undefined;
+  for (const n of names) {
+    if (!company) company = n;
+    else if (!location) location = n;
+    else return false;
+  }
+  for (const p of places) {
+    if (!location) location = p;
+    else if (!company) company = p;
+    else return false;
+  }
+
+  const hasPresent = PRESENT_RE.test(line);
+  entry.company = company;
+  entry.location = location;
+  entry.startDate = dates[0];
+  entry.endDate = dates[1] ?? (hasPresent ? "Present" : undefined);
+  entry.isCurrent = hasPresent;
+  return true;
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -433,13 +498,8 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   const startEntryFromLine = (line: string) => {
     const dates = extractDates(line);
     const hasPresent = PRESENT_RE.test(line);
-    // Strip dates and the "present" token. Collapse 3+ whitespace to 2 so the
-    // DOCX-style two-space field separator survives for splitHeaderParts.
-    const cleaned = line
-      .replace(DATE_TOKEN_RE, " ")
-      .replace(PRESENT_RE, " ")
-      .replace(/[ \t]{3,}/g, "  ")
-      .trim();
+    // Strip dates and the "present" token.
+    const cleaned = stripHeaderDates(line);
     const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
 
     let role: string | undefined;
@@ -540,6 +600,15 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
         line.length < 80 &&
         !/[.!?]$/.test(line) &&
         !startsWithActionVerb);
+
+    // D1 (2026-10-31): the dated line UNDER a title is the tail of that
+    // header, not a second role. "Senior Procurement Specialist" /
+    // "Falcon FM · Abu Dhabi · Mar 2021 - Present" and "Role - Company" /
+    // "Dubai | Mar 2021 - Present" used to become two cards (card 2's Role =
+    // the city, and in DOCX its Company = the first unmarked bullet).
+    if (looksLikeNewHeader && current && hasInlineDates && mergeDatedTail(current, line)) {
+      continue;
+    }
 
     if (looksLikeNewHeader) {
       pushCurrent();

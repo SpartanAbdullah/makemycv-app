@@ -137,10 +137,12 @@ for a cross-origin worker was refused.
   one without any Latin contact line reports `mapping_empty`. pdf.js also
   returns Chrome-printed Arabic as isolated presentation-form glyphs. An
   Arabic parser is a feature, not a fix.
-- **Role segmentation**: a `Company · City · Dates` or `City | Dates` line under
-  a role title is split into a second experience entry (text-cv.pdf: 2 roles →
-  4 entries; rtl-mixed.docx: 2 → 5). Reviewable in MappingReview; not a failure
-  event. Parser work with the `test:parser` guard.
+- ~~**Role segmentation**~~ — fixed 2026-10-31 (session 5, D1): a dated
+  `Company · City · Dates` or `City | Dates` line directly under a title that
+  has no dates and no bullets yet is merged into that role
+  (`mergeDatedTail` in `textParser.ts`). text-cv.pdf and two-column-table.docx
+  now give 2 roles; `test:import` and `smoke:import` assert the exact count.
+  rtl-mixed.docx still adds a third card for its Arabic role line.
 - **Scans need OCR**; none is offered, and the copy does not promise one.
 - **DOCX produced by Google Docs / LibreOffice / Canva** could not be generated
   here; mammoth is known to read Google Docs and LibreOffice output, and the

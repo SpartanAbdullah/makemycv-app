@@ -62,6 +62,12 @@ const CASES = [
   ["large-25mb.pdf", "too_large"],
 ];
 
+// Experience cards the review must show (D1, 2026-10-31). Both files hold two
+// roles whose dates sit on the line under the title; until the fix the review
+// showed four cards and this smoke still passed, because it only checked that
+// a review opened and one push fired.
+const EXPECT_ROLES = { "text-cv.pdf": 2, "two-column-table.docx": 2 };
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mmcv-import-smoke-"));
 const largePath = path.join(tmp, "large-25mb.pdf");
 fs.writeFileSync(largePath, makeLargePdf(25 * 1024 * 1024));
@@ -115,6 +121,12 @@ async function runCase(name, file, expected) {
         await review.getByRole("button", { name: /^Cancel$/ }).click();
       } else {
         outcome = `review:${label.replace(/^Import\s*/, "")}`;
+        if (EXPECT_ROLES[name] !== undefined) {
+          const text = (await review.textContent()) ?? "";
+          const roles = Number(text.match(/Work experience \((\d+)\)/)?.[1] ?? 0);
+          if (roles === EXPECT_ROLES[name]) ok(`${name}: review shows ${roles} experience cards`);
+          else fail(`${name}: review shows ${EXPECT_ROLES[name]} experience cards`, `got ${roles}`);
+        }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }

@@ -25,6 +25,34 @@ Format:
 
 ---
 
+## [2026-10-31 21:00] Import: a role no longer splits into two cards when its dates sit under the title (session 5 D1, backlog E2)
+
+**Goal:** Major defect from the session-5 production import matrix (docs/ai-mission/IMPORT_MONITORING.md §8.3 D1).
+Every role whose dates were on the line below the title became two experience cards: card 1 title + company with no
+dates or bullets, card 2 with Role = the city and (in DOCX, where mammoth drops list markers) Company = the first
+bullet. The repo's own fixtures showed it (text-cv.pdf 2 roles → 4, two-column-table.docx 2 → 4) but the tests only
+asserted "≥ 2".
+**Files:**
+- edited: `lib/importers/textParser.ts` — `mergeDatedTail()`: in `parseExperienceBlock`, a line with inline dates
+  that would start a new entry is folded into the current one when that entry has a title/company but no dates and
+  no bullets yet. Dates go onto the role, a place (`looksLikeLocation`) fills `location`, other names fill an empty
+  `company`. It declines (old behaviour: new entry) when the line carries a job title, a sentence, or more names than
+  there are empty fields. `stripHeaderDates()` factors out the date-stripping step shared with `startEntryFromLine`.
+- edited: `scripts/parser-fixtures.test.cjs` — three inline cases: "Title" / "Company · City · dates",
+  "Title - Company" / "City | dates" with unmarked bullets, and a guard that a dateless role followed by a dated
+  role line stays two roles.
+- edited: `scripts/import-fixtures.test.mjs` — exact role counts and fields for text-cv.pdf, two-column-table.docx,
+  rtl-mixed.docx; new fixtures below.
+- created: `__fixtures__/import/s5-long-wrapped.pdf`, `__fixtures__/import/s5-header-table.docx` — copies of the
+  session-5 matrix cases 1 and 4 (`_cowork/session5/import/fixtures/01-long-6p.pdf`, `04-header-name-table.docx`;
+  synthetic persona "Noor Testwell", example.com).
+- edited: `scripts/import-smoke.mjs` — the review must show exactly 2 experience cards for text-cv.pdf and
+  two-column-table.docx.
+- edited: `docs/import-errors.md` — "Not fixed here" role-segmentation item marked fixed.
+**Notes / risks / follow-up:** LinkedIn-style "Company" / "Role" / "dates · City" also merges now (it split before);
+its role/company order is still as parsed. rtl-mixed.docx keeps a third card for its Arabic role line.
+**Suggested commit:** fix(import): merge a dated line under a role title into that role (D1)
+
 ## [2026-10-31 20:05] Import after typing no longer gets overwritten by the stale form (production QA P1, backlog E10)
 
 **Goal:** Major defect from the production QA (docs/ai-mission/QA_PRODUCTION_2026-10-31.md, P1). A visitor who typed

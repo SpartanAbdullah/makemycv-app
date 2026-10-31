@@ -111,11 +111,13 @@ ${JSON.stringify(r.partial, null, 1)}`);
   const r = await expectImport("text-cv.pdf", 5);
   check("text-cv.pdf", "name", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
   check("text-cv.pdf", "email", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
-  // Known parser quality gap (not a failure): a "Company · City · Dates" line
-  // under the role title is split into a second entry, so the two roles come
-  // back as four. The review screen is where the user merges them. Tracked in
-  // docs/import-errors.md ("Not fixed here").
-  check("text-cv.pdf", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
+  // D1 (2026-10-31): the "Company · City · Dates" line under the title is the
+  // tail of that role. Until then the two roles came back as four cards and
+  // this check (">= 2") passed anyway — it is exact now.
+  const exp = r.partial?.experience ?? [];
+  check("text-cv.pdf", "exactly 2 roles (not 4)", exp.length === 2, exp.map((e) => e.role));
+  check("text-cv.pdf", "role 1 title/company/location", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.company === "Falcon Facilities Management" && exp[0]?.location === "Abu Dhabi", exp[0]);
+  check("text-cv.pdf", "every role has a start date and bullets", exp.every((e) => e.startDate && e.bullets.length > 0), exp.map((e) => [e.startDate, e.bullets.length]));
   check("text-cv.pdf", "visa status read", /employment/i.test(r.partial?.personal?.visaStatus ?? ""), r.partial?.personal?.visaStatus);
 }
 await expectImport("plain-helvetica-cv.pdf", 5);
@@ -133,13 +135,42 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const r = await expectImport("two-column-table.docx", 5);
   check("two-column-table.docx", "email", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
   check("two-column-table.docx", "skills", (r.partial?.skills?.length ?? 0) >= 4, r.partial?.skills?.length);
+  // D1: "Role - Company" / "City | dates" — 2 roles, the city is the location
+  // and the first (marker-less) bullet is a bullet, not card 2's Company.
+  const exp = r.partial?.experience ?? [];
+  check("two-column-table.docx", "exactly 2 roles (not 4)", exp.length === 2, exp.map((e) => e.role));
+  check("two-column-table.docx", "role 1 company/location", exp[0]?.company === "Falcon Facilities Management" && exp[0]?.location === "Abu Dhabi", exp[0]);
+  check("two-column-table.docx", "first bullet stays a bullet", /^Ran 60\+ tenders/.test(exp[0]?.bullets?.[0] ?? ""), exp[0]?.bullets?.[0]);
+  check("two-column-table.docx", "every role has a start date", exp.every((e) => e.startDate), exp.map((e) => e.startDate));
 }
 {
   const r = await expectImport("rtl-mixed.docx", 5);
   check("rtl-mixed.docx", "Latin name survives the Arabic line", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
-  // Same split as text-cv.pdf ("City | Dates" line becomes an entry), plus the
-  // Arabic role line is read as a role — all reviewable, none a failure.
+  // The two English roles merge with their "City | Dates" lines (D1); the
+  // Arabic role line is still read as a third role — reviewable, not a failure.
   check("rtl-mixed.docx", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
+  const exp = r.partial?.experience ?? [];
+  check("rtl-mixed.docx", "English roles not split (cards 1-2 are the dated roles)", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.startDate === "Mar 2021" && exp[1]?.role === "Procurement Officer" && exp[1]?.startDate === "Jun 2017", exp.map((e) => [e.role, e.startDate]));
+}
+/* ── session 5 production-matrix fixtures (2026-10-31) ─────────────────────
+   Copied from _cowork/session5/import/fixtures/ (synthetic persona "Noor
+   Testwell"): s5-long-wrapped.pdf = case 1 (react-pdf, 6 pages, 3 roles × 4
+   wrapped bullets, "Title — Company" / "City | dates"), s5-header-table.docx
+   = case 4 (contact in the Word header, two-column table, mammoth drops the
+   list markers). */
+{
+  const r = await expectImport("s5-long-wrapped.pdf", 6);
+  const exp = r.partial?.experience ?? [];
+  check("s5-long-wrapped.pdf", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
+  check("s5-long-wrapped.pdf", "every role dated, located, with bullets (D1)", exp.every((e) => e.startDate && e.location && e.bullets.length >= 4), exp.map((e) => [e.startDate, e.location, e.bullets.length]));
+  check("s5-long-wrapped.pdf", "role 1 company", exp[0]?.company === "Falcon Facilities Management", exp[0]?.company);
+}
+{
+  const r = await expectImport("s5-header-table.docx", 6);
+  const exp = r.partial?.experience ?? [];
+  check("s5-header-table.docx", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
+  check("s5-header-table.docx", "4 bullets per role, first bullet not a Company (D1)", exp.every((e) => e.bullets.length === 4 && !/^(Directed|Ran|Supervised)/.test(e.company ?? "")), exp.map((e) => [e.company, e.bullets.length]));
+  check("s5-header-table.docx", "cities are locations", exp.map((e) => e.location).join(",") === "Dubai,Abu Dhabi,Sharjah", exp.map((e) => e.location));
 }
 {
   // English-centric parser: the Arabic headings are not recognised, but the
