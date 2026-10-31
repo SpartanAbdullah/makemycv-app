@@ -750,5 +750,59 @@ const runText = (label, text) => {
   check(f, "dates stay on the dated role", !d.experience[0]?.startDate && d.experience[1]?.startDate === "Jan 2020", d.experience.map((e) => e.startDate));
 }
 
+/* ── D2 (session 5): wrapped marked bullets in PDFs ──────────────────────── */
+{
+  const f = "d2-wrapped-bullets (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "noor@example.com",
+    "Experience",
+    "Senior Facilities Operations Manager — Falcon Facilities Management",
+    "Dubai | Mar 2021 - Present",
+    "• Directed hard and soft services for a 14-tower portfolio with 140 technicians and 9",
+    "supervisors.",
+    "• Cut reactive work orders by 31% by moving 1,900 assets onto a planned-maintenance",
+    "calendar in the CAFM system.",
+    "• Held 99.2% SLA compliance and passed every Dubai Civil Defence inspection without a",
+    "finding over 36 consecutive months, across",
+    "2.4 million sq ft.",
+    "Facilities Manager — Oasis Healthcare Estates",
+    "Abu Dhabi | Jan 2017 - Feb 2021",
+    "• Ran facilities for a 210-bed hospital",
+  ].join("\n"));
+  const b = d.experience[0]?.bullets ?? [];
+  check(f, "2 roles", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "3 bullets on role 1 (wraps joined)", b.length === 3, b);
+  check(f, "bullet 1 ends with its wrapped tail", b[0]?.endsWith("140 technicians and 9 supervisors."), b[0]);
+  check(f, "bullet 2 joined", b[1]?.endsWith("planned-maintenance calendar in the CAFM system."), b[1]);
+  check(f, "three-line bullet joined (lower-case + number starts)", b[2]?.endsWith("across 2.4 million sq ft."), b[2]);
+  check(f, "company not taken from a wrapped tail", d.experience[0]?.company === "Falcon Facilities Management", d.experience[0]?.company);
+}
+{
+  // Guard: bullets WITHOUT full stops are common; the next role must not be
+  // swallowed into the last bullet.
+  const f = "d2-guard-unpunctuated-bullets (inline)";
+  const d = runText(f, [
+    "Layla Haddad",
+    "layla@example.com",
+    "Experience",
+    "Senior Procurement Specialist",
+    "Falcon Facilities Management · Abu Dhabi · Mar 2021 - Present",
+    "• Ran 60+ tenders a year",
+    "• Cut vendor lead time from 18 to 14 days",
+    "Procurement Officer",
+    "Oasis Build Contracting · Dubai · Jun 2017 - Feb 2021",
+    "• Sourced materials for 12 projects",
+    "Acme Trading LLC",
+    "Buyer",
+    "2015 - 2017",
+    "• Raised purchase orders",
+  ].join("\n"));
+  check(f, "3 roles", d.experience.length === 3, d.experience.map((e) => e.role));
+  check(f, "role 1 keeps 2 bullets", d.experience[0]?.bullets?.length === 2, d.experience[0]?.bullets);
+  check(f, "role 2 title not appended to a bullet", d.experience[1]?.role === "Procurement Officer", d.experience[1]?.role);
+  check(f, "company-first role not appended to a bullet", !/Acme/.test((d.experience[1]?.bullets ?? []).join(" ")), d.experience[1]?.bullets);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

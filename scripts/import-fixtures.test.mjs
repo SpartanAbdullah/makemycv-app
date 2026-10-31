@@ -164,6 +164,11 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   check("s5-long-wrapped.pdf", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
   check("s5-long-wrapped.pdf", "every role dated, located, with bullets (D1)", exp.every((e) => e.startDate && e.location && e.bullets.length >= 4), exp.map((e) => [e.startDate, e.location, e.bullets.length]));
   check("s5-long-wrapped.pdf", "role 1 company", exp[0]?.company === "Falcon Facilities Management", exp[0]?.company);
+  // D2: the four marked bullets per role wrap onto a second PDF line; each must
+  // come back whole (it used to end "…140 technicians and 9", with
+  // "supervisors." as the Company or a bullet of its own).
+  check("s5-long-wrapped.pdf", "bullet 1 joined across the wrap (D2)", exp[0]?.bullets?.[0]?.endsWith("140 technicians and 9 supervisors."), exp[0]?.bullets?.[0]);
+  check("s5-long-wrapped.pdf", "first 4 bullets of every role are whole sentences (D2)", exp.every((e) => e.bullets.slice(0, 4).every((b) => /^[A-Z]/.test(b) && /\.$/.test(b))), exp.map((e) => e.bullets.slice(0, 4)));
 }
 {
   const r = await expectImport("s5-header-table.docx", 6);

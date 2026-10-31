@@ -441,6 +441,27 @@ function mergeDatedTail(entry: ParsedExperience, line: string): boolean {
   return true;
 }
 
+/**
+ * D2 (session 5): does `line` read as the wrapped second half of the marked
+ * bullet above it (which has no closing punctuation)? Yes when it starts in
+ * lower case, or with a number that is not a date ("140 technicians…"), or
+ * starts upper case but ends a sentence and carries none of the marks of a
+ * new role (dates, a separator, a job title). A short capitalised line with
+ * no full stop ("Procurement Officer", "Acme LLC") stays a header — bullets
+ * without full stops are common and the next role must not be swallowed.
+ */
+function isBulletContinuation(line: string): boolean {
+  if (isBulletLine(line)) return false;
+  if (detectSection(line)) return false;
+  if (/^[a-z]/.test(line)) return true;
+  const hasDates = extractDates(line).length > 0 || PRESENT_RE.test(line);
+  if (/^[\d(&%+]/.test(line)) return !hasDates;
+  if (hasDates) return false;
+  if (splitHeaderParts(line).length >= 2) return false;
+  if (looksLikeRole(line) && line.length < 60) return false;
+  return /[.!?]["')\]]?$/.test(line);
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -468,6 +489,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   let current: ParsedExperience | null = null;
   let pendingDates: string[] | null = null;
   let pendingPresent = false;
+  // True while the last line handled was a marked bullet (or a wrapped line
+  // appended to one). See isBulletContinuation.
+  let bulletOpen = false;
 
   const pushCurrent = () => {
     if (!current) return;
@@ -558,6 +582,25 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       }
       current.bullets = current.bullets ?? [];
       current.bullets.push(stripBulletPrefix(line));
+      bulletOpen = true;
+      continue;
+    }
+
+    // D2 (session 5): a marked bullet that wraps in a PDF arrives as two
+    // lines, and the second half became the role's Company ("supervisors.")
+    // or a bullet of its own. While the last marked bullet has no closing
+    // punctuation, a line that reads as its continuation is appended to it.
+    const wasOpen = bulletOpen;
+    bulletOpen = false;
+    if (
+      wasOpen &&
+      current?.bullets?.length &&
+      !/[.!?]["')\]]?$/.test(current.bullets[current.bullets.length - 1]) &&
+      isBulletContinuation(line)
+    ) {
+      const last = current.bullets.length - 1;
+      current.bullets[last] = `${current.bullets[last]} ${line}`;
+      bulletOpen = true;
       continue;
     }
 

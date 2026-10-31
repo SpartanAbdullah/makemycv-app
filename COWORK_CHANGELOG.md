@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-10-31 21:20] Import: wrapped PDF bullets come back whole (session 5 D2)
+
+**Goal:** Major defect D2 (IMPORT_MONITORING.md §8.3): a marked bullet that wraps onto a second PDF line was cut in
+two — the tail became the role's Company ("supervisors.") or a separate bullet ("calendar in the CAFM system.").
+**Files:**
+- edited: `lib/importers/textParser.ts` — `parseExperienceBlock` keeps `bulletOpen` while the last line was a marked
+  bullet without closing punctuation; `isBulletContinuation()` appends the next line to it when it starts lower case,
+  starts with a non-date number, or starts upper case and ends a sentence without any sign of a new role (dates, a
+  header separator, a job title). A short capitalised line with no full stop ("Procurement Officer", "Acme LLC")
+  still starts the next role, because bullets without full stops are common.
+- edited: `scripts/parser-fixtures.test.cjs` — wrapped two- and three-line bullets, and a guard CV whose bullets have
+  no full stops followed by a title-only role and a company-first role.
+- edited: `scripts/import-fixtures.test.mjs` — s5-long-wrapped.pdf: bullet 1 ends "…9 supervisors.", the first four
+  bullets of every role are whole sentences.
+**Notes / risks / follow-up:** only MARKED bullets are joined. mammoth drops list markers, so DOCX is unaffected; an
+unmarked PDF paragraph (s5-long-wrapped.pdf's "Detailed … narrative" blocks) still arrives as one bullet per line.
+**Suggested commit:** fix(import): join a wrapped PDF bullet with its continuation line (D2)
+
 ## [2026-10-31 21:00] Import: a role no longer splits into two cards when its dates sit under the title (session 5 D1, backlog E2)
 
 **Goal:** Major defect from the session-5 production import matrix (docs/ai-mission/IMPORT_MONITORING.md §8.3 D1).
