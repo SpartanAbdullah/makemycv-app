@@ -16,6 +16,90 @@ Format:
 
 ---
 
+## [2026-10-31 13:40] CV import: failure taxonomy, pre-parse gate, encrypted/scan/.doc detection, header text, empty-mapping guard
+
+**Goal:** GA4 (Oct 3–30) shows `cv_import` 296 / 234 users and `cv_import_failed` 41 / 19 users. Establish
+what the two events mean, reproduce the failure modes with synthetic documents, and make every failure
+path report one closed-set `error_reason` with a next step for the user. Findings and the before/after
+matrix are in `docs/import-errors.md`.
+**Files:**
+- created: `lib/importers/importErrors.ts` — the closed `IMPORT_ERROR_REASONS` set (12 file-import reasons +
+  4 report hand-off reasons), `IMPORT_FILE_TYPES` buckets, `MAX_IMPORT_BYTES` (15 MB), `PDF_TIMEOUT_MS`
+  (45 s), `MAX_PDF_PAGES` (30), `ImportParseError` (moved here; `adapter.ts` re-exports it),
+  `gateImportFile` (type → 0 bytes → size), `sniffContainer` (zip / OLE / %PDF), `classifyPdfError`
+  (PasswordException → encrypted_pdf, InvalidPDF/FormatError → corrupt_pdf, "fake worker failed" →
+  worker_load_failed), `classifyDocxError`, and `IMPORT_ERROR_COPY` (the user-facing sentence per reason).
+- created: `lib/importers/docxParts.ts` — dependency-free zip walk + `DecompressionStream("deflate-raw")`
+  that reads `word/header*.xml` / `word/footer*.xml`. mammoth reads `document.xml` only, and Word CV
+  templates put the name and contact line in the header, so those imports arrived with no name or email.
+  Headers are prepended; only footer lines that look like contact details are appended.
+- edited: `lib/importers/pdfAdapter.ts` — `extractPdfText(data, { pdfjs, workerSrc, timeoutMs, maxPages })`
+  takes an injected pdf.js module (the Node suite passes the legacy build); `resolveWorkerSrc` HEAD-probes
+  the self-hosted worker ONCE per page and picks the CDN copy only if it is unreachable. The old
+  catch-and-retry-via-CDN could never succeed: after the first worker failure pdf.js sets
+  `#isWorkerDisabled` and memoises the rejected fake-worker import (`shadow(this, "_setupFakeWorkerGlobal")`),
+  so the retry hit the same cached rejection. Deadline wrapper destroys the loading task on timeout;
+  `parsePdfBytes` shared by browser + Node. Error objects are no longer logged (FormatError quotes bytes).
+- edited: `lib/importers/docxAdapter.ts` — `extractDocxText(buffer, mammoth)` with byte sniff (OLE2 → the
+  "older .doc, Save As .docx" message as `unsupported_type`; not a zip → `corrupt_docx`), header/footer
+  pass, `parseDocxBytes` shared by browser + Node.
+- edited: `lib/importers/adapter.ts` — `ImportFailureKind = ImportErrorReason`; re-exports `ImportParseError`.
+- edited: `lib/importers/fieldMapper.ts` — `hasUsableContent(partial)`: a name alone is not usable (the parser
+  lifts the first line of ANY document as a name, so a mis-picked meeting note opened the review as
+  "1 section"); email/phone/summary/LinkedIn or any list section counts.
+- edited: `components/builder/BuilderShell.tsx` — `handleImport`: `importFileType()` bucket (never the
+  name) is the `file_type` param and the routing key; `gateImportFile` before any bytes are read; ONE
+  `failImport(reason, message)` closure is the only place `cv_import_failed` is pushed; the empty-mapping
+  guard reports `mapping_empty` with the checker hint instead of opening MappingReview in its disabled
+  state; unknown throwables become `parse_exception` without their message. Error bar `<p>` now carries
+  `data-testid="import-error"` (the smoke reads it).
+- edited: `components/builder/ImportFromReportBanner.tsx` — reasons renamed to the closed set
+  (`report_expired`, `report_fetch_failed`, `report_no_cv`, `report_network`; copy from `IMPORT_ERROR_COPY`).
+- edited: `next.config.ts` — CSP gains `worker-src 'self' blob:`. Without it `worker-src` fell back to
+  `script-src` (no `blob:`), and pdf.js loads a cross-origin worker through a blob: wrapper module, so the
+  CDN fallback was refused by the browser as well.
+- created: `__fixtures__/import/*` (12 files) + `scripts/make-import-fixtures.mjs` (`npm run
+  fixtures:import`) — invented-person documents: Chrome-printed text PDF and Arabic-only PDF, hand-written
+  Helvetica PDF, image-only "scan" (JPEG XObject, no text operators), RC4-40 encrypted PDF (user password
+  `secret`), prose that is not a CV, DOCX with the contact line in the header, two-column table DOCX,
+  EN+Arabic/Urdu bidi DOCX, OLE2 ".doc renamed .docx", 0-byte PDF, a 22-byte .jpg. The 25 MB PDF is built
+  in a temp dir at test time, not committed.
+- created: `scripts/import-fixtures.test.mjs` (`npm run test:import`, picked up by `npm test`) — real adapters
+  from `.test-build/` over every fixture with pdf.js legacy + mammoth injected, plus timeout / worker /
+  page-cap checks with stubbed modules. 51 assertions.
+- created: `lib/importers/importErrors.test.ts`, `lib/importers/docxParts.test.ts` — node:test units.
+- created: `scripts/import-smoke.mjs` (`npm run smoke:import`) — the fixtures through the real picker in
+  Chrome against a running server; asserts the error bar text and exactly one `cv_import*` dataLayer push
+  per pick, plus two worker scenarios (local worker 404 → CDN import; everything offline →
+  `worker_load_failed`).
+- created: `docs/import-errors.md` — event semantics and how to state the failure rate, the taxonomy with
+  the copy, the pipeline order, the before/after matrix, what is not fixed.
+- edited: `package.json` — scripts `test:import`, `smoke:import`, `fixtures:import`.
+**Notes / risks / follow-up:**
+- Event semantics: `cv_import` = a CONFIRMED review (never per attempt); `cv_import_failed` = a pick stopped
+  before the review. A cancelled review fires nothing, so 41 / (296 + 41) = 12.2 % is a floor on the
+  per-pick failure rate, and "19 of 234 users" are two independently counted sets (overlap unknown:
+  7.5 %–8.1 % of users who tried saw a failure). Both events include `file_type: ats_report`.
+- `error_reason` values changed shape (snake_case, 16 values) — GA4 explorations filtering on
+  `corrupt-file` / `empty-text` / `report-expired` need updating; the GTM DLVs (`file_type`, `error_reason`)
+  already exist, no container change needed.
+- 15 MB gate is new behaviour: before, a 25 MB PDF imported fine on desktop Chrome. The limit is a
+  judgement call (text CVs are under 2 MB; photo CVs 1–5 MB).
+- Parser quality gaps surfaced but NOT fixed (reviewable in MappingReview, not failure events): a
+  `Company · City · Dates` / `City | Dates` line under a role title becomes a second experience entry
+  (text-cv.pdf 2 roles → 4 entries, rtl-mixed.docx 2 → 5); Arabic headings are not recognised (an Arabic
+  CV with a Latin email line imports as "1 section"). Scans still need OCR, which is not offered.
+- Gates: `npx tsc --noEmit` clean; `npm run lint` 11/11 warnings (unchanged); `npm test` all suites green
+  (unit 479 incl. 20 new; parser 191; import 51); `npm run build` clean; against `next start -p 3500`:
+  `smoke:builder` all passed, `smoke:import` 15/15 passed. The dev server on 3300 and the start on 3500
+  were stopped afterwards.
+- Not touched: `components/pdf/**`, `scripts/pdf-*` (another agent), `.env.local`, `UploadDropzone.tsx`
+  (it shares the extraction functions and still shows its own generic messages — a follow-up could map
+  `ImportParseError.kind` to the same copy).
+**Suggested commit:** feat(import): closed error taxonomy, pre-parse gate, encrypted/scan/.doc detection, header text, empty-mapping guard
+
+---
+
 ## [2026-10-31 12:30] Public checklist endpoint so the marketing site can catch checker-count drift (Mission 8)
 
 **Goal:** www.makemycv.ae hard-codes "44 checks" and the per-category counts (its `WhatWeCheck`
