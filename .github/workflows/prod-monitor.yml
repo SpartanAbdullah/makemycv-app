@@ -9,6 +9,9 @@
 # Alert path: a failed run fails the job (GitHub emails the repo owner about
 # failed scheduled runs) AND opens — or comments on — one open issue labelled
 # `prod-monitor`. A green run closes that issue with a "recovered" comment.
+# Alert drill: `gh workflow run prod-monitor.yml --ref <branch> -f simulate_failure=true`
+# adds one fake failing row so the issue + failed-job path can be tested; the
+# next normal run closes the issue again.
 #
 # Guardrails:
 #   - No AI content is generated. The builder smoke never calls an AI route;
@@ -33,6 +36,11 @@ on:
   schedule:
     - cron: "0 4 * * *" # 04:00 UTC = 08:00 UAE
   workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Alert drill - add a failing check so the issue path runs
+        type: boolean
+        default: false
   # Validate the monitor itself whenever this file changes on the working
   # branch (also registers the workflow so it can be dispatched by hand).
   push:
@@ -156,6 +164,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          R_DRILL: ${{ inputs.simulate_failure }}
           R_HEALTH: ${{ steps.health.outcome }}
           R_PAGES: ${{ steps.pages.outcome }}
           R_BUILDER: ${{ steps.builder.outcome }}
@@ -169,6 +178,10 @@ jobs:
             "smoke:import|$R_IMPORT|smoke-import.log"
             "smoke:checker|$R_CHECKER|smoke-checker.log"
           )
+          if [ "$R_DRILL" = true ]; then
+            echo "simulate_failure=true: this run only tests the alert path; nothing is wrong." > "$ART/drill.log"
+            rows+=("alert drill (simulated, not a real fault)|failure|drill.log")
+          fi
           failed=()
           {
             echo "## app.makemycv.ae production monitor"

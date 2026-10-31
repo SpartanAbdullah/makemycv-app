@@ -43,6 +43,7 @@ trace at all. And nothing exercised production after a release except a person r
 - created: `.github/workflows/prod-monitor.yml` - daily 04:00 UTC + dispatch + push-on-change: `/api/health`, 6
   public URLs, `smoke:builder`, `smoke:import`, `smoke:checker` against https://app.makemycv.ae (one retry each),
   screenshots + logs as artifacts, one open `prod-monitor` issue on failure (closed on recovery), job fails.
+  Dispatch input `simulate_failure=true` is an alert drill (one fake failing row; the next normal run closes the issue).
 - created: `scripts/monitor-screenshots.mjs` - full-page PNGs of the 5 public pages, analytics blocked.
 - edited: `scripts/builder-smoke.mjs`, `scripts/checker-smoke.mjs` - `SMOKE_BLOCK_ANALYTICS=1` aborts GTM / GA /
   doubleclick / Speed Insights requests (default unchanged); dataLayer assertions unaffected.
