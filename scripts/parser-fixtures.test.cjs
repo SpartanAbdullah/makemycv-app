@@ -944,5 +944,47 @@ const D9_WRAPPED = [
   check(f, "no 5-word joined item", d.skills.includes("Preventive Maintenance Planning") && d.skills.includes("Civil Defence Compliance"), d.skills);
 }
 
+/* ── Session 6: unmarked PDF paragraphs wrapped across lines ──────────────
+   A role whose header fills role, company and location; the unmarked lines
+   under it are bullets. In a PDF (softWrapped) a paragraph that wraps used to
+   come back as one bullet per physical line. */
+const P_HEAD = [...D9_HEAD.slice(0, 4), "EXPERIENCE", "Facilities Manager | Oasis Healthcare Estates | Abu Dhabi | Jan 2017 - Feb 2021"];
+const P_WRAPPED = [
+  "Ran facilities for a 210-bed hospital and two outpatient clinics under DoH and JCI requirements, with a team",
+  "of 60 technicians across three shifts, and delivered a AED 4.2M HVAC retrofit on schedule with no break to the",
+  "Clinical services wing. Introduced a critical-spares register that cut emergency procurement by 44%.",
+];
+{
+  const f = "s6-paragraph-wrap (inline, PDF)";
+  const d = runText(f, [...P_HEAD, ...P_WRAPPED].join("\n"), { softWrapped: true });
+  const b = d.experience[0]?.bullets ?? [];
+  check(f, "three physical lines are one bullet (lower-case start, then a dangling \"the\")", b.length === 1 && b[0].startsWith("Ran facilities") && b[0].endsWith("by 44%."), b);
+}
+{
+  // DOCX: mammoth gives one paragraph per line and drops list markers, so
+  // unmarked lower-case bullets must stay separate.
+  const f = "s6-paragraph-not-soft-wrapped (inline, DOCX)";
+  const d = runText(f, [...P_HEAD, ...P_WRAPPED].join("\n"));
+  check(f, "no join without softWrapped", (d.experience[0]?.bullets ?? []).length === 3, d.experience[0]?.bullets);
+}
+{
+  // Guard: short lower-case bullets do not reach the margin — the author
+  // broke them, the renderer did not.
+  const f = "s6-paragraph-guard-short (inline, PDF)";
+  const d = runText(f, [...P_HEAD, "managed vendor contracts", "reduced costs by 10%", "trained 60 staff"].join("\n"), { softWrapped: true });
+  check(f, "short lower-case lines stay separate bullets", (d.experience[0]?.bullets ?? []).length === 3, d.experience[0]?.bullets);
+}
+{
+  // Guard: a margin-length line ending on "and" never swallows the next
+  // (dated, separated) role header.
+  const f = "s6-paragraph-guard-next-role (inline, PDF)";
+  const d = runText(f, [...P_HEAD,
+    "Coordinated planned shutdowns with academic timetabling across a 12-building university campus, security and",
+    "Assistant Facilities Manager | Gulf Campus Services | Sharjah | Jun 2014 - Dec 2016",
+    "Supervised 35 technicians across a 12-building university campus.",
+  ].join("\n"), { softWrapped: true });
+  check(f, "2 roles; the second header is not appended to a bullet", d.experience.length === 2 && d.experience[1]?.role === "Assistant Facilities Manager", d.experience.map((e) => e.role));
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

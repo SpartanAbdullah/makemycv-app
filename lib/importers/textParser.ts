@@ -472,6 +472,29 @@ function isBulletContinuation(line: string): boolean {
   return /[.!?]["')\]]?$/.test(line);
 }
 
+/** Words a wrapped line can end on but a finished sentence or a header cannot. */
+const DANGLING_END_RE =
+  /(?:[,&/–-]|\b(?:a|an|the|of|in|on|at|to|for|with|and|or|by|from|into|across|over|under|per|via|as|its|their|our|his|her|my|this|that|these|those))$/i;
+
+/**
+ * Session 6 (E11 "remaining"): is `line` the next physical line of the
+ * unmarked paragraph whose last physical line was `prev`? Only for PDF text
+ * (`wrapWidth` > 0), and only when `prev` ran to the right margin (so the
+ * renderer broke it) without closing punctuation. Then the line continues it
+ * when it starts lower case, or when `prev` stopped on a word no sentence
+ * ends on ("…archived in the" / "CAFM system. …") and the line carries no
+ * dates and no header separator (a new role is never swallowed).
+ */
+function isParagraphContinuation(prev: string, line: string, wrapWidth: number): boolean {
+  if (!reachesMargin(prev, wrapWidth)) return false;
+  if (/[.!?:;]["')\]]?$/.test(prev)) return false;
+  if (isBulletLine(line) || detectSection(line)) return false;
+  if (/^[a-z]/.test(line)) return true;
+  if (!DANGLING_END_RE.test(prev)) return false;
+  const hasDates = extractDates(line).length > 0 || PRESENT_RE.test(line);
+  return !hasDates && splitHeaderParts(line).length < 2;
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -494,7 +517,10 @@ function isBulletContinuation(line: string): boolean {
  *        "Jan 2024 - Present · Dubai, UAE"
  *        "Built ops team from scratch"
  */
-function parseExperienceBlock(lines: string[]): ParsedExperience[] {
+function parseExperienceBlock(
+  lines: string[],
+  wrapWidth = 0,
+): ParsedExperience[] {
   const entries: ParsedExperience[] = [];
   let current: ParsedExperience | null = null;
   let pendingDates: string[] | null = null;
@@ -502,6 +528,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   // True while the last line handled was a marked bullet (or a wrapped line
   // appended to one). See isBulletContinuation.
   let bulletOpen = false;
+  // The physical line last stored as (or appended to) an UNMARKED bullet,
+  // while that paragraph may still continue. See isParagraphContinuation.
+  let paragraphTail: string | null = null;
 
   const pushCurrent = () => {
     if (!current) return;
@@ -593,6 +622,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       current.bullets = current.bullets ?? [];
       current.bullets.push(stripBulletPrefix(line));
       bulletOpen = true;
+      paragraphTail = null;
       continue;
     }
 
@@ -611,6 +641,24 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       const last = current.bullets.length - 1;
       current.bullets[last] = `${current.bullets[last]} ${line}`;
       bulletOpen = true;
+      continue;
+    }
+
+    // Session 6: an UNMARKED paragraph in a PDF wraps too, and arrived as one
+    // bullet per physical line ("…with weekly" / "steering reviews, …" /
+    // "CAFM system. Lessons learned…"). PDF text only (wrapWidth > 0): in a
+    // DOCX every line is a paragraph of its own, and mammoth drops list
+    // markers, so lower-case bullets there would wrongly merge.
+    const tail = paragraphTail;
+    paragraphTail = null;
+    if (
+      tail !== null &&
+      current?.bullets?.length &&
+      isParagraphContinuation(tail, line, wrapWidth)
+    ) {
+      const last = current.bullets.length - 1;
+      current.bullets[last] = `${current.bullets[last]} ${line}`;
+      paragraphTail = line;
       continue;
     }
 
@@ -683,6 +731,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
         // structural position (after role/company/location).
         current.bullets = current.bullets ?? [];
         current.bullets.push(line);
+        paragraphTail = line;
       }
     }
   }
@@ -1741,8 +1790,12 @@ export function parseTextToDocument(
     result.unplaced = [...unplaced, ...buffers.personal];
   }
 
+  // PDF text column width in characters (0 for DOCX / pasted text), used to
+  // tell a renderer's line wrap from an author's line break.
+  const wrapWidth = wrapWidthOf(lines, opts);
+
   result.summary = buffers.summary.join(" ").replace(/\s{2,}/g, " ").trim();
-  result.experience = parseExperienceBlock(buffers.experience);
+  result.experience = parseExperienceBlock(buffers.experience, wrapWidth);
   result.education = parseEducationBlock(buffers.education);
   result.certifications = parseCertificationsBlock(buffers.certifications);
   // A detected Projects section used to be buffered and then silently
@@ -1751,7 +1804,6 @@ export function parseTextToDocument(
 
   // D9: rejoin list items the PDF renderer wrapped across two lines (PDF only,
   // see joinWrappedListLines for the guards).
-  const wrapWidth = wrapWidthOf(lines, opts);
   result.skills = flattenList(joinWrappedListLines(buffers.skills, wrapWidth));
 
   // Languages: `languages` stays the plain name list (its consumers all read

@@ -25,6 +25,22 @@ Format:
 
 ---
 
+## [2026-11-01 00:10] Import: an unmarked PDF paragraph comes back as one bullet, not one per line (session 5 remaining)
+
+**Goal:** session-5 remaining item (IMPORT_MONITORING.md §8.5, backlog E11.D2 note): an unmarked paragraph under a role
+in a PDF ("Detailed … narrative: …") arrived as one bullet per physical line, cut mid-sentence.
+**Files:**
+- edited: `lib/importers/textParser.ts`: `parseExperienceBlock(lines, wrapWidth)` appends a line to the unmarked bullet
+  above it when `isParagraphContinuation` holds: PDF text only (`wrapWidth` > 0), the previous physical line ran to
+  the right margin without closing punctuation, and the line starts lower case, or the previous line stopped on a
+  word no sentence ends on ("the", "and", "with", a comma…) and the line has no dates and no header separator.
+- edited: `scripts/parser-fixtures.test.cjs` (joined in PDF; not in DOCX; short lower-case bullets kept apart; a dated
+  role header after a line ending "and" is still a new role), `scripts/import-fixtures.test.mjs` (s5-long-wrapped.pdf:
+  exactly 5 bullets per role, the narrative whole).
+**Notes / risks / follow-up:** DOCX untouched on purpose: mammoth drops list markers, so lower-case Word bullets would
+merge.
+**Suggested commit:** fix(import): join wrapped lines of unmarked PDF paragraphs
+
 ## [2026-11-01 00:00] Import: a renamed PDF / Word file is named for what it is (session 5 D11)
 
 **Goal:** Minor copy defect D11 (IMPORT_MONITORING.md §8.3): a .docx renamed .pdf got "may be damaged, re-export",
