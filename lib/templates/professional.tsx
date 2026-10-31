@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
@@ -309,7 +309,7 @@ const ProfessionalBase = ({
                     .map((b) => b.trim())
                     .filter(Boolean)
                     .map((bullet, i) => (
-                      <li key={i}>{bullet}</li>
+                      <li key={i} {...bulletLiProps(bullet, "1rem")}>{bullet}</li>
                     ))}
                 </ul>
               </div>
@@ -403,7 +403,7 @@ const ProfessionalBase = ({
                   {bullets.length > 0 && (
                     <ul className={bulletListClass}>
                       {bullets.map((b, i) => (
-                        <li key={i}>{b}</li>
+                        <li key={i} {...bulletLiProps(b, "1rem")}>{b}</li>
                       ))}
                     </ul>
                   )}

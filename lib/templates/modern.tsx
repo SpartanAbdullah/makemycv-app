@@ -8,7 +8,7 @@ import {
   educationTitle,
   meaningfulEducation,
 } from "../utils/education";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -219,7 +219,7 @@ export const ModernTemplate = ({
                     )}
                     <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700 mt-2">
                       {role.bullets.filter(Boolean).map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
+                        <li key={index} {...bulletLiProps(bullet, "1.25rem")}>{bullet}</li>
                       ))}
                     </ul>
                   </div>
@@ -300,14 +300,14 @@ export const ModernTemplate = ({
                         {titleRow}
                         {firstBullet && (
                           <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
-                            <li>{firstBullet}</li>
+                            <li {...bulletLiProps(firstBullet, "1.25rem")}>{firstBullet}</li>
                           </ul>
                         )}
                       </div>
                       {remainingBullets.length > 0 && (
                         <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                           {remainingBullets.map((bullet, bulletIndex) => (
-                            <li key={bulletIndex}>{bullet}</li>
+                            <li key={bulletIndex} {...bulletLiProps(bullet, "1.25rem")}>{bullet}</li>
                           ))}
                         </ul>
                       )}
@@ -321,14 +321,14 @@ export const ModernTemplate = ({
                       {titleRow}
                       {firstBullet && (
                         <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
-                          <li>{firstBullet}</li>
+                          <li {...bulletLiProps(firstBullet, "1.25rem")}>{firstBullet}</li>
                         </ul>
                       )}
                     </div>
                     {remainingBullets.length > 0 && (
                       <ul className="list-disc pl-5 text-[calc(0.875rem*var(--fs))] leading-[calc(1.25rem*var(--lh))] text-slate-700">
                         {remainingBullets.map((bullet, bulletIndex) => (
-                          <li key={bulletIndex}>{bullet}</li>
+                          <li key={bulletIndex} {...bulletLiProps(bullet, "1.25rem")}>{bullet}</li>
                         ))}
                       </ul>
                     )}

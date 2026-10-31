@@ -11,6 +11,7 @@ import {
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { bulletLiProps } from "./utils";
 
 /**
  * "Onyx" — charcoal left sidebar with a prominent circular photo, inspired by
@@ -316,7 +317,7 @@ export const OnyxTemplate = ({
                   {role.bullets.filter(Boolean).length > 0 && (
                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                       {role.bullets.filter(Boolean).map((bullet, i) => (
-                        <li key={i} style={{ fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
+                        <li key={i} {...bulletLiProps(bullet, "14px", { fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale })}>
                           {bullet}
                         </li>
                       ))}
@@ -432,7 +433,7 @@ export const OnyxTemplate = ({
                     {bullets.length > 0 && (
                       <ul style={{ margin: "3px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                         {bullets.map((b, i) => (
-                          <li key={i} style={{ fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
+                          <li key={i} {...bulletLiProps(b, "14px", { fontSize: `${11 * theme.fontScale}px`, color: "#374151", lineHeight: 1.55 * theme.lineScale })}>
                             {b}
                           </li>
                         ))}

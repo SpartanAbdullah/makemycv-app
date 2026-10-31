@@ -154,9 +154,13 @@ fidelity composites) and the "Session 4 — Arabic" section of
   - Latin-first and letterless paragraphs resolve LTR exactly as before:
     the Latin fidelity gate passes unchanged (31 ok / 11 check), and Latin
     PDF content streams are byte-identical. Explicit `center` / `right`
-    alignment is kept. List markers stay on the left in both renderers (the
-    li / bullet row keeps its LTR direction); an Arabic-first bullet's text
-    aligns right of it.
+    alignment is kept. An Arabic-first bullet's marker sits on the RIGHT,
+    right before its text, in both renderers: the PDF bullet row is
+    `row-reverse` with the list's left padding mirrored onto the right
+    (`bulletRowDir` / `bulletDotDir` in `CVDocument.tsx`, all five bullet
+    renderers), the live `<li>` gets `dir="rtl"` and the same mirrored
+    margins (`bulletLiProps` in `lib/templates/utils.ts`, every bullet list
+    in the 13 template files). Latin bullets get no extra props or styles.
 - **Fonts not registered** (registration failed, or Node without
   `registerPdfFontsFromDir`): the wrapper leaves text alone and Helvetica
   prints the session-3 junk. `pdfArabicFamily()` is the switch.

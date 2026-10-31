@@ -25,6 +25,26 @@ Format:
 
 ---
 
+## [2026-11-01 02:30] Arabic-first bullets: the marker moves to the right, next to its text (session 6, E8.2 follow-up)
+
+**Goal:** release blocker found in review of E8.2 (`_cowork/session6/arabic/compare-A-classic.png`): Arabic-first
+bullets aligned right but kept their marker at the far left, a column-width away from the text.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — `bulletRowDir` / `bulletDotDir`: an Arabic-first bullet row is
+  `row-reverse` with the list's left padding mirrored to the right (margin -pad / +pad), the dot right-aligned in its
+  box; applied in the shared `BulletList` and the four layout-local bullet renderers (Modern helper, Banner,
+  Chronicle, Harvard).
+- edited: `lib/templates/utils.ts` — `bulletLiProps(text, pad, style)`: `dir="rtl"` + the same mirrored margins for
+  an Arabic-first `<li>`; Latin items get their original style back.
+- edited: 13 `lib/templates/*.tsx` — every bullet `<li>` (28) goes through `bulletLiProps` with its list's padding.
+- edited: `docs/arabic-pdf.md` — "Paragraph direction".
+**Notes / risks / follow-up:** checked the other prefixes beside Arabic-first text — " • " / " · " skill and
+language separators are inside one run (bidi orders them), role titles keep their place at the row start opposite
+the dates (same as LTR), contact icons sit next to content-sized items: none detached. Browser print enlarges the
+`.cv-print` list padding to 1.25rem, so in print the right gutter of an Arabic bullet is the template's own pad.
+Evidence `_cowork/session6/arabic/compare-*-bullets.png`.
+**Suggested commit:** fix(pdf,preview): Arabic-first bullets keep their marker beside the text, on the right
+
 ## [2026-11-01 01:40] smoke:arabic: Dense-2, mid-line Latin, Urdu name, whole-line reading-order check (session 6, E8.7)
 
 **Goal:** E8.7 — make the staging smoke cover what session-5 production verification found: the Dense-2 shape (page 2

@@ -10,7 +10,7 @@ import {
 import { isSkillsFirst } from "../data/sectionOrder";
 import { splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -289,7 +289,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
                       .map((bullet) => bullet.trim())
                       .filter(Boolean)
                       .map((bullet, index) => (
-                        <li key={index}>{bullet}</li>
+                        <li key={index} {...bulletLiProps(bullet, "1rem")}>{bullet}</li>
                       ))}
                   </ul>
                 </div>
@@ -411,14 +411,14 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
                       {titleRow}
                       {firstBullet && (
                         <ul className={bulletListClass}>
-                          <li>{firstBullet}</li>
+                          <li {...bulletLiProps(firstBullet, "1rem")}>{firstBullet}</li>
                         </ul>
                       )}
                     </div>
                     {remainingBullets.length > 0 && (
                       <ul className={bulletListClass}>
                         {remainingBullets.map((bullet, bulletIndex) => (
-                          <li key={bulletIndex}>{bullet}</li>
+                          <li key={bulletIndex} {...bulletLiProps(bullet, "1rem")}>{bullet}</li>
                         ))}
                       </ul>
                     )}
@@ -432,14 +432,14 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
                     {titleRow}
                     {firstBullet && (
                       <ul className={bulletListClass}>
-                        <li>{firstBullet}</li>
+                        <li {...bulletLiProps(firstBullet, "1rem")}>{firstBullet}</li>
                       </ul>
                     )}
                   </div>
                   {remainingBullets.length > 0 && (
                     <ul className={bulletListClass}>
                       {remainingBullets.map((bullet, bulletIndex) => (
-                        <li key={bulletIndex}>{bullet}</li>
+                        <li key={bulletIndex} {...bulletLiProps(bullet, "1rem")}>{bullet}</li>
                       ))}
                     </ul>
                   )}

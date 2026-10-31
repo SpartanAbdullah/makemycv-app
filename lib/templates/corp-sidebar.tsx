@@ -1,6 +1,6 @@
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
@@ -310,11 +310,11 @@ export const CorpSidebarTemplate = ({
                         .map((bullet, i) => (
                           <li
                             key={i}
-                            style={{
+                            {...bulletLiProps(bullet, "14px", {
                               fontSize: `${10.5 * theme.fontScale}px`,
                               color: "#374151",
                               lineHeight: 1.5 * theme.lineScale,
-                            }}
+                            })}
                           >
                             {bullet}
                           </li>
@@ -486,11 +486,11 @@ export const CorpSidebarTemplate = ({
                         {bullets.map((bullet, i) => (
                           <li
                             key={i}
-                            style={{
+                            {...bulletLiProps(bullet, "14px", {
                               fontSize: `${10.5 * theme.fontScale}px`,
                               color: "#374151",
                               lineHeight: 1.5 * theme.lineScale,
-                            }}
+                            })}
                           >
                             {bullet}
                           </li>

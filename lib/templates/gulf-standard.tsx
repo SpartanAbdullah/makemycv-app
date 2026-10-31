@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CvData, CvEducation, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
@@ -290,7 +290,7 @@ export const GulfStandardTemplate = ({
     return (
       <ul className="marker:text-slate-500" style={bulletListStyle}>
         {items.map((bullet, index) => (
-          <li key={index} style={bulletStyle}>
+          <li key={index} {...bulletLiProps(bullet, bulletListStyle.paddingLeft, bulletStyle)}>
             {bullet}
           </li>
         ))}

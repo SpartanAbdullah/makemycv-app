@@ -11,6 +11,7 @@ import {
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { bulletLiProps } from "./utils";
 
 /**
  * "Sandstone" — warm beige left sidebar with a profile photo, inspired by the
@@ -319,7 +320,7 @@ export const SandstoneTemplate = ({
                   {role.bullets.filter(Boolean).length > 0 && (
                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                       {role.bullets.filter(Boolean).map((bullet, i) => (
-                        <li key={i} style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls }}>
+                        <li key={i} {...bulletLiProps(bullet, "14px", { fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls })}>
                           {bullet}
                         </li>
                       ))}
@@ -436,7 +437,7 @@ export const SandstoneTemplate = ({
                     {bullets.length > 0 && (
                       <ul style={{ margin: "3px 0 0 0", paddingLeft: "14px", listStyleType: "disc" }}>
                         {bullets.map((b, i) => (
-                          <li key={i} style={{ fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls }}>
+                          <li key={i} {...bulletLiProps(b, "14px", { fontSize: `${11 * fs}px`, color: "#44403C", lineHeight: 1.55 * ls })}>
                             {b}
                           </li>
                         ))}

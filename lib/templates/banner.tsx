@@ -8,7 +8,7 @@ import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
 
 /**
@@ -241,7 +241,7 @@ export const BannerTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
         style={{ margin: "4px 0 0", paddingLeft: "16px" }}
       >
         {items.map((bullet, i) => (
-          <li key={i} style={{ ...bodyText, marginBottom: "2px" }}>
+          <li key={i} {...bulletLiProps(bullet, "16px", { ...bodyText, marginBottom: "2px" })}>
             {bullet}
           </li>
         ))}

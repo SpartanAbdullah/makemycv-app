@@ -132,6 +132,23 @@ const pt = (px: number) => px * 0.75;
  */
 const roleBox = (text: string): Style =>
   firstStrongDirection(text) === "rtl" ? { flexGrow: 0, flexShrink: 1 } : { flex: 1 };
+/**
+ * Bullet row of an Arabic-first bullet (session 6, E8.2 follow-up). The text
+ * aligns right (its paragraph direction), so the marker moves to the right
+ * too, right before the text in reading order: the row is reversed and the
+ * list's left padding is mirrored onto the right (margin -pad / +pad), so the
+ * marker sits as far from the right edge, and as close to its text, as an
+ * LTR marker does on the left; the text box keeps its width. The live lists
+ * do the same with `dir="rtl"` + mirrored margins (lib/templates/utils.ts
+ * `bulletLiProps`). Latin bullets get {} — identical styles.
+ */
+const bulletRowDir = (text: string, listPadLeft: number): Style =>
+  firstStrongDirection(text) === "rtl"
+    ? { flexDirection: "row-reverse", marginLeft: -listPadLeft, marginRight: listPadLeft }
+    : {};
+/** The marker glyph sits at the outer edge of its box, mirrored with the row. */
+const bulletDotDir = (text: string): Style => (firstStrongDirection(text) === "rtl" ? { textAlign: "right" } : {});
+
 /** `base` with its `flex` shorthand swapped for roleBox (Gulf Standard's entry title carries `flex: 1`). */
 const withRoleBox = (base: Style, text: string): Style => {
   if (firstStrongDirection(text) !== "rtl") return base;
@@ -419,11 +436,12 @@ const BulletList = ({
 }) => {
   const items = bullets.map((b) => b.trim()).filter(Boolean);
   if (items.length === 0) return null;
+  const listPad = Number(styles?.list?.paddingLeft ?? s.bulletList?.paddingLeft ?? 0) || 0;
   return (
     <View style={{ ...s.bulletList, ...styles?.list }}>
       {items.map((bullet, bi) => (
-        <View key={bi} style={{ ...s.bulletItem, ...styles?.item, ...(styles?.gap && bi > 0 ? { marginTop: styles.gap } : {}) }}>
-          <Text style={{ ...s.bulletDot, ...styles?.dot }}>•</Text>
+        <View key={bi} style={{ ...s.bulletItem, ...styles?.item, ...(styles?.gap && bi > 0 ? { marginTop: styles.gap } : {}), ...bulletRowDir(bullet, listPad) }}>
+          <Text style={{ ...s.bulletDot, ...styles?.dot, ...bulletDotDir(bullet) }}>•</Text>
           <Text style={{ ...s.bulletText, ...styles?.text }}>{bullet}</Text>
         </View>
       ))}
@@ -2154,8 +2172,8 @@ const ModernBullets = ({
   return (
     <View style={{ marginTop, paddingLeft: 6 }}>
       {bullets.map((bullet, i) => (
-        <View key={i} style={{ flexDirection: "row" }}>
-          <Text style={{ ...style, width: 9 }}>•</Text>
+        <View key={i} style={{ flexDirection: "row", ...bulletRowDir(bullet, 6) }}>
+          <Text style={{ ...style, width: 9, ...bulletDotDir(bullet) }}>•</Text>
           <Text style={{ ...style, flex: 1 }}>{bullet}</Text>
         </View>
       ))}
@@ -4590,8 +4608,8 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 3, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 2 }}>
-            <Text style={{ ...bodyText, width: 10, color: SLATE_400 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 2, ...bulletRowDir(bullet, 10) }}>
+            <Text style={{ ...bodyText, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...bodyText, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
@@ -5435,8 +5453,8 @@ const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 2, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5 }}>
-            <Text style={{ ...body, width: 10, color: SLATE_400 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5, ...bulletRowDir(bullet, 10) }}>
+            <Text style={{ ...body, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
@@ -5835,8 +5853,8 @@ const HarvardPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 1.5, paddingLeft: 12 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75 }}>
-            <Text style={{ ...body, width: 9 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75, ...bulletRowDir(bullet, 12) }}>
+            <Text style={{ ...body, width: 9, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
