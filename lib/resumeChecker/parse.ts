@@ -15,6 +15,7 @@
 import { z } from "zod";
 import {
   ANTHROPIC_PARSE_TIMEOUT_MS,
+  PARSE_MAX_TOKENS,
   CLAUDE_EFFORT,
   CLAUDE_MODEL,
   anthropicSignal,
@@ -232,7 +233,7 @@ async function callClaude(rawText: string): Promise<{
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
-      max_tokens: 8192,
+      max_tokens: PARSE_MAX_TOKENS,
       output_config: { effort: CLAUDE_EFFORT },
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUserPrompt(rawText) }],

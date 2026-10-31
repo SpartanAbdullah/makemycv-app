@@ -25,6 +25,120 @@ Format:
 
 ---
 
+## [2026-10-31 21:00] Classic: a right-to-left name / headline reaches the right margin (session 7, E8.8)
+
+**Goal:** backlog E8.8. Classic's header column reserves a right gutter for its corner photo (live `pr-24`, PDF 72pt).
+A right-aligned Arabic name or headline stopped at that gutter, ~140 px (at 2×) short of the margin, even with no photo
+(production render `_cowork/session6/prod-arabic/A-classic-p1.png`).
+**Files:**
+- edited: `lib/templates/utils.ts` - `hasRtlHeader(name, headline)`: true when either reads right to left.
+- edited: `lib/templates/classic.tsx` - the header column drops `pr-24` when `hasRtlHeader` and no photo is shown;
+  otherwise the class string is unchanged.
+- edited: `components/pdf/CVDocument.tsx` - Classic's header column: `paddingRight` 0 under the same condition, else
+  `pt(96)` as before.
+**Notes / risks / follow-up:** only Classic reserves such a gutter (searched every template for a fixed-width / padded
+name column). Latin output is unchanged: the Latin control renders a byte-identical page content stream
+(`_cowork/session7/e88/before-latin-classic.pdf` / `after-latin-classic.pdf`, sha1 03f874d3d222 both); the Arabic name
+now ends at x = 571.3pt = page width − 24pt margin (was 499.3). With a photo the gutter stays, so text never runs under
+it. Evidence: `_cowork/session7/e88/*-p1.png` (PDF) and `_cowork/session7/e88/preview-*.png` (live preview).
+**Suggested commit:** fix(pdf,preview): Classic RTL name and headline span the header when no photo is shown
+
+## [2026-10-31 20:40] Import: Arabic dates, a wrapped licence line, and a cover letter without a contact line (session 7)
+
+**Goal:** the three parser items left open in IMPORT_MONITORING §8.6.
+**Files:**
+- edited: `lib/importers/textParser.ts` - (1) `DATE_TOKEN_RE` reads Arabic month + year: Gregorian يناير … ديسمبر with
+  the common spellings, Levantine / Iraqi كانون الثاني … كانون الأول, ASCII or Arabic-Indic year; a month without a year
+  is not a date. `PRESENT_RE` reads حتى / إلى / لغاية الآن, حتى تاريخه and حالياً (bare "الآن" is not). Tokens are kept
+  as written. Before: "(مارس 2021 - حتى الآن)" left "(مارس" in the Company and the role not current. (2)
+  `wrappedUaeTail`: a labelled UAE value that ends mid-list (",", "&", "and") takes a short, label-free, non-heading
+  next line as its tail — "Driving Licence: UAE," / "valid" is ONE unplaced line (matrix case 1), "DL: Light," /
+  "manual" maps to Light Vehicle.
+- edited: `lib/importers/importErrors.ts`, `lib/importers/fieldMapper.ts` - `MAPPING_EMPTY_LETTER_COPY` and
+  `mappingEmptyMessage(parsed)`: a file with nothing importable that reads like a cover letter (matrix case 10b) gets
+  "This file reads like a cover letter rather than a CV…" instead of "no CV sections … written in English". The reason
+  stays `mapping_empty`.
+- edited: `components/builder/BuilderShell.tsx` - uses `mappingEmptyMessage`; the error bar adds "Open the cover letter
+  tool" → /cover-letter for that copy only.
+- created: `__fixtures__/import/s5-cover-letter-prose.pdf` - matrix case 10b (synthetic "Noor Testwell").
+- edited: `scripts/parser-fixtures.test.cjs` (+11 checks: Arabic dates and guards, the wrap and its guards),
+  `scripts/import-fixtures.test.mjs` (10b copy, not-a-cv keeps the generic copy, case-1 licence line; the harness uses
+  `mappingEmptyMessage` like the builder), `scripts/import-smoke.mjs` (10b case: reason, copy, link; no link on other
+  `mapping_empty` files).
+**Notes / risks / follow-up:** the new date tests fail on the previous parser (5 of 5) and pass now; the s6 rule that
+keeps an Arabic repeat line out of a Latin block still holds (rtl-mixed.docx: 2 cards, the line unplaced).
+**Suggested commit:** fix(import): Arabic month names and "until now" as dates, wrapped UAE values, cover-letter copy for 10b
+
+## [2026-10-31 20:10] Import: a Word file gets the same 45 s read deadline as a PDF (session 7)
+
+**Goal:** IMPORT_MONITORING §8.6 "still open": a DOCX import had no read deadline. On a stalled connection the adapter /
+mammoth chunk kept "Reading your DOCX" up indefinitely, while a PDF gave up at 45 s (D10).
+**Files:**
+- edited: `lib/importers/importErrors.ts` - `DOCX_TIMEOUT_MS` (= `PDF_TIMEOUT_MS`), `DOCX_TIMEOUT_COPY` ("Reading this Word
+  file took too long…" — the reason's default copy names a PDF and suggests a Word version), `withDeadline` takes an
+  optional message.
+- edited: `lib/importers/docxAdapter.ts` - `docxAdapter.parse` honours `deadlineAt` over the mammoth chunk, the file read
+  and the extraction (`parseDocxBytes(…, { deadlineAt })`); the checker's `extractDocxTextInBrowser` gets its own 45 s
+  budget, like `extractPdfTextInBrowser`.
+- edited: `components/builder/BuilderShell.tsx` - the budget starts at the pick for both formats; the docxAdapter chunk
+  load is inside it.
+- edited: `lib/importers/adapter.ts` - interface comment.
+- created: `lib/importers/docxDeadline.test.ts` - a mammoth that never answers rejects with `timeout` and the Word copy
+  at the deadline; same budget as PDF; the no-deadline Node path still reads.
+- edited: `scripts/import-smoke.mjs` - `checkDocxUnderDeadline`: every script chunk requested after the builder is
+  ready is held 60 s; expects the slow-read hint at ~8 s and `cv_import_failed(timeout)` with the Word copy at ~45 s
+  (adds ~46 s to the smoke and to the production monitor).
+**Notes / risks / follow-up:** `error_reason` stays `timeout` (no new analytics value). The slow-read hint was already
+format-agnostic. mammoth cannot be aborted; after the deadline its result is ignored.
+**Suggested commit:** fix(import): Word imports get the same read deadline and timeout as PDF
+
+## [2026-10-31 19:40] Import: Arabic right-to-left runs read in order; our Arabic Classic export round-trips again (session 7, E11.R2)
+
+**Goal:** backlog E11.R2. Since E8.2 the Arabic-first Classic export lays "role | company" and the bullet markers out
+right to left, and the importer read the line as "| company role" and each bullet as "text •": Role = "company role",
+Company = the first bullet.
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` - `reconstructLines` (now exported for its unit test) reads a run of
+  right-to-left items from its right end (`rtlReadingOrder`): the letterless items between them, a marker at the
+  line's right edge, and sentence punctuation at the run's left end join the run; a marker at the line's left edge,
+  anything next to a Latin item, dates and single-item lines keep their place. A space before a haraka is dropped
+  ("فريقا ً" → "فريقاً"; our own text layer writes it).
+- edited: `lib/importers/textParser.ts` - `looksLikeLocation` accepts a whole line that is a Gulf / Levant city in
+  Arabic, optionally ", country" (`ARABIC_LOCATION_RE`); the role's city line ("دبي") was becoming a bullet.
+- replaced: `__fixtures__/import/arabic-export-classic.pdf` - re-exported from the current build with the smoke:arabic
+  Node renderer (synthetic persona "Reem Al Hashimi", example.com): two roles, a city line, Arabic + Latin bullets.
+- edited: `scripts/import-fixtures.test.mjs` - five new checks on that fixture (2 roles, location, the three bullets
+  exactly as written, role 2 fields, nothing unplaced); `arabic-only.pdf` (Chrome-printed, one item per glyph run) now
+  imports the real name and headline in reading order, so its "no mirrored name" check became the stricter "exactly
+  ليلى / حداد / أخصائية مشتريات" plus "the mirrored form appears nowhere".
+- created: `lib/importers/pdfLines.test.ts` - 10 cases (the production item positions, guards for Latin lines, a
+  left-edge marker, "English | العربية", a date left of Arabic text).
+- edited: `scripts/parser-fixtures.test.cjs` - inline fixtures for the Arabic city line and its whole-line guard.
+**Notes / risks / follow-up:** measured over every PDF fixture and the session-6 production exports
+(`_cowork/session7/import/rtl-before.txt` vs `rtl-after5.txt`): only Arabic documents change; every Latin fixture is
+identical. Applies to the checker's text extraction too (same function). Not fixed: "محلل أول — المشتريات | الشركة"
+splits at the em dash (the Latin "Role — X | Company" does the same), and glyph-mirrored brackets in Chrome-printed
+Arabic.
+**Suggested commit:** fix(import): read right-to-left PDF runs in order so the Arabic Classic export round-trips
+
+## [2026-10-31 19:00] Checker parse: one pinned output ceiling, comments and spend weight agree (session 7)
+
+**Goal:** stabilisation finding (PRODUCTION_STABILITY_2026-10-31 §2.3 item 3): `/api/resume-checker/parse` sends
+`max_tokens` 8192 while the route and spend-guard comments said 4096, and the 3-unit spend weight was reasoned from 4096.
+**Files:**
+- edited: `lib/server/anthropic.ts` - `PARSE_MAX_TOKENS = 8192`, with the reasoning: the Haiku 5.5 migration (`eeb7112`)
+  doubled every route's ceiling together (small routes 1024 → 2048, parse 4096 → 8192) for thinking tokens and the ~30%
+  larger token counts, so the parse : small-route ratio (4×) the 3-unit weight was reasoned from is unchanged.
+- edited: `lib/resumeChecker/parse.ts` - sends `PARSE_MAX_TOKENS` instead of the literal.
+- edited: `lib/server/spendGuard.ts`, `app/api/resume-checker/parse/route.ts` - comments now say 8192.
+- edited: `lib/server/anthropic.test.ts` - pins the constant at 8192, fails on a numeric `max_tokens` literal in
+  `parse.ts`, and fails when the spend-guard / route comments state a parse ceiling other than the constant.
+**Notes / risks / follow-up:** no behaviour or cost change: 8192 has been in production since 2026-10-10, and it is a
+ceiling, not a charge (output is billed as generated). Kept rather than lowered because the parse answers with the
+whole CV as JSON (bullets verbatim) and a cut-off answer falls back to the heuristic parser. Raising it later means
+revisiting `PARSE_SPEND_UNITS`.
+**Suggested commit:** fix(checker): pin the parse max_tokens at 8192 and make the cost comments agree
+
 ## [2026-11-01 02:50] Arabic bullets: Banner / Chronicle / Harvard mirror the live list padding (session 6, follow-up)
 
 **Goal:** after the RTL-marker fix the Harvard dense Arabic cells dropped from ok to check in the fidelity harness

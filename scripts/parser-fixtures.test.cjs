@@ -1015,5 +1015,109 @@ const AR_REPEAT = "أخصائية مشتريات أولى — فالكون لإ�
   check(f, "both Arabic roles kept", d.experience.length === 2 && d.experience[1]?.role === "منسق مشتريات", d.experience.map((e) => e.role));
 }
 
+/* ── Session 7 (E11.R2): our own Arabic-first Classic export, as pdfAdapter
+   now reads it (role | company in reading order, the city on its own line). */
+{
+  const f = "s7-arabic-city-line (inline)";
+  const d = runText(f, [
+    "ريم الهاشمي", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية Jan 2023 – Present",
+    "دبي",
+    "• قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب",
+    "منسق مشتريات | شركة الواحة للمقاولات Jun 2019 – Dec 2022",
+    "أبوظبي، الإمارات",
+    "• أدار عقود الموردين في دبي",
+  ].join("\n"));
+  const e = d.experience;
+  check(f, "role / company / location / bullets in place", e.length === 2 && e[0]?.role === "محلل سلسلة التوريد" && e[0]?.company === "شركة الخليج للخدمات اللوجستية" && e[0]?.location === "دبي" && e[0]?.bullets?.length === 1, e);
+  check(f, "\"City، Country\" in Arabic is a location", e[1]?.location === "أبوظبي، الإمارات", e[1]);
+  check(f, "a bullet that mentions دبي stays a bullet", e[1]?.bullets?.[0] === "أدار عقود الموردين في دبي", e[1]?.bullets);
+}
+/* ── Session 7: a labelled UAE value wrapped onto the next line ─────────── */
+{
+  const f = "s7-uae-value-wrap (inline, PDF)";
+  const d = runText(f, [
+    "Noor Testwell", "noor@example.com | +971 50 123 4567",
+    "Visa Status: Employment visa | Notice Period: 60 days | Driving Licence: Light,",
+    "manual",
+    "SUMMARY", "Facilities operations manager with 11 years in the UAE.",
+  ].join("\n"), { softWrapped: true });
+  check(f, "\"Light,\" + \"manual\" → Light Vehicle, nothing unplaced", d.uae?.drivingLicense === "Light Vehicle" && !(d.unplaced ?? []).some((u) => /manual|Driving/i.test(u)), [d.uae, d.unplaced]);
+}
+{
+  // Guards: no join onto a heading, a labelled line, or a value that ended.
+  const f = "s7-uae-value-wrap-guard (inline, PDF)";
+  const d = runText(f, [
+    "Noor Testwell", "noor@example.com",
+    "Visa Status: Employment visa | Driving Licence: UAE,",
+    "SUMMARY", "Facilities operations manager with 11 years in the UAE.",
+  ].join("\n"), { softWrapped: true });
+  check(f, "\"SUMMARY\" is not joined to the licence", (d.unplaced ?? []).includes("Driving Licence: UAE,") && /Facilities operations manager/.test(d.summary ?? ""), [d.unplaced, d.summary]);
+  const d2 = runText(f + " 2", [
+    "Noor Testwell", "noor@example.com",
+    "Driving Licence: UAE,",
+    "Nationality: Emirati",
+  ].join("\n"), { softWrapped: true });
+  check(f, "a labelled next line is not a tail", d2.uae?.nationality === "Emirati", d2.uae);
+  const d3 = runText(f + " 3", [
+    "Noor Testwell", "noor@example.com",
+    "Nationality: Emirati",
+    "Dubai",
+  ].join("\n"), { softWrapped: true });
+  check(f, "a value that ended takes no tail", d3.uae?.nationality === "Emirati", d3.uae);
+  const d4 = runText(f + " 4", [
+    "Noor Testwell", "noor@example.com",
+    "Nationality: Emirati,",
+    "Jordanian",
+  ].join("\n"), { softWrapped: true });
+  check(f, "…while one that ends on \",\" does (free-text field)", d4.uae?.nationality === "Emirati, Jordanian", d4.uae);
+}
+
+/* ── Session 7: Arabic month names and "until now" are dates ───────────────
+   IMPORT_MONITORING §8.6: "(مارس 2021 - حتى الآن)" left the month in the
+   Company and the role not current. Tokens are kept as written. */
+{
+  const f = "s7-arabic-dates (inline)";
+  const d = runText(f, [
+    "ليلى حداد", "layla@example.com", "الخبرة المهنية", "Experience",
+    "أخصائية مشتريات أولى | فالكون لإدارة المرافق (مارس 2021 - حتى الآن)",
+    "• إدارة أكثر من 60 مناقصة سنوياً",
+    "مسؤولة مشتريات | واحة البناء للمقاولات (يونيو 2017 - فبراير 2021)",
+    "• توفير المواد لاثني عشر مشروعاً",
+    "منسقة مشتريات | شركة النور للتجارة (كانون الثاني 2014 - أيار 2017)",
+    "• متابعة أوامر الشراء",
+    "مساعدة إدارية | مجموعة الريم",
+    "تشرين الأول ٢٠١٢ - حالياً",
+    "• تنظيم المراسلات",
+  ].join("\n"));
+  const e = d.experience;
+  check(f, "4 roles", e.length === 4, e.map((x) => x.role));
+  check(f, "Gregorian month + \"حتى الآن\": start, current, Company clean", e[0]?.startDate === "مارس 2021" && e[0]?.isCurrent === true && e[0]?.endDate === "Present" && e[0]?.company === "فالكون لإدارة المرافق", e[0]);
+  check(f, "Gregorian range", e[1]?.startDate === "يونيو 2017" && e[1]?.endDate === "فبراير 2021" && e[1]?.isCurrent === false && e[1]?.company === "واحة البناء للمقاولات", e[1]);
+  check(f, "Levantine two-word month names", e[2]?.startDate === "كانون الثاني 2014" && e[2]?.endDate === "أيار 2017" && e[2]?.company === "شركة النور للتجارة", e[2]);
+  check(f, "date-only line with Arabic-Indic year and \"حالياً\"", e[3]?.startDate === "تشرين الأول ٢٠١٢" && e[3]?.isCurrent === true && e[3]?.company === "مجموعة الريم", e[3]);
+}
+{
+  // Guards: a month name without a year, and "الآن" alone, are not dates.
+  const f = "s7-arabic-dates-guard (inline)";
+  const d = runText(f, [
+    "ريم الهاشمي", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية | 2020",
+    "• أطلق حملة مارس السنوية ويعمل الآن على توسيعها",
+  ].join("\n"));
+  const e = d.experience[0];
+  check(f, "the bullet stays a bullet; the role is not current", d.experience.length === 1 && e?.isCurrent === false && e?.bullets?.[0] === "أطلق حملة مارس السنوية ويعمل الآن على توسيعها", d.experience);
+}
+{
+  // Guard: an unmarked Arabic line that merely mentions a city is not a location.
+  const f = "s7-arabic-city-guard (inline)";
+  const d = runText(f, [
+    "ريم الهاشمي", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية Jan 2023 – Present",
+    "إدارة مستودعات دبي",
+  ].join("\n"));
+  check(f, "\"إدارة مستودعات دبي\" is not the location", !d.experience[0]?.location, d.experience[0]);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

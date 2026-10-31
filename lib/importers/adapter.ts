@@ -122,7 +122,7 @@ export interface ImportAdapter {
   name: string;
   /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste).
    *  `deadlineAt` (epoch ms) is the caller's budget for the whole read; the
-   *  PDF adapter honours it (session 6 D10), others may ignore it. */
+   *  PDF (session 6 D10) and DOCX (session 7) adapters honour it. */
   parse(
     input: File | string,
     opts?: { deadlineAt?: number },

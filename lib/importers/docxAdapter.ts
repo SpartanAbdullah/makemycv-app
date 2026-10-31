@@ -8,6 +8,8 @@
 
 import type { ImportAdapter, ParsedDocument } from "./adapter";
 import {
+  DOCX_TIMEOUT_COPY,
+  DOCX_TIMEOUT_MS,
   ImportParseError,
   MISMATCH_COPY,
   MIN_TEXT_LENGTH,
@@ -15,6 +17,7 @@ import {
   sniffContainer,
   toImportParseError,
   unsupportedTypeMessage,
+  withDeadline,
 } from "./importErrors";
 import { contactLinesOnly, readDocxHeaderFooter } from "./docxParts";
 import { parseTextToDocument } from "./textParser";
@@ -81,22 +84,48 @@ export async function extractDocxText(
  * June — Word is the most common CV format among UAE job seekers).
  */
 export async function extractDocxTextInBrowser(input: File): Promise<string> {
-  let mammoth: MammothModule;
+  const deadlineAt = Date.now() + DOCX_TIMEOUT_MS;
+  const mammoth = await loadMammoth(deadlineAt);
+  return withDeadline(
+    input.arrayBuffer().then((buf) => extractDocxText(buf, mammoth)),
+    deadlineAt,
+    undefined,
+    DOCX_TIMEOUT_COPY,
+  );
+}
+
+/**
+ * The mammoth chunk, inside the read's deadline (session 7). A Word import
+ * used to have no deadline at all: on a stalled connection the chunk load
+ * kept "Reading your DOCX" up with no end, while a PDF gave up at 45 s
+ * (D10). Same budget, same `timeout` reason, Word-specific copy.
+ */
+async function loadMammoth(deadlineAt: number): Promise<MammothModule> {
   try {
-    mammoth = (await import("mammoth")) as unknown as MammothModule;
-  } catch {
+    return (await withDeadline(
+      import("mammoth"),
+      deadlineAt,
+      undefined,
+      DOCX_TIMEOUT_COPY,
+    )) as unknown as MammothModule;
+  } catch (err) {
+    if (err instanceof ImportParseError) throw err; // timeout
     throw new ImportParseError("worker_load_failed");
   }
-  return extractDocxText(await input.arrayBuffer(), mammoth);
 }
 
 /** Bytes → ParsedDocument, shared by the browser adapter and the Node fixture
- *  suite. Throws ImportParseError only. */
+ *  suite. Throws ImportParseError only. With `deadlineAt` (epoch ms) the read
+ *  rejects with `timeout` once it passes. */
 export async function parseDocxBytes(
   buffer: ArrayBuffer,
   mammoth: MammothModule,
+  opts?: { deadlineAt?: number },
 ): Promise<ParsedDocument> {
-  const text = await extractDocxText(buffer, mammoth);
+  const read = extractDocxText(buffer, mammoth);
+  const text = opts?.deadlineAt
+    ? await withDeadline(read, opts.deadlineAt, undefined, DOCX_TIMEOUT_COPY)
+    : await read;
   if (text.trim().length < MIN_TEXT_LENGTH) {
     throw new ImportParseError("empty_text");
   }
@@ -110,17 +139,14 @@ export async function parseDocxBytes(
 export const docxAdapter: ImportAdapter = {
   name: "DOCX",
 
-  async parse(input: File): Promise<ParsedDocument> {
+  async parse(input: File, opts?: { deadlineAt?: number }): Promise<ParsedDocument> {
     // Typed failures instead of swallow-to-`{}` — see pdfAdapter (UX-18).
     if (typeof window === "undefined") {
       throw new ImportParseError("parse_exception");
     }
-    let mammoth: MammothModule;
-    try {
-      mammoth = (await import("mammoth")) as unknown as MammothModule;
-    } catch {
-      throw new ImportParseError("worker_load_failed");
-    }
-    return parseDocxBytes(await input.arrayBuffer(), mammoth);
+    const deadlineAt = opts?.deadlineAt ?? Date.now() + DOCX_TIMEOUT_MS;
+    const mammoth = await loadMammoth(deadlineAt);
+    const data = await withDeadline(input.arrayBuffer(), deadlineAt, undefined, DOCX_TIMEOUT_COPY);
+    return parseDocxBytes(data, mammoth, { deadlineAt });
   },
 };

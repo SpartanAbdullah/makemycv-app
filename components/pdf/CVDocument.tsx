@@ -18,6 +18,7 @@ import type { CvData, PlanTier } from "../../lib/types/cv";
 import { formatLanguageLevel } from "../../lib/language";
 import { getEssentialChips } from "../../lib/utils/essentials";
 import { resolveTheme } from "../../lib/templates/theme";
+import { hasRtlHeader } from "../../lib/templates/utils";
 import {
   bannerContactItems,
   bannerEducationTitle,
@@ -1039,7 +1040,15 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-          <View style={{ flex: 1, paddingRight: pt(96), gap: pt(4) }}>
+          {/* pr-24 keeps the photo's corner clear; a right-to-left header
+              with no photo spans the full width (E8.8, hasRtlHeader). */}
+          <View
+            style={{
+              flex: 1,
+              paddingRight: hasRtlHeader(name, data.personal.headline) && !showPhoto ? 0 : pt(96),
+              gap: pt(4),
+            }}
+          >
             <Text
               style={{
                 ...bold,

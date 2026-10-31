@@ -5,6 +5,7 @@ import type { CvData } from "../types/cv";
 import type { ParsedDocument, ParsedExperience } from "./adapter";
 import { createId } from "../utils/id";
 import { defaultCvData } from "../store/cvStore";
+import { MAPPING_EMPTY_LETTER_COPY, importErrorMessage } from "./importErrors";
 
 /**
  * Seed a professional headline when the parser didn't produce one.
@@ -277,4 +278,15 @@ export function looksLikeCoverLetter(parsed: ParsedDocument): boolean {
   if ((parsed.experience?.length ?? 0) > 0) return false;
   if ((parsed.education?.length ?? 0) > 0) return false;
   return (parsed.unplaced ?? []).some((l) => LETTER_OPENING_RE.test(l.trim()));
+}
+
+/**
+ * The error-bar copy for a parse with nothing importable (`mapping_empty`):
+ * the cover-letter wording when the file reads like one (session 7, matrix
+ * case 10b), else the reason's own copy. The reason itself never changes.
+ */
+export function mappingEmptyMessage(parsed: ParsedDocument): string {
+  return looksLikeCoverLetter(parsed)
+    ? MAPPING_EMPTY_LETTER_COPY
+    : importErrorMessage("mapping_empty");
 }

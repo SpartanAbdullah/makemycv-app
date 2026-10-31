@@ -29,7 +29,7 @@ export const IMPORT_ERROR_REASONS = [
   "corrupt_pdf",
   /** The pdf.js worker script could not be loaded (local and CDN). */
   "worker_load_failed",
-  /** Extraction exceeded PDF_TIMEOUT_MS. */
+  /** Extraction exceeded PDF_TIMEOUT_MS / DOCX_TIMEOUT_MS. */
   "timeout",
   // --- DOCX adapter
   /** Not a zip / no document part — a damaged or mislabelled .docx. */
@@ -73,6 +73,9 @@ export const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
 export const MIN_TEXT_LENGTH = 200;
 /** Whole-document budget for pdf.js extraction. */
 export const PDF_TIMEOUT_MS = 45_000;
+/** The same budget for a Word file: mammoth chunk + read + parse (session 7;
+ *  until then a DOCX read had no deadline at all). */
+export const DOCX_TIMEOUT_MS = PDF_TIMEOUT_MS;
 /** Pages read past this are ignored — a CV never needs them and a 300-page
  *  mis-pick would otherwise run into the timeout instead of importing. */
 export const MAX_PDF_PAGES = 30;
@@ -95,18 +98,20 @@ export function withDeadline<T>(
   work: Promise<T>,
   deadlineAt: number,
   onExpire?: () => void,
+  /** Copy for the timeout; the PDF wording when omitted. */
+  message?: string,
 ): Promise<T> {
   const remaining = deadlineAt - Date.now();
   if (remaining <= 0) {
     onExpire?.();
     // Keep a late rejection of `work` from surfacing as unhandled.
     work.catch(() => {});
-    return Promise.reject(new ImportParseError("timeout"));
+    return Promise.reject(new ImportParseError("timeout", message));
   }
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      reject(new ImportParseError("timeout"));
+      reject(new ImportParseError("timeout", message));
       onExpire?.();
     }, remaining);
   });
@@ -309,6 +314,18 @@ export const IMPORT_ERROR_COPY: Record<ImportErrorReason, string> = {
   report_no_cv: "Report returned no CV data.",
   report_network: "Network error while importing the report.",
 };
+
+/** `mapping_empty` copy when the file reads like a cover letter (session 7,
+ *  import matrix case 10b: a letter with no contact line got the generic
+ *  "no CV sections … written in English" copy). Same reason, so analytics are
+ *  unchanged; the builder's error bar adds a link to /cover-letter. */
+export const MAPPING_EMPTY_LETTER_COPY =
+  "This file reads like a cover letter rather than a CV, so there was nothing to import. Pick your CV file instead — or write a letter for a specific role with the cover letter tool.";
+
+/** `timeout` copy for a Word file — the reason's default copy names a PDF and
+ *  suggests a Word version (session 7, DOCX read deadline). */
+export const DOCX_TIMEOUT_COPY =
+  "Reading this Word file took too long. A slow connection can cause this — try again, or save it as a PDF and import that instead.";
 
 /** Type-specific wording for `unsupported_type` — the one reason where the
  *  next step depends on what was picked. */

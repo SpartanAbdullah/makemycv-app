@@ -130,8 +130,9 @@ export async function POST(request: Request) {
 
   // Global daily spend cap — after the per-IP limiter (per-IP 429s win) and
   // after text validation (bad uploads never burn budget). This route sends
-  // up to 100k chars with max_tokens 4096 — by far the most expensive Claude
-  // call in the app — so it charges 3 units against the shared daily budget.
+  // up to 100k chars with max_tokens 8192 (PARSE_MAX_TOKENS) — by far the
+  // most expensive Claude call in the app — so it charges 3 units against the
+  // shared daily budget.
   const spend = await takeSpendUnits(PARSE_SPEND_UNITS);
   if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 

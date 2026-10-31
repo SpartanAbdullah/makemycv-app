@@ -70,6 +70,8 @@ const CASES = [
   ["s5-31-pages.pdf", "import"],
   // Session 6: a cover letter with a contact header (matrix case 10a).
   ["s5-cover-letter-contact.pdf", "import"],
+  // Session 7: a letter with no contact line (matrix case 10b).
+  ["s5-cover-letter-prose.pdf", "mapping_empty"],
   // Session 6 (D11): extension / bytes mismatch (matrix cases 9a / 9b).
   ["s5-docx-bytes.pdf", "corrupt_pdf"],
   ["s5-pdf-bytes.docx", "corrupt_docx"],
@@ -79,6 +81,8 @@ const CASES = [
 const EXPECT_MESSAGE = {
   "s5-docx-bytes.pdf": /actually a Word document with a \.pdf name/,
   "s5-pdf-bytes.docx": /actually a PDF with a \.docx name/,
+  // Session 7 (10b): the letter copy, not "no CV sections … in English".
+  "s5-cover-letter-prose.pdf": /reads like a cover letter/,
 };
 
 // D7a (session 6): the review names the pages it read when the PDF is longer
@@ -218,6 +222,15 @@ async function runCase(name, file, expected) {
     if (EXPECT_MESSAGE[name]) {
       if (EXPECT_MESSAGE[name].test(message)) ok(`${name}: copy names the real type (D11)`);
       else fail(`${name}: copy names the real type (D11)`, `"${message}"`);
+    }
+    if (name === "s5-cover-letter-prose.pdf") {
+      const href = await page.getByTestId("import-error-cover-letter").getAttribute("href", { timeout: 2000 }).catch(() => null);
+      if (href === "/cover-letter") ok(`${name}: error bar links to /cover-letter (session 7)`);
+      else fail(`${name}: error bar links to /cover-letter (session 7)`, `href=${href}`);
+    } else if (expected === "mapping_empty") {
+      const n = await page.getByTestId("import-error-cover-letter").count();
+      if (n === 0) ok(`${name}: no cover-letter link on a non-letter`);
+      else fail(`${name}: no cover-letter link on a non-letter`, `${n} links`);
     }
   } else {
     fail(label, `outcome=${outcome}; ${summary}; message="${message.slice(0, 90)}"`);
@@ -555,9 +568,63 @@ async function checkProbeUnderDeadline() {
   );
 }
 
+// 3. Session 7: a Word import had no deadline at all — with the adapter /
+//    mammoth chunks stalled, "Reading your DOCX" stayed up until they came.
+//    Every script chunk requested AFTER the builder is ready (the lazily
+//    loaded import code) is held 60 s: the hint shows at ~8 s and the pick
+//    ends in cv_import_failed(timeout) at ~45 s with the Word wording.
+async function checkDocxUnderDeadline() {
+  const label = "Word import, chunks held 60 s (session 7): hint at ~8 s, timeout at ~45 s, Word copy";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "load" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    await pg.waitForLoadState("networkidle").catch(() => {});
+    await pg.evaluate(() => { window.dataLayer = []; });
+    let held = 0;
+    await c.route("**/_next/static/chunks/**", async (route) => {
+      held++;
+      await hold(60000);
+      await route.continue().catch(() => {});
+    });
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "two-column-table.docx")))) return fail(label, "file chooser never opened");
+    const t0 = Date.now();
+    const hint = pg.getByTestId("import-slow-hint");
+    const errorBar = pg.getByTestId("import-error");
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    let hintAt = null;
+    let outcome = "nothing";
+    while (Date.now() - t0 < 75000) {
+      if (hintAt === null && /Still reading your file/.test((await hint.textContent().catch(() => "")) ?? "")) hintAt = Date.now() - t0;
+      if (await errorBar.isVisible().catch(() => false)) { outcome = "error"; break; }
+      if (await review.isVisible().catch(() => false)) { outcome = "review"; break; }
+      await pg.waitForTimeout(250);
+    }
+    const took = Date.now() - t0;
+    const message = outcome === "error" ? ((await errorBar.textContent()) ?? "").trim() : "";
+    const pushes = await importPushes(pg);
+    if (held === 0) {
+      console.log(`INFO  ${label}: no chunk was requested after the pick (import code already loaded) — inconclusive`);
+    } else if (
+      outcome === "error" && pushes.length === 1 && pushes[0] === "cv_import_failed(timeout)" &&
+      took >= 43000 && took < 50000 && hintAt !== null && hintAt >= 7500 && hintAt < 11000 &&
+      /Word file took too long/.test(message)
+    ) {
+      ok(`${label} — hint at ${(hintAt / 1000).toFixed(1)} s, ${pushes[0]} after ${(took / 1000).toFixed(1)} s`);
+    } else {
+      fail(label, `outcome=${outcome} after ${took} ms; hint ${hintAt ?? "never"}; pushes=${JSON.stringify(pushes)}; held=${held}; message="${message.slice(0, 90)}"`);
+    }
+  } finally {
+    await c.close();
+  }
+}
+
 for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
 await checkSlowReadHint();
 await checkProbeUnderDeadline();
+await checkDocxUnderDeadline();
 await checkImportAfterTyping();
 await checkErrorClearedByNextPick();
 await checkFirstImportToast();

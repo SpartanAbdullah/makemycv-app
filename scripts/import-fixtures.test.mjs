@@ -26,7 +26,7 @@ const build = (p) => require(path.join(root, ".test-build", "importers", p));
 
 const { parsePdfBytes, extractPdfText } = build("pdfAdapter.js");
 const { parseDocxBytes, extractDocxText } = build("docxAdapter.js");
-const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter } = build("fieldMapper.js");
+const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter, mappingEmptyMessage } = build("fieldMapper.js");
 const { gateImportFile, importFileType, importErrorMessage, IMPORT_ERROR_REASONS, ImportParseError } =
   build("importErrors.js");
 
@@ -77,7 +77,8 @@ async function runImport(name, data) {
         : await parsePdfBytes(data, { pdfjs, workerSrc });
     const partial = mapParsedToCv(parsed);
     if (!hasUsableContent(partial)) {
-      return { reason: "mapping_empty", message: importErrorMessage("mapping_empty"), parsed };
+      // Same copy choice as BuilderShell (session 7: a letter gets its own).
+      return { reason: "mapping_empty", message: mappingEmptyMessage(parsed), parsed };
     }
     return { parsed, partial, sections: countSectionsFilled(partial) };
   } catch (err) {
@@ -183,6 +184,10 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const skills = (r.partial?.skills ?? []).map((s) => s.name ?? s);
   check("s5-long-wrapped.pdf", "\"Budget Control\" is one skill (D9)", skills.includes("Budget Control") && !skills.includes("Budget") && !skills.includes("Control"), skills);
   check("s5-long-wrapped.pdf", "10 skills, as written (D9)", skills.length === 10, skills);
+  // Session 7: "… | Driving Licence: UAE," / "valid" wraps; the review shows
+  // ONE unplaced line (no vehicle class to map), not two halves.
+  const unplaced = r.parsed?.unplaced ?? [];
+  check("s5-long-wrapped.pdf", "wrapped \"Driving Licence: UAE, valid\" is one unplaced line (session 7)", unplaced.includes("Driving Licence: UAE, valid") && !unplaced.includes("valid") && !unplaced.includes("Driving Licence: UAE,"), unplaced);
 }
 {
   const r = await expectImport("s5-header-table.docx", 6);
@@ -200,10 +205,17 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const r = await runImport("arabic-only.pdf", bytesOf("arabic-only.pdf"));
   check("arabic-only.pdf", "partial import (no failure)", !r.reason, r.reason);
   check("arabic-only.pdf", "email found", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
-  // Chrome-printed Arabic comes out of pdf.js in VISUAL order ("ليلى" as
-  // "ىليل"). Once NFKC made those letters visible to the name test (D4), the
-  // mirrored name must still not be adopted — empty is honest, mirrored is not.
-  check("arabic-only.pdf", "no mirrored Arabic name or headline (D4)", !/[؀-ۿ]/.test(`${r.partial?.personal?.firstName ?? ""}${r.partial?.personal?.lastName ?? ""}${r.partial?.personal?.headline ?? ""}`), r.partial?.personal);
+  // Chrome-printed Arabic comes out of pdf.js as one item per glyph run in
+  // VISUAL order ("ليلى" as "ىليل"). Once NFKC made those letters visible to
+  // the name test (D4), the mirrored name must still not be adopted — empty
+  // is honest, mirrored is not. Session 7 (E11.R2): pdfAdapter now reads a
+  // run of right-to-left items from its right end, so the name comes back in
+  // reading order — the check is now that it is EXACTLY the real name (a
+  // mirrored one still fails it; the parser's own mirror guard keeps its
+  // inline fixture in parser-fixtures.test.cjs).
+  const ap = r.partial?.personal ?? {};
+  check("arabic-only.pdf", "Arabic name and headline in reading order, never mirrored (D4, E11.R2)", ap.firstName === "ليلى" && ap.lastName === "حداد" && ap.headline === "أخصائية مشتريات", ap);
+  check("arabic-only.pdf", "no mirrored name anywhere in the import (D4)", !JSON.stringify([r.partial, r.parsed?.unplaced]).includes("ىليل"));
 }
 
 {
@@ -243,10 +255,16 @@ await expectImport("plain-helvetica-cv.pdf", 5);
    s5-arabic-majority.pdf = session-5 matrix case 3 (Arabic headings, Latin
    email line, Vazirmatn shaped by react-pdf). arabic-export-classic.pdf = a
    CV exported from the builder's Classic template with an Arabic name, role
-   and company (_cowork/session5/arabic/A-classic.pdf, synthetic persona
-   "Reem Al Hashimi", example.com). pdf.js returns both as presentation forms
-   (U+FB50–U+FEFF); the adapter NFKC-normalises them. */
+   and company (synthetic persona "Reem Al Hashimi", example.com; session 7
+   re-exported it from the current build with the smoke:arabic Node renderer
+   — two roles, a city line, Arabic and Latin bullets). pdf.js returns both
+   as presentation forms (U+FB50–U+FEFF); the adapter NFKC-normalises them. */
 const PRESENTATION_FORMS = /[ﭐ-﷿ﹰ-﻿]/;
+const ARABIC_EXPORT_BULLETS = [
+  "قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب إلى 94% عبر 4 مستودعات في جبل علي",
+  "خفّض المخزون الاحتياطي بنسبة 12% بعد تطبيق نظام SAP IBP",
+  "Cut freight spend by AED 1.2M across the GCC lane network in 2025.",
+];
 {
   const r = await runImport("s5-arabic-majority.pdf", bytesOf("s5-arabic-majority.pdf"));
   const p = r.partial?.personal ?? {};
@@ -265,6 +283,13 @@ const PRESENTATION_FORMS = /[ﭐ-﷿ﹰ-﻿]/;
   check("arabic-export-classic.pdf", "headline", p.headline === "محللة سلسلة التوريد", p.headline);
   check("arabic-export-classic.pdf", "role | company in base letters", exp[0]?.role === "محلل سلسلة التوريد" && exp[0]?.company === "شركة الخليج للخدمات اللوجستية" && exp[0]?.startDate === "Jan 2023", exp[0]);
   check("arabic-export-classic.pdf", "no presentation forms stored (E8.3)", !PRESENTATION_FORMS.test(JSON.stringify(r.partial)));
+  // Session 7 (E11.R2): re-exported from the E8.2 build, where the Arabic-first
+  // "role | company" line and the bullet markers are laid out right to left.
+  check("arabic-export-classic.pdf", "2 roles (E11.R2)", exp.length === 2, exp.map((e) => e.role));
+  check("arabic-export-classic.pdf", "role 1 current, location دبي, not a bullet (E11.R2)", exp[0]?.isCurrent === true && exp[0]?.endDate === "Present" && exp[0]?.location === "دبي", exp[0]);
+  check("arabic-export-classic.pdf", "role 1 bullets exactly as written, first bullet not the Company (E11.R2)", JSON.stringify(exp[0]?.bullets) === JSON.stringify(ARABIC_EXPORT_BULLETS), exp[0]?.bullets);
+  check("arabic-export-classic.pdf", "role 2: منسق مشتريات | شركة الواحة للمقاولات, Jun 2019 – Dec 2022 (E11.R2)", exp[1]?.role === "منسق مشتريات" && exp[1]?.company === "شركة الواحة للمقاولات" && exp[1]?.startDate === "Jun 2019" && exp[1]?.endDate === "Dec 2022" && exp[1]?.bullets?.length === 1 && exp[1]?.bullets?.[0] === "أدار عقود 30 مورّداً في المنطقة الحرة بجبل علي", exp[1]);
+  check("arabic-export-classic.pdf", "nothing unplaced (E11.R2)", (r.parsed?.unplaced ?? []).length === 0, r.parsed?.unplaced);
 }
 
 /* ── documents that must fail with the right reason ────────────────────── */
@@ -274,7 +299,16 @@ await expectReason("encrypted-cv.pdf", "encrypted_pdf");
 await expectReason("legacy-doc-renamed.docx", "unsupported_type");
 await expectReason("empty.pdf", "empty_file");
 await expectReason("photo-of-cv.jpg", "unsupported_type");
-await expectReason("not-a-cv.pdf", "mapping_empty");
+{
+  const r = await expectReason("not-a-cv.pdf", "mapping_empty");
+  check("not-a-cv.pdf", "generic mapping_empty copy, not the letter copy (session 7)", r.message === importErrorMessage("mapping_empty"), r.message);
+}
+{
+  // Session 7: import matrix case 10b — a letter with no contact line. The
+  // reason stays mapping_empty; the copy says it reads like a cover letter.
+  const r = await expectReason("s5-cover-letter-prose.pdf", "mapping_empty");
+  check("s5-cover-letter-prose.pdf", "cover-letter copy, not the generic one (10b)", /reads like a cover letter/.test(r.message ?? "") && r.message !== importErrorMessage("mapping_empty"), r.message);
+}
 {
   const big = makeLargePdf(25 * 1024 * 1024);
   await expectReason("large-25mb.pdf", "too_large", big.buffer.slice(big.byteOffset, big.byteOffset + big.byteLength));

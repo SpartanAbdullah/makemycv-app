@@ -29,10 +29,12 @@ import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import {
+  DOCX_TIMEOUT_COPY,
+  DOCX_TIMEOUT_MS,
+  MAPPING_EMPTY_LETTER_COPY,
   PDF_TIMEOUT_MS,
   SLOW_READ_HINT_MS,
   gateImportFile,
-  importErrorMessage,
   importFileType,
   toImportParseError,
   withDeadline,
@@ -42,6 +44,7 @@ import {
   countSectionsFilled,
   hasUsableContent,
   mapParsedToCv,
+  mappingEmptyMessage,
 } from "../../lib/importers/fieldMapper";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 
@@ -1173,14 +1176,24 @@ export const BuilderShell = ({
       const startedAt = Date.now();
       // D10 (session 6): the PDF budget starts at the pick, so loading the
       // adapter chunk, pdf.js and the worker probe count against it too.
-      const deadlineAt = startedAt + PDF_TIMEOUT_MS;
+      // Session 7: a Word file gets the same budget (it had none), with its
+      // own timeout copy.
+      const deadlineAt =
+        startedAt + (fileType === "docx" ? DOCX_TIMEOUT_MS : PDF_TIMEOUT_MS);
       setImportState({ phase: "parsing", source, startedAt });
       try {
         // Adapters (and the textParser they pull in) load on first import,
         // not at builder first paint (audit PERF-6).
         const adapter =
           fileType === "docx"
-            ? (await import("../../lib/importers/docxAdapter")).docxAdapter
+            ? (
+                await withDeadline(
+                  import("../../lib/importers/docxAdapter"),
+                  deadlineAt,
+                  undefined,
+                  DOCX_TIMEOUT_COPY,
+                )
+              ).docxAdapter
             : (
                 await withDeadline(
                   import("../../lib/importers/pdfAdapter"),
@@ -1194,7 +1207,9 @@ export const BuilderShell = ({
         // the document's first line taken for a name) — a dead end that
         // recorded nothing. Say so here instead, with a next step, and count it.
         if (!hasUsableContent(mapParsedToCv(parsed))) {
-          failImport("mapping_empty", importErrorMessage("mapping_empty"));
+          // Session 7: a cover letter (matrix case 10b) gets its own copy
+          // and a link; the reason stays mapping_empty.
+          failImport("mapping_empty", mappingEmptyMessage(parsed));
           return;
         }
         setImportState({ phase: "review", source, parsed });
@@ -1365,6 +1380,19 @@ export const BuilderShell = ({
               style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}
             >
               {errorMsg ?? downloadError}
+              {errorMsg === MAPPING_EMPTY_LETTER_COPY && (
+                <>
+                  {" "}
+                  <Link
+                    href="/cover-letter"
+                    data-testid="import-error-cover-letter"
+                    className="underline underline-offset-2"
+                    style={{ fontWeight: 600 }}
+                  >
+                    Open the cover letter tool
+                  </Link>
+                </>
+              )}
             </p>
             <button
               type="button"
