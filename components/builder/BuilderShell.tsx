@@ -29,10 +29,13 @@ import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import {
+  PDF_TIMEOUT_MS,
+  SLOW_READ_HINT_MS,
   gateImportFile,
   importErrorMessage,
   importFileType,
   toImportParseError,
+  withDeadline,
   type ImportErrorReason,
 } from "../../lib/importers/importErrors";
 import {
@@ -116,7 +119,7 @@ export const useGuardedDownload = () => useContext(DownloadContext);
 
 type ImportState =
   | { phase: "idle" }
-  | { phase: "parsing"; source: string }
+  | { phase: "parsing"; source: string; startedAt: number }
   | { phase: "review"; source: string; parsed: ParsedDocument };
 
 /* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
@@ -776,6 +779,18 @@ export const BuilderShell = ({
   const pushToast = useUiStore((s) => s.pushToast);
   const [importState, setImportState] = useState<ImportState>({ phase: "idle" });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // D10 (session 6): after SLOW_READ_HINT_MS on "Reading your PDF" the
+  // overlay says it is still working. Keyed by the read's start time, so a
+  // new read never inherits the previous one's hint and nothing resets it.
+  const parsingStartedAt =
+    importState.phase === "parsing" ? importState.startedAt : null;
+  const [slowReadFor, setSlowReadFor] = useState<number | null>(null);
+  useEffect(() => {
+    if (parsingStartedAt === null) return;
+    const t = setTimeout(() => setSlowReadFor(parsingStartedAt), SLOW_READ_HINT_MS);
+    return () => clearTimeout(t);
+  }, [parsingStartedAt]);
+  const slowRead = parsingStartedAt !== null && slowReadFor === parsingStartedAt;
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [supportCardOpen, setSupportCardOpen] = useState(false);
@@ -1155,15 +1170,24 @@ export const BuilderShell = ({
         return;
       }
 
-      setImportState({ phase: "parsing", source });
+      const startedAt = Date.now();
+      // D10 (session 6): the PDF budget starts at the pick, so loading the
+      // adapter chunk, pdf.js and the worker probe count against it too.
+      const deadlineAt = startedAt + PDF_TIMEOUT_MS;
+      setImportState({ phase: "parsing", source, startedAt });
       try {
         // Adapters (and the textParser they pull in) load on first import,
         // not at builder first paint (audit PERF-6).
         const adapter =
           fileType === "docx"
             ? (await import("../../lib/importers/docxAdapter")).docxAdapter
-            : (await import("../../lib/importers/pdfAdapter")).pdfAdapter;
-        const parsed = await adapter.parse(file);
+            : (
+                await withDeadline(
+                  import("../../lib/importers/pdfAdapter"),
+                  deadlineAt,
+                )
+              ).pdfAdapter;
+        const parsed = await adapter.parse(file, { deadlineAt });
         // Partial-import guard: a parse with nothing usable used to open
         // MappingReview in its "No fields could be extracted" state with the
         // Import button disabled (or, worse, with a "1 section" that was only
@@ -1562,6 +1586,20 @@ export const BuilderShell = ({
                   "Mapping to your CV",
                 ]}
               />
+              <p
+                role="status"
+                data-testid="import-slow-hint"
+                style={{
+                  fontSize: 13,
+                  color: "var(--ff-ink)",
+                  lineHeight: 1.5,
+                  margin: slowRead ? "14px 0 0" : 0,
+                }}
+              >
+                {slowRead
+                  ? "Still reading your file… A slow connection can make this take longer. You'll see the result, or what to try instead, as soon as it's done."
+                  : null}
+              </p>
               <p
                 style={{
                   fontSize: 12,

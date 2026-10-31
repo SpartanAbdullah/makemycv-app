@@ -120,6 +120,11 @@ export { ImportParseError };
 export interface ImportAdapter {
   /** Human-readable source label */
   name: string;
-  /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste) */
-  parse(input: File | string): Promise<ParsedDocument>;
+  /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste).
+   *  `deadlineAt` (epoch ms) is the caller's budget for the whole read; the
+   *  PDF adapter honours it (session 6 D10), others may ignore it. */
+  parse(
+    input: File | string,
+    opts?: { deadlineAt?: number },
+  ): Promise<ParsedDocument>;
 }

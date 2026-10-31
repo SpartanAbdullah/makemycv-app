@@ -25,6 +25,29 @@ Format:
 
 ---
 
+## [2026-10-31 23:50] Import: the 45 s PDF budget starts at the pick, and a slow read says so (session 5 D10)
+
+**Goal:** Minor defect D10 (IMPORT_MONITORING.md §8.3): on a 10 KiB/s link the user waited 57 s on "Reading your PDF"
+with no message, and the 45 s timeout never fired, because the adapter chunk, the `pdfjs-dist` import and the worker
+HEAD probe ran before the budget started (and had no bound at all).
+**Files:**
+- edited: `lib/importers/importErrors.ts`: `withDeadline(work, deadlineAt, onExpire)` (rejects with `timeout`),
+  `SLOW_READ_HINT_MS` = 8 s.
+- edited: `lib/importers/pdfAdapter.ts`: `extractPdfText` takes `deadlineAt` (absolute; wins over `timeoutMs`) and
+  does not open the PDF when it is already spent; `loadPdfjs` puts the pdf.js import and the worker probe under the
+  same deadline (a probe that times out is forgotten so the next pick probes again); `pdfAdapter.parse(file,
+  { deadlineAt })`; the checker's `extractPdfTextInBrowserDetailed` gets one budget from its own start.
+- edited: `lib/importers/adapter.ts`: optional `{ deadlineAt }` on `ImportAdapter.parse`.
+- edited: `components/builder/BuilderShell.tsx`: the deadline is fixed when the pick starts and covers the adapter
+  chunk import; the parsing overlay shows "Still reading your file… A slow connection can make this take longer…"
+  after 8 s (`role="status"`, `data-testid="import-slow-hint"`).
+- edited: `lib/importers/importErrors.test.ts` (withDeadline), `scripts/import-fixtures.test.mjs` (spent deadline does
+  not open the PDF; deadlineAt beats timeoutMs), `scripts/import-smoke.mjs` (worker GET held 12 s → hint at ~8 s then
+  the review; worker HEAD held 60 s → `cv_import_failed(timeout)` at ~45 s), `docs/import-errors.md`.
+**Notes / risks / follow-up:** `error_reason` values unchanged. DOCX has no deadline (unchanged); the hint shows for
+both formats.
+**Suggested commit:** fix(import): start the PDF deadline at the pick and show a slow-read hint (D10)
+
 ## [2026-10-31 23:40] Import: a skill list wrapped across two PDF lines keeps its items whole (session 5 D9)
 
 **Goal:** Minor defect D9 (IMPORT_MONITORING.md §8.3): "… · SLA Reporting · Budget" / "Control · Civil Defence …"

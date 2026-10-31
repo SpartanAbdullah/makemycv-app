@@ -294,6 +294,33 @@ await expectReason("empty.docx", "empty_file", new ArrayBuffer(0));
   check("timeout", "a hung pdf.js task reports timeout", reason === "timeout", reason);
 }
 {
+  // D10 (session 6): the caller's deadline (fixed when the pick started)
+  // governs. When loading pdf.js and probing the worker already used it up,
+  // extraction does not start at all; when part is left, only that part runs.
+  let opened = 0;
+  const counting = {
+    GlobalWorkerOptions: { workerSrc: "" },
+    getDocument: () => { opened++; return { promise: new Promise(() => {}), destroy: () => {} }; },
+  };
+  let reason;
+  try {
+    await extractPdfText(bytesOf("text-cv.pdf"), { pdfjs: counting, workerSrc: "x", deadlineAt: Date.now() - 1 });
+  } catch (err) {
+    reason = err.kind;
+  }
+  check("deadline", "a spent deadline reports timeout without opening the PDF (D10)", reason === "timeout" && opened === 0, [reason, opened]);
+  const t0 = Date.now();
+  reason = undefined;
+  try {
+    // timeoutMs alone would allow 60 s; the absolute deadline leaves 80 ms.
+    await extractPdfText(bytesOf("text-cv.pdf"), { pdfjs: counting, workerSrc: "x", timeoutMs: 60_000, deadlineAt: Date.now() + 80 });
+  } catch (err) {
+    reason = err.kind;
+  }
+  const took = Date.now() - t0;
+  check("deadline", "deadlineAt wins over timeoutMs (D10)", reason === "timeout" && took < 2000, [reason, took]);
+}
+{
   // A worker that never loads: pdf.js's own wording for the memoised failure.
   const broken = {
     GlobalWorkerOptions: { workerSrc: "" },

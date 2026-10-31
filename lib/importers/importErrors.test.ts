@@ -24,6 +24,7 @@ import {
   sniffContainer,
   toImportParseError,
   unsupportedTypeMessage,
+  withDeadline,
 } from "./importErrors";
 
 describe("taxonomy", () => {
@@ -137,5 +138,34 @@ describe("classifyDocxError / toImportParseError", () => {
     assert.equal(e.kind, "parse_exception");
     assert.doesNotMatch(e.message, /Layla/);
     assert.equal(e.message, IMPORT_ERROR_COPY.parse_exception);
+  });
+});
+
+describe("withDeadline (D10, session 6)", () => {
+  test("resolves with the work when it beats the deadline", async () => {
+    assert.equal(await withDeadline(Promise.resolve(7), Date.now() + 1000), 7);
+  });
+  test("rejects with timeout and runs onExpire when the deadline passes first", async () => {
+    let expired = 0;
+    const never = new Promise<number>(() => {});
+    await assert.rejects(
+      withDeadline(never, Date.now() + 20, () => { expired++; }),
+      (e: unknown) => e instanceof ImportParseError && e.kind === "timeout",
+    );
+    assert.equal(expired, 1);
+  });
+  test("a deadline already past rejects at once, even for work that would succeed", async () => {
+    let expired = 0;
+    const started = Date.now();
+    await assert.rejects(
+      withDeadline(Promise.resolve(1), Date.now() - 1, () => { expired++; }),
+      (e: unknown) => e instanceof ImportParseError && e.kind === "timeout",
+    );
+    assert.equal(expired, 1);
+    assert.ok(Date.now() - started < 50);
+  });
+  test("the work's own error passes through unchanged", async () => {
+    const err = new ImportParseError("corrupt_pdf");
+    await assert.rejects(withDeadline(Promise.reject(err), Date.now() + 1000), (e: unknown) => e === err);
   });
 });

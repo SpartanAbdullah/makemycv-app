@@ -15,6 +15,7 @@ import {
   PDF_TIMEOUT_MS,
   classifyPdfError,
   toImportParseError,
+  withDeadline,
 } from "./importErrors";
 import { parseTextToDocument } from "./textParser";
 
@@ -150,7 +151,11 @@ export type ExtractPdfOptions = {
   pdfjs: PdfjsModule;
   /** Resolved worker URL — same-origin path in the browser, file: URL in Node. */
   workerSrc: string;
+  /** Budget from the start of THIS call. Ignored when `deadlineAt` is set. */
   timeoutMs?: number;
+  /** Absolute deadline (epoch ms) fixed by the caller when the pick started,
+   *  so the time spent loading pdf.js and probing the worker counts (D10). */
+  deadlineAt?: number;
   maxPages?: number;
 };
 
@@ -168,29 +173,27 @@ export type ExtractedPdf = {
  * Text + page count from PDF bytes. Throws ImportParseError with
  * encrypted_pdf / corrupt_pdf / worker_load_failed / timeout / parse_exception.
  *
- * The timeout covers the whole run (open + every page), and on expiry the
- * loading task is destroyed so the worker stops chewing on the file.
+ * The deadline covers the whole run (open + every page), and on expiry the
+ * loading task is destroyed so the worker stops chewing on the file. When the
+ * caller passes `deadlineAt`, the budget also covers what it did before.
  */
 export async function extractPdfText(
   data: ArrayBuffer,
   opts: ExtractPdfOptions,
 ): Promise<ExtractedPdf> {
   const { pdfjs } = opts;
-  const timeoutMs = opts.timeoutMs ?? PDF_TIMEOUT_MS;
+  const deadlineAt = opts.deadlineAt ?? Date.now() + (opts.timeoutMs ?? PDF_TIMEOUT_MS);
   const maxPages = opts.maxPages ?? MAX_PDF_PAGES;
+  // The caller's steps already used the whole budget: do not start pdf.js.
+  if (Date.now() >= deadlineAt) throw new ImportParseError("timeout");
   pdfjs.GlobalWorkerOptions.workerSrc = opts.workerSrc;
 
   // pdf.js transfers (detaches) the buffer it receives — hand it a copy so
   // a caller can still read the original afterwards.
   const task = pdfjs.getDocument({ data: data.slice(0) });
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new ImportParseError("timeout"));
-      void Promise.resolve(task.destroy()).catch(() => {});
-    }, timeoutMs);
-  });
+  const destroyTask = () => {
+    void Promise.resolve(task.destroy()).catch(() => {});
+  };
 
   const run = async (): Promise<ExtractedPdf> => {
     const pdf = await task.promise;
@@ -216,7 +219,7 @@ export async function extractPdfText(
   };
 
   try {
-    return await Promise.race([run(), deadline]);
+    return await withDeadline(run(), deadlineAt, destroyTask);
   } catch (err) {
     const reason = classifyPdfError(err);
     if (reason !== "timeout") {
@@ -224,8 +227,6 @@ export async function extractPdfText(
       console.warn(`[pdfAdapter] extraction failed: ${reason}`);
     }
     throw new ImportParseError(reason);
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -263,6 +264,35 @@ export function resolveWorkerSrc(pdfjs: Pick<PdfjsModule, "version">): Promise<s
 }
 
 /**
+ * pdf.js module + worker URL, both under the pick's deadline (D10, session
+ * 6). Before, the chunk import and the HEAD probe ran on no clock and the
+ * 45 s budget only started afterwards (case 12a: 57 s with no timeout).
+ */
+async function loadPdfjs(
+  deadlineAt: number,
+): Promise<{ pdfjs: PdfjsModule; workerSrc: string }> {
+  let pdfjs: PdfjsModule;
+  try {
+    pdfjs = (await withDeadline(
+      import("pdfjs-dist") as Promise<unknown>,
+      deadlineAt,
+    )) as PdfjsModule;
+  } catch (err) {
+    if (err instanceof ImportParseError) throw err; // timeout
+    // The library chunk itself did not load (offline mid-session, blocker).
+    throw new ImportParseError("worker_load_failed");
+  }
+  try {
+    return { pdfjs, workerSrc: await withDeadline(resolveWorkerSrc(pdfjs), deadlineAt) };
+  } catch (err) {
+    // A probe that never answered stays pending; let the next pick probe again
+    // instead of awaiting the same stuck request.
+    workerSrcPromise = null;
+    throw err;
+  }
+}
+
+/**
  * Extract raw text from a PDF in the browser using pdfjs-dist.
  *
  * Reconstructs lines from item Y-positions so downstream parsers see one
@@ -290,16 +320,10 @@ export async function extractPdfTextInBrowserDetailed(
   if (typeof window === "undefined") {
     throw new Error("extractPdfTextInBrowser must run in the browser");
   }
-  let pdfjs: PdfjsModule;
-  try {
-    pdfjs = (await import("pdfjs-dist")) as unknown as PdfjsModule;
-  } catch {
-    // The library chunk itself did not load (offline mid-session, blocker).
-    throw new ImportParseError("worker_load_failed");
-  }
-  const workerSrc = await resolveWorkerSrc(pdfjs);
+  const deadlineAt = Date.now() + PDF_TIMEOUT_MS;
+  const { pdfjs, workerSrc } = await loadPdfjs(deadlineAt);
   const arrayBuffer = await input.arrayBuffer();
-  return extractPdfText(arrayBuffer, { pdfjs, workerSrc });
+  return extractPdfText(arrayBuffer, { pdfjs, workerSrc, deadlineAt });
 }
 
 /** Bytes → ParsedDocument, shared by the browser adapter and the Node fixture
@@ -329,7 +353,7 @@ export async function parsePdfBytes(
 export const pdfAdapter: ImportAdapter = {
   name: "PDF",
 
-  async parse(input: File): Promise<ParsedDocument> {
+  async parse(input: File, opts?: { deadlineAt?: number }): Promise<ParsedDocument> {
     // Failures THROW typed errors instead of resolving `{}` (audit UX-18) —
     // the old swallow-to-empty behavior made every failure mode (corrupt
     // file, scanned image, odd layout) land on the same dead-end "No fields
@@ -338,14 +362,11 @@ export const pdfAdapter: ImportAdapter = {
     if (typeof window === "undefined") {
       throw new ImportParseError("parse_exception");
     }
-    let pdfjs: PdfjsModule;
-    try {
-      pdfjs = (await import("pdfjs-dist")) as unknown as PdfjsModule;
-    } catch {
-      throw new ImportParseError("worker_load_failed");
-    }
-    const workerSrc = await resolveWorkerSrc(pdfjs);
+    // D10: BuilderShell fixes the deadline when the pick starts, before it
+    // loads this chunk; one budget then covers chunk, pdf.js, probe and read.
+    const deadlineAt = opts?.deadlineAt ?? Date.now() + PDF_TIMEOUT_MS;
+    const { pdfjs, workerSrc } = await loadPdfjs(deadlineAt);
     const data = await input.arrayBuffer();
-    return parsePdfBytes(data, { pdfjs, workerSrc });
+    return parsePdfBytes(data, { pdfjs, workerSrc, deadlineAt });
   },
 };

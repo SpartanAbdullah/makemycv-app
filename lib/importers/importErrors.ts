@@ -77,6 +77,44 @@ export const PDF_TIMEOUT_MS = 45_000;
  *  mis-pick would otherwise run into the timeout instead of importing. */
 export const MAX_PDF_PAGES = 30;
 
+/** After this long on "Reading your PDF/DOCX" the import overlay adds a
+ *  "still reading your file…" line (D10, session 6). */
+export const SLOW_READ_HINT_MS = 8_000;
+
+/**
+ * Race `work` against an absolute deadline (epoch ms). On expiry the promise
+ * rejects with ImportParseError("timeout") and `onExpire` runs (e.g. to
+ * destroy a pdf.js task). A deadline already past rejects at once.
+ *
+ * D10 (session 6): the PDF budget used to start inside `extractPdfText`, so
+ * the adapter chunk, the pdf.js import and the worker probe that precede it
+ * were unbounded (57 s seen on a slow link with no timeout). Callers now fix
+ * the deadline when the pick starts and pass it down through every step.
+ */
+export function withDeadline<T>(
+  work: Promise<T>,
+  deadlineAt: number,
+  onExpire?: () => void,
+): Promise<T> {
+  const remaining = deadlineAt - Date.now();
+  if (remaining <= 0) {
+    onExpire?.();
+    // Keep a late rejection of `work` from surfacing as unhandled.
+    work.catch(() => {});
+    return Promise.reject(new ImportParseError("timeout"));
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new ImportParseError("timeout"));
+      onExpire?.();
+    }, remaining);
+  });
+  return Promise.race([work, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export class ImportParseError extends Error {
   constructor(
     public kind: ImportErrorReason,
