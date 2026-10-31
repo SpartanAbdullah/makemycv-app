@@ -111,7 +111,16 @@ const FORMS: Record<number, Forms> = {
   0x06af: [0xfb92, 0xfb93, 0xfb94, 0xfb95], // گ
   0x06ba: [0xfb9e, 0xfb9f], // ں
   0x06be: [0xfbaa, 0xfbab, 0xfbac, 0xfbad], // ھ
-  0x06c1: [0xfba6, 0xfba7, 0xfba8, 0xfba9], // ہ
+  // ہ (heh goal). Vazirmatn has no glyph for the isolated presentation form
+  // U+FBA6, and a code point the face lacks is handed to textkit's font
+  // substitution, which prints Helvetica-Bold "¦" and adds a second font run
+  // to the line (session 5, ARABIC_PRODUCTION §1 test 7). The base letter
+  // U+06C1 maps to Vazirmatn's isolated outline (the face draws it like
+  // U+FEE9), it is one code point → one glyph like every other form, and it
+  // keeps the Urdu letter itself in the text layer (U+FEE9 would read back
+  // as the Arabic ه after NFKC). `scripts/arabic-glyphs.test.mjs` fails if
+  // any form below is missing from either Vazirmatn cut.
+  0x06c1: [0x06c1, 0xfba7, 0xfba8, 0xfba9], // ہ
   0x06cc: [0xfbfc, 0xfbfd, 0xfbfe, 0xfbff], // ی
   0x06d2: [0xfbae, 0xfbaf], // ے
   0x06d3: [0xfbb0, 0xfbb1], // ۓ
@@ -189,8 +198,45 @@ const LATIN_LIGATURES: ReadonlyArray<readonly [RegExp, string]> = [
  */
 export function shapeArabic(text: string): string {
   if (!containsArabic(text)) return text;
-  return shapeArabicLetters(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text));
+  return shapeArabicLetters(
+    decomposeUnmapped(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text)),
+  );
 }
+
+/**
+ * Letters that have no presentation forms of their own but are a letter we
+ * do shape plus a combining hamza: ۂ (U+06C2, Urdu heh goal + hamza) is
+ * canonically ہ + U+0654. Passed through whole, it would reach fontkit as a
+ * base letter between non-joining presentation forms and print isolated in
+ * the middle of a word; decomposed, ہ joins and the hamza mark rides on it.
+ * NFC / NFKC compose the pair back, so the text layer still reads ۂ.
+ */
+const decomposeUnmapped = (text: string): string => text.replace(/\u06C2/g, "\u06C1\u0654");
+
+/**
+ * Arabic-script letters in `text` that `shapeArabic` has no forms for, so the
+ * PDF prints them in their isolated shape even mid-word (e.g. ۃ U+06C3, ۀ
+ * U+06C0, Sindhi / Pashto / Kurdish letters). Hamza (ء, never joins) and ۂ
+ * (decomposed above) are not reported. The Review step names these to the
+ * user instead of claiming support it has not verified; the Arabic, Persian
+ * and Urdu letters in FORMS are rendered and checked in `npm run smoke:arabic`.
+ */
+export function unjoinedArabicLetters(text: string): string[] {
+  const out = new Set<string>();
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) as number;
+    if (cp >= 0xfb50) continue; // already a presentation form
+    if (!ARABIC_RE.test(ch) || !/\p{L}/u.test(ch)) continue; // marks, digits, punctuation
+    if (FORMS[cp] || cp === 0x0621 || cp === 0x06c2 || cp === TATWEEL) continue;
+    out.add(ch);
+  }
+  return [...out];
+}
+
+/** Every code point `shapeArabic` can emit for a letter (forms + lam-alef). For the glyph-coverage test. */
+export const shapedLetterCodePoints = (): number[] => [
+  ...new Set([...Object.values(FORMS).flat(), ...Object.values(LAM_ALEF).flat()]),
+];
 
 function shapeArabicLetters(text: string): string {
   const cps = Array.from(text, (ch) => ch.codePointAt(0) as number);

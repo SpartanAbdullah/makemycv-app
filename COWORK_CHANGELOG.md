@@ -25,6 +25,25 @@ Format:
 
 ---
 
+## [2026-10-31 23:30] Arabic PDF: Urdu heh goal prints in Vazirmatn, no Helvetica "¦" (session 6, E8.4)
+
+**Goal:** E8.4 (ARABIC_PRODUCTION_2026-10-31.md §1 test 7): an isolated ہ (U+FBA6, absent from Vazirmatn) fell back
+to Helvetica-Bold and printed "¦", added a second font run to the line, and lost the word from every text layer
+(the session-6 Node render of the same Urdu persona crashed in textkit's reorder instead).
+**Files:**
+- edited: `lib/pdf/arabicText.ts` — isolated ہ → base U+06C1 (Vazirmatn's isolated outline; text layer keeps the Urdu
+  letter); ۂ decomposed to ہ + U+0654 so it joins; `unjoinedArabicLetters()` reports letters without forms;
+  `shapedLetterCodePoints()` for the coverage test.
+- edited: `lib/pdf/arabicText.test.ts` — Urdu heh goal forms, Urdu letters, ۂ, `unjoinedArabicLetters`.
+- created: `scripts/arabic-glyphs.test.mjs` + `test:arabic-glyphs` — every emitted form + Urdu/Arabic digits and
+  punctuation exist in both Vazirmatn cuts (fontkit).
+- edited: `components/builder/steps/ReviewStep.tsx` — the Arabic note names any letter that prints unjoined.
+- edited: `docs/arabic-pdf.md` — the Urdu limit rewritten.
+**Notes / risks / follow-up:** verified by rendering "طاہرہ ملک" on Classic and Gulf Standard
+(`_cowork/session6/arabic/`): fonts = Vazirmatn + Inter only, name extracts in logical order in pdf.js / pypdf /
+PyMuPDF / pdftotext. ۃ / ۀ and other letters without forms still print isolated (named to the user).
+**Suggested commit:** fix(pdf): Urdu isolated heh goal prints in Vazirmatn (E8.4)
+
 ## [2026-11-01 00:30] Import: a cover letter picked by mistake gets a pointer to /cover-letter (D8 follow-up)
 
 **Goal:** the optional D8 follow-up (IMPORT_MONITORING.md §8.3, backlog E11.D8): a cover letter with a contact header

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { containsArabic, shapeArabic, toLogicalArabic } from "./arabicText";
+import { containsArabic, shapeArabic, toLogicalArabic, unjoinedArabicLetters } from "./arabicText";
 
 const cps = (s: string) => Array.from(s, (c) => c.codePointAt(0)!.toString(16).toUpperCase());
 
@@ -51,6 +51,44 @@ describe("shapeArabic joining forms", () => {
     assert.deepEqual(cps(shapeArabic("پ")), ["FB56"]);
     assert.deepEqual(cps(shapeArabic("گچ")), ["FB94", "FB7B"]);
     assert.deepEqual(cps(shapeArabic("ے")), ["FBAE"]);
+  });
+
+  it("sets an isolated Urdu heh goal as the base letter the PDF face has (E8.4)", () => {
+    // طاہرہ: ط(init) ا(final) | ہ(init) ر(final) | ہ isolated → U+06C1, never U+FBA6
+    assert.deepEqual(cps(shapeArabic("طاہرہ")), ["FEC3", "FE8E", "FBA8", "FEAE", "6C1"]);
+    // joined heh goal keeps its presentation forms: تجزیہ ends in final ہ, مہینے has a medial one
+    assert.deepEqual(cps(shapeArabic("یہ")), ["FBFE", "FBA7"]);
+    assert.deepEqual(cps(shapeArabic("مہینے")), ["FEE3", "FBA9", "FBFF", "FEE8", "FBAF"]);
+    assert.equal(shapeArabic("طاہرہ ملک").includes("ﮦ"), false);
+  });
+
+  it("shapes the other Urdu letters UAE job seekers type", () => {
+    // ٹرک ڈرائیور گودام میں بناۓ بڑھایا: ٹ ڈ ڑ ک گ ں ھ ے ۓ all take a presentation form
+    const out = shapeArabic("ٹرک ڈرائیور گودام میں نئے بناۓ بڑھایا");
+    for (const ch of out) {
+      const cp = ch.codePointAt(0)!;
+      assert.equal([0x0679, 0x0688, 0x0691, 0x06a9, 0x06af, 0x06ba, 0x06be, 0x06d2, 0x06d3].includes(cp), false, `unshaped U+${cp.toString(16)}`);
+    }
+    assert.equal(toLogicalArabic(out), "ٹرک ڈرائیور گودام میں نئے بناۓ بڑھایا".normalize("NFKC"));
+  });
+
+  it("decomposes ۂ (heh goal + hamza) so it joins, and NFKC composes it back", () => {
+    // کۂ → ک(init) ہ(final) + hamza above
+    assert.deepEqual(cps(shapeArabic("کۂ")), ["FB90", "FBA7", "654"]);
+    assert.equal(toLogicalArabic(shapeArabic("کۂ")), "کۂ");
+  });
+});
+
+describe("unjoinedArabicLetters", () => {
+  it("reports nothing for Arabic, Persian and the Urdu letters the shaper covers", () => {
+    assert.deepEqual(unjoinedArabicLetters("أحمد الراشد — مدير مالي أول، ٢٠٢٦"), []);
+    assert.deepEqual(unjoinedArabicLetters("پژوهشگر چاپ"), []);
+    assert.deepEqual(unjoinedArabicLetters("طاہرہ ملک — ٹرک ڈرائیور گودام میں بناۓ بڑھایا کۂ ۔"), []);
+    assert.deepEqual(unjoinedArabicLetters("Senior Finance Manager"), []);
+  });
+
+  it("names letters without presentation forms (they print unjoined)", () => {
+    assert.deepEqual(unjoinedArabicLetters("صلوۃ ۀ ۀ"), ["ۃ", "ۀ"]);
   });
 });
 

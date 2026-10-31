@@ -97,10 +97,20 @@ fidelity composites) and the "Session 4 — Arabic" section of
 - **Fonts not registered** (registration failed, or Node without
   `registerPdfFontsFromDir`): the wrapper leaves text alone and Helvetica
   prints the session-3 junk. `pdfArabicFamily()` is the switch.
-- **Urdu is not covered.** Vazirmatn lacks U+FBA6 (isolated ہ); probe 7
-  (`_cowork/pdf-fidelity-s4-scratch/probe7.mjs`) shows an isolated ہ printing
-  nothing and a letter after a joined ہ dropping. Arabic and Persian letters
-  are what the suite verifies.
+- **Urdu (session 6, E8.4).** Vazirmatn has every presentation form the
+  shaper emits except U+FBA6, the isolated heh goal ہ (session 5 saw it fall
+  back to Helvetica-Bold and print "¦"). The shaper now emits the base letter
+  U+06C1 for that position — Vazirmatn maps it to its isolated outline, which
+  in this face is drawn like the Arabic isolated ه — so "طاہرہ" prints in
+  Vazirmatn and the text layer keeps the Urdu letter. ٹ ڈ ڑ ک گ ں ھ ہ ی ے ۓ
+  are rendered and checked (`scripts/arabic-glyphs.test.mjs` asserts every
+  emitted form is in both cuts). ۂ is
+  decomposed to ہ + hamza above so it joins. Still **not** shaped: Arabic-
+  script letters without presentation forms in the table (ۃ U+06C3, ۀ U+06C0,
+  Sindhi / Pashto / Kurdish letters) print in their isolated shape mid-word;
+  the Review note names any such letter the CV contains
+  (`unjoinedArabicLetters`). The isolated ہ uses Vazirmatn's naskh-style
+  design, not the Nastaliq shape an Urdu reader may expect.
 
 ## Checks
 
