@@ -1015,5 +1015,34 @@ const AR_REPEAT = "أخصائية مشتريات أولى — فالكون لإ�
   check(f, "both Arabic roles kept", d.experience.length === 2 && d.experience[1]?.role === "منسق مشتريات", d.experience.map((e) => e.role));
 }
 
+/* ── Session 7 (E11.R2): our own Arabic-first Classic export, as pdfAdapter
+   now reads it (role | company in reading order, the city on its own line). */
+{
+  const f = "s7-arabic-city-line (inline)";
+  const d = runText(f, [
+    "ريم الهاشمي", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية Jan 2023 – Present",
+    "دبي",
+    "• قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب",
+    "منسق مشتريات | شركة الواحة للمقاولات Jun 2019 – Dec 2022",
+    "أبوظبي، الإمارات",
+    "• أدار عقود الموردين في دبي",
+  ].join("\n"));
+  const e = d.experience;
+  check(f, "role / company / location / bullets in place", e.length === 2 && e[0]?.role === "محلل سلسلة التوريد" && e[0]?.company === "شركة الخليج للخدمات اللوجستية" && e[0]?.location === "دبي" && e[0]?.bullets?.length === 1, e);
+  check(f, "\"City، Country\" in Arabic is a location", e[1]?.location === "أبوظبي، الإمارات", e[1]);
+  check(f, "a bullet that mentions دبي stays a bullet", e[1]?.bullets?.[0] === "أدار عقود الموردين في دبي", e[1]?.bullets);
+}
+{
+  // Guard: an unmarked Arabic line that merely mentions a city is not a location.
+  const f = "s7-arabic-city-guard (inline)";
+  const d = runText(f, [
+    "ريم الهاشمي", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية Jan 2023 – Present",
+    "إدارة مستودعات دبي",
+  ].join("\n"));
+  check(f, "\"إدارة مستودعات دبي\" is not the location", !d.experience[0]?.location, d.experience[0]);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

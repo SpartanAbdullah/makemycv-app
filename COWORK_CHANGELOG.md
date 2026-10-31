@@ -25,6 +25,35 @@ Format:
 
 ---
 
+## [2026-10-31 19:40] Import: Arabic right-to-left runs read in order; our Arabic Classic export round-trips again (session 7, E11.R2)
+
+**Goal:** backlog E11.R2. Since E8.2 the Arabic-first Classic export lays "role | company" and the bullet markers out
+right to left, and the importer read the line as "| company role" and each bullet as "text •": Role = "company role",
+Company = the first bullet.
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` - `reconstructLines` (now exported for its unit test) reads a run of
+  right-to-left items from its right end (`rtlReadingOrder`): the letterless items between them, a marker at the
+  line's right edge, and sentence punctuation at the run's left end join the run; a marker at the line's left edge,
+  anything next to a Latin item, dates and single-item lines keep their place. A space before a haraka is dropped
+  ("فريقا ً" → "فريقاً"; our own text layer writes it).
+- edited: `lib/importers/textParser.ts` - `looksLikeLocation` accepts a whole line that is a Gulf / Levant city in
+  Arabic, optionally ", country" (`ARABIC_LOCATION_RE`); the role's city line ("دبي") was becoming a bullet.
+- replaced: `__fixtures__/import/arabic-export-classic.pdf` - re-exported from the current build with the smoke:arabic
+  Node renderer (synthetic persona "Reem Al Hashimi", example.com): two roles, a city line, Arabic + Latin bullets.
+- edited: `scripts/import-fixtures.test.mjs` - five new checks on that fixture (2 roles, location, the three bullets
+  exactly as written, role 2 fields, nothing unplaced); `arabic-only.pdf` (Chrome-printed, one item per glyph run) now
+  imports the real name and headline in reading order, so its "no mirrored name" check became the stricter "exactly
+  ليلى / حداد / أخصائية مشتريات" plus "the mirrored form appears nowhere".
+- created: `lib/importers/pdfLines.test.ts` - 10 cases (the production item positions, guards for Latin lines, a
+  left-edge marker, "English | العربية", a date left of Arabic text).
+- edited: `scripts/parser-fixtures.test.cjs` - inline fixtures for the Arabic city line and its whole-line guard.
+**Notes / risks / follow-up:** measured over every PDF fixture and the session-6 production exports
+(`_cowork/session7/import/rtl-before.txt` vs `rtl-after5.txt`): only Arabic documents change; every Latin fixture is
+identical. Applies to the checker's text extraction too (same function). Not fixed: "محلل أول — المشتريات | الشركة"
+splits at the em dash (the Latin "Role — X | Company" does the same), and glyph-mirrored brackets in Chrome-printed
+Arabic.
+**Suggested commit:** fix(import): read right-to-left PDF runs in order so the Arabic Classic export round-trips
+
 ## [2026-10-31 19:00] Checker parse: one pinned output ceiling, comments and spend weight agree (session 7)
 
 **Goal:** stabilisation finding (PRODUCTION_STABILITY_2026-10-31 §2.3 item 3): `/api/resume-checker/parse` sends

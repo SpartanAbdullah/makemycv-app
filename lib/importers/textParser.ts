@@ -117,6 +117,21 @@ const COUNTRY_HINTS = [
   "australia",
 ];
 
+/**
+ * A whole line that is a Gulf / Levant city in Arabic, optionally followed by
+ * its country ("دبي", "أبوظبي، الإمارات"). Whole-line only — unlike the Latin
+ * hints, which match inside a line — so an Arabic bullet that mentions Dubai
+ * is never taken for a location. Session 7 (E11.R2): our own Arabic-first
+ * export prints the role's city on its own line, and it became a bullet.
+ */
+const ARABIC_CITIES =
+  "دبي|أبو ?ظبي|ابو ?ظبي|الشارقة|عجمان|الفجيرة|رأس الخيمة|راس الخيمة|أم القيوين|ام القيوين|العين|الرياض|جدة|الدمام|الخبر|الدوحة|الكويت|المنامة|مسقط|عمّان|عمان|بيروت|القاهرة|الإسكندرية|دمشق|بغداد";
+const ARABIC_COUNTRIES =
+  "الإمارات(?: العربية المتحدة)?|الامارات(?: العربية المتحدة)?|السعودية|المملكة العربية السعودية|قطر|الكويت|البحرين|عُمان|عمان|الأردن|لبنان|مصر|سوريا|العراق";
+const ARABIC_LOCATION_RE = new RegExp(
+  `^(?:${ARABIC_CITIES})(?:\\s*[،,]\\s*(?:${ARABIC_COUNTRIES}))?$`,
+);
+
 const CITY_HINTS = [
   "dubai",
   "abu dhabi",
@@ -285,6 +300,7 @@ function looksLikeLocation(line: string): boolean {
   const lower = line.toLowerCase();
   if (CITY_HINTS.some((c) => lower.includes(c))) return true;
   if (COUNTRY_HINTS.some((c) => lower.includes(c))) return true;
+  if (ARABIC_LOCATION_RE.test(line)) return true;
   // Generic "City, Country" / "City, ST" pattern with no obvious title words.
   if (/^[A-Za-z .'-]+,\s*[A-Za-z .'-]{2,}$/.test(line) && !/\b(at|the)\b/i.test(line)) {
     return true;
