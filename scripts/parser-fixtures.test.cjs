@@ -829,5 +829,52 @@ const runText = (label, text) => {
   check(f, "experience: company without the empty bracket", d.experience[0]?.company === "Acme LLC" && d.experience[0]?.isCurrent === true, d.experience[0]);
 }
 
+/* ── D4 (session 5): name heuristic on Arabic text (post-NFKC) ──────────── */
+{
+  // A bullet line ahead of the real name (pdf.js line order on an Arabic
+  // PDF) must not become the name; nor may a line with digits.
+  const f = "d4-arabic-name (inline)";
+  const d = runText(f, [
+    "• إدارة الخدمات الفنية لمحفظة من 14 برجاً",
+    "نور تستويل",
+    "مديرة عمليات المرافق الأولى",
+    "noor.testwell@example.com | +971 50 123 4567",
+  ].join("\n"));
+  check(f, "name is the Arabic name line", d.contact.name === "نور تستويل", d.contact.name);
+  check(f, "headline is the Arabic line under it", d.contact.headline === "مديرة عمليات المرافق الأولى", d.contact.headline);
+}
+{
+  const f = "d4-latin-name-arabic-second-line (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "نور تستويل",
+    "Senior Facilities Operations Manager",
+    "noor.testwell@example.com",
+  ].join("\n"));
+  check(f, "Latin name kept", d.contact.name === "Noor Testwell", d.contact.name);
+  check(f, "Arabic transliteration is NOT the headline", d.contact.headline === "Senior Facilities Operations Manager", d.contact.headline);
+}
+{
+  // Visual-order (mirrored) Arabic, as pdf.js returns Chrome-printed PDFs.
+  const f = "d4-visual-order-arabic (inline)";
+  const d = runText(f, [
+    "اددح ىليل",
+    "تايرتشم ةيئاصخأ",
+    "layla.haddad@example.com",
+    "صخلملا",
+    "ةيئاصخأ تايرتشم ةربخب عبس تاونس",
+  ].join("\n"));
+  check(f, "mirrored Arabic is not adopted as the name", !d.contact.name, d.contact.name);
+}
+{
+  const f = "d4-headline-skips-dated-lines (inline)";
+  const d = runText(f, [
+    "Omar Khan",
+    "omar@example.com",
+    "Consultant — Acme LLC 2019 - 2021",
+  ].join("\n"));
+  check(f, "a dated role line is not the headline", d.contact.headline === undefined, d.contact.headline);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

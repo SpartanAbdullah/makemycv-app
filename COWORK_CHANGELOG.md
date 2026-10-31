@@ -25,6 +25,36 @@ Format:
 
 ---
 
+## [2026-10-31 22:00] Import: Arabic PDFs keep the name, in base letters (session 5 D4, backlog E8.3)
+
+**Goal:** Major defect D4 (IMPORT_MONITORING.md §8.3) and the Arabic round-trip loss
+(ARABIC_PRODUCTION_2026-10-31.md §4/§6.3). pdf.js returns Arabic as presentation forms (U+FB50–U+FEFF), which the
+name test did not count as letters: the real Arabic name was skipped and the first line holding a harakat mark was
+taken instead — a bullet, giving First name "•" and Last name a sentence; every Arabic value was stored as glyph codes.
+Re-importing a CV exported from our own Classic template lost first and last name.
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` — `reconstructLines` returns each line `.normalize("NFKC")` (also covers the
+  /resume-checker client extraction, which uses the same function).
+- edited: `lib/importers/textParser.ts` — `harvestContact`: the name loop skips bullet lines and lines with digits;
+  an Arabic line directly under an Arabic name is the headline; the headline scan skips dated lines (a dated
+  "Role — Company" line was being taken because of its em dash); `arabicLooksVisualOrder()` detects mirrored Arabic
+  (Chrome-printed PDFs: words starting with ة/ى) and then never adopts an Arabic line as the name, so NFKC does not
+  turn `arabic-only.pdf` into a mirrored name "اددح ىليل".
+- created: `__fixtures__/import/s5-arabic-majority.pdf` (matrix case 3, persona "Noor Testwell") and
+  `__fixtures__/import/arabic-export-classic.pdf` (`_cowork/session5/arabic/A-classic.pdf`, a builder Classic export,
+  synthetic persona "Reem Al Hashimi", example.com).
+- edited: `scripts/import-fixtures.test.mjs` — Arabic name, headline, role/company, and no presentation forms stored
+  for both; arabic-only.pdf must not get a mirrored Arabic name.
+- edited: `scripts/parser-fixtures.test.cjs` — Arabic name after a bullet line, Latin name with an Arabic
+  transliteration line, mirrored Arabic, dated headline candidate.
+- edited: `scripts/import-smoke.mjs` — the four session-5 fixtures are import cases (3 and 3 experience cards for the
+  two English ones).
+- edited: `docs/import-errors.md`, `docs/arabic-pdf.md` — importer NFKC noted.
+**Notes / risks / follow-up:** visual-order repair (reversing mirrored RTL runs) and the word loss in long Arabic lines
+(react-pdf splits them across `TJ` operators, E8.1) are not addressed; the Arabic bullet in 02-mixed-lang.pdf is now
+base letters but still in scrambled word order. NFKC also unfolds Latin ligatures, full-width forms and "…" → "...".
+**Suggested commit:** fix(import): NFKC Arabic PDF text and keep bullets out of the name (D4)
+
 ## [2026-10-31 21:40] Import: "Degree, School (2018 - 2020)" gives the degree and the school (session 5 D3)
 
 **Goal:** Major defect D3 (IMPORT_MONITORING.md §8.3): every education line of the form "Degree, School (dates)" came

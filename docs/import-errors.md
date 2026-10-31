@@ -134,9 +134,14 @@ for a cross-origin worker was refused.
 
 - **Non-Latin CVs** (Arabic, Urdu): `textParser.ts` recognises English
   headings only. An Arabic PDF with a Latin email line imports as "1 section";
-  one without any Latin contact line reports `mapping_empty`. pdf.js also
-  returns Chrome-printed Arabic as isolated presentation-form glyphs. An
-  Arabic parser is a feature, not a fix.
+  one without any Latin contact line reports `mapping_empty`. pdf.js returns
+  Arabic as presentation-form glyphs; since 2026-10-31 (session 5 D4) the PDF
+  adapter NFKC-normalises them, an Arabic name / headline is read, and a
+  bullet or a line with digits is never taken as the name. Chrome-printed
+  Arabic also arrives in VISUAL (mirrored) order; such a document's Arabic
+  lines are never adopted as name or headline (`arabicLooksVisualOrder`), and
+  repairing the order is not attempted. An Arabic parser is a feature, not a
+  fix.
 - ~~**Role segmentation**~~ — fixed 2026-10-31 (session 5, D1): a dated
   `Company · City · Dates` or `City | Dates` line directly under a title that
   has no dates and no bullets yet is merged into that role

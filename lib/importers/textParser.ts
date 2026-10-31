@@ -1355,6 +1355,32 @@ function parseProjectsBlock(lines: string[]): ParsedProject[] {
 
 const CONTACT_SCAN_DEPTH = 30;
 
+/** Base Arabic-script letters (after the PDF adapter's NFKC). */
+const ARABIC_LETTER_RE = /[ؠ-يٱ-ۓ]/;
+
+/**
+ * True when the document's Arabic reads in VISUAL order (letters reversed),
+ * which is how pdf.js returns Chrome-printed Arabic: "ليلى حداد" arrives as
+ * "اددح ىليل". Our own react-pdf export extracts in logical order. Signal:
+ * ة / ى only ever END a word and "ال" STARTS one, so in reversed text words
+ * begin with ة / ى and end with "لا". Reversed Arabic must not be adopted as
+ * the name or headline — an empty field is honest, a mirrored name is not.
+ */
+function arabicLooksVisualOrder(lines: string[]): boolean {
+  let logical = 0;
+  let visual = 0;
+  for (const line of lines) {
+    if (!line || !ARABIC_LETTER_RE.test(line)) continue;
+    for (const raw of line.split(/\s+/)) {
+      const w = raw.replace(/[^ؠ-يٱ-ۓ]/g, "");
+      if (w.length < 3) continue;
+      if (/[ةى]$/.test(w) || /^ال/.test(w)) logical++;
+      if (/^[ةى]/.test(w) || /لا$/.test(w)) visual++;
+    }
+  }
+  return visual >= 2 && visual > logical;
+}
+
 function harvestContact(lines: string[]): {
   contact: NonNullable<ParsedDocument["contact"]>;
   nameLine: number;
@@ -1443,6 +1469,8 @@ function harvestContact(lines: string[]): {
     if (matchedSomething) consumed.add(i);
   }
 
+  const arabicVisual = arabicLooksVisualOrder(lines);
+
   // Name: the first non-consumed, short, alphabetic line in the top depth
   // that doesn't look like a section header or contact value.
   for (let i = 0; i < depth; i++) {
@@ -1456,6 +1484,11 @@ function harvestContact(lines: string[]): {
     if (sec) break;
     if (line.length > 70) continue;
     if (line.match(EMAIL_RE) || line.match(GENERIC_URL_RE) || line.match(PHONE_RE)) continue;
+    // D4 (session 5): a name is never a bullet and never carries a number.
+    // On an Arabic PDF the first line the letter test accepted was a bullet,
+    // so First name became "•" and Last name a whole sentence.
+    if (isBulletLine(line) || /^[•·●◦▪■*›▸▶►★]/.test(line) || /\d/.test(line)) continue;
+    if (arabicVisual && ARABIC_LETTER_RE.test(line)) continue;
     // Must contain at least one alphabetic char and not look like a headline / sentence.
     if (!/[A-Za-zÀ-ɏ؀-ۿ]/.test(line)) continue;
     // Likely headline if it's a known job title.
@@ -1477,6 +1510,12 @@ function harvestContact(lines: string[]): {
   // skip any already-consumed contact lines, and accept a line that reads like a
   // job title or carries a title separator ("Accountant | CMA Candidate").
   if (nameLine >= 0 && !contact.headline) {
+    // D4 (session 5): an Arabic CV's headline is the Arabic line right under
+    // an Arabic name — the English role-word test can never accept it, and
+    // the scan used to run on into the (unrecognised) Arabic sections and
+    // take a dated role line as the headline because it held an em dash.
+    const arabicName = ARABIC_LETTER_RE.test(contact.name ?? "");
+    let firstCandidate = true;
     for (let i = nameLine + 1; i < depth; i++) {
       if (consumed.has(i)) continue;
       const line = lines[i]?.trim();
@@ -1494,6 +1533,22 @@ function harvestContact(lines: string[]): {
       ) {
         continue;
       }
+      const wasFirst = firstCandidate;
+      firstCandidate = false;
+      if (
+        wasFirst &&
+        arabicName &&
+        ARABIC_LETTER_RE.test(line) &&
+        !/[A-Za-z\d]/.test(line) &&
+        !isBulletLine(line) &&
+        line.length <= 60
+      ) {
+        contact.headline = line;
+        consumed.add(i);
+        break;
+      }
+      // A headline carries no dates; a dated line is a role or a degree.
+      if (extractDates(line).length > 0) continue;
       const titleish = looksLikeRole(line) || /\s[|·•—–]\s/.test(line);
       if (titleish) {
         contact.headline = line;

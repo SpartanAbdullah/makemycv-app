@@ -60,13 +60,24 @@ const CASES = [
   ["arabic-only.pdf", "import"],
   ["not-a-cv.pdf", "mapping_empty"],
   ["large-25mb.pdf", "too_large"],
+  // Session 5 production-matrix shapes (2026-10-31): wrapped bullets, Word
+  // header + table, Arabic headings, our own Arabic export round-tripped.
+  ["s5-long-wrapped.pdf", "import"],
+  ["s5-header-table.docx", "import"],
+  ["s5-arabic-majority.pdf", "import"],
+  ["arabic-export-classic.pdf", "import"],
 ];
 
 // Experience cards the review must show (D1, 2026-10-31). Both files hold two
 // roles whose dates sit on the line under the title; until the fix the review
 // showed four cards and this smoke still passed, because it only checked that
 // a review opened and one push fired.
-const EXPECT_ROLES = { "text-cv.pdf": 2, "two-column-table.docx": 2 };
+const EXPECT_ROLES = {
+  "text-cv.pdf": 2,
+  "two-column-table.docx": 2,
+  "s5-long-wrapped.pdf": 3,
+  "s5-header-table.docx": 3,
+};
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mmcv-import-smoke-"));
 const largePath = path.join(tmp, "large-25mb.pdf");

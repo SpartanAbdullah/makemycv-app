@@ -111,7 +111,13 @@ function reconstructLines(items: PdfTextItemLike[]): string[] {
       const w = item.width ?? text.length * (medianHeight * 0.5);
       prevEndX = startX + w;
     }
-    return out.replace(/[ \t]+/g, " ").trim();
+    // NFKC (D4 / backlog E8.3, 2026-10-31): Arabic set by our own PDF export
+    // (and by Chrome's print) comes out of pdf.js as presentation forms
+    // (U+FB50–U+FEFF), which no parser regex counts as Arabic letters — the
+    // real name was skipped and every Arabic value was stored as glyph codes.
+    // NFKC maps them back to the base letters (and unfolds Latin ligatures
+    // such as "ﬁ"). Visual word order of RTL runs is NOT repaired here.
+    return out.normalize("NFKC").replace(/[ \t]+/g, " ").trim();
   });
 }
 

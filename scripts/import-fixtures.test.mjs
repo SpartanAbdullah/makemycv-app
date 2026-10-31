@@ -189,6 +189,38 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const r = await runImport("arabic-only.pdf", bytesOf("arabic-only.pdf"));
   check("arabic-only.pdf", "partial import (no failure)", !r.reason, r.reason);
   check("arabic-only.pdf", "email found", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
+  // Chrome-printed Arabic comes out of pdf.js in VISUAL order ("ليلى" as
+  // "ىليل"). Once NFKC made those letters visible to the name test (D4), the
+  // mirrored name must still not be adopted — empty is honest, mirrored is not.
+  check("arabic-only.pdf", "no mirrored Arabic name or headline (D4)", !/[؀-ۿ]/.test(`${r.partial?.personal?.firstName ?? ""}${r.partial?.personal?.lastName ?? ""}${r.partial?.personal?.headline ?? ""}`), r.partial?.personal);
+}
+
+/* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
+   s5-arabic-majority.pdf = session-5 matrix case 3 (Arabic headings, Latin
+   email line, Vazirmatn shaped by react-pdf). arabic-export-classic.pdf = a
+   CV exported from the builder's Classic template with an Arabic name, role
+   and company (_cowork/session5/arabic/A-classic.pdf, synthetic persona
+   "Reem Al Hashimi", example.com). pdf.js returns both as presentation forms
+   (U+FB50–U+FEFF); the adapter NFKC-normalises them. */
+const PRESENTATION_FORMS = /[ﭐ-﷿ﹰ-﻿]/;
+{
+  const r = await runImport("s5-arabic-majority.pdf", bytesOf("s5-arabic-majority.pdf"));
+  const p = r.partial?.personal ?? {};
+  check("s5-arabic-majority.pdf", "imports (no failure)", !r.reason, r.reason);
+  check("s5-arabic-majority.pdf", "Arabic name read, not \"•\" (D4)", p.firstName === "نور" && p.lastName === "تستويل", [p.firstName, p.lastName]);
+  check("s5-arabic-majority.pdf", "Arabic headline is the line under the name (D4)", p.headline === "مديرة عمليات المرافق الأولى", p.headline);
+  check("s5-arabic-majority.pdf", "email", p.email === "noor.testwell@example.com", p.email);
+  check("s5-arabic-majority.pdf", "no presentation forms in any field or unplaced line (D4)", !PRESENTATION_FORMS.test(JSON.stringify([r.partial, r.parsed?.unplaced])));
+}
+{
+  const r = await runImport("arabic-export-classic.pdf", bytesOf("arabic-export-classic.pdf"));
+  const p = r.partial?.personal ?? {};
+  const exp = r.partial?.experience ?? [];
+  check("arabic-export-classic.pdf", "imports (no failure)", !r.reason, r.reason);
+  check("arabic-export-classic.pdf", "round trip keeps the Arabic first/last name (E8.3)", p.firstName === "ريم" && p.lastName === "الهاشمي", [p.firstName, p.lastName]);
+  check("arabic-export-classic.pdf", "headline", p.headline === "محللة سلسلة التوريد", p.headline);
+  check("arabic-export-classic.pdf", "role | company in base letters", exp[0]?.role === "محلل سلسلة التوريد" && exp[0]?.company === "شركة الخليج للخدمات اللوجستية" && exp[0]?.startDate === "Jan 2023", exp[0]);
+  check("arabic-export-classic.pdf", "no presentation forms stored (E8.3)", !PRESENTATION_FORMS.test(JSON.stringify(r.partial)));
 }
 
 /* ── documents that must fail with the right reason ────────────────────── */
