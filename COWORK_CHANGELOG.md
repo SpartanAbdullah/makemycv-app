@@ -129,6 +129,83 @@ cosmetic). Gates: `npx tsc --noEmit` clean, `npm run lint` 11/11 warnings, `npm 
 **Suggested commit:** feat(checker): public /api/resume-checker/checklist endpoint for the site's drift check
 
 ---
+## [2026-10-31 15:40] PDF fidelity session 3: ATS Clean / Onyx / Sandstone / Professional transcribed, line-box rule, fidelity gate, Arabic + extraction checks
+
+**Goal:** `docs/ai-mission/PDF_FIDELITY.md` goals 1–5 (parent folder): close the ATS Clean header offset
+(rank 5 residual), the remaining Onyx / Sandstone mismatches, the one page-count disagreement
+(Professional Photo at density 5), and measure Arabic script and ATS text extraction — with a regression
+guard for each fix. Dual-render-path rule: live templates untouched; every change is on the PDF side.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` —
+  - **Root cause found for the whole "cumulative drift" family:** a react-pdf `<Text>` with no
+    `lineHeight` does not re-resolve from its own size — it inherits the page's RESOLVED box
+    (8.6 × 1.45 = 12.47pt) whatever its size (probe: two 20pt lines 12.47pt apart). The live templates
+    inherit `line-height: 1.5` from Tailwind's preflight (`html { line-height: 1.5 }`) on every run
+    that sets none (headings, side labels, chips, entry rows). New `LH_NORMAL = 1.5` constant; every
+    such run in the four layouts below now sets its line box explicitly.
+  - `ATSCleanPDFLayout` rewritten from `ats-clean.tsx`: name 26px × 1.2, headline 13px, contact 10.5px
+    and essentials 10px at the root 1.55 line, 2px rule 8/16px, headings 11px × 1.55 over a 1.5px rule
+    (20px·sp above, 8px below), summary 1.6, roles through `ExperienceEntry` (12px gap, 16px list indent,
+    no bullet gap), languages joined with ", " as live (was " · "), certificates 4px apart, projects
+    10px apart. Dead `ats*` keys dropped from `BASE_STYLES` / `SECTION_GAP_KEYS`.
+  - `OnyxPDFLayout` / `SandstonePDFLayout`: photo 108 / 110px with a 3px ring, headline 11px × 1.4,
+    sidebar runs 10px (were 7.8pt — the About-me paragraph wrapped into more lines than the preview),
+    live column gaps (4 / 3 / 4px; Sandstone details 6px, label 8.5px at 0.04em), Onyx detail labels and
+    Sandstone contact/language runs in the live band colours, main column pulled to the live 30px·m
+    padding (`marginTop −4.5·m`, `marginRight −1.5·m`), certificates "name | issuer | date" with the
+    tail in grey, projects 11.5px / 14px indent / 10px gap, `LH_NORMAL` on headings, side labels, chips,
+    role / education rows and project titles.
+  - `ProfessionalPDFLayout` rewritten from `professional.tsx` (it reused the Classic sheet): the live
+    40·m / 44·m px page padding (the layout pads the 3 / 9pt difference so lines wrap where the preview
+    wraps), 28px name, 12.5px headline, 10.5px contact with slate-300 "•", chips at the root line,
+    11px headings × 1.5 (18px·sp above, 10px below), summary 1.55, roles 12px × 1.35 with `space-y-1`
+    inside and `space-y-3` between, bullets 11px × 1.5 with a 4px item gap, Languages | Certifications as
+    a plain two-column row (the old `s.twoCol` added a second 18pt·sp section gap on top of the heading's
+    own — the cause of the page-2 spill at density 5), bold language names, "| issuer | date" tails.
+    `ProPdfHeading` removed (PdfHeading does it).
+  - Primitives: `HeadingVariant.lineHeight?` (PdfHeading applies it); `BulletStyles.gap?` (the live
+    `space-y-*` between items, as marginTop on every item after the first).
+- edited: `scripts/pdf-ops-check.mjs` — check 5: no two text runs overprint (pdf.js text boxes on one page
+  overlapping > ½ their height and > 1pt horizontally) — the guard for the inherited-line-box class of
+  defect. 44 smoke PDFs pass.
+- edited: `scripts/pdf-fidelity.mjs` — `--gate` (compares every cell with `scripts/pdf-fidelity-baseline.json`:
+  PDF page count must not change, text parity not drop > 1 point, page-1 block diff not rise > 3 points,
+  section order not regress; exit 1 otherwise), `--persona=bilingual`, and an extraction check per cell
+  (heading order in the pdf.js text layer vs the preview DOM, email / phone surviving as one run) printed
+  in the console line and a new matrix column.
+- created: `scripts/pdf-fidelity-baseline.json` — the 42 accepted cells from this session's final run.
+- edited: `package.json` — `fidelity:pdf` = `node scripts/pdf-fidelity.mjs --gate` (needs `next start` +
+  Chrome; not a `test:*` script).
+- edited: `scripts/pdf-fidelity-render.tsx`, `lib/data/preview-profiles.ts`,
+  `app/preview/[templateId]/page.tsx` — `getBilingualPreviewProfile()` (SYNTHETIC Arabic + English
+  overlay of each template's persona, labelled as such, email `bilingual.synthetic@email.ae`),
+  `/preview/<id>?persona=bilingual`, `FIDELITY_PERSONA=bilingual` in the renderer with its own
+  `manifest-bilingual.json`.
+**Notes / risks / follow-up:**
+- Fidelity (page-1 pixel / block, before → after, `_cowork/pdf-fidelity-2026-10-31-s3-baseline` →
+  `-s3-final`): ats-clean 10.67/21.33 → 7.78/10.51, 9.43/19.51 → 7.93/7.19, 10.68/22.04 → 8.24/10.26;
+  onyx 8.94/9.32 → 5.81/0.79, 8.52/9.82 → 3.75/0.55, 11.81/18.18 → 9.37/9.92; sandstone 7.09/5.57 →
+  6.21/5.59, 7.06/7.65 → 4.14/0.66, 10.06/14.30 → 6.09/1.11; professional 10.82/20.04 → 4.36/2.29,
+  8.90/13.44 → 5.62/1.82, 11.79/23.95 → 7.22/2.16; professional-photo 9.85/18.10 → 4.98/2.56,
+  8.58/14.63 → 5.16/2.74, 11.19/23.40 → 6.71/0.81. Tally 14 ok / 17 check / 11 mismatch → 24 / 15 / 3;
+  page counts agree in 42/42 (professional-photo dense was 1~/2). Text parity 100 % everywhere it was.
+- **Arabic (goal 4): the PDF cannot print Arabic.** None of the six embedded faces has an Arabic glyph
+  (fontkit: 0/14 code points in Inter / Bricolage / Instrument Serif), react-pdf has no fallback chain,
+  and Helvetica cannot encode it either, so every Arabic run prints as garbage Latin glyphs and the text
+  layer loses every Arabic word (32/32 in all 14 templates, 40–50 junk tokens instead; composites in
+  `_cowork/pdf-fidelity-2026-10-31-bilingual/`). The live preview is fine (browser system-font
+  fallback). Not fixed: it needs an Arabic face (Noto Sans Arabic / IBM Plex Sans Arabic, both SIL OFL
+  1.1 — licence file must ship) registered as a second family plus script-aware run splitting, and a
+  spike on react-pdf's Arabic shaping / bidi before it can be promised.
+- Extraction (goal 5): section order and the email / phone lines survive in 41/42 cells. `modern-dense`
+  is a real difference: the two-column Modern breaks across pages, so the text layer emits the aside
+  (Education, Skills) before Certifications (page 2); the preview DOM has them after. Gulf Standard's
+  "no heading: languages" is a label in its Personal Details table, not a section.
+- Remaining mismatches (Classic / Modern / Executive at density 5) and most `check` cells are the same
+  inherited-line-box drift in layouts not transcribed in this pass; `LH_NORMAL` is the fix shape.
+- Weight 500 live runs (ATS Clean / Professional headline) print in the 400 cut — the PDF faces ship
+  400 / 700 only.
+**Suggested commit:** fix(pdf): transcribe ATS Clean, Onyx, Sandstone, Professional; explicit line boxes; fidelity gate
 
 ## [2026-10-31 11:10] PDF fidelity ranks 2–3: ATS Clean bullet pitch, Onyx/Sandstone band widths + names
 

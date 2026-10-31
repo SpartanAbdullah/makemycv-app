@@ -281,6 +281,18 @@ npm run build
   every template three times (fixture, tripled experience, density extremes)
   and `scripts/pdf-ops-check.mjs` fails on alpha colours or a missing band.
   Verify parity with pdf.js text extraction, not by eye.
+- **Every PDF `<Text>` sets its own `lineHeight`.** react-pdf does not resolve a
+  line box from the run's own size: a `<Text>` without `lineHeight` inherits the
+  page's already-resolved 8.6 × 1.45 = 12.47pt box whatever its font size (a 20pt
+  name overprints its headline; a 9pt label sits in a box too tall), while the
+  live templates inherit Tailwind's `html { line-height: 1.5 }` on every run that
+  sets none. Use `LH_NORMAL` (1.5) in `CVDocument.tsx` for those runs and the live
+  ratio × `lineScale` where the template sets one. `scripts/pdf-ops-check.mjs`
+  fails on overprinting runs. `npm run fidelity:pdf` (needs `next start -p 3000`
+  and Chrome) puts every template's preview next to its PDF and fails when a cell
+  regresses against `scripts/pdf-fidelity-baseline.json` — lower a cell's baseline
+  when a fix improves it; `--persona=bilingual` is the Arabic check (the PDF faces
+  have no Arabic glyphs; see `docs/ai-mission/PDF_FIDELITY.md` in the parent folder).
 - **Anything that changes layout on blur needs `smoke:builder`.** A helper line
   that appears when a field loses focus moves the Continue button during the
   user's own click and the click is lost (2026-10 audit F01). `FieldError` has a
