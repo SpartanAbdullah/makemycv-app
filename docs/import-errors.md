@@ -86,7 +86,10 @@ text layer too, so it is not offered for scans.
      disables real workers and memoises a failed fake-worker import after the
      first failure, so a retry _after_ a failure can never work; that is what
      the previous catch-and-retry did). Then `getDocument` under a 45 s
-     deadline, first 30 pages read.
+     deadline, first 30 pages read. A longer file still imports, and the
+     review says so in one line ("We read the first 30 of 31 pages. Anything
+     after page 30 is not in this review…", `ParsedDocument.pagesSkipped`,
+     session 6 D7a). Nothing about it goes to analytics.
    - DOCX: byte sniff (OLE → `.doc`, not zip → corrupt), mammoth for the body,
      then `docxParts.ts` reads `word/header*.xml` (prepended) and the contact
      lines of `word/footer*.xml` (appended). mammoth ignores headers, and Word

@@ -212,6 +212,16 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const exp = r.partial?.experience ?? [];
   check("s5-31-pages.pdf", "no \"Page N of M\" roles or bullets (D7b)", !/Page \d+ of \d+/.test(JSON.stringify(exp)), exp.map((e) => e.role));
   check("s5-31-pages.pdf", "the one real role, dated, 2 bullets", exp.length === 1 && exp[0]?.startDate === "Mar 2021" && exp[0]?.bullets.length === 2, exp);
+  // D7a (session 6): page 31 is past MAX_PDF_PAGES. It used to be skipped
+  // with no trace; the parsed document now says 30 of 31 pages were read.
+  check("s5-31-pages.pdf", "pages skipped reported: 30 of 31 (D7a)", r.parsed?.pagesSkipped?.read === 30 && r.parsed?.pagesSkipped?.total === 31, r.parsed?.pagesSkipped);
+  const raw = await extractPdfText(bytesOf("s5-31-pages.pdf"), { pdfjs, workerSrc });
+  check("s5-31-pages.pdf", "extractPdfText: pages 31, pagesRead 30, truncated (D7a)", raw.pages === 31 && raw.pagesRead === 30 && raw.truncated === true, [raw.pages, raw.pagesRead, raw.truncated]);
+}
+{
+  // A document inside the cap carries no pagesSkipped at all.
+  const r = await runImport("s5-long-wrapped.pdf", bytesOf("s5-long-wrapped.pdf"));
+  check("s5-long-wrapped.pdf", "6 pages, nothing skipped (D7a)", !r.reason && r.parsed?.pagesSkipped === undefined, r.parsed?.pagesSkipped);
 }
 
 /* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
@@ -301,6 +311,7 @@ await expectReason("empty.docx", "empty_file", new ArrayBuffer(0));
   const data = bytesOf("text-cv.pdf");
   const r = await extractPdfText(data, { pdfjs, workerSrc, maxPages: 1 });
   check("page-cap", "page count reported", r.pages === 1, r.pages);
+  check("page-cap", "a 1-page file under a 1-page cap is not truncated", r.pagesRead === 1 && r.truncated === false, [r.pagesRead, r.truncated]);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

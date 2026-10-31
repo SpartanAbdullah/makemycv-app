@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-10-31 23:30] Import: the review says when pages past 30 were not read (session 5 D7a)
+
+**Goal:** Minor defect D7(a) (IMPORT_MONITORING.md §8.3): a PDF longer than `MAX_PDF_PAGES` (30) imported with the
+extra pages silently dropped (the 31-page fixture lost its skills and education with no message).
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts`: `extractPdfText` returns `pagesRead` and `truncated` beside `pages`;
+  `parsePdfBytes` sets `ParsedDocument.pagesSkipped = { read, total }` when truncated.
+- edited: `lib/importers/adapter.ts`: optional `pagesSkipped` on `ParsedDocument` (counts only).
+- edited: `components/import/MappingReview.tsx`: one line under the header, "We read the first 30 of 31 pages.
+  Anything after page 30 is not in this review; add it in the builder after importing."
+  (`data-testid="import-pages-skipped"`).
+- edited: `scripts/import-fixtures.test.mjs` (30 of 31 reported, 6-page file reports nothing, 1-page cap not
+  truncated), `scripts/import-smoke.mjs` (s5-31-pages.pdf case; line present for it, absent for text-cv.pdf),
+  `docs/import-errors.md`.
+**Notes / risks / follow-up:** no analytics change: no existing `cv_import` param fits and a new one is not needed to
+act on this. The cap itself is unchanged.
+**Suggested commit:** fix(import): say when a PDF's pages past 30 were not read (D7a)
+
 ## [2026-10-31 15:15] Ops: daily production monitor + AI-route failures now reach Vercel's error clusters (session 6)
 
 **Goal:** production stability review (docs/ai-mission/PRODUCTION_STABILITY_2026-10-31.md). Vercel is on Hobby:

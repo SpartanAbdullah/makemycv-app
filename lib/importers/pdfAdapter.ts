@@ -154,7 +154,15 @@ export type ExtractPdfOptions = {
   maxPages?: number;
 };
 
-export type ExtractedPdf = { text: string; pages: number };
+export type ExtractedPdf = {
+  text: string;
+  /** Pages in the document. */
+  pages: number;
+  /** Pages actually read: `min(pages, maxPages)`. */
+  pagesRead: number;
+  /** True when pages past `maxPages` were skipped (D7a, session 6). */
+  truncated: boolean;
+};
 
 /**
  * Text + page count from PDF bytes. Throws ImportParseError with
@@ -187,8 +195,9 @@ export async function extractPdfText(
   const run = async (): Promise<ExtractedPdf> => {
     const pdf = await task.promise;
     const pages = pdf.numPages;
+    const pagesRead = Math.min(pages, maxPages);
     const pageTexts: string[] = [];
-    for (let pageNum = 1; pageNum <= Math.min(pages, maxPages); pageNum++) {
+    for (let pageNum = 1; pageNum <= pagesRead; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
       // D7b (session 5): "Page 2 of 3" footers sat inside the Experience
@@ -198,7 +207,12 @@ export async function extractPdfText(
       );
       pageTexts.push(lines.join("\n"));
     }
-    return { text: pageTexts.join("\n\n"), pages };
+    return {
+      text: pageTexts.join("\n\n"),
+      pages,
+      pagesRead,
+      truncated: pages > pagesRead,
+    };
   };
 
   try {
@@ -294,15 +308,21 @@ export async function parsePdfBytes(
   data: ArrayBuffer,
   opts: ExtractPdfOptions,
 ): Promise<ParsedDocument> {
-  const { text } = await extractPdfText(data, opts);
+  const { text, pages, pagesRead, truncated } = await extractPdfText(data, opts);
   if (text.trim().length < MIN_TEXT_LENGTH) {
     throw new ImportParseError("no_text_layer");
   }
+  let parsed: ParsedDocument;
   try {
-    return parseTextToDocument(text);
+    parsed = parseTextToDocument(text);
   } catch (err) {
     throw toImportParseError(err);
   }
+  // D7a (session 6): pages past MAX_PDF_PAGES used to vanish without a word
+  // (a 31-page file lost its last page, skills and education, silently). The
+  // review now says how many pages were read. Counts only, no analytics.
+  if (truncated) parsed.pagesSkipped = { read: pagesRead, total: pages };
+  return parsed;
 }
 
 export const pdfAdapter: ImportAdapter = {

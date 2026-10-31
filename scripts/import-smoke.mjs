@@ -66,7 +66,16 @@ const CASES = [
   ["s5-header-table.docx", "import"],
   ["s5-arabic-majority.pdf", "import"],
   ["arabic-export-classic.pdf", "import"],
+  // Session 6 (D7a): 31 pages, one past MAX_PDF_PAGES.
+  ["s5-31-pages.pdf", "import"],
 ];
+
+// D7a (session 6): the review names the pages it read when the PDF is longer
+// than MAX_PDF_PAGES, and says nothing for a normal file.
+const EXPECT_PAGES_SKIPPED = {
+  "s5-31-pages.pdf": /We read the first 30 of 31 pages/,
+  "text-cv.pdf": null,
+};
 
 // Experience cards the review must show (D1, 2026-10-31). Both files hold two
 // roles whose dates sit on the line under the title; until the fix the review
@@ -137,6 +146,13 @@ async function runCase(name, file, expected) {
           const roles = Number(text.match(/Work experience \((\d+)\)/)?.[1] ?? 0);
           if (roles === EXPECT_ROLES[name]) ok(`${name}: review shows ${roles} experience cards`);
           else fail(`${name}: review shows ${EXPECT_ROLES[name]} experience cards`, `got ${roles}`);
+        }
+        if (name in EXPECT_PAGES_SKIPPED) {
+          const want = EXPECT_PAGES_SKIPPED[name];
+          const line = review.getByTestId("import-pages-skipped");
+          const shown = (await line.isVisible().catch(() => false)) ? ((await line.textContent()) ?? "").trim() : null;
+          if (want ? shown && want.test(shown) : shown === null) ok(`${name}: pages-skipped line ${want ? `"${shown}"` : "absent"} (D7a)`);
+          else fail(`${name}: pages-skipped line (D7a)`, `expected ${want ?? "none"}, got ${JSON.stringify(shown)}`);
         }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});

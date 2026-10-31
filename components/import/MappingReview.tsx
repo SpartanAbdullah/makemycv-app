@@ -323,6 +323,19 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 ? "No fields could be extracted. Try a different file."
                 : "Fix anything that looks wrong, then confirm to import. Common mis-mappings: role ↔ company, school ↔ degree."}
             </p>
+            {/* D7a (session 6): the PDF adapter reads MAX_PDF_PAGES pages; say
+                so instead of dropping the rest silently. */}
+            {parsed.pagesSkipped && (
+              <p
+                className="mt-2 text-sm text-slate-600"
+                data-testid="import-pages-skipped"
+              >
+                We read the first {parsed.pagesSkipped.read} of{" "}
+                {parsed.pagesSkipped.total} pages. Anything after page{" "}
+                {parsed.pagesSkipped.read} is not in this review; add it in the
+                builder after importing.
+              </p>
+            )}
             {sectionCount > 0 && (
               <p className="mt-2 text-xs text-slate-400">
                 {uaeFound.length > 0 ? (
