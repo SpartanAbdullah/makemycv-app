@@ -140,6 +140,58 @@ compact 12.5 %, Exec Split dense 11.1 %, ATS Clean 10.5 %, Banner, Chronicle) ar
 transcription in layouts not touched here; kept out to limit merge conflicts with the Arabic work in the
 text-primitives region of `CVDocument.tsx`. Branch `mission/pdf-fidelity-4`, not pushed.
 **Suggested commit:** fix(pdf): transcribe Classic, Modern and Executive from their live templates (fidelity session 4)
+## [2026-10-31 17:30] Arabic in the PDF export: shaper + single-run rule + Vazirmatn, preview face, persona suite, smoke, disclosure
+
+**Goal:** Session-3 goal 4 left Arabic unprintable in the download (junk Latin glyphs, every Arabic word
+lost from the text layer) while the preview rendered it. Make Arabic and mixed Arabic/English CVs export
+correctly, or say exactly what must be restricted. Outcome: shipped with disclosure — see
+`docs/arabic-pdf.md` (the library findings with file/line, the approach, the limits) and the "Session 4 —
+Arabic" section of `../docs/ai-mission/PDF_FIDELITY.md`.
+**Findings that shaped the design** (probes in `../_cowork/pdf-fidelity-s4-scratch/`, rasters in
+`../_cowork/pdf-fidelity-2026-10-31-arabic/`): react-pdf 4.3.2 DOES bidi (bidi-js, per line) and DOES shape
+(fontkit GSUB), but (1) a `fontFamily` stack is unusable — `reorderLine` pulls glyphs across runs by string
+index and poisons pdfkit's subsets for the whole document; (2) it dedupes ligature glyphs by id per line, so
+a second lam-alef on a line vanishes; (3) it charges no index to a glyph with no code points, so fonts that
+build dots via `ccmp` (both Noto Arabic faces) drift and drop glyphs; (4) fontkit caches a glyph with the
+code points of its first creation and pdfkit's subsetter creates composite components with none, so the
+second document in a process (or the second download in a tab) corrupts. Pre-shaping to presentation forms
+removes (2) and (3); one family per Arabic-bearing run removes (1); a glyph-cache warm-up removes (4).
+**Files:**
+- created: `lib/pdf/arabicText.ts` — `containsArabic`, `shapeArabic` (joining table → U+FB50–FDFF /
+  U+FE70–FEFF, lam-alef composed, marks/tatweel/ZWNJ handled, Latin fi/fl/ffi/ffl → U+FB01–FB04),
+  `toLogicalArabic` (NFKC). `lib/pdf/arabicText.test.ts` — 12 cases.
+- created: `components/pdf/ArabicText.tsx` — `Text` / `Link` wrappers: Latin-only runs returned untouched;
+  Arabic-bearing runs flattened to one string, shaped, set in the Arabic family with `letterSpacing: 0`.
+- edited: `components/pdf/CVDocument.tsx` — imports `Text` / `Link` from the wrapper (only change).
+- edited: `lib/pdf/fonts.ts` — `PDF_ARABIC_FAMILY` (Vazirmatn 400/700, italic mapped to upright),
+  `pdfArabicFamily()`, `warmPdfFonts(arabic)`; `hooks/useDownloadCV.ts` awaits the warm-up (Arabic face only
+  when the CV contains Arabic).
+- created: `public/fonts/pdf/vazirmatn-400.ttf`, `vazirmatn-700.ttf` (static instances of google/fonts
+  `ofl/vazirmatn/Vazirmatn[wght].ttf`, Vazirmatn 33.003, source commit 14f86869 in rastikerdar/vazirmatn),
+  `vazirmatn-OFL.txt` (SIL OFL 1.1).
+- edited: `app/globals.css` — `'Vazirmatn CV'` @font-face ×2 (`unicode-range` Arabic blocks) placed first
+  in the three `--cv-font-*` stacks so the preview uses the PDF's face for Arabic and nothing else.
+- edited: `lib/data/preview-profiles.ts` — `ARABIC_PERSONA_IDS`, `PERSONA_IDS`, `getPersonaProfile()` with
+  `arabic-only`, `arabic-first`, `arabic-name`, `arabic-dense` (6 roles × 7 bullets, paginates everywhere);
+  `app/preview/[templateId]/page.tsx` accepts them; `scripts/pdf-fidelity-render.tsx` + `pdf-fidelity.mjs`
+  take `--persona=<any of the five>`.
+- created: `scripts/arabic-smoke.tsx` + `scripts/arabic-smoke-check.mjs`, `npm run smoke:arabic` — 56 PDFs,
+  every persona Arabic word found in the pdf.js text layer after NFKC, no U+FFFD / junk, dense ≥ 2 pages
+  with Arabic on page 2, page rasters in `.arabic-smoke/`. `scripts/pdf-smoke.tsx` warms fonts too.
+- edited: `components/builder/steps/ReviewStep.tsx` — a note under the download buttons when the CV
+  contains Arabic (presentation forms in the text layer; mixed lines print in one face; .docx unchanged).
+- edited: `eslint.config.mjs` (ignore the new transient dirs), `.gitignore`, `CLAUDE.md` (Fonts and print +
+  checks), `docs/arabic-pdf.md` (new).
+**Notes / risks / follow-up:** Latin-only output is byte-identical (wrapper short-circuits; the Arabic face is
+not even fetched) — `npm run fidelity:pdf` gate result is in PDF_FIDELITY.md. Limits disclosed: text layer
+holds presentation forms (ATS keyword match on Arabic may fail unless it normalises); inside an Arabic-bearing
+line a nested bold / link / Inter-Latin is flattened into the one Vazirmatn run; the PDF resolves paragraph
+direction from the first strong character while the live templates use an LTR base, so an Arabic-FIRST line
+that also holds Latin orders its segments differently in the preview (`unicode-bidi: plaintext` on
+`.cv-print` + an alignment decision is the template-side follow-up, an owner call); Urdu ہ forms are not
+reliable. Never use a `fontFamily` array with react-pdf; never import react-pdf's `Text` into a layout.
+Gates: tsc clean, lint 11/11, `npm test` green, build green, `smoke:pdf` green, `smoke:arabic` 56/56.
+**Suggested commit:** feat(pdf): print Arabic — presentation-form shaper, single-run Text, Vazirmatn face
 
 ---
 

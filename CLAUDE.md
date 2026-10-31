@@ -195,6 +195,15 @@ Apply the same reasoning to any future per-skill visibility state.
 - Every rendered template root carries `.cv-print`, which remaps generic
   typography inside a CV. Check `.cv-print` and its print-media block in
   `globals.css` when changing global type rules.
+- **Arabic (2026-10-31, `docs/arabic-pdf.md`).** The PDF cannot use a font
+  stack and cannot take raw Arabic letters: `components/pdf/CVDocument.tsx`
+  imports `Text` / `Link` from `components/pdf/ArabicText.tsx`, which shapes
+  any Arabic-bearing run into presentation forms (`lib/pdf/arabicText.ts`)
+  and sets it in Vazirmatn as ONE run. Never import react-pdf's `Text` into a
+  layout directly, never put `fontFamily` arrays in a style, and call
+  `warmPdfFonts()` after registering fonts in any new Node renderer. The
+  preview gets the same face through the `'Vazirmatn CV'` @font-face
+  (`unicode-range`-limited) that sits first in the `--cv-font-*` stacks.
 
 ---
 
@@ -291,8 +300,10 @@ npm run build
   fails on overprinting runs. `npm run fidelity:pdf` (needs `next start -p 3000`
   and Chrome) puts every template's preview next to its PDF and fails when a cell
   regresses against `scripts/pdf-fidelity-baseline.json` — lower a cell's baseline
-  when a fix improves it; `--persona=bilingual` is the Arabic check (the PDF faces
-  have no Arabic glyphs; see `docs/ai-mission/PDF_FIDELITY.md` in the parent folder).
+  when a fix improves it; `--persona=bilingual | arabic-only | arabic-first |
+  arabic-name | arabic-dense` are the Arabic checks and `npm run smoke:arabic`
+  is the Arabic text-layer guard (see `docs/arabic-pdf.md` and
+  `docs/ai-mission/PDF_FIDELITY.md` in the parent folder).
 - **Anything that changes layout on blur needs `smoke:builder`.** A helper line
   that appears when a field loses focus moves the Continue button during the
   user's own click and the click is lost (2026-10 audit F01). `FieldError` has a
