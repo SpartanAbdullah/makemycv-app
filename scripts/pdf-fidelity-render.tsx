@@ -7,7 +7,7 @@
  * can put the live preview and the download side by side with identical
  * input. Compiled and run by that script; not part of `npm test`.
  *
- * Output: .fidelity-pdfs/<templateId>-<case>.pdf + manifest.json (manifest-bilingual.json for the persona run; build
+ * Output: .fidelity-pdfs/<templateId>-<case>.pdf + manifest.json (manifest-<persona>.json for a persona run; build
  * output — add .fidelity-pdfs/ and .pdf-fidelity-build/ to .gitignore).
  *
  * Cases (see CASES below): "natural" = the persona's own levels, "compact" =
@@ -23,17 +23,20 @@ import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
 import { CVDocument } from "../components/pdf/CVDocument";
 import {
-  getBilingualPreviewProfile,
+  getPersonaProfile,
   getPreviewProfile,
   previewPhotoSrc,
 } from "../lib/data/preview-profiles";
-import { registerPdfFontsFromDir } from "../lib/pdf/fonts";
+import { registerPdfFontsFromDir, warmPdfFonts } from "../lib/pdf/fonts";
 import { templates } from "../lib/templates";
 import type { CvData } from "../lib/types/cv";
 
-const BILINGUAL = process.env.FIDELITY_PERSONA === "bilingual";
-export const CASES: Array<{ id: string; density?: number }> = BILINGUAL
-  ? [{ id: "bilingual" }]
+// FIDELITY_PERSONA=bilingual | arabic-only | arabic-first | arabic-name |
+// arabic-dense (set by `pdf-fidelity.mjs --persona=…`) renders that ONE
+// synthetic Arabic persona at its own levels instead of the density trio.
+const PERSONA = process.env.FIDELITY_PERSONA || "";
+export const CASES: Array<{ id: string; density?: number }> = PERSONA
+  ? [{ id: PERSONA }]
   : [
       { id: "natural" },
       { id: "compact", density: 1 },
@@ -60,13 +63,17 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   const fontsReady = registerPdfFontsFromDir(join(root, "public", "fonts", "pdf"));
   console.log(fontsReady ? "fonts: embedded from public/fonts/pdf" : "fonts: Helvetica fallback");
+  // Same glyph-cache warm-up as the download (lib/pdf/fonts.ts); the Arabic
+  // face is only needed for the persona runs.
+  await warmPdfFonts(Boolean(PERSONA));
   const photoUri =
     "data:image/jpeg;base64," +
     readFileSync(join(root, "public", previewPhotoSrc.replace(/^\//, ""))).toString("base64");
 
   const manifest: Array<{ template: string; case: string; file: string; density: number | null }> = [];
   for (const t of templates) {
-    const profile = BILINGUAL ? getBilingualPreviewProfile(t.id) : getPreviewProfile(t.id);
+    const profile = PERSONA ? getPersonaProfile(t.id, PERSONA) : getPreviewProfile(t.id);
+    if (!profile) throw new Error(`unknown FIDELITY_PERSONA=${PERSONA}`);
     for (const c of CASES) {
       const base = withDensity(profile, c.density);
       const data: CvData =
@@ -86,7 +93,7 @@ async function main() {
     }
   }
   // One manifest per persona so a --skip-render run of either set stays intact.
-  writeFileSync(join(outDir, BILINGUAL ? "manifest-bilingual.json" : "manifest.json"), JSON.stringify(manifest, null, 2));
+  writeFileSync(join(outDir, PERSONA ? `manifest-${PERSONA}.json` : "manifest.json"), JSON.stringify(manifest, null, 2));
 }
 
 main().catch((err) => {

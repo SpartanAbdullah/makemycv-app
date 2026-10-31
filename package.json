@@ -13,6 +13,7 @@
     "test:import": "tsc -p tsconfig.test.json && node scripts/import-fixtures.test.mjs",
     "fidelity:pdf": "node scripts/pdf-fidelity.mjs --gate",
     "smoke:pdf": "tsc scripts/pdf-smoke.tsx --outDir .pdfsmoke-test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck --jsx react-jsx && node .pdfsmoke-test-build/scripts/pdf-smoke.js && node scripts/pdf-ops-check.mjs",
+    "smoke:arabic": "tsc scripts/arabic-smoke.tsx --outDir .arabic-smoke-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck --jsx react-jsx && node .arabic-smoke-build/scripts/arabic-smoke.js && node scripts/arabic-smoke-check.mjs",
     "capture:previews": "node scripts/capture-previews.js",
     "smoke:builder": "node scripts/builder-smoke.mjs",
     "smoke:checker": "node scripts/checker-smoke.mjs",

@@ -1061,3 +1061,244 @@ export function getBilingualPreviewProfile(templateId: string): CvData {
     ),
   };
 }
+
+/* ── Arabic PDF suite (session 4, 2026-10-31) ─────────────────────────────
+   Four SYNTHETIC personas for `npm run smoke:arabic`, `/preview/<id>?persona=…`
+   and `scripts/pdf-fidelity.mjs --persona=…`. They cover the cases the PDF
+   path has to get right: a CV written entirely in Arabic, an Arabic-first
+   bilingual CV, an English CV that only carries an Arabic name and Arabic job
+   titles, and a dense all-Arabic CV that must paginate. Not marketing
+   personas; every email says so. */
+
+export const ARABIC_PERSONA_IDS = [
+  "arabic-only",
+  "arabic-first",
+  "arabic-name",
+  "arabic-dense",
+] as const;
+export type ArabicPersonaId = (typeof ARABIC_PERSONA_IDS)[number];
+
+/** Every persona id the preview route and the harnesses accept. */
+export const PERSONA_IDS = ["bilingual", ...ARABIC_PERSONA_IDS] as const;
+export type PersonaId = (typeof PERSONA_IDS)[number];
+
+const AR_BULLETS = [
+  "أعدّ تقارير الإدارة الشهرية والميزانيات التقديرية لمجلس الإدارة وفق المعايير الدولية للتقارير المالية (IFRS)",
+  "قاد فريقاً من 12 محاسباً عبر ثلاث شركات تابعة في الإمارات والسعودية وخفّض فترة الإقفال الشهري من 12 إلى 6 أيام",
+  "طبّق نظام Oracle NetSuite وأتمت تسويات البنوك، ما رفع دقة التقارير بنسبة 30% وقلّص الأخطاء اليدوية",
+  "تفاوض مع البنوك على تسهيلات ائتمانية بقيمة 45 مليون درهم بشروط أفضل بنسبة 1.5% من العروض السابقة",
+  "أشرف على التدقيق الخارجي السنوي مع شركات الأربعة الكبار دون أي ملاحظات جوهرية لثلاث سنوات متتالية",
+  "صمّم لوحات متابعة الأداء المالي (Power BI) للإدارة التنفيذية وربطها بمؤشرات الأداء الرئيسية لكل قطاع",
+  "حضّر ملف ضريبة القيمة المضافة وضريبة الشركات الإماراتية وقدّم الإقرارات في مواعيدها دون غرامات",
+  "درّب 20 موظفاً في الفروع على سياسات الإنفاق الجديدة ونظام الموافقات الإلكتروني",
+];
+
+const AR_EXPERIENCE = [
+  {
+    company: "مجموعة الخليج القابضة",
+    role: "مدير مالي أول",
+    location: "دبي",
+    startDate: "2021-03",
+    endDate: "",
+    isCurrent: true,
+  },
+  {
+    company: "شركة الإمارات للتطوير العقاري",
+    role: "رئيس قسم المحاسبة",
+    location: "أبوظبي",
+    startDate: "2017-06",
+    endDate: "2021-02",
+    isCurrent: false,
+  },
+  {
+    company: "ديلويت الشرق الأوسط",
+    role: "محاسب أول — التدقيق",
+    location: "الشارقة",
+    startDate: "2014-01",
+    endDate: "2017-05",
+    isCurrent: false,
+  },
+  {
+    company: "بنك المشرق",
+    role: "محلل مالي",
+    location: "دبي",
+    startDate: "2012-07",
+    endDate: "2013-12",
+    isCurrent: false,
+  },
+  {
+    company: "شركة أبوظبي الوطنية للطاقة",
+    role: "محاسب تكاليف",
+    location: "أبوظبي",
+    startDate: "2010-09",
+    endDate: "2012-06",
+    isCurrent: false,
+  },
+  {
+    company: "مجموعة الفطيم",
+    role: "مساعد محاسب",
+    location: "دبي",
+    startDate: "2008-08",
+    endDate: "2010-08",
+    isCurrent: false,
+  },
+];
+
+function arabicOnlyProfile(base: CvData, dense: boolean): CvData {
+  // dense: six roles with seven bullets each — past page 1 in every layout,
+  // including the compact Harvard sheet and the wide-column sidebars.
+  const roles = dense ? AR_EXPERIENCE : AR_EXPERIENCE.slice(0, 3);
+  const perRole = dense ? 7 : 4;
+  return {
+    ...base,
+    personal: {
+      ...base.personal,
+      firstName: "أحمد",
+      lastName: "الراشد",
+      headline: "مدير مالي أول — محاسب قانوني معتمد (CPA)",
+      email: "arabic.synthetic@email.ae",
+      phone: "+971 50 123 4567",
+      location: "دبي، الإمارات العربية المتحدة",
+      website: "",
+      linkedin: "linkedin.com/in/ahmed-alrashid",
+      summary:
+        "مدير مالي يحمل خبرة تزيد على 12 عاماً في الشركات القابضة والتطوير العقاري في دولة الإمارات، يجيد إعداد التقارير المالية الموحدة وإدارة السيولة والعلاقات المصرفية، وقاد تحوّل الأنظمة المالية إلى Oracle NetSuite مع تدريب الفرق على السياسات الجديدة.",
+      nationality: "إماراتي",
+      visaStatus: "مواطن",
+      availability: "متاح خلال شهر",
+      drivingLicense: "رخصة قيادة إماراتية",
+      photo: undefined,
+      showPhoto: false,
+    },
+    experience: roles.map((r, i) => ({
+      ...r,
+      id: `ar-exp-${i}`,
+      bullets: Array.from({ length: perRole }, (_, k) => AR_BULLETS[(i * 2 + k) % AR_BULLETS.length]),
+    })),
+    education: [
+      {
+        id: "ar-edu-1",
+        school: "جامعة الإمارات العربية المتحدة",
+        degree: "بكالوريوس في المحاسبة",
+        field: "المحاسبة والتمويل",
+        startDate: "2008",
+        endDate: "2012",
+        notes: "بتقدير امتياز مع مرتبة الشرف",
+        attested: true,
+        attestingBody: "وزارة الخارجية — الإمارات",
+      },
+    ],
+    skills: [
+      { id: "ar-sk-1", name: "التقارير المالية الموحدة" },
+      { id: "ar-sk-2", name: "المعايير الدولية IFRS" },
+      { id: "ar-sk-3", name: "إدارة السيولة والخزينة" },
+      { id: "ar-sk-4", name: "Oracle NetSuite" },
+      { id: "ar-sk-5", name: "ضريبة القيمة المضافة" },
+      { id: "ar-sk-6", name: "إعداد الميزانيات" },
+      { id: "ar-sk-7", name: "Power BI" },
+      { id: "ar-sk-8", name: "قيادة الفرق" },
+    ],
+    languages: [
+      { id: "ar-l-1", name: "العربية", level: "native" },
+      { id: "ar-l-2", name: "الإنجليزية", level: "professional" },
+    ],
+    certifications: [
+      { id: "ar-c-1", name: "محاسب قانوني معتمد (CPA)", issuer: "AICPA", date: "2016" },
+      { id: "ar-c-2", name: "شهادة ضريبة القيمة المضافة", issuer: "الهيئة الاتحادية للضرائب", date: "2018" },
+    ],
+    projects: [
+      {
+        id: "ar-p-1",
+        name: "التحوّل إلى Oracle NetSuite",
+        bullets: ["قاد الانتقال من النظام القديم خلال 9 أشهر لثلاث شركات دون توقف العمليات"],
+      },
+    ],
+  };
+}
+
+function arabicFirstProfile(base: CvData): CvData {
+  const ar = arabicOnlyProfile(base, false);
+  return {
+    ...ar,
+    personal: {
+      ...ar.personal,
+      headline: "مدير مالي أول | Senior Finance Manager (CPA)",
+      email: "arabic-first.synthetic@email.ae",
+      location: "دبي، الإمارات · Dubai, UAE",
+      summary:
+        "مدير مالي يحمل خبرة تزيد على 12 عاماً في الشركات القابضة والتطوير العقاري في الإمارات، يجيد إعداد التقارير المالية الموحدة وإدارة السيولة. " +
+        "Bilingual finance leader who reports in Arabic and English and led an Oracle NetSuite migration across three entities.",
+    },
+    experience: ar.experience.map((e, i) => ({
+      ...e,
+      role: `${e.role} — ${["Senior Finance Manager", "Head of Accounting", "Senior Auditor"][i] ?? e.role}`,
+      bullets: [
+        ...e.bullets.slice(0, 3),
+        "Reduced month-end close from 12 to 6 days — خفّض فترة الإقفال الشهري من 12 إلى 6 أيام",
+      ],
+    })),
+    skills: [
+      ...ar.skills.slice(0, 5),
+      { id: "ar-sk-en-1", name: "IFRS 16" },
+      { id: "ar-sk-en-2", name: "Consolidation" },
+      { id: "ar-sk-en-3", name: "Treasury" },
+    ],
+    languages: [
+      { id: "arf-l-1", name: "العربية (لغة أم)", level: "native" },
+      { id: "arf-l-2", name: "English", level: "professional" },
+    ],
+  };
+}
+
+const AR_NAMES: Record<string, string> = {
+  Omar: "عمر الفارسي",
+  Sara: "سارة الحوسني",
+  Layla: "ليلى المنصوري",
+  Aisha: "عائشة النعيمي",
+  Rashid: "راشد الكعبي",
+  Priya: "بريا ناير",
+  Mariam: "مريم السويدي",
+  Nadia: "نادية حداد",
+};
+const AR_ROLE_TITLES = ["مدير أول", "رئيس قسم", "أخصائي أول", "منسق"];
+
+function arabicNameProfile(base: CvData): CvData {
+  const arabicName = AR_NAMES[base.personal.firstName] ?? "أحمد الراشد";
+  return {
+    ...base,
+    personal: {
+      ...base.personal,
+      lastName: `${base.personal.lastName} · ${arabicName}`,
+      headline: `${base.personal.headline} — ${AR_ROLE_TITLES[0]}`,
+      email: "arabic-name.synthetic@email.ae",
+    },
+    experience: base.experience.map((e, i) => ({
+      ...e,
+      role: `${e.role} — ${AR_ROLE_TITLES[i % AR_ROLE_TITLES.length]}`,
+    })),
+  };
+}
+
+/**
+ * The profile for a persona id, or null when the id is unknown. `bilingual`
+ * is the session-3 overlay above; the four `arabic-*` ids are the session-4
+ * suite. Photos are dropped from the all-Arabic personas (no synthetic face
+ * for a synthetic name); the overlays keep the base persona's.
+ */
+export function getPersonaProfile(templateId: string, persona: string): CvData | null {
+  const base = getPreviewProfile(templateId);
+  switch (persona) {
+    case "bilingual":
+      return getBilingualPreviewProfile(templateId);
+    case "arabic-only":
+      return arabicOnlyProfile(base, false);
+    case "arabic-dense":
+      return arabicOnlyProfile(base, true);
+    case "arabic-first":
+      return arabicFirstProfile(base);
+    case "arabic-name":
+      return arabicNameProfile(base);
+    default:
+      return null;
+  }
+}

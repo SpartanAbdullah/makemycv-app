@@ -42,7 +42,10 @@ const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const BASE_URL = (process.env.PREVIEW_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 const DAY = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD
 const PERSONA = opt("persona");
-if (PERSONA && PERSONA !== "bilingual") throw new Error(`unknown --persona=${PERSONA} (only "bilingual")`);
+// bilingual = session-3 overlay; arabic-* = the session-4 Arabic PDF suite
+// (lib/data/preview-profiles.ts getPersonaProfile).
+const PERSONAS = ["bilingual", "arabic-only", "arabic-first", "arabic-name", "arabic-dense"];
+if (PERSONA && !PERSONAS.includes(PERSONA)) throw new Error(`unknown --persona=${PERSONA} (one of ${PERSONAS.join(", ")})`);
 const OUT_DIR = path.resolve(process.env.FIDELITY_OUT || path.join(ROOT, "..", "_cowork", `pdf-fidelity-${DAY}${PERSONA ? `-${PERSONA}` : ""}`));
 const BASELINE_FILE = path.join(ROOT, "scripts", "pdf-fidelity-baseline.json");
 const GATE_BLOCK_SLACK = 3; // points of page-1 block diff a cell may rise before --gate fails
@@ -51,8 +54,8 @@ const PDFJS_DIR = path.join(ROOT, "node_modules", "pdfjs-dist", "build");
 const TOL = Number(process.env.FIDELITY_TOL || 0.1); // 10% of full intensity
 const BLOCK = 8; // px; block metric = mean-luminance drift per 8x8 cell
 const A4 = { w: 794, h: 1123 }; // CSS px at 96dpi, the app-wide render size
-const CASES = PERSONA === "bilingual"
-  ? [{ id: "bilingual", query: "?persona=bilingual" }] // synthetic Arabic + English overlay, own levels
+const CASES = PERSONA
+  ? [{ id: PERSONA, query: `?persona=${PERSONA}` }] // one synthetic Arabic persona, own levels
   : [
       { id: "natural", query: "" }, // persona's own density levels (one page by design)
       { id: "compact", query: "?density=1" }, // all four density controls at 1
@@ -84,12 +87,24 @@ window.compare = async ({ png, pdfUrl, W, H, tol, block }) => {
   const img = await loadImg("data:image/png;base64," + png);
   const doc = await pdfjs.getDocument({ url: pdfUrl }).promise;
   const n = doc.numPages, thr = tol * 255;
-  // text layer, all pages: runs on one line are glued when their x-extents touch
+  // text layer, all pages: runs on one line are glued when their x-extents touch.
+  // A glued group whose lettered items are all right-to-left is one Arabic word
+  // or phrase drawn visually (pdf.js splits items at positioning adjustments),
+  // so its item order is reversed back to logical order; a direction change
+  // between lettered items closes the group (session 4, 2026-10-31). Latin-only
+  // lines never form an rtl group, so their text is unchanged.
   let text = "";
+  const lettered = (s) => /\\p{L}/u.test(s);
   for (let p = 1; p <= n; p++) {
     const items = (await (await doc.getPage(p)).getTextContent()).items.filter((it) => "str" in it);
-    items.forEach((it, i) => { const nx = items[i + 1]; text += it.str;
-      if (it.hasEOL || !nx) text += "\\n"; else text += nx.transform[4] - (it.transform[4] + it.width) > 0.9 ? " " : ""; });
+    let grp = [], grpDir = null;
+    const flush = (sep) => { if (grp.length) { const l = grp.filter((it) => lettered(it.str));
+      const rtl = l.length > 0 && l.every((it) => it.dir === "rtl");
+      text += (rtl ? [...grp].reverse() : grp).map((it) => it.str).join(""); } grp = []; grpDir = null; text += sep; };
+    items.forEach((it, i) => { const nx = items[i + 1]; const d = lettered(it.str) ? it.dir : null;
+      if (grp.length && d && grpDir && d !== grpDir) flush("");
+      grp.push(it); if (d) grpDir = d;
+      if (it.hasEOL || !nx) flush("\\n"); else if (nx.transform[4] - (it.transform[4] + it.width) > 0.9) flush(" "); });
     text += "\\n";
   }
   const previewPages = Math.max(1, Math.ceil((img.height - 2) / H));

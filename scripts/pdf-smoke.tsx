@@ -20,7 +20,7 @@ import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
 import { CVDocument } from "../components/pdf/CVDocument";
 import { previewProfiles } from "../lib/data/preview-profiles";
-import { registerPdfFontsFromDir } from "../lib/pdf/fonts";
+import { registerPdfFontsFromDir, warmPdfFonts } from "../lib/pdf/fonts";
 import type { CvData } from "../lib/types/cv";
 
 const fixture: CvData = {
@@ -201,6 +201,9 @@ async function main() {
       ? "fonts: embedded from public/fonts/pdf"
       : "fonts: registration failed, Helvetica fallback",
   );
+  // The fixture has an Arabic language name; warm the glyph caches the way
+  // the download does (lib/pdf/fonts.ts) before the first subset.
+  await warmPdfFonts(true);
   // Every template renders three times: the fixture as is; with the
   // experience list tripled (<id>-long.pdf) so each layout also crosses a
   // page break — audit 2026-10: the Executive band left a white notch on
