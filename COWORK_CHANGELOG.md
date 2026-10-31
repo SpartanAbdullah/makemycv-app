@@ -25,6 +25,18 @@ Format:
 
 ---
 
+## [2026-11-01 02:50] Arabic bullets: Banner / Chronicle / Harvard mirror the live list padding (session 6, follow-up)
+
+**Goal:** after the RTL-marker fix the Harvard dense Arabic cells dropped from ok to check in the fidelity harness
+(block diff 3.5 % → 9.7 %): Banner, Chronicle and Harvard draw the PDF dot INSIDE the list padding, so mirroring
+the PDF's own padding ended the Arabic text ~9pt further from the right edge than the live list.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — those three renderers pass `pt(live padding) − dot width` to
+  `bulletRowDir`, so the RTL text ends where the live list puts it (text width unchanged).
+**Notes / risks / follow-up:** Harvard dense back to ok (block diff 3.0 %); Banner / Chronicle cells unchanged; Latin
+bullets untouched (the helper returns {} for them).
+**Suggested commit:** fix(pdf): RTL bullet mirror in Banner / Chronicle / Harvard matches the live list padding
+
 ## [2026-11-01 02:30] Arabic-first bullets: the marker moves to the right, next to its text (session 6, E8.2 follow-up)
 
 **Goal:** release blocker found in review of E8.2 (`_cowork/session6/arabic/compare-A-classic.png`): Arabic-first

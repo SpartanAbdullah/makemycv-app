@@ -140,7 +140,10 @@ const roleBox = (text: string): Style =>
  * marker sits as far from the right edge, and as close to its text, as an
  * LTR marker does on the left; the text box keeps its width. The live lists
  * do the same with `dir="rtl"` + mirrored margins (lib/templates/utils.ts
- * `bulletLiProps`). Latin bullets get {} — identical styles.
+ * `bulletLiProps`). Latin bullets get {} — identical styles. Banner,
+ * Chronicle and Harvard draw their dot INSIDE the list padding (their LTR
+ * text sits pad + dot in), so they pass the live padding minus the dot width:
+ * the RTL text then ends exactly where the live list puts it.
  */
 const bulletRowDir = (text: string, listPadLeft: number): Style =>
   firstStrongDirection(text) === "rtl"
@@ -4608,7 +4611,7 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 3, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 2, ...bulletRowDir(bullet, 10) }}>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 2, ...bulletRowDir(bullet, Math.max(0, pt(16) - 10)) }}>
             <Text style={{ ...bodyText, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...bodyText, flex: 1 }}>{bullet}</Text>
           </View>
@@ -5453,7 +5456,7 @@ const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 2, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5, ...bulletRowDir(bullet, 10) }}>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5, ...bulletRowDir(bullet, Math.max(0, pt(14) * fs - 10)) }}>
             <Text style={{ ...body, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
@@ -5853,7 +5856,7 @@ const HarvardPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 1.5, paddingLeft: 12 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75, ...bulletRowDir(bullet, 12) }}>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75, ...bulletRowDir(bullet, Math.max(0, pt(16) * fs - 9)) }}>
             <Text style={{ ...body, width: 9, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
