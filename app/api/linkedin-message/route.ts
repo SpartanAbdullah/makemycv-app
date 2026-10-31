@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey || apiKey === "replace_with_your_key") {
-      return NextResponse.json({ error: "API not configured" }, { status: 500 });
+      return NextResponse.json({ error: "This feature is temporarily unavailable. Please try again later." }, { status: 503 });
     }
 
     const ip = getClientIp(request);

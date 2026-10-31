@@ -156,6 +156,12 @@ export async function POST(request: Request) {
         { status: UPSTREAM_TIMEOUT_STATUS },
       );
     }
+    if (e?.kind === "claude-failed" && /not configured/i.test(String(e.message ?? ""))) {
+      return NextResponse.json(
+        { error: "This feature is temporarily unavailable. Please try again later.", requestId },
+        { status: 503 },
+      );
+    }
     if (e?.kind === "claude-failed") {
       return NextResponse.json(
         {

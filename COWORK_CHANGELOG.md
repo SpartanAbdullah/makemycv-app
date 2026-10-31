@@ -6,6 +6,15 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-10-31 15:10] QA follow-ups: LinkedIn minimum-length hint, consistent 503 when the AI key is missing
+
+**Goal:** close three minor findings from the independent release QA (docs/ai-mission/QA_INDEPENDENT_2026-10-31.md D3, D5).
+**Files:**
+- edited: `components/linkedin/LinkedinMessagePanel.tsx` - a `role="status"` line under the counter explains the 30-character minimum while the button is disabled.
+- edited: `app/api/linkedin-message/route.ts`, `app/api/cover-letter/route.ts` - a missing `ANTHROPIC_API_KEY` answers 503 "This feature is temporarily unavailable" instead of 500 "API not configured".
+- edited: `app/api/resume-checker/parse/route.ts` - the same configuration failure, previously surfaced as 422 "Our parser had trouble with this CV", now answers 503 with the same sentence; real parse failures keep the 422.
+**Verification:** tsc, lint 11/11, npm test; the hooks already render `error` from any status.
+
 ## [YYYY-MM-DD HH:MM] Short title
 **Goal:** why — the task, and which business objective it serves
 **Files:**

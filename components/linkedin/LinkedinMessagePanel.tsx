@@ -248,6 +248,11 @@ const LinkedinMessageForm = () => {
         <div style={{ fontSize: 12, color: "var(--ff-faint)", marginTop: -8, textAlign: "right" }}>
           {jobText.length.toLocaleString()} / {LINKEDIN_MESSAGE_LIMITS.jobTextChars.toLocaleString()}
         </div>
+        {jobText.trim().length > 0 && jobText.trim().length < LINKEDIN_MESSAGE_LIMITS.jobTextMinChars ? (
+          <p role="status" style={{ fontSize: 12, color: "var(--ff-faint)", marginTop: -4 }}>
+            Paste at least {LINKEDIN_MESSAGE_LIMITS.jobTextMinChars} characters of the ad or the message so there is something to reply to.
+          </p>
+        ) : null}
 
         {/* Format toggle — the two things LinkedIn lets you send a stranger. */}
         <fieldset style={{ border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
