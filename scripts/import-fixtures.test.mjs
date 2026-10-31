@@ -195,6 +195,16 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   check("arabic-only.pdf", "no mirrored Arabic name or headline (D4)", !/[؀-ۿ]/.test(`${r.partial?.personal?.firstName ?? ""}${r.partial?.personal?.lastName ?? ""}${r.partial?.personal?.headline ?? ""}`), r.partial?.personal);
 }
 
+{
+  // D8: session-5 matrix case 10a — a cover letter with a contact header.
+  // It still imports (contact is real), but "Dear Hiring Manager," is not the
+  // headline any more.
+  const r = await runImport("s5-cover-letter-contact.pdf", bytesOf("s5-cover-letter-contact.pdf"));
+  const p = r.partial?.personal ?? {};
+  check("s5-cover-letter-contact.pdf", "name and email read", p.firstName === "Noor" && p.email === "noor.testwell@example.com", p);
+  check("s5-cover-letter-contact.pdf", "salutation is not the headline (D8)", !/dear/i.test(p.headline ?? ""), p.headline);
+}
+
 /* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
    s5-arabic-majority.pdf = session-5 matrix case 3 (Arabic headings, Latin
    email line, Vazirmatn shaped by react-pdf). arabic-export-classic.pdf = a

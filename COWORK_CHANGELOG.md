@@ -25,6 +25,20 @@ Format:
 
 ---
 
+## [2026-10-31 22:40] Import: a letter's salutation is never the headline or the name (session 5 D8)
+
+**Goal:** Minor defect D8 (IMPORT_MONITORING.md §8.3): a cover letter with a contact header imported with Headline =
+"Dear Hiring Manager," (the line holds the role word "manager").
+**Files:**
+- edited: `lib/importers/textParser.ts` — `SALUTATION_RE` (Dear / To whom it may concern / Hello / Hi / Greetings /
+  Good morning…): `harvestContact` skips such lines as name and as headline.
+- created: `__fixtures__/import/s5-cover-letter-contact.pdf` (matrix case 10a, persona "Noor Testwell").
+- edited: `scripts/import-fixtures.test.mjs`, `scripts/parser-fixtures.test.cjs` — salutation not the headline / name.
+**Notes / risks / follow-up:** the letter still imports as a CV with contact only (correct contact, letter text in
+"We couldn't place this"). Saying "this looks like a cover letter → /cover-letter" is a product call (mapping_empty
+variant), not done.
+**Suggested commit:** fix(import): never take a letter's salutation as the headline (D8)
+
 ## [2026-10-31 22:30] Import: the confirm toast is no longer wiped on the first import of a session (session 5 D6)
 
 **Goal:** Minor defect D6 (IMPORT_MONITORING.md §8.3): on the first import of a browser session the "Imported N

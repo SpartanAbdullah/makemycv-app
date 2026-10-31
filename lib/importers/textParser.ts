@@ -1355,6 +1355,10 @@ function parseProjectsBlock(lines: string[]): ParsedProject[] {
 
 const CONTACT_SCAN_DEPTH = 30;
 
+/** A letter's salutation line — never a name or a headline. */
+const SALUTATION_RE =
+  /^(?:dear|to\s+whom\s+it\s+may\s+concern|hello|hi|greetings|good\s+(?:morning|afternoon|day))\b/i;
+
 /** Base Arabic-script letters (after the PDF adapter's NFKC). */
 const ARABIC_LETTER_RE = /[ؠ-يٱ-ۓ]/;
 
@@ -1489,6 +1493,7 @@ function harvestContact(lines: string[]): {
     // so First name became "•" and Last name a whole sentence.
     if (isBulletLine(line) || /^[•·●◦▪■*›▸▶►★]/.test(line) || /\d/.test(line)) continue;
     if (arabicVisual && ARABIC_LETTER_RE.test(line)) continue;
+    if (SALUTATION_RE.test(line)) continue;
     // Must contain at least one alphabetic char and not look like a headline / sentence.
     if (!/[A-Za-zÀ-ɏ؀-ۿ]/.test(line)) continue;
     // Likely headline if it's a known job title.
@@ -1547,6 +1552,9 @@ function harvestContact(lines: string[]): {
         consumed.add(i);
         break;
       }
+      // D8 (session 5): a cover letter's "Dear Hiring Manager," was taken as
+      // the headline (it holds the role word "manager").
+      if (SALUTATION_RE.test(line)) continue;
       // A headline carries no dates; a dated line is a role or a degree.
       if (extractDates(line).length > 0) continue;
       const titleish = looksLikeRole(line) || /\s[|·•—–]\s/.test(line);

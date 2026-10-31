@@ -876,5 +876,19 @@ const runText = (label, text) => {
   check(f, "a dated role line is not the headline", d.contact.headline === undefined, d.contact.headline);
 }
 
+/* ── D8 (session 5): salutations are never the name or the headline ─────── */
+{
+  const f = "d8-salutation (inline)";
+  const d = runText(f, [
+    "Dear Hiring Manager,",
+    "Noor Testwell",
+    "noor.testwell@example.com",
+    "Dear Recruitment Manager,",
+    "Facilities Manager",
+  ].join("\n"));
+  check(f, "salutation skipped as name", d.contact.name === "Noor Testwell", d.contact.name);
+  check(f, "salutation skipped as headline", d.contact.headline === "Facilities Manager", d.contact.headline);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);
