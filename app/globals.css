@@ -1305,3 +1305,17 @@ body {
   outline: 2px solid var(--ff-ink);
   outline-offset: 2px;
 }
+
+/* Cookie-consent banner vs modal dialogs (backlog E9, found on production
+   2026-10-31). The banner (components/consent/ConsentBanner.tsx, a shared
+   byte-identical copy of the site's — not edited here) is fixed at the
+   bottom with z-index 1000, while every modal in the app sits between 60
+   and 200, so at 1440×900 the banner covered MappingReview's "Import"
+   button until the visitor answered it. The banner is a non-modal region
+   that nothing waits on, so while a modal dialog is open it yields: hidden
+   here, back as soon as the dialog closes. One rule covers all six
+   aria-modal dialogs instead of six z-index bumps. !important because the
+   banner sets display: flex inline. */
+body:has([role="dialog"][aria-modal="true"]) [role="region"][aria-label="Cookie settings"] {
+  display: none !important;
+}

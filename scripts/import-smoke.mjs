@@ -70,14 +70,72 @@ const browser = await chromium.launch({ channel: "chrome" }).catch(() => chromiu
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 page.on("pageerror", (e) => console.log(`      pageerror: ${e.message.slice(0, 160)}`));
+// The consent banner only mounts when the build has NEXT_PUBLIC_GTM_ID; keep
+// Google's script off the wire so the smoke stays local when it does.
+await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
 
 const rows = [];
+
+// ── Consent banner vs the Import button (backlog E9) ───────────────────────
+// Found on production 2026-10-31: the cookie banner (z-index 1000, fixed at
+// the bottom) covered MappingReview's Import button at 1440×900 until the
+// visitor answered it. This context carries NO mmcv_consent cookie, so the
+// banner is up during every review below; the check asks the browser what
+// actually sits at the button's centre. Reported once per run.
+let consentChecked = false;
+let bannerSeen = false;
+async function checkConsentOverlap(btn) {
+  if (consentChecked) return;
+  const banner = page.getByRole("region", { name: "Cookie settings" });
+  const cookie = (await ctx.cookies()).some((c) => c.name === "mmcv_consent");
+  if (cookie) {
+    consentChecked = true;
+    console.log("INFO  consent-overlap: mmcv_consent is set in this context — check skipped");
+    return;
+  }
+  // `bannerSeen` was recorded by runCase() before the dialog opened (the fix
+  // hides the region while a modal is up, so it cannot be read here).
+  const bannerMounted = (await banner.count()) > 0;
+  consentChecked = true;
+  const box = await btn.boundingBox();
+  if (!box) {
+    fail("consent-overlap: Import button has a box", "boundingBox() returned null");
+    return;
+  }
+  const hit = await page.evaluate(
+    ([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      const button = el?.closest("button");
+      return {
+        isImport: !!button && /^Import/.test(button.textContent?.trim() ?? ""),
+        under: el ? `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[aria-label=${el.getAttribute("aria-label")}]` : ""}` : "null",
+        inBanner: !!el?.closest('[role="region"][aria-label="Cookie settings"]'),
+      };
+    },
+    [box.x + box.width / 2, box.y + box.height / 2],
+  );
+  const where = `button centre (${Math.round(box.x + box.width / 2)}, ${Math.round(box.y + box.height / 2)}) at 1440×900`;
+  if (hit.isImport) {
+    ok(`consent-overlap: Import button is the element at its own centre — ${where}; banner ${bannerSeen ? `was up before the dialog opened and is ${bannerMounted ? "hidden while it is open" : "unmounted"}` : "not rendered by this build (no NEXT_PUBLIC_GTM_ID)"}`);
+  } else {
+    fail("consent-overlap: Import button is the element at its own centre", `${where} is ${hit.under}${hit.inBanner ? " (inside the cookie banner)" : ""}`);
+  }
+}
 
 /** Pick `file` through the real Import button; record what happened. */
 async function runCase(name, file, expected) {
   await page.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
   await page.evaluate(() => { window.dataLayer = []; });
+  if (!consentChecked && !bannerSeen) {
+    // Client-only render; give hydration a beat before concluding it is absent.
+    const banner = page.getByRole("region", { name: "Cookie settings" });
+    bannerSeen = await banner.isVisible().catch(() => false);
+    if (!bannerSeen) {
+      await page.waitForTimeout(500);
+      bannerSeen = await banner.isVisible().catch(() => false);
+    }
+  }
 
   // The picker is a detached <input> created on click; before hydration the
   // button has no handler yet (seen against `next dev`), so retry the click
@@ -112,6 +170,7 @@ async function runCase(name, file, expected) {
         await review.getByRole("button", { name: /^Cancel$/ }).click();
       } else {
         outcome = `review:${label.replace(/^Import\s*/, "")}`;
+        await checkConsentOverlap(btn);
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }
@@ -186,6 +245,9 @@ for (const r of rows) {
       (r.message ? `\n  ${"".padEnd(30)} message="${r.message}"` : ""),
   );
 }
+
+if (!consentChecked) fail("consent-overlap", "no import review ever opened, so the Import-button hit test never ran");
+else if (!bannerSeen) console.log("INFO  consent-overlap: the banner was never visible in this run — the hit test passed, but to exercise the overlap build with NEXT_PUBLIC_GTM_ID set (e.g. GTM-SMOKE01)");
 
 await browser.close();
 fs.rmSync(tmp, { recursive: true, force: true });

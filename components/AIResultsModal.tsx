@@ -310,13 +310,19 @@ export function AIResultsModal({
     <div
       className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--surface-overlay)]"
       onClick={handleBackdrop}
+      // A modal in behaviour (backdrop, Escape, scroll lock) — named as one so
+      // assistive tech knows, and so the cookie banner yields to it (E9 rule
+      // in globals.css keys on aria-modal).
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-results-title"
     >
       <div className="relative mx-4 w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         {/* Close button */}
         <ModalCloseButton onClick={onClose} className="absolute right-3 top-3" />
 
         {/* Header */}
-        <h2 className="text-lg font-bold text-[var(--ff-ink)]">{TITLES[type]}</h2>
+        <h2 id="ai-results-title" className="text-lg font-bold text-[var(--ff-ink)]">{TITLES[type]}</h2>
         <p className="mb-4 text-sm text-[var(--ff-muted)]">{SUBTITLES[type]}</p>
 
         {/* Loading state */}

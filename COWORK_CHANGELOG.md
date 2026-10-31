@@ -25,6 +25,31 @@ Format:
 
 ---
 
+## [2026-10-31 18:05] Consent banner no longer covers modal dialogs (backlog E9)
+
+**Goal:** on production at 1440×900 the cookie-consent banner (fixed bottom, `z-index: 1000`) sat on top of the
+MappingReview dialog's "Import (N sections)" button until the visitor answered it, so a first-time visitor on a
+short viewport could not finish an import (found by the production `smoke:import` run, session 4). Every modal in
+the app sits between z 60 and 200, so the same overlap applies to the export gate, the template preview, the JD
+Match dialog, the mobile preview overlay and the tip jar.
+**Files:**
+- edited: `app/globals.css` — one rule: `body:has([role="dialog"][aria-modal="true"]) [role="region"][aria-label="Cookie settings"] { display: none }`.
+  The banner is a non-modal region that nothing waits on, so while a modal dialog is open it yields and comes back
+  when the dialog closes. Chosen over six z-index bumps, and over editing `components/consent/ConsentBanner.tsx`,
+  which is a byte-identical copy of the site's file (CLAUDE.md: edit both) — the site has no modal dialogs, so the
+  shared file did not need to change.
+- edited: `scripts/import-smoke.mjs` — `checkConsentOverlap()`: in the first review that opens (the context has no
+  `mmcv_consent` cookie, viewport 1440×900) it asks `document.elementFromPoint` what sits at the Import button's
+  centre and fails unless it is the button; reports whether the banner was up before the dialog opened. GTM /
+  GA requests are aborted so a build with `NEXT_PUBLIC_GTM_ID` stays offline. Without a GTM id the banner does not
+  mount at all (`app/layout.tsx`), so the run prints an INFO line saying the overlap was not exercised — build with
+  `NEXT_PUBLIC_GTM_ID=GTM-SMOKE01` to exercise it.
+**Notes / risks / follow-up:** `:has()` is supported by every browser the app targets (Chrome 105+, Safari 15.4+,
+Firefox 121+); in an older browser the rule is ignored and behaviour is as before, never worse. A dialog that
+omits `aria-modal="true"` (none today — `ScoreChip`'s popover and `AIResultsModal` are not modal regions in that
+sense) would not trigger the rule; add the attribute rather than a z-index when one appears.
+**Suggested commit:** fix(consent): hide the cookie banner while a modal dialog is open (E9) + import-smoke hit test
+
 ## [2026-10-31 17:10] smoke:checker: allow the pdf.js worker HEAD probe in the privacy assertion
 
 **Goal:** `npm run smoke:checker` has been red since `45ade82` (this morning's import commit): the new
