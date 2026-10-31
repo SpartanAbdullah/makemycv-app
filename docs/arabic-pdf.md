@@ -29,6 +29,7 @@ fidelity composites) and the "Session 4 — Arabic" section of
 | Can a Latin + Arabic font stack be used? | **No.** `fontFamily: [Inter, Arabic]` is accepted (`layout/lib/index.js:1376`, per-code-point pick at `textkit.js:2804`), but `reorderLine` pulls glyphs across run boundaries by string index: a Latin run draws Arabic glyph ids and the bogus ids poison pdfkit's subset / ToUnicode tables for the whole document (probe 1 / probe 3 rows A). | `textkit.js:874-897` |
 | Ligatures? | `reorderLine` dedupes ligature glyphs by `glyph.id` per line, so the second lam-alef on a line vanishes ("لا" dropped from "الإدارة لا تعرف الآن إلا الله", probe 3 row B3); pdf.js also reads a multi-code-point ligature back reversed ("سالم"). | `textkit.js:883-890` |
 | Decomposed dots? | `resolve()` maps string indices to glyph indices by `codePoints.length`; a glyph with no code points (Noto Sans / Naskh Arabic build dotted letters as base + dot mark via `ccmp`) gets no index, the map drifts, dots land on the wrong letters and the last glyphs of a run vanish ("أول" lost, "مالي" → "مالى", probe 2). | `textkit.js:940` |
+| Why do long Arabic lines extract with words missing? (session 6) | `bidiEngine` splits runs at every bidi-level change; `reorderLine` keeps each run's logical length and refills it with visual-order glyphs, so each run's `TJ` is cut at an arbitrary point inside a word. Patched — approach 6. | `textkit.js:1658` (`bidiEngine`), `:874` (`reorderLine`) |
 | Glyph cache? | fontkit caches one Glyph object per id with the code points of its FIRST creation; pdfkit's subsetter resolves composite components with `getGlyph(id)` (no code points). After a document embeds ض (composite over ص) the ص glyph is `[]` for the rest of the process → the next line with ص drops glyphs or throws `reading 'id'`. Same state across two downloads in one browser tab. | `fontkit` `getGlyph`, `pdfkit` `TTFSubset.encode` |
 
 ### The approach
@@ -63,8 +64,31 @@ fidelity composites) and the "Session 4 — Arabic" section of
    after a face loads, every code point it maps is laid out once, so every
    cmap glyph exists with its code points before any subset runs. Called by
    `downloadCV` (Arabic face only when the CV has Arabic) and the Node
-   renderers.
-5. **Preview**: `app/globals.css` declares `'Vazirmatn CV'` from the same two
+   renderers. It also installs a repair on the face's `getGlyph`: a glyph
+   reachable only through GSUB (Vazirmatn's contextual alternates, e.g. the
+   medial ی after چ) can still be created first by an earlier document's
+   subsetter with no code points; when layout later asks for it with code
+   points, the cached glyph takes them (session 6 — an Urdu CV rendered after
+   an Arabic one in the same process threw `reading 'id'` without it).
+6. **textkit reorder patch** (`scripts/patch-react-pdf-textkit.mjs`, run on
+   `postinstall`, session 6, E8.1). textkit splits a paragraph into runs at
+   every bidi-level change (an Arabic line with "8", "94%" or "SAP IBP" in it
+   is 3–7 runs), and `reorderLine` kept each run's LOGICAL length while
+   refilling it with VISUAL-order glyphs — so the run that held the
+   one-character "8" drew one letter from the middle of some Arabic word, and
+   each run became its own `BT … TJ … ET`. pdf.js and pypdf reverse each text
+   item on its own and lost the cut words (session 5: persona A b1 3 of 14
+   words, b2 1 of 7); PyMuPDF scrambled them. The patch rebuilds the line's
+   runs in visual order (each glyph keeps its own run's font / size / colour /
+   link; adjacent runs that draw alike merge; a multi-character glyph is
+   drawn once per occurrence, keyed by run + glyph index rather than glyph
+   id). A one-face Arabic line is now ONE text-show operator; rasters are
+   pixel-identical to the unpatched output (checked on 8 pages); lines that
+   need no reordering (every Latin-only line) return before the patched code.
+   `npm run test:textkit-patch` (in `npm test`, so CI) fails if the installed
+   textkit is not patched — on a textkit upgrade the script warns, leaves the
+   file alone, and that test fails until the patch is ported.
+7. **Preview**: `app/globals.css` declares `'Vazirmatn CV'` from the same two
    files with `unicode-range` limited to the Arabic blocks, placed FIRST in
    the three `--cv-font-*` stacks (it must precede the next/font families,
    whose metric-adjusted Arial fallback carries Arabic glyphs of its own).
@@ -80,7 +104,11 @@ fidelity composites) and the "Session 4 — Arabic" section of
   NFKC-normalises every extracted PDF line (`lib/importers/pdfAdapter.ts`,
   2026-10-31), so re-importing an exported Arabic CV keeps the name, headline
   and role in base letters (`__fixtures__/import/arabic-export-classic.pdf`).
-  Long Arabic lines split across `TJ` operators can still lose words.
+  Since the textkit patch (approach 6) a long Arabic line is one text-show
+  operator and pdf.js / pypdf no longer lose words from it; how a tool ORDERS
+  a mixed line still depends on the tool (see the session-6 matrix in
+  `docs/ai-mission/ARABIC_PRODUCTION_2026-10-31.md` in the parent folder), and
+  pdfminer-based parsers still read Arabic in visual (reversed) order.
 - **One run per line.** Inside a `<Text>` that contains Arabic, a nested bold
   label loses its weight, a `<Link>` loses its hyperlink (text stays), Latin
   words are set in Vazirmatn's Latin instead of Inter / Bricolage / Instrument

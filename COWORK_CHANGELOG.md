@@ -25,6 +25,31 @@ Format:
 
 ---
 
+## [2026-10-31 23:55] Arabic PDF: one text-show operator per Arabic line, no words lost in pdf.js / pypdf (session 6, E8.1)
+
+**Goal:** E8.1 (ARABIC_PRODUCTION_2026-10-31.md §2): long Arabic lines were written as 3–7 `TJ` operators split
+inside words; pdf.js and pypdf (and so our own importer) lost the cut words — persona A b1 3/14, b2 1/7.
+**Root cause:** `@react-pdf/textkit` 6.1.0 splits a paragraph into runs at every bidi-level change (digits, "%",
+Latin inside Arabic), and `reorderLine` keeps each run's LOGICAL length while refilling it with VISUAL-order glyphs, so
+every run's text-show operator starts and ends at an arbitrary glyph inside a word (the 1-character run "8" drew the
+single letter "د" of "مستودعات"). Not justification, not GPOS offsets.
+**Files:**
+- created: `scripts/patch-react-pdf-textkit.mjs` + `"postinstall"` — rewrites that block of `reorderLine` to rebuild
+  runs in visual order (each glyph keeps its own run; adjacent runs that draw alike merge; multi-character glyphs drawn
+  once per occurrence). Idempotent; warns and leaves the file alone if the anchor is gone.
+- created: `scripts/textkit-patch.test.mjs` + `test:textkit-patch` (in `npm test` → CI) — installed textkit is patched;
+  a real render of three mixed Arabic lines keeps every Arabic word whole in one pdf.js item; Latin line one item.
+  Fails on unpatched textkit with exactly the session-5 symptom.
+- edited: `lib/pdf/fonts.ts` — `repairGlyphCache`: a GSUB-only glyph (Vazirmatn contextual alternate) cached with no
+  code points by an earlier subset takes the code points layout supplies (an Urdu CV rendered after an Arabic one in
+  one process threw `reading 'id'`, before and after the patch).
+- edited: `docs/arabic-pdf.md` — approach 6, the probe table row, the text-layer limit.
+**Notes / risks / follow-up:** rasters of 8 Arabic pages are pixel-identical before/after; 6 Latin templates have
+byte-identical content streams. Lines that need no bidi reorder never reach the patched code. The patch lives in
+`node_modules`: any environment that installs with `--ignore-scripts` ships the old behaviour (test:textkit-patch
+catches it in CI). Before/after matrix: `_cowork/session6/arabic/`.
+**Suggested commit:** fix(pdf): one text-show operator per Arabic line (textkit reorder patch, E8.1)
+
 ## [2026-10-31 23:30] Arabic PDF: Urdu heh goal prints in Vazirmatn, no Helvetica "¦" (session 6, E8.4)
 
 **Goal:** E8.4 (ARABIC_PRODUCTION_2026-10-31.md §1 test 7): an isolated ہ (U+FBA6, absent from Vazirmatn) fell back

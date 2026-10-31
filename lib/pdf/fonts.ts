@@ -170,16 +170,44 @@ const WARM_ARABIC =
   codePointRange(0xfb50, 0xfdff) +
   codePointRange(0xfe70, 0xfeff);
 
+type FontkitGlyph = { codePoints?: number[]; isLigature?: boolean };
 type FontkitLike = {
   hasGlyphForCodePoint?: (cp: number) => boolean;
   layout?: (s: string, f?: unknown, sc?: unknown, l?: unknown, d?: string) => unknown;
+  getGlyph?: (id: number, codePoints?: number[]) => FontkitGlyph | null;
+  __mmcvGlyphRepair?: boolean;
 };
+
+/**
+ * The warm-up covers glyphs the cmap reaches. A glyph only reachable through
+ * GSUB — Vazirmatn's contextual alternates, e.g. the medial ی after چ in
+ * "چین" (session 6) — can still be created first by an earlier document's
+ * subsetter with no code points, and the next layout that substitutes it
+ * gets that cached empty glyph: textkit's index map drifts and the render
+ * throws (it crashed an Urdu CV rendered after an Arabic one). fontkit's
+ * layout always asks for the glyph WITH the code points it stands for, so
+ * when a cached glyph has none, take the ones the layout supplies.
+ */
+function repairGlyphCache(data: FontkitLike): void {
+  if (!data.getGlyph || data.__mmcvGlyphRepair) return;
+  const original = data.getGlyph.bind(data);
+  data.getGlyph = (id: number, codePoints: number[] = []) => {
+    const glyph = original(id, codePoints);
+    if (glyph && codePoints.length > 0 && (!glyph.codePoints || glyph.codePoints.length === 0)) {
+      glyph.codePoints = codePoints;
+      glyph.isLigature = codePoints.length > 1;
+    }
+    return glyph;
+  };
+  data.__mmcvGlyphRepair = true;
+}
 
 async function warmFace(fontFamily: string, fontWeight: number, text: string): Promise<void> {
   const descriptor = { fontFamily, fontWeight, fontStyle: "normal" as const };
   await Font.load(descriptor);
   const data = (Font.getFont(descriptor) as { data?: FontkitLike } | undefined)?.data;
   if (!data?.layout || !data.hasGlyphForCodePoint) return;
+  repairGlyphCache(data);
   const covered = Array.from(text)
     .filter((ch) => data.hasGlyphForCodePoint!(ch.codePointAt(0) as number))
     .join("");
