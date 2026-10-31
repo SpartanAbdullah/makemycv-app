@@ -1015,3 +1015,49 @@ export function getPreviewProfile(templateId: string): CvData {
     settings: { ...omarClassic.settings, templateId },
   };
 }
+
+/**
+ * SYNTHETIC bilingual (Arabic + English) overlay of a template's persona, for
+ * the preview-vs-PDF fidelity harness only (`/preview/<id>?persona=bilingual`,
+ * `scripts/pdf-fidelity.mjs --persona=bilingual`). It exists to show what the
+ * live preview and the react-pdf download do with Arabic script — font
+ * fallback, glyph shaping, bidi order and text extraction — so the Arabic
+ * runs sit where a UAE candidate plausibly writes them: the name in both
+ * scripts, a bilingual headline and location, one Arabic sentence in the
+ * summary, an Arabic-named skill, the Arabic language in its own script and
+ * one Arabic bullet. Not a marketing persona; the email says so.
+ */
+export function getBilingualPreviewProfile(templateId: string): CvData {
+  const base = getPreviewProfile(templateId);
+  const [firstRole, ...otherRoles] = base.experience;
+  return {
+    ...base,
+    personal: {
+      ...base.personal,
+      firstName: "Ahmed",
+      lastName: "Al-Rashid · أحمد الراشد",
+      headline: `${base.personal.headline} | ثنائي اللغة (عربي / إنجليزي)`,
+      email: "bilingual.synthetic@email.ae",
+      location: `${base.personal.location} · دبي، الإمارات`,
+      summary:
+        `${base.personal.summary} ` +
+        "يجيد العمل في بيئات ثنائية اللغة ويحرر التقارير المالية باللغتين العربية والإنجليزية.",
+    },
+    experience: firstRole
+      ? [
+          {
+            ...firstRole,
+            bullets: [
+              ...firstRole.bullets,
+              "أعدّ تقارير الإدارة الشهرية باللغة العربية لمجلس الإدارة",
+            ],
+          },
+          ...otherRoles,
+        ]
+      : base.experience,
+    skills: [...base.skills, { id: "bilingual-sk-ar", name: "التحرير باللغة العربية" }],
+    languages: base.languages.map((lang) =>
+      lang.name === "Arabic" ? { ...lang, name: "Arabic · العربية" } : lang,
+    ),
+  };
+}

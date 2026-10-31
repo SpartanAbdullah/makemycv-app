@@ -13,11 +13,21 @@
  * Writes <out>/<template>-<case>.png (preview | pdf | diff), results.json, matrix.md.
  *
  * Run (Git Bash, production server already on :3000):
- *   MSYS_NO_PATHCONV=1 node scripts/pdf-fidelity.mjs [--skip-render] [--only=classic,onyx]
+ *   MSYS_NO_PATHCONV=1 node scripts/pdf-fidelity.mjs [--skip-render] [--only=classic,onyx] [--persona=bilingual] [--gate]
  * Env: PREVIEW_BASE_URL (default http://localhost:3000), FIDELITY_OUT (default
  *      ../_cowork/pdf-fidelity-<today>), FIDELITY_TOL (luminance tolerance, 0.10).
  * Needs the repo's Playwright + the system Chrome (channel "chrome"); pdf.js is
  * served from node_modules by a tiny node:http server so no network is needed.
+ *
+ * --persona=bilingual renders the ONE case "bilingual" (the synthetic Arabic +
+ * English overlay, lib/data/preview-profiles.ts) instead of the density trio.
+ * --gate compares every cell with scripts/pdf-fidelity-baseline.json and exits 1
+ * when a page count changes, text parity drops by more than 1 point or the
+ * page-1 block diff rises by more than GATE_BLOCK_SLACK points — the regression
+ * guard for the transcription fixes (PDF_FIDELITY.md). `npm run fidelity:pdf`.
+ * Every cell also records an ATS-style extraction check: the order in which the
+ * section headings come out of the pdf.js text layer against the preview's DOM
+ * order, and whether the email and phone survive as one run each.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -31,22 +41,29 @@ const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const BASE_URL = (process.env.PREVIEW_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 const DAY = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD
-const OUT_DIR = path.resolve(process.env.FIDELITY_OUT || path.join(ROOT, "..", "_cowork", `pdf-fidelity-${DAY}`));
+const PERSONA = opt("persona");
+if (PERSONA && PERSONA !== "bilingual") throw new Error(`unknown --persona=${PERSONA} (only "bilingual")`);
+const OUT_DIR = path.resolve(process.env.FIDELITY_OUT || path.join(ROOT, "..", "_cowork", `pdf-fidelity-${DAY}${PERSONA ? `-${PERSONA}` : ""}`));
+const BASELINE_FILE = path.join(ROOT, "scripts", "pdf-fidelity-baseline.json");
+const GATE_BLOCK_SLACK = 3; // points of page-1 block diff a cell may rise before --gate fails
 const PDF_DIR = path.join(ROOT, ".fidelity-pdfs");
 const PDFJS_DIR = path.join(ROOT, "node_modules", "pdfjs-dist", "build");
 const TOL = Number(process.env.FIDELITY_TOL || 0.1); // 10% of full intensity
 const BLOCK = 8; // px; block metric = mean-luminance drift per 8x8 cell
 const A4 = { w: 794, h: 1123 }; // CSS px at 96dpi, the app-wide render size
-const CASES = [
-  { id: "natural", query: "" }, // persona's own density levels (one page by design)
-  { id: "compact", query: "?density=1" }, // all four density controls at 1
-  { id: "dense", query: "?density=5" }, // all four at 5 -> crosses a page break
-];
+const CASES = PERSONA === "bilingual"
+  ? [{ id: "bilingual", query: "?persona=bilingual" }] // synthetic Arabic + English overlay, own levels
+  : [
+      { id: "natural", query: "" }, // persona's own density levels (one page by design)
+      { id: "compact", query: "?density=1" }, // all four density controls at 1
+      { id: "dense", query: "?density=5" }, // all four at 5 -> crosses a page break
+    ];
 
 // ---------- 1. PDFs: compile + run the Node renderer (same persona + density) ----------
 function renderPdfs() {
   const run = (cmd, a) => {
-    const r = spawnSync(cmd, a, { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32" });
+    const env = PERSONA ? { ...process.env, FIDELITY_PERSONA: PERSONA } : process.env;
+    const r = spawnSync(cmd, a, { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32", env });
     if (r.status !== 0) throw new Error(`${cmd} ${a.join(" ")} exited ${r.status}`);
   };
   run("npx", ["tsc", "scripts/pdf-fidelity-render.tsx", "--outDir", ".pdf-fidelity-build", "--module", "commonjs",
@@ -152,6 +169,64 @@ function textParity(previewText, pdfText) {
     parityPct: total ? +((1 - (missing.length + extra.length) / total) * 100).toFixed(1) : 100 };
 }
 
+// ---------- 3b. ATS-style extraction: heading order + contact runs ----------
+// Canonical section ids matched against whole lines of either text; the first
+// occurrence of each gives the order a parser would see the sections in.
+const SECTION_HEADINGS = [
+  ["summary", /^(summary|profile|about( me)?|professional summary|profile summary|executive summary)$/i],
+  ["experience", /^(experience|work experience|professional experience|employment( history)?|career history)$/i],
+  ["education", /^(education|academic background)$/i],
+  ["skills", /^(skills|core skills|key skills|technical skills|skills & interests|skills & expertise|core competencies|expertise)$/i],
+  ["languages", /^languages$/i],
+  ["certifications", /^(certifications?|certificates|certifications & training|professional development)$/i],
+  ["projects", /^(projects|key projects)$/i],
+];
+// A line counts when it is one heading, or a run of headings — pdf.js puts the
+// two column headings of a Languages | Certifications row on ONE line.
+const headingsOnLine = (line) => {
+  const words = line.split(" ");
+  const found = [];
+  for (let i = 0; i < words.length; ) {
+    let hit = null;
+    for (let k = Math.min(4, words.length - i); k >= 1 && !hit; k--) {
+      const chunk = words.slice(i, i + k).join(" ");
+      const m = SECTION_HEADINGS.find(([, re]) => re.test(chunk));
+      if (m) hit = { id: m[0], k };
+    }
+    if (!hit) return [];
+    found.push(hit.id); i += hit.k;
+  }
+  return found;
+};
+const headingOrder = (text) => {
+  const seen = [];
+  for (const raw of text.split("\n")) {
+    const line = unsplit(raw.replace(/\s+/g, " ").trim());
+    if (!line) continue;
+    for (const id of headingsOnLine(line)) if (!seen.includes(id)) seen.push(id);
+  }
+  return seen;
+};
+function extractionCheck(previewText, pdfText) {
+  const previewOrder = headingOrder(previewText);
+  const pdfOrder = headingOrder(pdfText);
+  // Only sections found on BOTH sides are compared for order; a heading the
+  // regex misses on one side is reported, not counted as a reorder.
+  const common = previewOrder.filter((id) => pdfOrder.includes(id));
+  const pdfCommon = pdfOrder.filter((id) => common.includes(id));
+  const orderMatch = common.every((id, i) => pdfCommon[i] === id);
+  const squash = (t) => t.replace(/\s+/g, " ");
+  const email = (previewText.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [])[0] || null;
+  const phone = (previewText.match(/\+\d[\d\sX-]{6,}[\dX]/) || [])[0]?.trim() || null;
+  const pdfSquashed = squash(pdfText);
+  return {
+    previewOrder, pdfOrder, orderMatch,
+    missingHeadings: previewOrder.filter((id) => !pdfOrder.includes(id)),
+    email, emailInPdf: email ? pdfSquashed.includes(email) : null,
+    phone, phoneInPdf: phone ? pdfSquashed.includes(squash(phone)) : null,
+  };
+}
+
 function verdict(r) {
   if (r.error) return "ERROR";
   const p1 = r.visual[0];
@@ -164,7 +239,7 @@ function verdict(r) {
 // ---------- 4. main loop ----------
 async function main() {
   if (!flag("skip-render")) renderPdfs();
-  const manifest = JSON.parse(fs.readFileSync(path.join(PDF_DIR, "manifest.json"), "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(PDF_DIR, PERSONA ? `manifest-${PERSONA}.json` : "manifest.json"), "utf8"));
   const only = opt("only")?.split(",");
   const templateIds = [...new Set(manifest.map((m) => m.template))].filter((t) => !only || only.includes(t));
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -202,8 +277,11 @@ async function main() {
         r.pdfPages = out.pdfPages;
         r.text = textParity(info.text, out.text);
         r.visual = out.pages;
+        r.extraction = extractionCheck(info.text, out.text);
         r.verdict = verdict(r);
-        console.log(`${r.verdict.padEnd(9)} pages ${r.previewPages}~/${r.pdfPages}  text ${r.text.parityPct}%  px ${r.visual[0].pixelDiffPct}%  blk ${r.visual[0].blockDiffPct}%  miss ${r.text.missing.length} extra ${r.text.extra.length}`);
+        const x = r.extraction;
+        const xFlag = `${x.orderMatch ? "order=" : "ORDER≠"}${x.emailInPdf === false ? " EMAIL-SPLIT" : ""}${x.phoneInPdf === false ? " PHONE-SPLIT" : ""}${x.missingHeadings.length ? ` no-heading:${x.missingHeadings.join(",")}` : ""}`;
+        console.log(`${r.verdict.padEnd(9)} pages ${r.previewPages}~/${r.pdfPages}  text ${r.text.parityPct}%  px ${r.visual[0].pixelDiffPct}%  blk ${r.visual[0].blockDiffPct}%  miss ${r.text.missing.length} extra ${r.text.extra.length}  ${xFlag}`);
       } catch (err) {
         r.error = String(err.message || err).split("\n")[0]; r.verdict = "ERROR";
         console.log(`ERROR     ${r.error}`);
@@ -217,12 +295,48 @@ async function main() {
   fs.writeFileSync(path.join(OUT_DIR, "results.json"), JSON.stringify({ meta, results }, null, 2));
   const rows = results.map((r) => r.error
     ? `| ${r.template} | ${r.case} | – | – | – | – | ERROR: ${r.error} |`
-    : `| ${r.template} | ${r.case} | ${r.previewPages}~ / ${r.pdfPages} | ${r.text.parityPct}% (−${r.text.missing.length} / +${r.text.extra.length}) | ${r.visual[0].pixelDiffPct}% / ${r.visual[0].blockDiffPct}% | ${r.visual[1] ? `${r.visual[1].pixelDiffPct}% / ${r.visual[1].blockDiffPct}%` : "–"} | ${r.verdict} |`);
-  const matrix = ["| Template | Case | Pages preview~ / PDF | Text parity (missing / extra words) | p1 pixel / block diff | p2 pixel / block diff | Verdict |", "|---|---|---|---|---|---|---|", ...rows].join("\n");
+    : `| ${r.template} | ${r.case} | ${r.previewPages}~ / ${r.pdfPages} | ${r.text.parityPct}% (−${r.text.missing.length} / +${r.text.extra.length}) | ${r.visual[0].pixelDiffPct}% / ${r.visual[0].blockDiffPct}% | ${r.visual[1] ? `${r.visual[1].pixelDiffPct}% / ${r.visual[1].blockDiffPct}%` : "–"} | ${extractionCell(r.extraction)} | ${r.verdict} |`);
+  const matrix = ["| Template | Case | Pages preview~ / PDF | Text parity (missing / extra words) | p1 pixel / block diff | p2 pixel / block diff | Extraction (order / contact) | Verdict |", "|---|---|---|---|---|---|---|---|", ...rows].join("\n");
   fs.writeFileSync(path.join(OUT_DIR, "matrix.md"), matrix + "\n");
   const tally = results.reduce((m, r) => ((m[r.verdict] = (m[r.verdict] || 0) + 1), m), {});
   console.log(`\n${results.length} comparisons -> ${JSON.stringify(tally)}\nwrote ${OUT_DIR}`);
   process.exitCode = tally.ERROR ? 1 : 0;
+  if (flag("gate")) process.exitCode = gate(results) || process.exitCode;
+}
+
+const extractionCell = (x) => {
+  if (!x) return "–";
+  const parts = [x.orderMatch ? "order ok" : `ORDER pdf: ${x.pdfOrder.join(">")}`];
+  if (x.missingHeadings.length) parts.push(`no heading in pdf: ${x.missingHeadings.join(",")}`);
+  parts.push(x.emailInPdf === null ? "no email" : x.emailInPdf ? "email ok" : "EMAIL split");
+  parts.push(x.phoneInPdf === null ? "no phone" : x.phoneInPdf ? "phone ok" : "PHONE split");
+  return parts.join("; ");
+};
+
+// ---------- 5. --gate: regression guard against the committed baseline ----------
+// scripts/pdf-fidelity-baseline.json holds, per cell, the PDF page count, text
+// parity and page-1 block diff of the last accepted run. A fix that improves a
+// cell should also lower its baseline so the number cannot drift back up.
+function gate(results) {
+  if (!fs.existsSync(BASELINE_FILE)) { console.error(`--gate: no baseline at ${BASELINE_FILE}`); return 1; }
+  const baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8")).cells;
+  const failures = [];
+  for (const r of results) {
+    const key = `${r.template}-${r.case}`;
+    const b = baseline[key];
+    if (r.error) { failures.push(`${key}: render/compare error`); continue; }
+    if (!b) { console.log(`--gate: ${key} has no baseline entry (new cell), skipped`); continue; }
+    if (r.pdfPages !== b.pdfPages) failures.push(`${key}: PDF pages ${b.pdfPages} -> ${r.pdfPages}`);
+    if (r.text.parityPct < b.parityPct - 1) failures.push(`${key}: text parity ${b.parityPct}% -> ${r.text.parityPct}%`);
+    if (r.visual[0].blockDiffPct > b.blockDiffPct + GATE_BLOCK_SLACK) failures.push(`${key}: p1 block diff ${b.blockDiffPct}% -> ${r.visual[0].blockDiffPct}% (slack ${GATE_BLOCK_SLACK})`);
+    // Order is gated as a regression only: a two-column layout that breaks
+    // across pages legitimately emits its aside before the rest of the main
+    // column (Modern at density 5), and the baseline records that.
+    if (b.orderMatch && r.extraction && !r.extraction.orderMatch) failures.push(`${key}: section order in the PDF text layer no longer matches the preview`);
+  }
+  if (failures.length) { console.error(`\n--gate FAILED (${failures.length}):\n  ${failures.join("\n  ")}`); return 1; }
+  console.log("--gate passed: no cell regressed against scripts/pdf-fidelity-baseline.json");
+  return 0;
 }
 
 main().catch((err) => { console.error("fidelity harness failed:", err); process.exit(1); });

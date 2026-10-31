@@ -7,11 +7,13 @@
  * can put the live preview and the download side by side with identical
  * input. Compiled and run by that script; not part of `npm test`.
  *
- * Output: .fidelity-pdfs/<templateId>-<case>.pdf + manifest.json (build
+ * Output: .fidelity-pdfs/<templateId>-<case>.pdf + manifest.json (manifest-bilingual.json for the persona run; build
  * output — add .fidelity-pdfs/ and .pdf-fidelity-build/ to .gitignore).
  *
  * Cases (see CASES below): "natural" = the persona's own levels, "compact" =
- * ?density=1, "dense" = ?density=5. The persona photo is the route's
+ * ?density=1, "dense" = ?density=5. With FIDELITY_PERSONA=bilingual (set by
+ * `pdf-fidelity.mjs --persona=bilingual`) the one case "bilingual" renders the
+ * SYNTHETIC Arabic + English overlay at the persona's own levels instead. The persona photo is the route's
  * /preview-photo.jpg, which react-pdf in Node cannot fetch, so it is inlined
  * as a data URI from public/.
  */
@@ -20,16 +22,23 @@ import { join } from "node:path";
 import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
 import { CVDocument } from "../components/pdf/CVDocument";
-import { getPreviewProfile, previewPhotoSrc } from "../lib/data/preview-profiles";
+import {
+  getBilingualPreviewProfile,
+  getPreviewProfile,
+  previewPhotoSrc,
+} from "../lib/data/preview-profiles";
 import { registerPdfFontsFromDir } from "../lib/pdf/fonts";
 import { templates } from "../lib/templates";
 import type { CvData } from "../lib/types/cv";
 
-export const CASES: Array<{ id: string; density?: number }> = [
-  { id: "natural" },
-  { id: "compact", density: 1 },
-  { id: "dense", density: 5 },
-];
+const BILINGUAL = process.env.FIDELITY_PERSONA === "bilingual";
+export const CASES: Array<{ id: string; density?: number }> = BILINGUAL
+  ? [{ id: "bilingual" }]
+  : [
+      { id: "natural" },
+      { id: "compact", density: 1 },
+      { id: "dense", density: 5 },
+    ];
 
 function withDensity(profile: CvData, level?: number): CvData {
   if (!level) return profile;
@@ -57,7 +66,7 @@ async function main() {
 
   const manifest: Array<{ template: string; case: string; file: string; density: number | null }> = [];
   for (const t of templates) {
-    const profile = getPreviewProfile(t.id);
+    const profile = BILINGUAL ? getBilingualPreviewProfile(t.id) : getPreviewProfile(t.id);
     for (const c of CASES) {
       const base = withDensity(profile, c.density);
       const data: CvData =
@@ -76,7 +85,8 @@ async function main() {
       }
     }
   }
-  writeFileSync(join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2));
+  // One manifest per persona so a --skip-render run of either set stays intact.
+  writeFileSync(join(outDir, BILINGUAL ? "manifest-bilingual.json" : "manifest.json"), JSON.stringify(manifest, null, 2));
 }
 
 main().catch((err) => {

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { getPreviewProfile } from "@/lib/data/preview-profiles";
+import {
+  getBilingualPreviewProfile,
+  getPreviewProfile,
+} from "@/lib/data/preview-profiles";
 import { getTemplateById } from "@/lib/templates";
 
 /**
@@ -23,12 +26,18 @@ export default async function TemplatePreviewPage({
   searchParams,
 }: {
   params: Promise<{ templateId: string }>;
-  searchParams: Promise<{ photo?: string; density?: string }>;
+  searchParams: Promise<{ photo?: string; density?: string; persona?: string }>;
 }) {
   const { templateId } = await params;
-  const { photo, density } = await searchParams;
+  const { photo, density, persona } = await searchParams;
   const template = getTemplateById(templateId);
-  const profile = getPreviewProfile(template.id);
+  // ?persona=bilingual swaps in the SYNTHETIC Arabic + English overlay of the
+  // template's persona — review tooling for the PDF-fidelity harness
+  // (scripts/pdf-fidelity.mjs --persona=bilingual), never a marketing capture.
+  const profile =
+    persona === "bilingual"
+      ? getBilingualPreviewProfile(template.id)
+      : getPreviewProfile(template.id);
   // ?photo=0 renders the same template without its photo — the marketing
   // site shows both variants so users can compare with/without.
   const withPhoto =
