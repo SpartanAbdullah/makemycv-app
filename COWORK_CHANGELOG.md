@@ -25,6 +25,21 @@ Format:
 
 ---
 
+## [2026-10-31 22:30] Import: the confirm toast is no longer wiped on the first import of a session (session 5 D6)
+
+**Goal:** Minor defect D6 (IMPORT_MONITORING.md §8.3): on the first import of a browser session the "Imported N
+sections — review the steps below…" toast was replaced within ~300 ms by the "<Section> section done ✓" toasts the
+import itself triggered (same `success` tone, replace-not-stack); the user saw only "Languages section done ✓".
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` — `handleImportConfirm` stamps `importConfirmedAtRef` before the store
+  write; the section-done effect, within 2 s of that stamp, still sends `cv_section_completed` and sets the
+  sessionStorage marks but does not push the toast.
+- edited: `scripts/import-smoke.mjs` — fresh-context check: after confirming text-cv.pdf, the confirm toast is visible
+  1.5 s later and no "section done ✓" toast is.
+**Notes / risks / follow-up:** sections completed by an import never get their own celebration toast in that session
+(their marks are set), which is the intent — the import toast already says what landed.
+**Suggested commit:** fix(builder): keep the import confirmation toast on the first import (D6)
+
 ## [2026-10-31 22:20] Import: a new pick clears the previous failure message (session 5 D5)
 
 **Goal:** Minor defect D5 (IMPORT_MONITORING.md §8.3): after a failed import the red bar stayed on screen behind the

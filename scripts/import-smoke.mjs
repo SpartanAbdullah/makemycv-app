@@ -397,9 +397,40 @@ async function checkErrorClearedByNextPick() {
   }
 }
 
+// ── The confirm toast survives the first import of a session (D6) ─────────
+// Production 2026-10-31: the "Imported N sections" toast was replaced within
+// ~300 ms by the "<Section> section done ✓" toasts the import itself
+// triggered (replace-not-stack), so a first import showed only "Languages
+// section done ✓". Fresh context = fresh sessionStorage = first import.
+async function checkFirstImportToast() {
+  const label = "first-import toast (D6): the confirm toast is the one left on screen";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened");
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      return fail(label, "the review never opened");
+    }
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(1500); // past the ~300 ms in which the section toasts used to land
+    const confirm = await pg.getByText(/Imported \d+ sections? — review the steps below/).isVisible().catch(() => false);
+    const sectionDone = await pg.getByText(/section done ✓/).count();
+    if (confirm && sectionDone === 0) ok(`${label} — "Imported … sections" visible, no section-done toast`);
+    else fail(label, `confirm toast visible=${confirm}, section-done toasts=${sectionDone}`);
+  } finally {
+    await c.close();
+  }
+}
+
 for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
 await checkImportAfterTyping();
 await checkErrorClearedByNextPick();
+await checkFirstImportToast();
 
 // ── pdf.js worker network scenarios ────────────────────────────────────────
 // The worker choice is cached per page lifetime and runCase() navigates, so
