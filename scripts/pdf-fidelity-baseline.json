@@ -7,63 +7,63 @@
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 100,
-      "blockDiffPct": 11.62,
+      "blockDiffPct": 0.55,
       "orderMatch": true
     },
     "classic-compact": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 100,
-      "blockDiffPct": 9.47,
+      "blockDiffPct": 0.63,
       "orderMatch": true
     },
     "classic-dense": {
       "pdfPages": 2,
       "previewPages": 2,
       "parityPct": 100,
-      "blockDiffPct": 15.63,
+      "blockDiffPct": 1.48,
       "orderMatch": true
     },
     "modern-natural": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 100,
-      "blockDiffPct": 3.14,
+      "blockDiffPct": 1.03,
       "orderMatch": true
     },
     "modern-compact": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 100,
-      "blockDiffPct": 12.09,
+      "blockDiffPct": 0.65,
       "orderMatch": true
     },
     "modern-dense": {
       "pdfPages": 2,
       "previewPages": 2,
       "parityPct": 100,
-      "blockDiffPct": 18.47,
+      "blockDiffPct": 1.07,
       "orderMatch": false
     },
     "executive-natural": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 99.3,
-      "blockDiffPct": 10.12,
+      "blockDiffPct": 7.4,
       "orderMatch": true
     },
     "executive-compact": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 99.3,
-      "blockDiffPct": 7.68,
+      "blockDiffPct": 2.05,
       "orderMatch": true
     },
     "executive-dense": {
       "pdfPages": 1,
       "previewPages": 1,
       "parityPct": 99.3,
-      "blockDiffPct": 16.26,
+      "blockDiffPct": 5.71,
       "orderMatch": true
     },
     "ats-clean-natural": {

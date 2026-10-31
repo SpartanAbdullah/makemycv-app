@@ -89,6 +89,50 @@ export or import time.
 pass/fail). Usage in the file header. Event Timing API was not used for typing because Chrome clamps
 `durationThreshold` to 16 ms, which hides exactly the keystrokes we care about.
 **Suggested commit:** chore(perf): add scripts/perf-measure.mjs runtime measurement harness
+## [2026-10-31 11:51] PDF fidelity session 4: Classic, Modern and Executive at density 5 — the last three mismatches
+
+**Goal:** "What you see is what you download" for the three templates that were still `mismatch` in the
+preview-vs-PDF harness (classic-dense 15.6 %, modern-dense 18.5 %, executive-dense 16.3 % page-1 block
+diff), by root cause rather than by nudging numbers. Each turned out to be a different defect: Classic ran
+on the shared `BASE_STYLES` sheet instead of `classic.tsx` (sizes, header gap, bullet gutter, trailing
+entry margins, line boxes); Modern's line-heights are absolute px (`leading-[calc(Xrem*var(--lh))]`) so a
+fontScale-scaled ratio made every line 10 % too tall at density 5, and its columns were not the live
+`2fr 1fr` grid; Executive inherited the page line box on every row and padded its main column with the
+page's 27/24 instead of the live 28·m px. Evidence, per-line measurements and the full matrix are in
+`docs/ai-mission/PDF_FIDELITY.md` (parent folder), section "Session 4 — mismatches".
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — `ClassicPDFLayout` transcribed from `classic.tsx` (own sheet in
+  px through `pt()`, every line box explicit at the root's 1.45·lineScale, bullets on the
+  `ExperienceEntry` gutter rule, no header `marginBottom` because CSS collapses it into the first section's
+  margin); `EducationVariant.notesMarginTop?` (Classic's `mt-1`; default 0.75 pt unchanged elsewhere).
+  `ModernPDFLayout`: `absLine(boxPx, fontPx)` divides each ratio by fontScale, the main column and aside
+  take the widths the live grid resolves to (`A4_WIDTH_PT`), and sections are flat children of their column
+  with the gap on the heading — react-pdf honours `minPresenceAhead` only when the element has a previous
+  sibling on the page, so the Certifications heading had been orphaned at the foot of page 1.
+  `ExecutivePDFLayout`: `LH_NORMAL` on role / date / company / education rows and sidebar labels, the
+  heading's 1.65 box, Summary at the live 11 px × 1.6, main column pulled up 6·m / out 3·m to the live
+  padding, live sidebar pitches (contact 4 px, personal 4 px with a bold label, skills / languages 2 px,
+  certifications 6 px with a 9 px issuer) without trailing margins, 88 px photo, Projects transcribed.
+- edited: `scripts/pdf-fidelity-baseline.json` — the nine Classic / Modern / Executive cells lowered to the
+  session-4 run (0.55 / 0.63 / 1.48, 1.03 / 0.65 / 1.07, 7.40 / 2.05 / 5.71); pages, parity and order
+  entries unchanged.
+- edited: `../docs/ai-mission/PDF_FIDELITY.md` — "Session 4 — mismatches": root causes, before → after per
+  cell, the modern-dense extraction-order investigation, the full 42-cell matrix, gates, what remains.
+**Notes / risks / follow-up:** Full matrix 31 ok / 11 check / **0 mismatch** (was 24 / 15 / 3); page
+counts agree in 42 / 42; the 33 untouched cells are byte-identical to the previous baseline. modern-dense's
+extraction order (aside before Certifications) stays as the baseline records it: the text layer is per
+page and Certifications is on page 2 — every reordering option changes the visual; documented. Executive
+dense's residual (one bullet that wraps in Chrome and fits in the PDF, run ending at the column edge) is
+the rasteriser floor. Gates: tsc clean, lint 11 / 11, `npm test` 3 / 3, `smoke:pdf` 44 PDFs all checks
+passed (overprint guard, Executive band on 2-page renders), `next build` clean, `fidelity:pdf --gate`
+against the lowered baseline passed (42 cells, 31 ok / 11 check, no cell regressed; run
+`_cowork/pdf-fidelity-2026-10-31-s4-gate/`). Remaining `check` cells (Corporate 13.6 %, Harvard
+compact 12.5 %, Exec Split dense 11.1 %, ATS Clean 10.5 %, Banner, Chronicle) are the same line-box
+transcription in layouts not touched here; kept out to limit merge conflicts with the Arabic work in the
+text-primitives region of `CVDocument.tsx`. Branch `mission/pdf-fidelity-4`, not pushed.
+**Suggested commit:** fix(pdf): transcribe Classic, Modern and Executive from their live templates (fidelity session 4)
+
+---
 
 ## [2026-10-31 13:40] CV import: failure taxonomy, pre-parse gate, encrypted/scan/.doc detection, header text, empty-mapping guard
 
