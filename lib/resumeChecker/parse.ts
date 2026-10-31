@@ -13,7 +13,14 @@
 // the Next.js Turbopack + pdfjs worker incompatibility.
 
 import { z } from "zod";
-import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "../server/anthropic";
+import {
+  ANTHROPIC_PARSE_TIMEOUT_MS,
+  CLAUDE_EFFORT,
+  CLAUDE_MODEL,
+  anthropicSignal,
+  isTimeoutError,
+  responseText,
+} from "../server/anthropic";
 import type { CvData } from "../types/cv";
 import type { ParsedDocument } from "../importers/adapter";
 import { mapParsedToCv } from "../importers/fieldMapper";
@@ -230,6 +237,9 @@ async function callClaude(rawText: string): Promise<{
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUserPrompt(rawText) }],
     }),
+    // 45 s: the route's maxDuration is 60 and the report still has to be
+    // scored and written to KV after the model answers.
+    signal: anthropicSignal(ANTHROPIC_PARSE_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -318,7 +328,9 @@ async function callClaude(rawText: string): Promise<{
 
 export type ParseError =
   | { kind: "too-short"; textLength: number }
-  | { kind: "claude-failed"; message: string };
+  | { kind: "claude-failed"; message: string }
+  /** The model did not answer within ANTHROPIC_PARSE_TIMEOUT_MS. */
+  | { kind: "claude-timeout" };
 
 export type ParseResult = {
   cv: CvData;
@@ -346,6 +358,10 @@ export async function parseCvText(rawText: string): Promise<ParseResult> {
     signals = out.signals;
     usedFallback = out.usedFallback;
   } catch (err) {
+    if (isTimeoutError(err)) {
+      const e: ParseError = { kind: "claude-timeout" };
+      throw e;
+    }
     const message = err instanceof Error ? err.message : "Claude call failed";
     const e: ParseError = { kind: "claude-failed", message };
     throw e;

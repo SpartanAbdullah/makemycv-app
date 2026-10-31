@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { Ratelimit } from "@upstash/ratelimit";
 import { parseCvText } from "@/lib/resumeChecker/parse";
+import { UPSTREAM_TIMEOUT_BODY, UPSTREAM_TIMEOUT_STATUS } from "@/lib/server/anthropic";
 import { computeScore } from "@/lib/scoreEngine";
 import { saveReport } from "@/lib/resumeChecker/storage";
 import {
@@ -144,6 +145,15 @@ export async function POST(request: Request) {
           requestId,
         },
         { status: 422 },
+      );
+    }
+    if (e?.kind === "claude-timeout") {
+      // Bounded upstream wait (lib/server/anthropic.ts): the user gets this
+      // sentence after 45 s instead of a spinner until the 60 s maxDuration
+      // kills the function with a body-less 504.
+      return NextResponse.json(
+        { ...UPSTREAM_TIMEOUT_BODY, requestId },
+        { status: UPSTREAM_TIMEOUT_STATUS },
       );
     }
     if (e?.kind === "claude-failed") {

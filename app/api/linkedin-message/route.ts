@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
-import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "@/lib/server/anthropic";
+import {
+  CLAUDE_EFFORT,
+  CLAUDE_MODEL,
+  UPSTREAM_TIMEOUT_BODY,
+  UPSTREAM_TIMEOUT_STATUS,
+  anthropicSignal,
+  isTimeoutError,
+  responseText,
+} from "@/lib/server/anthropic";
 import { checkRateLimit, getClientIp, makeLimiter } from "@/lib/server/rateLimit";
 import { parseLinkedinMessageRequest, type LinkedinMessageRequest } from "@/lib/linkedinMessage/payload";
 import {
@@ -74,6 +82,7 @@ async function callHaiku(apiKey: string, req: LinkedinMessageRequest): Promise<s
       system: LINKEDIN_SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildLinkedinUserPrompt(req) }],
     }),
+    signal: anthropicSignal(),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "Unknown API error");
@@ -115,7 +124,11 @@ export async function POST(request: Request) {
         const raw = await callHaiku(apiKey, req);
         apiFailed = false;
         outcome = parseLinkedinModelOutput(raw, req.variant);
-      } catch {
+      } catch (err) {
+        // A timeout is not retried — the user has already waited 25 s.
+        if (isTimeoutError(err)) {
+          return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
+        }
         apiFailed = true;
       }
     }
