@@ -11,6 +11,10 @@ import {
 import type { CvData } from "@/lib/types/cv";
 import type { ParseSignals } from "@/lib/resumeChecker/types";
 import { track } from "@/lib/analytics";
+import {
+  importErrorMessage,
+  type ImportErrorReason,
+} from "@/lib/importers/importErrors";
 
 // Same dynamic split as BuilderShell — the review screen loads only when an
 // import is actually in flight.
@@ -69,17 +73,16 @@ export default function ImportFromReportBanner() {
         });
         if (!res.ok) {
           if (cancelled) return;
+          // Reasons come from the closed set in lib/importers/importErrors.ts
+          // (snake_case since 2026-10-31; before: report-expired,
+          // fetch-failed, no-cv-data, network).
+          const reason: ImportErrorReason =
+            res.status === 404 ? "report_expired" : "report_fetch_failed";
           track("cv_import_failed", {
             file_type: "ats_report",
-            error_reason: res.status === 404 ? "report-expired" : "fetch-failed",
+            error_reason: reason,
           });
-          setPhase({
-            kind: "error",
-            message:
-              res.status === 404
-                ? "This report expired. Reports are kept for 24 hours."
-                : "Couldn't import the report. Try uploading the CV again.",
-          });
+          setPhase({ kind: "error", message: importErrorMessage(reason) });
           stripParam();
           return;
         }
@@ -91,9 +94,9 @@ export default function ImportFromReportBanner() {
           if (cancelled) return;
           track("cv_import_failed", {
             file_type: "ats_report",
-            error_reason: "no-cv-data",
+            error_reason: "report_no_cv" satisfies ImportErrorReason,
           });
-          setPhase({ kind: "error", message: "Report returned no CV data." });
+          setPhase({ kind: "error", message: importErrorMessage("report_no_cv") });
           stripParam();
           return;
         }
@@ -114,12 +117,9 @@ export default function ImportFromReportBanner() {
         if (cancelled) return;
         track("cv_import_failed", {
           file_type: "ats_report",
-          error_reason: "network",
+          error_reason: "report_network" satisfies ImportErrorReason,
         });
-        setPhase({
-          kind: "error",
-          message: "Network error while importing the report.",
-        });
+        setPhase({ kind: "error", message: importErrorMessage("report_network") });
         stripParam();
       }
     };

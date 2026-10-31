@@ -1,16 +1,22 @@
 // PDF import adapter.
 // Requires: pdfjs-dist (npm install pdfjs-dist)
-// Worker is loaded from CDN to avoid Next.js bundling complexity.
-// unspecified: worker CDN URL must be reachable; swap for local path in offline envs.
+//
+// Extraction is split in two since 2026-10-31: `extractPdfText` takes bytes
+// plus an injected pdf.js module and worker URL (so the Node fixture suite can
+// run the real code with the legacy build), and the `...InBrowser` wrappers
+// supply the dynamic import, the self-hosted worker and the CDN fallback.
+// Every failure is an ImportParseError with a reason from importErrors.ts.
 
 import type { ImportAdapter, ParsedDocument } from "./adapter";
-import { ImportParseError } from "./adapter";
+import {
+  ImportParseError,
+  MAX_PDF_PAGES,
+  MIN_TEXT_LENGTH,
+  PDF_TIMEOUT_MS,
+  classifyPdfError,
+  toImportParseError,
+} from "./importErrors";
 import { parseTextToDocument } from "./textParser";
-
-// Below this many characters of extracted text, the PDF is almost
-// certainly a scanned image with no usable text layer (mirrors the
-// /resume-checker dropzone's guard).
-const MIN_TEXT_LENGTH = 200;
 
 type PdfTextItemLike = {
   str: string;
@@ -109,6 +115,125 @@ function reconstructLines(items: PdfTextItemLike[]): string[] {
   });
 }
 
+/* ── pdf.js plumbing ────────────────────────────────────────────────────── */
+
+/** The slice of pdfjs-dist this module uses. Structural so the Node suite can
+ *  pass the legacy build and a test can pass a stub. */
+export type PdfjsModule = {
+  version?: string;
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument(src: { data: ArrayBuffer | Uint8Array; password?: string }): {
+    promise: Promise<PdfDocumentLike>;
+    destroy(): Promise<void> | void;
+  };
+};
+
+export type PdfDocumentLike = {
+  numPages: number;
+  getPage(n: number): Promise<{
+    getTextContent(): Promise<{ items: unknown[] }>;
+  }>;
+  destroy?(): Promise<void> | void;
+};
+
+export type ExtractPdfOptions = {
+  pdfjs: PdfjsModule;
+  /** Resolved worker URL — same-origin path in the browser, file: URL in Node. */
+  workerSrc: string;
+  timeoutMs?: number;
+  maxPages?: number;
+};
+
+export type ExtractedPdf = { text: string; pages: number };
+
+/**
+ * Text + page count from PDF bytes. Throws ImportParseError with
+ * encrypted_pdf / corrupt_pdf / worker_load_failed / timeout / parse_exception.
+ *
+ * The timeout covers the whole run (open + every page), and on expiry the
+ * loading task is destroyed so the worker stops chewing on the file.
+ */
+export async function extractPdfText(
+  data: ArrayBuffer,
+  opts: ExtractPdfOptions,
+): Promise<ExtractedPdf> {
+  const { pdfjs } = opts;
+  const timeoutMs = opts.timeoutMs ?? PDF_TIMEOUT_MS;
+  const maxPages = opts.maxPages ?? MAX_PDF_PAGES;
+  pdfjs.GlobalWorkerOptions.workerSrc = opts.workerSrc;
+
+  // pdf.js transfers (detaches) the buffer it receives — hand it a copy so
+  // a caller can still read the original afterwards.
+  const task = pdfjs.getDocument({ data: data.slice(0) });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new ImportParseError("timeout"));
+      void Promise.resolve(task.destroy()).catch(() => {});
+    }, timeoutMs);
+  });
+
+  const run = async (): Promise<ExtractedPdf> => {
+    const pdf = await task.promise;
+    const pages = pdf.numPages;
+    const pageTexts: string[] = [];
+    for (let pageNum = 1; pageNum <= Math.min(pages, maxPages); pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      const lines = reconstructLines(content.items as PdfTextItemLike[]);
+      pageTexts.push(lines.join("\n"));
+    }
+    return { text: pageTexts.join("\n\n"), pages };
+  };
+
+  try {
+    return await Promise.race([run(), deadline]);
+  } catch (err) {
+    const reason = classifyPdfError(err);
+    if (reason !== "timeout") {
+      // Never log the error object: a FormatError can quote stream bytes.
+      console.warn(`[pdfAdapter] extraction failed: ${reason}`);
+    }
+    throw new ImportParseError(reason);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// Worker is self-hosted (audit PERF-8): the old cdnjs URL failed at the exact
+// moment a user uploads on corporate networks and under ad/privacy blockers —
+// common for job seekers uploading from office machines. The vendored copy in
+// /public is version-locked to the installed pdfjs-dist; after upgrading the
+// package, re-run:
+//   Copy-Item node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/
+//
+// The CDN is a fallback that has to be chosen BEFORE the first getDocument:
+// once a worker script fails to load, pdf.js disables real workers for the
+// page and memoises the failed fake-worker import, so a "retry with another
+// workerSrc" after the fact can never succeed (that is what the previous
+// catch-and-retry did). We probe the local file with a HEAD request instead
+// and fall back to the CDN only when it is unreachable. The result is cached
+// for the page lifetime.
+const LOCAL_WORKER = "/pdf.worker.min.mjs";
+let workerSrcPromise: Promise<string> | null = null;
+
+export function resolveWorkerSrc(pdfjs: Pick<PdfjsModule, "version">): Promise<string> {
+  if (!workerSrcPromise) {
+    workerSrcPromise = (async () => {
+      try {
+        const res = await fetch(LOCAL_WORKER, { method: "HEAD", cache: "force-cache" });
+        if (res.ok) return LOCAL_WORKER;
+      } catch {
+        /* fall through to the CDN */
+      }
+      console.warn("[pdfAdapter] local worker unreachable, using the CDN copy");
+      return `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+    })();
+  }
+  return workerSrcPromise;
+}
+
 /**
  * Extract raw text from a PDF in the browser using pdfjs-dist.
  *
@@ -133,73 +258,59 @@ export async function extractPdfTextInBrowser(input: File): Promise<string> {
  */
 export async function extractPdfTextInBrowserDetailed(
   input: File,
-): Promise<{ text: string; pages: number }> {
+): Promise<ExtractedPdf> {
   if (typeof window === "undefined") {
     throw new Error("extractPdfTextInBrowser must run in the browser");
   }
-
-  const pdfjsLib = await import("pdfjs-dist");
-
-  const arrayBuffer = await input.arrayBuffer();
-
-  // Worker is self-hosted (audit PERF-8): the old cdnjs URL failed at the
-  // exact moment a user uploads on corporate networks and under ad/privacy
-  // blockers — common for job seekers uploading from office machines. The
-  // vendored copy in /public is version-locked to the installed pdfjs-dist;
-  // after upgrading the package, re-run:
-  //   Copy-Item node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/
-  // The CDN stays as a catch-retry fallback. Each attempt gets its own
-  // buffer copy because pdfjs transfers (detaches) the ArrayBuffer it
-  // receives.
-  let pdf;
+  let pdfjs: PdfjsModule;
   try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    pdfjs = (await import("pdfjs-dist")) as unknown as PdfjsModule;
+  } catch {
+    // The library chunk itself did not load (offline mid-session, blocker).
+    throw new ImportParseError("worker_load_failed");
+  }
+  const workerSrc = await resolveWorkerSrc(pdfjs);
+  const arrayBuffer = await input.arrayBuffer();
+  return extractPdfText(arrayBuffer, { pdfjs, workerSrc });
+}
+
+/** Bytes → ParsedDocument, shared by the browser adapter and the Node fixture
+ *  suite. Throws ImportParseError only. */
+export async function parsePdfBytes(
+  data: ArrayBuffer,
+  opts: ExtractPdfOptions,
+): Promise<ParsedDocument> {
+  const { text } = await extractPdfText(data, opts);
+  if (text.trim().length < MIN_TEXT_LENGTH) {
+    throw new ImportParseError("no_text_layer");
+  }
+  try {
+    return parseTextToDocument(text);
   } catch (err) {
-    console.warn("[pdfAdapter] local worker failed, retrying via CDN:", err);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-    pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+    throw toImportParseError(err);
   }
-
-  const pageTexts: string[] = [];
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const items = content.items as PdfTextItemLike[];
-    const lines = reconstructLines(items);
-    pageTexts.push(lines.join("\n"));
-  }
-
-  return { text: pageTexts.join("\n\n"), pages: pdf.numPages };
 }
 
 export const pdfAdapter: ImportAdapter = {
   name: "PDF",
 
   async parse(input: File): Promise<ParsedDocument> {
-    if (typeof window === "undefined") return {};
-
     // Failures THROW typed errors instead of resolving `{}` (audit UX-18) —
     // the old swallow-to-empty behavior made every failure mode (corrupt
     // file, scanned image, odd layout) land on the same dead-end "No fields
     // could be extracted" review screen, and BuilderShell's error UI was
     // unreachable.
-    let fullText: string;
+    if (typeof window === "undefined") {
+      throw new ImportParseError("parse_exception");
+    }
+    let pdfjs: PdfjsModule;
     try {
-      fullText = await extractPdfTextInBrowser(input);
-    } catch (err) {
-      console.warn("[pdfAdapter] Extraction failed:", err);
-      throw new ImportParseError(
-        "corrupt-file",
-        "This PDF could not be opened. It may be corrupted or password-protected.",
-      );
+      pdfjs = (await import("pdfjs-dist")) as unknown as PdfjsModule;
+    } catch {
+      throw new ImportParseError("worker_load_failed");
     }
-    if (fullText.trim().length < MIN_TEXT_LENGTH) {
-      throw new ImportParseError(
-        "empty-text",
-        "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again.",
-      );
-    }
-    return parseTextToDocument(fullText);
+    const workerSrc = await resolveWorkerSrc(pdfjs);
+    const data = await input.arrayBuffer();
+    return parsePdfBytes(data, { pdfjs, workerSrc });
   },
 };

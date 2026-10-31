@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
               // the tag and this host stays unmeasured — which is the exact
               // state the audit found: zero GA4 hostname rows in 28 days.
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.googletagmanager.com",
+              // worker-src (2026-10-31, import investigation): without it the
+              // browser falls back to script-src, which has no `blob:` — and
+              // pdf.js loads a cross-origin (CDN fallback) worker through a
+              // blob: wrapper module. The self-hosted worker is 'self'.
+              "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' blob: data: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
