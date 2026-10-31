@@ -1253,12 +1253,16 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const s = buildStyles(theme, fonts);
   const m = theme.marginScale;
   const fs = theme.fontScale;
+  // executive.tsx sets no root line-height, so every run without its own
+  // inherits Tailwind's 1.5 (LH_NORMAL, not scaled by the Line Height
+  // slider); the PDF used to leave these on the page's 12.47pt box
+  // (PDF_FIDELITY.md session 4, 2026-10-31).
   const eduVariant: EducationVariant = {
     joiner: " \u2014 ",
-    titleStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
-    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
-    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    titleStyle: { fontSize: pt(11) * fs, lineHeight: LH_NORMAL, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, lineHeight: LH_NORMAL, color: "#6B7280" },
+    schoolStyle: { fontSize: pt(11) * fs, lineHeight: LH_NORMAL, color: "#374151" },
+    notesStyle: { fontSize: pt(10) * fs, lineHeight: LH_NORMAL, color: "#6B7280" },
     attested: "pill",
     attestedStyle: {
       fontSize: pt(8) * fs,
@@ -1280,6 +1284,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
     {
       fontSize: pt(10) * fs,
+      // The live heading is a 10px span inside a div whose strut is the
+      // root 11px × 1.5 = 16.5px, so the line box is 1.65 × the span size.
+      lineHeight: 1.65,
       color: theme.accentText,
       letterSpacing: 0.08 * pt(10) * fs,
       uppercase: true,
@@ -1292,9 +1299,9 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
     firstMain,
   );
   const expVariant: ExperienceVariant = {
-    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
-    companyStyle: { fontSize: pt(11) * fs, color: "#374151" },
+    roleStyle: { fontSize: pt(12) * fs, lineHeight: LH_NORMAL, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
+    dateStyle: { fontSize: pt(10) * fs, lineHeight: LH_NORMAL, color: "#6B7280" },
+    companyStyle: { fontSize: pt(11) * fs, lineHeight: LH_NORMAL, color: "#374151" },
     separator: " | ",
     bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
     bulletsMarginTop: pt(4),
@@ -1369,6 +1376,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
   const sideLabel = withTopGap<Style>(
     {
       fontSize: pt(9) * fs,
+      lineHeight: LH_NORMAL,
       fontFamily: fonts.bold, fontWeight: 700,
       color: onAccentMuted,
       // Live 0.1em; capped so pdf.js / ATS text layers do not read the label
@@ -1418,16 +1426,17 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
       >
         {/* Photo */}
         {showPhoto && data.personal.photo && (
-          <View style={{ marginBottom: 12 }}>
+          <View style={{ marginBottom: pt(16) }}>
+            {/* live photoSize 88px, 2px ring, 16px below */}
             <Image
               src={data.personal.photo}
               style={{
-                width: 64,
-                height: 64,
+                width: pt(88),
+                height: pt(88),
                 borderRadius:
-                  data.settings.photoShape === "square" ? 6 : 32,
+                  data.settings.photoShape === "square" ? pt(8) : pt(44),
                 objectFit: "cover",
-                borderWidth: 1.5,
+                borderWidth: pt(2),
                 borderColor: mix(onAccent, theme.accent, 0.8),
               }}
             />
@@ -1474,6 +1483,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {sidebarContacts.length > 0 && (
           <View>
             <Text style={sideLabel("contact")}>Contact</Text>
+            {/* live: 10px × 1.6 rows in a 4px-gap column, no trailing margin */}
             {sidebarContacts.map((item, i) =>
               item.href ? (
                 <Link
@@ -1483,6 +1493,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                     ...s.execContactItem,
                     color: onAccentMuted,
                     textDecoration: "underline",
+                    marginBottom: 0,
+                    marginTop: i > 0 ? pt(4) : 0,
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
                 >
@@ -1494,6 +1506,8 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                   style={{
                     ...s.execContactItem,
                     color: onAccentMuted,
+                    marginBottom: 0,
+                    marginTop: i > 0 ? pt(4) : 0,
                     ...(item.fontSize ? { fontSize: item.fontSize } : {}),
                   }}
                 >
@@ -1504,24 +1518,44 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Personal */}
+        {/* Personal: 10px × 1.5 rows, 4px apart, "Label:" bold at 0.04em */}
         {essentialChips.length > 0 && (
           <View>
             <Text style={sideLabel("personal")}>Personal</Text>
-            {essentialChips.map((chip) => (
-              <Text key={chip.label} style={{ ...s.execContactItem, color: onAccentMuted }}>
-                {chip.label}: {chip.value}
+            {essentialChips.map((chip, i) => (
+              <Text
+                key={chip.label}
+                style={{
+                  fontSize: pt(10) * fs,
+                  lineHeight: 1.5 * theme.lineScale,
+                  color: onAccentMuted,
+                  marginTop: i > 0 ? pt(4) : 0,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: fonts.bold,
+                    fontWeight: 700,
+                    letterSpacing: safeTracking(0.04 * pt(10) * fs, pt(10) * fs),
+                  }}
+                >
+                  {chip.label}:
+                </Text>
+                {` ${chip.value}`}
               </Text>
             ))}
           </View>
         )}
 
-        {/* Skills */}
+        {/* Skills: 10px × 1.7 rows (the 12px dot sits inside that box), 2px apart */}
         {hasSkills && (
           <View>
             <Text style={sideLabel("skills")}>Skills</Text>
-            {data.skills.map((skill) => (
-              <Text key={skill.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
+            {data.skills.map((skill, i) => (
+              <Text
+                key={skill.id}
+                style={{ ...s.execSkillItem, color: onAccentMuted, marginTop: i > 0 ? pt(2) : 0 }}
+              >
                 <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
                 {skill.name}
               </Text>
@@ -1529,12 +1563,15 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Languages */}
+        {/* Languages: 10px × 1.7 rows, 2px apart */}
         {hasLanguages && (
           <View>
             <Text style={sideLabel("languages")}>Languages</Text>
-            {data.languages.map((lang) => (
-              <Text key={lang.id} style={{ ...s.execSkillItem, color: onAccentMuted }}>
+            {data.languages.map((lang, i) => (
+              <Text
+                key={lang.id}
+                style={{ ...s.execSkillItem, color: onAccentMuted, marginTop: i > 0 ? pt(2) : 0 }}
+              >
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
                   {lang.name}
                 </Text>
@@ -1546,15 +1583,15 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Certifications */}
+        {/* Certifications: 10px bold name over a 9px issuer line, both × 1.4, entries 6px apart */}
         {hasCertifications && (
           <View>
             <Text style={sideLabel("certifications")}>Certifications</Text>
-            {data.certifications.map((cert) => (
-              <View key={cert.id} style={{ marginBottom: 4 }}>
+            {data.certifications.map((cert, i) => (
+              <View key={cert.id} style={{ marginTop: i > 0 ? pt(6) : 0 }}>
                 <Text
                   style={{
-                    fontSize: 7.5 * theme.fontScale,
+                    fontSize: pt(10) * fs,
                     fontFamily: fonts.bold, fontWeight: 700,
                     color: onAccent,
                     lineHeight: 1.4 * theme.lineScale,
@@ -1565,7 +1602,7 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
                 {(cert.issuer || cert.date) && (
                   <Text
                     style={{
-                      fontSize: 7 * theme.fontScale,
+                      fontSize: pt(9) * fs,
                       color: onAccentMuted,
                       lineHeight: 1.4 * theme.lineScale,
                     }}
@@ -1581,14 +1618,25 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column (live padding 28px*m; top/bottom/right come from the
-          scaled page padding) ── */}
-      <View style={{ flex: 1, paddingLeft: pt(28) * m }}>
-        {/* Summary */}
+      {/* ── Main column: live padding 28px·m = 21·m pt on every side. The
+          page pads 27·m top / 24·m right, so the column pulls itself up by
+          6·m and out by 3·m to start and wrap where the preview does; the
+          bottom keeps the page padding (it only decides where page 2 starts). ── */}
+      <View
+        style={{
+          flex: 1,
+          paddingLeft: pt(28) * m,
+          marginTop: -(27 - pt(28)) * m,
+          marginRight: -(24 - pt(28)) * m,
+        }}
+      >
+        {/* Summary: 11px × 1.6 in #374151 */}
         {hasSummary && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("summary")}>Summary</PdfHeading>
-            <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+            <Text style={{ fontSize: pt(11) * fs, lineHeight: 1.6 * theme.lineScale, color: "#374151" }}>
+              {data.personal.summary?.trim()}
+            </Text>
           </View>
         )}
 
@@ -1616,29 +1664,33 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
         {hasProjects && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
-            {projects.map((project) => {
+            {/* executive.tsx 616–690: 11px bold name, 10px accent link on its
+                own line, disc bullets 12px in at 11px × 1.55, projects 10px apart */}
+            {projects.map((project, i) => {
               const showLink = shouldShowProjectLink(project.link);
               return (
-                <View key={project.id} style={s.entryBlock} wrap={false}>
-                  <Text style={s.entryTitle}>
+                <View key={project.id} style={{ marginTop: i > 0 ? pt(10) : 0 }} wrap={false}>
+                  <Text style={{ fontSize: pt(11) * fs, lineHeight: LH_NORMAL, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" }}>
                     {project.name?.trim() || "Project"}
-                    {showLink ? (
-                      <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
-                        {" | "}
-                        <Link
-                          src={normalizeHref(project.link)}
-                          style={{
-                            ...s.entryCompany,
-                            color: theme.accentText,
-                            textDecoration: "none",
-                          }}
-                        >
-                          {project.link?.trim()}
-                        </Link>
-                      </Text>
-                    ) : null}
                   </Text>
-                  <BulletList bullets={project.bullets ?? []} s={s} />
+                  {showLink && (
+                    <Link
+                      src={normalizeHref(project.link)}
+                      style={{ fontSize: pt(10) * fs, lineHeight: LH_NORMAL, color: theme.accentText, textDecoration: "none" }}
+                    >
+                      {project.link!.trim()}
+                    </Link>
+                  )}
+                  <BulletList
+                    bullets={project.bullets ?? []}
+                    s={s}
+                    styles={{
+                      list: { marginTop: pt(3), paddingLeft: Math.max(0, pt(12) - BULLET_DOT_WIDTH) },
+                      item: { marginBottom: 0 },
+                      dot: { width: BULLET_DOT_WIDTH, fontSize: pt(11) * fs, color: "#374151" },
+                      text: expVariant.bulletText,
+                    }}
+                  />
                 </View>
               );
             })}
