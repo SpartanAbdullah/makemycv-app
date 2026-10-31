@@ -26,7 +26,7 @@ const build = (p) => require(path.join(root, ".test-build", "importers", p));
 
 const { parsePdfBytes, extractPdfText } = build("pdfAdapter.js");
 const { parseDocxBytes, extractDocxText } = build("docxAdapter.js");
-const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter } = build("fieldMapper.js");
+const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter, mappingEmptyMessage } = build("fieldMapper.js");
 const { gateImportFile, importFileType, importErrorMessage, IMPORT_ERROR_REASONS, ImportParseError } =
   build("importErrors.js");
 
@@ -77,7 +77,8 @@ async function runImport(name, data) {
         : await parsePdfBytes(data, { pdfjs, workerSrc });
     const partial = mapParsedToCv(parsed);
     if (!hasUsableContent(partial)) {
-      return { reason: "mapping_empty", message: importErrorMessage("mapping_empty"), parsed };
+      // Same copy choice as BuilderShell (session 7: a letter gets its own).
+      return { reason: "mapping_empty", message: mappingEmptyMessage(parsed), parsed };
     }
     return { parsed, partial, sections: countSectionsFilled(partial) };
   } catch (err) {
@@ -183,6 +184,10 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const skills = (r.partial?.skills ?? []).map((s) => s.name ?? s);
   check("s5-long-wrapped.pdf", "\"Budget Control\" is one skill (D9)", skills.includes("Budget Control") && !skills.includes("Budget") && !skills.includes("Control"), skills);
   check("s5-long-wrapped.pdf", "10 skills, as written (D9)", skills.length === 10, skills);
+  // Session 7: "… | Driving Licence: UAE," / "valid" wraps; the review shows
+  // ONE unplaced line (no vehicle class to map), not two halves.
+  const unplaced = r.parsed?.unplaced ?? [];
+  check("s5-long-wrapped.pdf", "wrapped \"Driving Licence: UAE, valid\" is one unplaced line (session 7)", unplaced.includes("Driving Licence: UAE, valid") && !unplaced.includes("valid") && !unplaced.includes("Driving Licence: UAE,"), unplaced);
 }
 {
   const r = await expectImport("s5-header-table.docx", 6);
@@ -294,7 +299,16 @@ await expectReason("encrypted-cv.pdf", "encrypted_pdf");
 await expectReason("legacy-doc-renamed.docx", "unsupported_type");
 await expectReason("empty.pdf", "empty_file");
 await expectReason("photo-of-cv.jpg", "unsupported_type");
-await expectReason("not-a-cv.pdf", "mapping_empty");
+{
+  const r = await expectReason("not-a-cv.pdf", "mapping_empty");
+  check("not-a-cv.pdf", "generic mapping_empty copy, not the letter copy (session 7)", r.message === importErrorMessage("mapping_empty"), r.message);
+}
+{
+  // Session 7: import matrix case 10b — a letter with no contact line. The
+  // reason stays mapping_empty; the copy says it reads like a cover letter.
+  const r = await expectReason("s5-cover-letter-prose.pdf", "mapping_empty");
+  check("s5-cover-letter-prose.pdf", "cover-letter copy, not the generic one (10b)", /reads like a cover letter/.test(r.message ?? "") && r.message !== importErrorMessage("mapping_empty"), r.message);
+}
 {
   const big = makeLargePdf(25 * 1024 * 1024);
   await expectReason("large-25mb.pdf", "too_large", big.buffer.slice(big.byteOffset, big.byteOffset + big.byteLength));

@@ -31,10 +31,10 @@ import { PreviewPanel } from "../preview/PreviewPanel";
 import {
   DOCX_TIMEOUT_COPY,
   DOCX_TIMEOUT_MS,
+  MAPPING_EMPTY_LETTER_COPY,
   PDF_TIMEOUT_MS,
   SLOW_READ_HINT_MS,
   gateImportFile,
-  importErrorMessage,
   importFileType,
   toImportParseError,
   withDeadline,
@@ -44,6 +44,7 @@ import {
   countSectionsFilled,
   hasUsableContent,
   mapParsedToCv,
+  mappingEmptyMessage,
 } from "../../lib/importers/fieldMapper";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 
@@ -1206,7 +1207,9 @@ export const BuilderShell = ({
         // the document's first line taken for a name) — a dead end that
         // recorded nothing. Say so here instead, with a next step, and count it.
         if (!hasUsableContent(mapParsedToCv(parsed))) {
-          failImport("mapping_empty", importErrorMessage("mapping_empty"));
+          // Session 7: a cover letter (matrix case 10b) gets its own copy
+          // and a link; the reason stays mapping_empty.
+          failImport("mapping_empty", mappingEmptyMessage(parsed));
           return;
         }
         setImportState({ phase: "review", source, parsed });
@@ -1377,6 +1380,19 @@ export const BuilderShell = ({
               style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}
             >
               {errorMsg ?? downloadError}
+              {errorMsg === MAPPING_EMPTY_LETTER_COPY && (
+                <>
+                  {" "}
+                  <Link
+                    href="/cover-letter"
+                    data-testid="import-error-cover-letter"
+                    className="underline underline-offset-2"
+                    style={{ fontWeight: 600 }}
+                  >
+                    Open the cover letter tool
+                  </Link>
+                </>
+              )}
             </p>
             <button
               type="button"

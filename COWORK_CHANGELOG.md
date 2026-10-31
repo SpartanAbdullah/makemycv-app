@@ -25,6 +25,32 @@ Format:
 
 ---
 
+## [2026-10-31 20:40] Import: Arabic dates, a wrapped licence line, and a cover letter without a contact line (session 7)
+
+**Goal:** the three parser items left open in IMPORT_MONITORING §8.6.
+**Files:**
+- edited: `lib/importers/textParser.ts` - (1) `DATE_TOKEN_RE` reads Arabic month + year: Gregorian يناير … ديسمبر with
+  the common spellings, Levantine / Iraqi كانون الثاني … كانون الأول, ASCII or Arabic-Indic year; a month without a year
+  is not a date. `PRESENT_RE` reads حتى / إلى / لغاية الآن, حتى تاريخه and حالياً (bare "الآن" is not). Tokens are kept
+  as written. Before: "(مارس 2021 - حتى الآن)" left "(مارس" in the Company and the role not current. (2)
+  `wrappedUaeTail`: a labelled UAE value that ends mid-list (",", "&", "and") takes a short, label-free, non-heading
+  next line as its tail — "Driving Licence: UAE," / "valid" is ONE unplaced line (matrix case 1), "DL: Light," /
+  "manual" maps to Light Vehicle.
+- edited: `lib/importers/importErrors.ts`, `lib/importers/fieldMapper.ts` - `MAPPING_EMPTY_LETTER_COPY` and
+  `mappingEmptyMessage(parsed)`: a file with nothing importable that reads like a cover letter (matrix case 10b) gets
+  "This file reads like a cover letter rather than a CV…" instead of "no CV sections … written in English". The reason
+  stays `mapping_empty`.
+- edited: `components/builder/BuilderShell.tsx` - uses `mappingEmptyMessage`; the error bar adds "Open the cover letter
+  tool" → /cover-letter for that copy only.
+- created: `__fixtures__/import/s5-cover-letter-prose.pdf` - matrix case 10b (synthetic "Noor Testwell").
+- edited: `scripts/parser-fixtures.test.cjs` (+11 checks: Arabic dates and guards, the wrap and its guards),
+  `scripts/import-fixtures.test.mjs` (10b copy, not-a-cv keeps the generic copy, case-1 licence line; the harness uses
+  `mappingEmptyMessage` like the builder), `scripts/import-smoke.mjs` (10b case: reason, copy, link; no link on other
+  `mapping_empty` files).
+**Notes / risks / follow-up:** the new date tests fail on the previous parser (5 of 5) and pass now; the s6 rule that
+keeps an Arabic repeat line out of a Latin block still holds (rtl-mixed.docx: 2 cards, the line unplaced).
+**Suggested commit:** fix(import): Arabic month names and "until now" as dates, wrapped UAE values, cover-letter copy for 10b
+
 ## [2026-10-31 20:10] Import: a Word file gets the same 45 s read deadline as a PDF (session 7)
 
 **Goal:** IMPORT_MONITORING §8.6 "still open": a DOCX import had no read deadline. On a stalled connection the adapter /

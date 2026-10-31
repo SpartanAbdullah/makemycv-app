@@ -68,8 +68,21 @@ const MONTH_NAMES =
 // but a separator and another 4-digit year), so it still yields two years.
 const ISO_MONTH = "\\b(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])\\b";
 const NUMERIC_MONTH_YEAR = "\\b(?:0?[1-9]|1[0-2])[/-](?:19|20)\\d{2}\\b";
+// Session 7: Arabic month names, Gregorian (يناير … ديسمبر, with the common
+// spelling variants) and Levantine / Iraqi (كانون الثاني … كانون الأول), each
+// only WITH a year — "آب" or "أيار" alone is too short to trust. `\b` is
+// ASCII-only, so the boundary is "no Arabic letter before / after". The
+// token is kept as written; the builder's date field is free text.
+const ARABIC_MONTH_NAMES =
+  "يناير|فبراير|مارس|أبريل|ابريل|إبريل|مايو|يونيو|يونيه|يوليو|يوليه|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر" +
+  "|كانون الثاني|شباط|آذار|اذار|نيسان|أيار|ايار|حزيران|تموز|آب|اب|أيلول|ايلول|تشرين الأول|تشرين الاول|تشرين الثاني|كانون الأول|كانون الاول";
+const ARABIC_LETTER = "\\u0621-\\u064A\\u0671-\\u06D3";
+const ARABIC_MONTH_YEAR =
+  `(?<![${ARABIC_LETTER}])(?:${ARABIC_MONTH_NAMES})(?![${ARABIC_LETTER}])` +
+  `[\\s،,]*(?:\\d{4}|[\\u0660-\\u0669]{4}|[\\u06F0-\\u06F9]{4})`;
 const DATE_TOKEN_RE = new RegExp(
-  `\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}` +
+  `${ARABIC_MONTH_YEAR}` +
+    `|\\b(?:${MONTH_NAMES})\\b[\\s.,]*\\d{4}` +
     `|${ISO_MONTH}` +
     `|${NUMERIC_MONTH_YEAR}` +
     `|\\b(?:${MONTH_NAMES})\\b` +
@@ -82,8 +95,12 @@ const DATE_TOKEN_RE = new RegExp(
 // negative lookbehind keeps "up to date" out: an unmarked bullet like "Kept
 // inventory records up to date" can reach the header path on two-column PDFs
 // (where pdf.js drops the bullet glyph), and must not mark the role current.
+//
+// Session 7: the Arabic open-ended forms — "حتى الآن" / "إلى الآن" / "لغاية
+// الآن" ("until now"), "حتى تاريخه" ("to date"), "حالياً" ("currently"). Bare
+// "الآن" ("now") is left out: it is an ordinary word in a bullet.
 const PRESENT_RE =
-  /\b(?:present|current|now|ongoing|till\s+date|(?<!\bup\s)to\s+date|todate)\b/i;
+  /\b(?:present|current|now|ongoing|till\s+date|(?<!\bup\s)to\s+date|todate)\b|(?<![ء-ي])(?:(?:حتى|إلى|الى|لغاية)\s+(?:الآن|الان|تاريخه)|حالياً|حاليًا|حاليا)(?![ء-ي])/i;
 
 const BULLET_PREFIX_RE = /^[\s]*[•·●◦▪■*\-–—›▸▶►★▎]\s+/;
 const NUMBERED_BULLET_RE = /^\s*\d+[.)]\s+/;
@@ -310,7 +327,8 @@ function looksLikeLocation(line: string): boolean {
 
 // Words that only ever JOIN two dates in a range. Stripped from the residue so
 // "03-2019 to 07-2021" still reads as a date-only line.
-const RANGE_CONNECTOR_RE = /\b(?:to|till|until|thru|through|and)\b/gi;
+const RANGE_CONNECTOR_RE =
+  /\b(?:to|till|until|thru|through|and)\b|(?<![ء-ي])(?:إلى|الى|حتى|لغاية)(?![ء-ي])/gi;
 
 function isDateOnlyLine(line: string): boolean {
   const dates = extractDates(line);
@@ -1418,6 +1436,29 @@ function normalizeUaeValue(
   }
 }
 
+/**
+ * The next line, when it is the wrapped tail of the labelled value that ends
+ * `line` ("Driving Licence: UAE," / "valid"), else null. The value must end
+ * mid-list (",", "&", "and"); the tail must be short, label-free and not a
+ * bullet or a heading.
+ */
+function wrappedUaeTail(line: string, next: string | undefined): string | null {
+  if (!next) return null;
+  const segments = line.split(UAE_SEGMENT_SPLIT).map((s) => s.trim()).filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (!last) return null;
+  const labelled = UAE_LABEL_PATTERNS.some(({ re }) => {
+    const m = last.match(re);
+    return !!m && /(?:[,&]|\band)\s*$/i.test(m[1]);
+  });
+  if (!labelled) return null;
+  const tail = next.trim();
+  if (!tail || tail.length > 40 || tail.split(/\s+/).length > 4) return null;
+  if (/[:|·•]/.test(tail) || isBulletLine(tail) || !/\p{L}/u.test(tail)) return null;
+  if (/^[A-Z][A-Z\s&]+$/.test(tail)) return null; // a heading ("SUMMARY")
+  return tail;
+}
+
 function harvestUaeFields(lines: string[]): {
   uae: ParsedUaeFields;
   consumedLines: Set<number>;
@@ -1430,8 +1471,17 @@ function harvestUaeFields(lines: string[]): {
   const consumed = new Set<number>();
   const leftovers: string[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    let line = lines[i];
     if (!line) continue;
+    // Session 7 (import matrix case 1): a PDF wraps "… | Driving Licence: UAE,"
+    // / "valid" across two lines, and both halves landed in "We couldn't place
+    // this" as separate entries. A labelled value that ends mid-list (",", "&",
+    // "and") takes a short, label-free next line as its tail.
+    const wrapped = wrappedUaeTail(line, lines[i + 1]);
+    if (wrapped !== null) {
+      line = `${line} ${wrapped}`;
+      consumed.add(i + 1);
+    }
     const segments = line
       .split(UAE_SEGMENT_SPLIT)
       .map((s) => s.trim())

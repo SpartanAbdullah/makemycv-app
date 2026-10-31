@@ -70,6 +70,8 @@ const CASES = [
   ["s5-31-pages.pdf", "import"],
   // Session 6: a cover letter with a contact header (matrix case 10a).
   ["s5-cover-letter-contact.pdf", "import"],
+  // Session 7: a letter with no contact line (matrix case 10b).
+  ["s5-cover-letter-prose.pdf", "mapping_empty"],
   // Session 6 (D11): extension / bytes mismatch (matrix cases 9a / 9b).
   ["s5-docx-bytes.pdf", "corrupt_pdf"],
   ["s5-pdf-bytes.docx", "corrupt_docx"],
@@ -79,6 +81,8 @@ const CASES = [
 const EXPECT_MESSAGE = {
   "s5-docx-bytes.pdf": /actually a Word document with a \.pdf name/,
   "s5-pdf-bytes.docx": /actually a PDF with a \.docx name/,
+  // Session 7 (10b): the letter copy, not "no CV sections … in English".
+  "s5-cover-letter-prose.pdf": /reads like a cover letter/,
 };
 
 // D7a (session 6): the review names the pages it read when the PDF is longer
@@ -218,6 +222,15 @@ async function runCase(name, file, expected) {
     if (EXPECT_MESSAGE[name]) {
       if (EXPECT_MESSAGE[name].test(message)) ok(`${name}: copy names the real type (D11)`);
       else fail(`${name}: copy names the real type (D11)`, `"${message}"`);
+    }
+    if (name === "s5-cover-letter-prose.pdf") {
+      const href = await page.getByTestId("import-error-cover-letter").getAttribute("href", { timeout: 2000 }).catch(() => null);
+      if (href === "/cover-letter") ok(`${name}: error bar links to /cover-letter (session 7)`);
+      else fail(`${name}: error bar links to /cover-letter (session 7)`, `href=${href}`);
+    } else if (expected === "mapping_empty") {
+      const n = await page.getByTestId("import-error-cover-letter").count();
+      if (n === 0) ok(`${name}: no cover-letter link on a non-letter`);
+      else fail(`${name}: no cover-letter link on a non-letter`, `${n} links`);
     }
   } else {
     fail(label, `outcome=${outcome}; ${summary}; message="${message.slice(0, 90)}"`);

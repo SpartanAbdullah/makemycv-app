@@ -315,6 +315,13 @@ export const IMPORT_ERROR_COPY: Record<ImportErrorReason, string> = {
   report_network: "Network error while importing the report.",
 };
 
+/** `mapping_empty` copy when the file reads like a cover letter (session 7,
+ *  import matrix case 10b: a letter with no contact line got the generic
+ *  "no CV sections … written in English" copy). Same reason, so analytics are
+ *  unchanged; the builder's error bar adds a link to /cover-letter. */
+export const MAPPING_EMPTY_LETTER_COPY =
+  "This file reads like a cover letter rather than a CV, so there was nothing to import. Pick your CV file instead — or write a letter for a specific role with the cover letter tool.";
+
 /** `timeout` copy for a Word file — the reason's default copy names a PDF and
  *  suggests a Word version (session 7, DOCX read deadline). */
 export const DOCX_TIMEOUT_COPY =
