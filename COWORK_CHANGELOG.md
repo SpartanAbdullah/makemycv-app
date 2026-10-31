@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-10-31 21:00] Classic: a right-to-left name / headline reaches the right margin (session 7, E8.8)
+
+**Goal:** backlog E8.8. Classic's header column reserves a right gutter for its corner photo (live `pr-24`, PDF 72pt).
+A right-aligned Arabic name or headline stopped at that gutter, ~140 px (at 2×) short of the margin, even with no photo
+(production render `_cowork/session6/prod-arabic/A-classic-p1.png`).
+**Files:**
+- edited: `lib/templates/utils.ts` - `hasRtlHeader(name, headline)`: true when either reads right to left.
+- edited: `lib/templates/classic.tsx` - the header column drops `pr-24` when `hasRtlHeader` and no photo is shown;
+  otherwise the class string is unchanged.
+- edited: `components/pdf/CVDocument.tsx` - Classic's header column: `paddingRight` 0 under the same condition, else
+  `pt(96)` as before.
+**Notes / risks / follow-up:** only Classic reserves such a gutter (searched every template for a fixed-width / padded
+name column). Latin output is unchanged: the Latin control renders a byte-identical page content stream
+(`_cowork/session7/e88/before-latin-classic.pdf` / `after-latin-classic.pdf`, sha1 03f874d3d222 both); the Arabic name
+now ends at x = 571.3pt = page width − 24pt margin (was 499.3). With a photo the gutter stays, so text never runs under
+it. Evidence: `_cowork/session7/e88/*-p1.png` (PDF) and `_cowork/session7/e88/preview-*.png` (live preview).
+**Suggested commit:** fix(pdf,preview): Classic RTL name and headline span the header when no photo is shown
+
 ## [2026-10-31 20:40] Import: Arabic dates, a wrapped licence line, and a cover letter without a contact line (session 7)
 
 **Goal:** the three parser items left open in IMPORT_MONITORING §8.6.

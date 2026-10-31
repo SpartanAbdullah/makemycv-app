@@ -10,7 +10,7 @@ import {
 import { isSkillsFirst } from "../data/sectionOrder";
 import { splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
-import { getFullName, bulletLiProps } from "./utils";
+import { getFullName, bulletLiProps, hasRtlHeader } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
 
@@ -20,6 +20,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
   const theme = resolveTheme(data.settings, "#1e5b54");
   const m = theme.marginScale;
   const photoVisible = theme.photoVisible;
+  const photoShown = Boolean(data.personal.photo && data.personal.showPhoto && photoVisible);
   const hasSummary = Boolean(data.personal.summary);
   const experience = meaningfulExperience(data.experience);
   const education = meaningfulEducation(data.education);
@@ -161,7 +162,15 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
           <div className="relative flex items-start">
 
             {/* Left block: Name + Headline + Contact */}
-            <div className="flex flex-col gap-1 flex-1 min-w-0 pr-24">
+            {/* pr-24 keeps the photo's corner clear; a right-to-left header
+                with no photo spans the full width (E8.8). */}
+            <div
+              className={
+                hasRtlHeader(name, headline) && !photoShown
+                  ? "flex flex-col gap-1 flex-1 min-w-0"
+                  : "flex flex-col gap-1 flex-1 min-w-0 pr-24"
+              }
+            >
               <h1
                 // The CV name is the page's h1 only in the PDF/preview sense;
                 // inside the builder the step title is the h1, so expose this
@@ -222,7 +231,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
             </div>
 
             {/* Photo: absolute top-right */}
-            {data.personal.photo && data.personal.showPhoto && photoVisible && (
+            {photoShown && (
               <div
                 style={{
                   position: "absolute",

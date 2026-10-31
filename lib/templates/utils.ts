@@ -5,6 +5,18 @@ import { firstStrongDirection } from "../pdf/arabicText";
 export const getFullName = (data: CvData) =>
   `${data.personal.firstName} ${data.personal.lastName}`.trim();
 
+/**
+ * True when the CV's name or headline reads right to left (session 7, E8.8).
+ * Classic reserves a right gutter in its header column for the photo (live
+ * `pr-24`, PDF 72pt); a right-aligned Arabic name stopped at that gutter,
+ * ~140 px short of the margin, even with no photo. Such a header spans the
+ * full width when no photo is shown; Latin headers keep the gutter, so their
+ * output is unchanged.
+ */
+export function hasRtlHeader(name: string, headline?: string): boolean {
+  return firstStrongDirection(name) === "rtl" || firstStrongDirection(headline ?? "") === "rtl";
+}
+
 
 /**
  * Props for a bullet <li> (session 6, E8.2 follow-up). An Arabic-first bullet
