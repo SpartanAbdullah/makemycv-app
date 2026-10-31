@@ -1,0 +1,4 @@
+# Synthetic import fixtures are byte-exact documents: a hand-written PDF has
+# no NUL bytes, so git would otherwise treat it as text and CRLF-convert it on
+# a Windows checkout, shifting every xref offset (2026-10-31).
+__fixtures__/import/** binary
