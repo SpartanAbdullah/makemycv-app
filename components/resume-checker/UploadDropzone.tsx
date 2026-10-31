@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractPdfTextInBrowserDetailed } from "@/lib/importers/pdfAdapter";
 import { extractDocxTextInBrowser } from "@/lib/importers/docxAdapter";
+import {
+  IMPORT_ERROR_COPY,
+  MAX_IMPORT_BYTES,
+  MIN_TEXT_LENGTH,
+  gateImportFile,
+  importFileType,
+  toImportParseError,
+} from "@/lib/importers/importErrors";
 import AtsTextPreview from "./AtsTextPreview";
 import {
   saveExtractionPreview,
@@ -33,7 +41,11 @@ const PHASE_COPY: Record<Phase, string> = {
   error: "",
 };
 
-const MAX_BYTES = 5 * 1024 * 1024;
+// Same gate as the builder import (lib/importers/importErrors.ts): the two
+// surfaces share the pdf.js / mammoth extraction, so they share one size
+// ceiling and one set of error messages. Only the extracted text is posted;
+// the file itself never leaves the browser.
+const MAX_MB = Math.round(MAX_IMPORT_BYTES / (1024 * 1024));
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -65,16 +77,12 @@ export default function UploadDropzone() {
   }, [phase]);
 
   const validate = useCallback((file: File): string | null => {
-    // PDF or DOCX (WP-2). Extension decides; MIME is only a cross-check
-    // because browsers report Word files inconsistently.
-    const name = file.name.toLowerCase();
-    const isPdf = name.endsWith(".pdf");
-    const isDocx = name.endsWith(".docx");
-    if (!isPdf && !isDocx) {
-      return name.endsWith(".doc")
-        ? "Old .doc format isn't supported — save it as .docx (or PDF) and try again."
-        : "Only PDF and DOCX files are supported.";
-    }
+    // Same gate and the same words as the builder import (backlog E1):
+    // extension, empty file, size — lib/importers/importErrors.ts.
+    const gate = gateImportFile(file);
+    if (gate) return gate.message;
+    // Extension decides; MIME is only a cross-check because browsers report
+    // Word files inconsistently.
     if (
       file.type &&
       file.type !== "application/pdf" &&
@@ -82,12 +90,6 @@ export default function UploadDropzone() {
       file.type !== "application/octet-stream"
     ) {
       return "File doesn't look like a PDF or DOCX. Check the extension.";
-    }
-    if (file.size === 0) {
-      return "This file is empty.";
-    }
-    if (file.size > MAX_BYTES) {
-      return "File is larger than 5MB. Export a lighter PDF and try again.";
     }
     return null;
   }, []);
@@ -106,7 +108,7 @@ export default function UploadDropzone() {
       setExtracted(null);
       setPhase("extracting");
 
-      const isDocx = file.name.toLowerCase().endsWith(".docx");
+      const isDocx = importFileType(file.name) === "docx";
       const kind: ExtractionKind = isDocx ? "docx" : "pdf";
       let rawText: string;
       let pages: number | undefined;
@@ -118,11 +120,18 @@ export default function UploadDropzone() {
           rawText = out.text;
           pages = out.pages;
         }
-      } catch {
+      } catch (err) {
+        // The adapters throw a typed ImportParseError (password, damaged,
+        // old .doc, worker blocked, timeout); show the builder's copy for it.
+        // The generic reason's copy points at the builder form, so the
+        // checker keeps its own wording for that one.
+        const e = toImportParseError(err);
         setError(
-          isDocx
-            ? "We couldn't open this Word file. Save it again as .docx (or export a PDF) and try again."
-            : "We couldn't read this PDF. Try re-saving it from the original source.",
+          e.kind !== "parse_exception"
+            ? e.message
+            : isDocx
+              ? "We couldn't open this Word file. Save it again as .docx (or export a PDF) and try again."
+              : "We couldn't read this PDF. Try re-saving it from the original source.",
         );
         setPhase("error");
         return;
@@ -133,12 +142,8 @@ export default function UploadDropzone() {
       const preview: Extracted = { text: rawText, kind, pages, fileName: file.name };
       setExtracted(preview);
 
-      if (rawText.trim().length < 200) {
-        setError(
-          isDocx
-            ? "This document has almost no readable text. Check the file and try again."
-            : "This PDF looks like a scanned image — no readable text. Export a text-based PDF from Word or Google Docs and try again.",
-        );
+      if (rawText.trim().length < MIN_TEXT_LENGTH) {
+        setError(isDocx ? IMPORT_ERROR_COPY.empty_text : IMPORT_ERROR_COPY.no_text_layer);
         setPhase("error");
         return;
       }
@@ -276,12 +281,15 @@ export default function UploadDropzone() {
               <div className="text-lg font-semibold text-slate-900">
                 Drop your CV here, or click to upload
               </div>
+              {/* What is accepted, then what happens to the file (backlog E1).
+                  Wording follows the page's privacy line ("deleted after 24
+                  hours") and its "What happens to your file" paragraph. */}
               <div className="text-sm text-slate-600">
-                PDF or DOCX · max 5MB · no sign-up
+                PDF or DOCX · up to {MAX_MB} MB · text-based, not a scanned image
               </div>
-              <div className="mt-1 text-xs text-slate-600">
-                Your file is read in this browser — only the extracted text
-                is sent to build your report.
+              <div className="mt-1 max-w-sm text-xs text-slate-600">
+                Processed in your browser — the file never leaves your device.
+                Only the extracted text is sent, and it is deleted after 24 hours.
               </div>
             </div>
           )}

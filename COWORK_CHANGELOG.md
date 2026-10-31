@@ -25,6 +25,26 @@ Format:
 
 ---
 
+## [2026-10-31 19:25] Checker dropzone: says what it accepts and what happens to the file; builder import errors (backlog E1)
+
+**Goal:** the /resume-checker dropzone said "max 5MB · no sign-up" while the builder import (same pdf.js / mammoth
+extraction) accepts 15 MB, did not say a scanned PDF will not work, and showed its own generic messages for
+failures the builder already names precisely (password-protected, damaged, old .doc, blocked PDF reader, timeout).
+**Files:**
+- edited: `components/resume-checker/UploadDropzone.tsx` —
+  - copy: "PDF or DOCX · up to 15 MB · text-based, not a scanned image", then "Processed in your browser — the file
+    never leaves your device. Only the extracted text is sent, and it is deleted after 24 hours." (matches the
+    page's "deleted after 24 hours" line and its "What happens to your file" paragraph). The number comes from
+    `MAX_IMPORT_BYTES`.
+  - validation: `gateImportFile()` (extension, empty, size) with the builder's copy; the MIME cross-check stays.
+  - extraction failures: `toImportParseError(err).message` for every typed reason; `parse_exception` keeps the
+    checker's own sentence because the builder copy points at the builder form.
+  - too little text: `MIN_TEXT_LENGTH` and `IMPORT_ERROR_COPY.no_text_layer` / `empty_text`.
+**Notes / risks / follow-up:** the size ceiling rises from 5 MB to 15 MB for the checker. Only the extracted text is
+posted, and the parse route still caps that text, so the server-side cost is unchanged. `.docm` now counts as Word
+(same as the builder).
+**Suggested commit:** fix(checker): dropzone states accepted files and data handling, builder import errors (E1)
+
 ## [2026-10-31 19:10] LinkedIn message: 90-word ceiling enforced server-side (backlog E5)
 
 **Goal:** the 60–90-word LinkedIn message came back at 101 words in the staging e2e and 102 on production. A
