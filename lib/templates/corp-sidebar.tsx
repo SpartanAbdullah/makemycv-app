@@ -159,6 +159,7 @@ export const CorpSidebarTemplate = ({
 
   return (
     <div
+      className="cv-bidi"
       style={{
         display: "flex",
         flexDirection: "row",

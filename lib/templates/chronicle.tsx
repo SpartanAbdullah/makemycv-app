@@ -442,7 +442,7 @@ export const ChronicleTemplate = ({ data }: { data: CvData; plan?: PlanTier }) =
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${36 * m}px ${32 * m}px`,

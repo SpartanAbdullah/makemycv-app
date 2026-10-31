@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { containsArabic, shapeArabic, toLogicalArabic, unjoinedArabicLetters } from "./arabicText";
+import { containsArabic, firstStrongDirection, shapeArabic, toLogicalArabic, unjoinedArabicLetters } from "./arabicText";
 
 const cps = (s: string) => Array.from(s, (c) => c.codePointAt(0)!.toString(16).toUpperCase());
 
@@ -76,6 +76,28 @@ describe("shapeArabic joining forms", () => {
     // کۂ → ک(init) ہ(final) + hamza above
     assert.deepEqual(cps(shapeArabic("کۂ")), ["FB90", "FBA7", "654"]);
     assert.equal(toLogicalArabic(shapeArabic("کۂ")), "کۂ");
+  });
+});
+
+describe("firstStrongDirection", () => {
+  it("is rtl for an Arabic-first paragraph, whatever follows", () => {
+    assert.equal(firstStrongDirection("صمّم لوحات متابعة (Power BI) لمستوى الخدمة"), "rtl");
+    assert.equal(firstStrongDirection("خفّض المخزون بنسبة 12% بعد تطبيق نظام SAP IBP"), "rtl");
+    assert.equal(firstStrongDirection("12% — خفّض المخزون"), "rtl"); // digits are weak
+    assert.equal(firstStrongDirection(shapeArabic("مدير مالي — Senior Manager")), "rtl"); // presentation forms
+    assert.equal(firstStrongDirection("طاہرہ ملک"), "rtl");
+  });
+
+  it("is ltr for a Latin-first paragraph, even with Arabic later", () => {
+    assert.equal(firstStrongDirection("Senior محلل Supply Chain"), "ltr");
+    assert.equal(firstStrongDirection("(CPA) محاسب قانوني"), "ltr");
+    assert.equal(firstStrongDirection("Cut freight spend by AED 1.2M"), "ltr");
+  });
+
+  it("is null when there is no letter", () => {
+    assert.equal(firstStrongDirection("2023 – 2025"), null);
+    assert.equal(firstStrongDirection("+971 50 123 4567"), null);
+    assert.equal(firstStrongDirection(""), null);
   });
 });
 

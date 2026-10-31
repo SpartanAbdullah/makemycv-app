@@ -314,7 +314,7 @@ export const HarvardTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${px(HARVARD_PAGE_PADDING_PT.vertical) * m}px ${

@@ -25,6 +25,30 @@ Format:
 
 ---
 
+## [2026-11-01 00:40] Arabic-first paragraphs are right-to-left in the preview AND the PDF (session 6, E8.2)
+
+**Goal:** E8.2 (ARABIC_PRODUCTION_2026-10-31.md §3), owner decision taken: first-strong, per-paragraph direction in
+both renderers. Before, both used an LTR base: "صمّم لوحات متابعة (Power BI) لمستوى …" read its clauses in reverse,
+"… نظام SAP IBP" put SAP IBP at the right end, a trailing "%" sat apart from its number, continuation lines were
+flush left.
+**Files:**
+- edited: `lib/pdf/arabicText.ts` (+ test) — `firstStrongDirection()`.
+- edited: `components/pdf/ArabicText.tsx` — Arabic-first runs get `direction: "rtl"` and, unless the layout set one,
+  an explicit `textAlign: "right"` (the implicit alignment drew a shrink-wrapped contact item outside its box).
+- edited: `components/pdf/CVDocument.tsx` — `roleBox` / `withRoleBox`: an Arabic-first role title next to its dates
+  gets a content-sized box (Classic, Professional, Modern, Gulf Standard, ExperienceEntry layouts), as live.
+- edited: `app/globals.css` — `.cv-bidi` scope: `unicode-bidi: plaintext` on blocks, `normal` on inline phrasing
+  elements, `plaintext` again on flex / grid children.
+- edited: all 14 `lib/templates/*.tsx` roots — `cv-bidi` class (only 6 carry `.cv-print`; CLAUDE.md says all do).
+- edited: `docs/arabic-pdf.md` — "Paragraph direction" rewritten; the probe-table bidi row corrected.
+**Notes / risks / follow-up:** Latin gate `fidelity:pdf` passed (31 ok / 11 check / 0 mismatch); Latin role rows keep
+`flex: 1` (identical style objects). Arabic personas vs session 4: arabic-first 9/4/1 (was 8/5/1), arabic-only 10/4/0
+(9/5/0), arabic-name 11/3/0 (9/5/0); text parity 98–100 % (was 99.8 % mean). pdf.js now reads every persona-A /
+dense / Urdu cell in logical order. List markers stay left of a right-aligned Arabic bullet in both renderers
+(mirroring the marker is a separate design call). The CLAUDE.md sentence "every template root carries .cv-print" is
+inaccurate (6 of 14) — not changed here.
+**Suggested commit:** feat(pdf,preview): first-strong paragraph direction for Arabic-first text (E8.2)
+
 ## [2026-10-31 23:55] Arabic PDF: one text-show operator per Arabic line, no words lost in pdf.js / pypdf (session 6, E8.1)
 
 **Goal:** E8.1 (ARABIC_PRODUCTION_2026-10-31.md §2): long Arabic lines were written as 3–7 `TJ` operators split

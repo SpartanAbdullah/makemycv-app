@@ -141,7 +141,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))] text-slate-700"
+      className="cv-print cv-bidi relative overflow-hidden bg-white text-[calc(11.5px*var(--fs))] leading-[calc(1.45*var(--lh))] text-slate-700"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${36 * m}px ${32 * m}px`,

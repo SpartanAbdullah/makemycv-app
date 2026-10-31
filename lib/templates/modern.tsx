@@ -82,7 +82,7 @@ export const ModernTemplate = ({
 
   return (
     <div
-      className="cv-print bg-white text-slate-900 text-[calc(0.9rem*var(--fs))] leading-[calc(1.625*var(--lh))]"
+      className="cv-print cv-bidi bg-white text-slate-900 text-[calc(0.9rem*var(--fs))] leading-[calc(1.625*var(--lh))]"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${36 * m}px ${32 * m}px`,

@@ -255,7 +255,7 @@ export const BannerTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         color: SLATE_700,

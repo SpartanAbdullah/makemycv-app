@@ -24,7 +24,7 @@ fidelity composites) and the "Session 4 — Arabic" section of
 
 | Question | Answer | Where |
 |---|---|---|
-| Does it reorder bidi? | Yes — bidi-js per paragraph, segments reversed per laid-out line, so wrapping and pagination stay correct. The paragraph base direction is resolved from the first strong character whatever the `direction` style says (`dir=auto` behaviour); explicit `direction: "rtl"` inverts the order, so it is never set. | `textkit/lib/textkit.js:1657` (`bidiEngine`), `:859` (`reorderLine`) |
+| Does it reorder bidi? | Yes — bidi-js per paragraph, segments reversed per laid-out line, so wrapping and pagination stay correct. The paragraph base direction is the `direction` style, which `@react-pdf/layout` defaults to `"ltr"` (`layout/lib/index.js:1375`; session 4 read it as first-strong, session 5 showed it is not). Since session 6 `ArabicText` sets `"rtl"` on Arabic-first runs (see "Paragraph direction"). | `textkit/lib/textkit.js:1657` (`bidiEngine`), `:859` (`reorderLine`) |
 | Does it shape Arabic? | Yes — fontkit's OpenType layout applies the font's init/medi/fina/rlig/liga lookups. | `textkit.js:977` (`layoutRun` → `font.layout(..., 'ltr')`) |
 | Can a Latin + Arabic font stack be used? | **No.** `fontFamily: [Inter, Arabic]` is accepted (`layout/lib/index.js:1376`, per-code-point pick at `textkit.js:2804`), but `reorderLine` pulls glyphs across run boundaries by string index: a Latin run draws Arabic glyph ids and the bogus ids poison pdfkit's subset / ToUnicode tables for the whole document (probe 1 / probe 3 rows A). | `textkit.js:874-897` |
 | Ligatures? | `reorderLine` dedupes ligature glyphs by `glyph.id` per line, so the second lam-alef on a line vanishes ("لا" dropped from "الإدارة لا تعرف الآن إلا الله", probe 3 row B3); pdf.js also reads a multi-code-point ligature back reversed ("سالم"). | `textkit.js:883-890` |
@@ -113,15 +113,33 @@ fidelity composites) and the "Session 4 — Arabic" section of
   label loses its weight, a `<Link>` loses its hyperlink (text stays), Latin
   words are set in Vazirmatn's Latin instead of Inter / Bricolage / Instrument
   Serif, and letter-spacing is dropped. Lines without Arabic are unaffected.
-- **Paragraph direction.** The PDF resolves each paragraph's base direction
-  from its first strong character (RTL for an Arabic-first line); the live
-  templates set no `dir`, so the browser lays the same line out with an LTR
-  base. Pure-Arabic and English-first lines look the same in both; an
-  Arabic-first line that also contains Latin (e.g. "مدير مالي — Senior
-  Manager | company") orders its segments differently in the preview. The
-  PDF's order is the one an Arabic reader expects. Follow-up for the live
-  templates: `unicode-bidi: plaintext` on `.cv-print` text plus an alignment
-  decision — a template-rendering change, so an owner call.
+- **Paragraph direction (session 6, E8.2 — owner decision taken: first
+  strong, per paragraph, in both renderers).** Session 5 measured that
+  BOTH renderers used an LTR base (`@react-pdf/layout` defaults `direction`
+  to `"ltr"`, so the old "first strong" sentence here was wrong): a mid-line
+  "(Power BI)" reversed the clauses around it, trailing Latin and "%" sat at
+  the wrong end, continuation lines were flush left. Now:
+  - **PDF**: `ArabicText` gives an Arabic-first run (`firstStrongDirection`,
+    `lib/pdf/arabicText.ts`) `direction: "rtl"` and — unless the layout set
+    `textAlign` — an explicit `textAlign: "right"` (layout's measure step
+    only compensates an explicit alignment in a shrink-wrapped box; with the
+    implicit one a contact item's text was drawn outside its box). Role
+    titles that share a row with dates get a content-sized box when
+    Arabic-first (`roleBox` / `withRoleBox` in `CVDocument.tsx`), as the
+    live templates size them, so they stay at the row start.
+  - **Preview**: every template root carries `.cv-bidi`; `app/globals.css`
+    sets `unicode-bidi: plaintext` on it and its descendants (each block's
+    direction from its first strong character; Chrome then aligns the
+    default `text-align: start` right for Arabic-first blocks), keeps inline
+    phrasing elements (`span`, `a`, `b`, …) at `normal` so a line built from
+    spans is ONE paragraph like the PDF's flattened run, and gives flex /
+    grid children `plaintext` back (they are block containers).
+  - Latin-first and letterless paragraphs resolve LTR exactly as before:
+    the Latin fidelity gate passes unchanged (31 ok / 11 check), and Latin
+    PDF content streams are byte-identical. Explicit `center` / `right`
+    alignment is kept. List markers stay on the left in both renderers (the
+    li / bullet row keeps its LTR direction); an Arabic-first bullet's text
+    aligns right of it.
 - **Fonts not registered** (registration failed, or Node without
   `registerPdfFontsFromDir`): the wrapper leaves text alone and Helvetica
   prints the session-3 junk. `pdfArabicFamily()` is the switch.

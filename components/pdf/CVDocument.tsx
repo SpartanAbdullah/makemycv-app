@@ -11,6 +11,7 @@ import {
 // ONE run (session 4, 2026-10-31 — see ArabicText.tsx and
 // lib/pdf/arabicText.ts); Latin-only runs are returned untouched.
 import { Link, Text } from "./ArabicText";
+import { firstStrongDirection } from "../../lib/pdf/arabicText";
 import type { Style } from "@react-pdf/types";
 import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";
@@ -118,6 +119,26 @@ const GREEN_700 = "#15803D";
 
 /** The live templates are written in CSS px (96 DPI); react-pdf is pt (72). */
 const pt = (px: number) => px * 0.75;
+
+/**
+ * Box of a role title that shares a row with its dates (E8.2, session 6).
+ * The live templates size that element to its content (justify-between pushes
+ * the dates right); the PDF stretches it with `flex: 1` so a long title wraps.
+ * For left-aligned Latin the two are indistinguishable and `flex: 1` stays.
+ * An Arabic-first title aligns right (its paragraph direction), so in a
+ * stretched box it would sit against the dates while the preview keeps it at
+ * the start of the row: such a title gets a content-sized, shrinkable box,
+ * which still wraps at the row width.
+ */
+const roleBox = (text: string): Style =>
+  firstStrongDirection(text) === "rtl" ? { flexGrow: 0, flexShrink: 1 } : { flex: 1 };
+/** `base` with its `flex` shorthand swapped for roleBox (Gulf Standard's entry title carries `flex: 1`). */
+const withRoleBox = (base: Style, text: string): Style => {
+  if (firstStrongDirection(text) !== "rtl") return base;
+  const { flex: _flex, ...rest } = base;
+  void _flex;
+  return { ...rest, ...roleBox(text) };
+};
 /**
  * The line box of every live run that sets no line-height of its own:
  * headings, side labels, chips and entry rows inherit `line-height: 1.5`
@@ -467,7 +488,7 @@ const ExperienceEntry = ({
           gap: 6,
         }}
       >
-        <Text style={{ ...v.roleStyle, flex: 1 }}>{role.role?.trim() || "Role"}</Text>
+        <Text style={{ ...v.roleStyle, ...roleBox(role.role ?? "") }}>{role.role?.trim() || "Role"}</Text>
         <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
           {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
         </Text>
@@ -1120,7 +1141,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                     gap: pt(12),
                   }}
                 >
-                  <Text style={{ ...entryTitle, lineHeight: 1.35 * ls, flex: 1 }}>
+                  <Text style={{ ...entryTitle, lineHeight: 1.35 * ls, ...roleBox(`${role.role ?? ""} ${role.company ?? ""}`) }}>
                     {role.role?.trim() || "Role"}
                     {role.company ? (
                       <Text style={{ ...regular, color: SLATE_700 }}>
@@ -2433,7 +2454,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                           gap: 6,
                         }}
                       >
-                        <Text style={{ ...bodyStrong, flex: 1 }}>
+                        <Text style={{ ...bodyStrong, ...roleBox(role.role ?? "") }}>
                           {role.role?.trim() || "Role"}
                         </Text>
                         {/* the date span inherits the row's font-semibold */}
@@ -3657,7 +3678,7 @@ const ProfessionalPDFLayout = ({
             // title row, the location line and the bullet list.
             <View key={role.id} style={{ marginTop: i > 0 ? pt(12) : 0 }} minPresenceAhead={48}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: pt(12) }}>
-                <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: 1.35 * ls, color: SLATE_800, flex: 1 }}>
+                <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: 1.35 * ls, color: SLATE_800, ...roleBox(`${role.role ?? ""} ${role.company ?? ""}`) }}>
                   {role.role?.trim() || "Role"}
                   {role.company ? (
                     <Text style={{ ...regular, color: SLATE_600 }}>{` | ${role.company.trim()}`}</Text>
@@ -5169,7 +5190,7 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
                 minPresenceAhead={48}
               >
                 <View style={entryRow}>
-                  <Text style={entryTitle}>{role.role?.trim() || "Role"}</Text>
+                  <Text style={withRoleBox(entryTitle, role.role ?? "")}>{role.role?.trim() || "Role"}</Text>
                   <Text style={dateStyle}>
                     {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                   </Text>

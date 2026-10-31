@@ -135,6 +135,7 @@ export const ExecSplitTemplate = ({
 
   return (
     <div
+      className="cv-bidi"
       style={{
         width: "794px",
         minHeight: "1123px",

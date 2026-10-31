@@ -44,10 +44,9 @@
 
 /**
  * Arabic letters, marks and presentation forms (what `containsArabic` tests).
- * Base direction is deliberately NOT decided here: the live templates set no
- * `dir`, so the browser lays every paragraph out with an LTR base and the PDF
- * does the same (textkit's default) — same line order, same bullet side,
- * same alignment in both renderers.
+ * Paragraph direction is decided by `firstStrongDirection` below (session 6,
+ * E8.2): Arabic-first paragraphs are RTL in the PDF (components/pdf/
+ * ArabicText.tsx) and in the preview (`unicode-bidi: plaintext`, globals.css).
  */
 const ARABIC_RE = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
 
@@ -212,6 +211,23 @@ export function shapeArabic(text: string): string {
  * NFC / NFKC compose the pair back, so the text layer still reads ۂ.
  */
 const decomposeUnmapped = (text: string): string => text.replace(/\u06C2/g, "\u06C1\u0654");
+
+/**
+ * Base direction of a paragraph by its first strong character (Unicode bidi
+ * rules P2/P3 — what the preview's `unicode-bidi: plaintext` does): "rtl"
+ * when the first letter is Hebrew / Arabic script (including presentation
+ * forms), "ltr" for any other letter, null when the text has no letter at all
+ * (digits, punctuation, dates). Session 6 (E8.2): an Arabic-first paragraph is
+ * laid out with an RTL base in BOTH renderers, so "… (Power BI) …" and
+ * "بنسبة 12%" read in order and continuation lines align right.
+ */
+export function firstStrongDirection(text: string): "rtl" | "ltr" | null {
+  for (const ch of text) {
+    if (!/\p{L}/u.test(ch)) continue; // digits, marks, spaces, punctuation are weak / neutral
+    return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(ch) ? "rtl" : "ltr";
+  }
+  return null;
+}
 
 /**
  * Arabic-script letters in `text` that `shapeArabic` has no forms for, so the

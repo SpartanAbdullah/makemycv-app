@@ -331,6 +331,45 @@ body {
   --font-serif: var(--cv-font-serif);
 }
 
+/* Paragraph direction (session 6, E8.2; docs/arabic-pdf.md "Paragraph
+   direction"). Every block in a CV takes its base direction from its first
+   strong character, as the PDF does (components/pdf/ArabicText.tsx): an
+   Arabic-first bullet lays out right-to-left, so a mid-line "(Power BI)" or
+   "12%" reads in order and — with the templates' default `text-align: start`
+   — its lines align right. Latin-first and letterless text resolves to LTR,
+   which is what it was, so Latin-only CVs render exactly as before. Explicit
+   alignment (text-center, text-right) is untouched; list markers stay on the
+   left because the li's own `direction` is still ltr. Scoped to `.cv-bidi`,
+   which all 14 template roots carry (only six carry .cv-print, and its print
+   block must not reach the others).
+   Inline phrasing elements stay `normal`: under `plaintext` an inline span
+   becomes an isolate, which first-strong detection skips — Classic's
+   "<span>role</span><span> | company</span>" line then resolved LTR with
+   its "|" thrown to the far end. As `normal` they are part of their line's
+   paragraph, exactly like the PDF, which flattens such a line into one run.
+   Flex and grid children are blockified (their own paragraphs, one PDF
+   <Text> each), so they get `plaintext` back whatever their tag. */
+.cv-bidi,
+.cv-bidi * {
+  unicode-bidi: plaintext;
+}
+.cv-bidi :is(span, a, b, strong, em, i, small, sub, sup, abbr, time) {
+  unicode-bidi: normal;
+}
+.cv-bidi
+  :is(
+    [class~="flex"],
+    [class~="inline-flex"],
+    [class~="grid"],
+    [style*="display: flex"],
+    [style*="display:flex"],
+    [style*="display: inline-flex"],
+    [style*="display: grid"]
+  )
+  > * {
+  unicode-bidi: plaintext;
+}
+
 /* The Arabic CV face, the SAME two static files the PDF embeds
    (public/fonts/pdf/vazirmatn-*.ttf, Vazirmatn 33.003, SIL OFL 1.1 — licence
    beside them). unicode-range keeps it to the Arabic blocks, so Latin stays

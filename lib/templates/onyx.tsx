@@ -150,6 +150,7 @@ export const OnyxTemplate = ({
 
   return (
     <div
+      className="cv-bidi"
       style={{
         display: "flex",
         flexDirection: "row",

@@ -28,7 +28,7 @@ import {
   type TextProps as PdfTextProps,
 } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
-import { containsArabic, shapeArabic } from "../../lib/pdf/arabicText";
+import { containsArabic, firstStrongDirection, shapeArabic } from "../../lib/pdf/arabicText";
 import { pdfArabicFamily } from "../../lib/pdf/fonts";
 
 type TextProps = PropsWithChildren<PdfTextProps>;
@@ -60,9 +60,22 @@ function arabicRun(
   const text = textOfChildren(children);
   if (!containsArabic(text)) return null;
   const base = Array.isArray(style) ? style : style ? [style] : [];
+  // E8.2 (session 6): an Arabic-first paragraph gets an RTL base, as the
+  // preview's `unicode-bidi: plaintext` gives it (app/globals.css). textkit
+  // then orders a mid-line "(Power BI)" / "12%" correctly, mirrors brackets,
+  // and the run aligns right — unless the layout set textAlign (a centred
+  // header stays centred, as `text-align: center` does in the preview).
+  // The right alignment is set EXPLICITLY: @react-pdf/layout's measure step
+  // compensates a shrink-wrapped Text (a contact item in a flex row) only for
+  // `style.textAlign`, so the implicit right alignment `direction: "rtl"`
+  // implies pushed such a run's glyphs out of its box (the location vanished
+  // from Classic's contact row). Latin-first and letterless runs are untouched.
+  const rtl = firstStrongDirection(text) === "rtl";
+  const hasAlign = base.some((s) => s && (s as Style).textAlign !== undefined);
+  const dir: Style = rtl ? { direction: "rtl", ...(hasAlign ? {} : { textAlign: "right" }) } : {};
   return {
     text: shapeArabic(text),
-    style: [...base, { fontFamily: family, letterSpacing: 0 }],
+    style: [...base, { fontFamily: family, letterSpacing: 0, ...dir }],
   };
 }
 
