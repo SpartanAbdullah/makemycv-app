@@ -115,6 +115,16 @@ const GREEN_700 = "#15803D";
 
 /** The live templates are written in CSS px (96 DPI); react-pdf is pt (72). */
 const pt = (px: number) => px * 0.75;
+/**
+ * The line box of every live run that sets no line-height of its own:
+ * headings, side labels, chips and entry rows inherit `line-height: 1.5`
+ * from Tailwind's preflight (`html { line-height: 1.5 }`, pulled in by
+ * app/globals.css), which the Line Height slider does not scale. A react-pdf <Text> with no lineHeight does NOT re-resolve
+ * from its own size but inherits the page's resolved box (8.6 × 1.45 =
+ * 12.47pt — a 20pt line overprints the next), so every such run must set
+ * this explicitly (measured in the preview, session 3, 2026-10-31).
+ */
+const LH_NORMAL = 1.5;
 
 /* ─── Styles ──────────────────────────────────────────────── */
 /*
@@ -309,43 +319,6 @@ const BASE_STYLES: Record<string, Style> = {
     lineHeight: 1.7,
   },
 
-  /* ── ATS Clean ──────────────────────────────────────────── */
-  atsName: {
-    fontSize: 20,
-    fontFamily: "Helvetica-Bold",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  atsHeadline: {
-    fontSize: 10,
-    color: "#374151",
-    marginBottom: 5,
-    marginTop: 0,
-  },
-  atsContactLine: {
-    fontSize: 8,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
-  atsDivider: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: "#111827",
-    marginBottom: 12,
-    marginTop: 6,
-  },
-  atsSectionHeading: {
-    fontSize: 8.5,
-    fontFamily: "Helvetica-Bold",
-    color: "#111827",
-    // 8% of the size (live 0.1em): tracking the text layer still reads as a word.
-    letterSpacing: 0.68,
-    textTransform: "uppercase",
-    paddingBottom: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: "#111827",
-    marginBottom: 6,
-    marginTop: 16,
-  },
 };
 
 /* ─── Per-render style factory ─────────────────────────────── */
@@ -364,10 +337,8 @@ const SECTION_GAP_KEYS: Record<string, ReadonlyArray<"marginTop" | "marginBottom
   // NOT entryBlock / sectionHeadingWrap: the live templates keep the gap
   // between entries and under a heading fixed (space-y-3 / pb-1 + mt-2) and
   // scale only the gap between sections (audit 2026-10 defect 37).
-  // ATS Clean uses atsSectionHeading itself as the section divider; its
-  // marginTop is the gap BETWEEN sections (the first section overrides it to 0
-  // inline, which is unaffected).
-  atsSectionHeading: ["marginTop"],
+  // ATS Clean builds its own sheet from the live px values (session 3,
+  // 2026-10-31) and scales its heading gap inline.
 };
 
 const buildStyles = (
@@ -409,7 +380,8 @@ const buildStyles = (
 
 /* ─── Shared bullet renderer ──────────────────────────────── */
 
-type BulletStyles = { list?: Style; item?: Style; dot?: Style; text?: Style };
+/** `gap` is the live space-y-* between items: margin above every item after the first. */
+type BulletStyles = { list?: Style; item?: Style; dot?: Style; text?: Style; gap?: number };
 
 const BulletList = ({
   bullets,
@@ -426,7 +398,7 @@ const BulletList = ({
   return (
     <View style={{ ...s.bulletList, ...styles?.list }}>
       {items.map((bullet, bi) => (
-        <View key={bi} style={{ ...s.bulletItem, ...styles?.item }}>
+        <View key={bi} style={{ ...s.bulletItem, ...styles?.item, ...(styles?.gap && bi > 0 ? { marginTop: styles.gap } : {}) }}>
           <Text style={{ ...s.bulletDot, ...styles?.dot }}>•</Text>
           <Text style={{ ...s.bulletText, ...styles?.text }}>{bullet}</Text>
         </View>
@@ -799,6 +771,8 @@ const withTopGap =
 
 type HeadingVariant = {
   fontSize: number;
+  /** Explicit line box; without it the heading inherits the page's resolved one. */
+  lineHeight?: number;
   color: string;
   letterSpacing: number;
   uppercase?: boolean;
@@ -837,6 +811,7 @@ const PdfHeading = ({
         fontWeight: 700,
         color: v.color,
         letterSpacing: safeTracking(v.letterSpacing, v.fontSize),
+        ...(v.lineHeight !== undefined ? { lineHeight: v.lineHeight } : {}),
         ...(v.uppercase ? { textTransform: "uppercase" } : {}),
         ...(v.textAlign ? { textAlign: v.textAlign } : {}),
       }}
@@ -1584,6 +1559,17 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
    ═══════════════════════════════════════════════════════════ */
 
 const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
+  /*
+   * Transcribed from lib/templates/ats-clean.tsx (PDF_FIDELITY.md rank 2 →
+   * rank 5 residual, 2026-10-31 session 3). Every size is the live px value
+   * through pt(); every line-height is the live ratio (the root 1.55 where
+   * the live element inherits it) — set explicitly on each <Text>, because a
+   * react-pdf child inherits its parent's RESOLVED line box, not the ratio.
+   * fontScale on sizes, lineScale on line-heights, spaceScale only on the
+   * gap between sections (the live SectionHeading marginTop), marginScale on
+   * the page padding via the router. Before this pass the header alone put
+   * the SUMMARY rule ~16pt lower than the preview.
+   */
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() ||
     "Your Name";
@@ -1634,22 +1620,47 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+
+  const ATS_INK = "#111827";
+  const ATS_TEXT = "#374151";
+  const ATS_MUTED = "#6B7280";
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  /** The live root: 11.5px × 1.55, inherited by everything that sets no own line-height. */
+  const rootLine = 1.55 * ls;
+  const body: Style = { fontSize: pt(11.5) * fs, lineHeight: rootLine, color: ATS_TEXT };
+  const small: Style = { fontSize: pt(11) * fs, lineHeight: rootLine, color: ATS_TEXT };
+  const muted: Style = { fontSize: pt(10.5) * fs, lineHeight: rootLine, color: ATS_MUTED };
+  const entryTitle: Style = { ...bold, fontSize: pt(11.5) * fs, lineHeight: rootLine, color: ATS_INK };
+
   const eduVariant: EducationVariant = {
     joiner: " in ",
-    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
-    dateStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
-    schoolStyle: { fontSize: pt(11) * fs, color: "#374151" },
-    notesStyle: { fontSize: pt(10.5) * fs, color: "#6B7280" },
+    titleStyle: entryTitle,
+    dateStyle: muted,
+    schoolStyle: small,
+    notesStyle: muted,
     attested: "inline",
     attestedStyle: { fontSize: pt(10) * fs, color: GREEN_700 },
     gap: pt(10),
+  };
+  // Role ............ dates / Company · Location / disc bullets 16px in, no
+  // gap between bullets, 12px between roles (ats-clean.tsx 365–465).
+  const expVariant: ExperienceVariant = {
+    roleStyle: entryTitle,
+    dateStyle: muted,
+    companyStyle: small,
+    separator: " · ",
+    companyMarginBottom: pt(4),
+    bulletText: small,
+    bulletsMarginTop: 0,
+    bulletsPaddingLeft: pt(16),
+    gap: pt(12),
   };
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
 
-  // atsSectionHeading already has marginTop: 16 baked in.
-  // Override first section to marginTop: 0 via inline style.
   const skillsFirst = isSkillsFirst(data.settings.domain);
   const firstSection = hasSummary
     ? "summary"
@@ -1669,10 +1680,29 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                   ? "projects"
                   : null;
 
-  const headingStyle = (id: string) =>
-    firstSection === id
-      ? { ...s.atsSectionHeading, marginTop: 0 }
-      : s.atsSectionHeading;
+  // Live SectionHeading: 20px·sp above (0 for the first section), 8px below,
+  // 11px bold uppercase at 0.1em over a 1.5px #111827 rule with 3px padding.
+  const headingVariant = withTopGap<HeadingVariant>(
+    {
+      fontSize: pt(11) * fs,
+      lineHeight: rootLine,
+      color: ATS_INK,
+      letterSpacing: 0.1 * pt(11) * fs,
+      uppercase: true,
+      ruleColor: ATS_INK,
+      ruleWidth: pt(1.5),
+      paddingBottom: pt(3),
+      marginBottom: pt(8),
+      marginTop: 0,
+    },
+    pt(20) * sp,
+    firstSection,
+  );
+  const heading = (id: string, label: string) => (
+    <PdfHeading v={headingVariant(id)} fonts={fonts}>
+      {label}
+    </PdfHeading>
+  );
 
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
@@ -1682,26 +1712,18 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       <>
         {generalSkills.length > 0 && (
           <View>
-            <Text style={headingStyle("skills")}>Skills</Text>
+            {heading("skills", "Skills")}
             {/* Text line, not chips, in both renderers — the ATS-safer form
                 (template audit 2026-10 defect 9); ats-clean.tsx matches. */}
-            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
+            <Text style={body}>
               {generalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
         )}
         {technicalSkills.length > 0 && (
           <View>
-            <Text
-              style={
-                generalSkills.length === 0
-                  ? headingStyle("skills")
-                  : s.atsSectionHeading
-              }
-            >
-              Technical Skills
-            </Text>
-            <Text style={{ ...s.body, color: "#374151", lineHeight: 1.55 * theme.lineScale }}>
+            {heading(generalSkills.length === 0 ? "skills" : "technical-skills", "Technical Skills")}
+            <Text style={body}>
               {technicalSkills.map((sk) => sk.name).join(" · ")}
             </Text>
           </View>
@@ -1709,62 +1731,70 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       </>
     ) : null;
 
-  // Live bullets (ats-clean.tsx ~440–460) are 11px × 1.55 with margin 0 →
-  // 12.8 pt pitch. The Classic sheet's 8.6 pt × 1.45 + marginBottom 3 gave
-  // 15.5 pt, so every bullet pushed the PDF ~2.7 pt lower than the preview
-  // (PDF_FIDELITY.md rank 2, 2026-10-31).
-  const atsBullets: BulletStyles = {
-    item: { marginBottom: 0 },
-    dot: { fontSize: pt(11) * theme.fontScale, color: "#374151" },
-    text: { fontSize: pt(11) * theme.fontScale, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
-  };
   return (
     <View>
-      {/* ── Header ── */}
+      {/* ── Header: name / headline / contact / essentials beside a 72px photo ── */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "flex-start",
-          marginBottom: 6,
-          gap: 12,
+          gap: pt(16),
         }}
       >
         <View style={{ flex: 1 }}>
-          <View style={{ marginBottom: 6 }}>
-            <Text style={{ ...s.atsName, lineHeight: 1 * theme.lineScale }}>{name}</Text>
-          </View>
+          <Text
+            style={{
+              ...bold,
+              fontSize: pt(26) * fs,
+              lineHeight: 1.2 * ls,
+              color: ATS_INK,
+              letterSpacing: pt(-0.3),
+              marginBottom: pt(2),
+            }}
+          >
+            {name}
+          </Text>
           {data.personal.headline?.trim() ? (
-            <View style={{ marginBottom: 4 }}>
-              <Text style={{ ...s.atsHeadline, lineHeight: 1.2 * theme.lineScale }}>
-                {data.personal.headline.trim()}
-              </Text>
-            </View>
+            // Live weight 500; the PDF faces ship 400/700 only and the
+            // regular cut is the nearer match.
+            <Text
+              style={{
+                fontSize: pt(13) * fs,
+                lineHeight: rootLine,
+                color: ATS_TEXT,
+                marginBottom: pt(8),
+              }}
+            >
+              {data.personal.headline.trim()}
+            </Text>
           ) : null}
           {contactParts.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: pt(4) }}>
               {contactParts.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row" }}>
                   {item.href ? (
-                    <Link
-                      src={item.href}
-                      style={{ ...s.atsContactLine, textDecoration: "none" }}
-                    >
+                    <Link src={item.href} style={{ ...muted, textDecoration: "none" }}>
                       {item.text}
                     </Link>
                   ) : (
-                    <Text style={s.atsContactLine}>{item.text}</Text>
+                    <Text style={muted}>{item.text}</Text>
                   )}
                   {i < contactParts.length - 1 && (
-                    <Text style={{ ...s.atsContactLine, marginHorizontal: 3 }}>
-                      ·
-                    </Text>
+                    <Text style={{ ...muted, marginHorizontal: 2 }}>·</Text>
                   )}
                 </View>
               ))}
             </View>
           )}
           {essentialsLine && (
-            <Text style={{ ...s.atsContactLine, color: "#374151", marginTop: 2 }}>
+            <Text
+              style={{
+                fontSize: pt(10) * fs,
+                lineHeight: rootLine,
+                color: ATS_TEXT,
+                marginTop: pt(2),
+              }}
+            >
               {essentialsLine}
             </Text>
           )}
@@ -1773,10 +1803,9 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           <Image
             src={data.personal.photo}
             style={{
-              width: 54,
-              height: 54,
-              borderRadius:
-                data.settings.photoShape === "square" ? 4 : 27,
+              width: pt(72),
+              height: pt(72),
+              borderRadius: data.settings.photoShape === "square" ? pt(6) : pt(36),
               objectFit: "cover",
               borderWidth: 0.75,
               borderColor: "#E5E7EB",
@@ -1784,13 +1813,21 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
           />
         )}
       </View>
-      <View style={{ ...s.atsDivider, borderBottomColor: theme.accentText }} />
+      {/* 2px accent rule, 8px under the header and 16px above the first section. */}
+      <View
+        style={{
+          borderBottomWidth: pt(2),
+          borderBottomColor: theme.accentText,
+          marginTop: pt(8),
+          marginBottom: pt(16),
+        }}
+      />
 
       {/* ── Summary ── */}
       {hasSummary && (
         <View>
-          <Text style={headingStyle("summary")}>Summary</Text>
-          <Text style={{ ...s.body, color: "#374151", lineHeight: 1.6 * theme.lineScale }}>
+          {heading("summary", "Summary")}
+          <Text style={{ ...body, lineHeight: 1.6 * ls }}>
             {data.personal.summary?.trim()}
           </Text>
         </View>
@@ -1802,50 +1839,9 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Experience ── */}
       {hasExperience && (
         <View>
-          <Text style={headingStyle("experience")}>Experience</Text>
-          {experience.map((role) => (
-            <View key={role.id} style={{ marginBottom: pt(12) }} minPresenceAhead={48}>
-              <View style={s.entryRow}>
-                <Text
-                  style={{
-                    fontFamily: fonts.bold, fontWeight: 700,
-                    fontSize: 8.6 * theme.fontScale,
-                    color: "#111827",
-                  }}
-                >
-                  {role.role?.trim() || "Role"}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 7.8 * theme.fontScale,
-                    color: "#6B7280",
-                    flexShrink: 0,
-                    paddingLeft: 6,
-                  }}
-                >
-                  {formatDateRange(
-                    role.startDate,
-                    role.endDate,
-                    role.isCurrent,
-                  )}
-                </Text>
-              </View>
-              {(role.company || role.location) && (
-                <Text
-                  style={{
-                    fontSize: 8.25 * theme.fontScale,
-                    color: "#374151",
-                    marginTop: 1,
-                    marginBottom: 3,
-                  }}
-                >
-                  {role.company?.trim() || ""}
-                  {role.company?.trim() && role.location?.trim() ? " · " : ""}
-                  {role.location?.trim() || ""}
-                </Text>
-              )}
-              <BulletList bullets={role.bullets} s={s} styles={atsBullets} />
-            </View>
+          {heading("experience", "Experience")}
+          {experience.map((role, i) => (
+            <ExperienceEntry key={role.id} role={role} v={expVariant} index={i} s={s} />
           ))}
         </View>
       )}
@@ -1853,7 +1849,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Education ── */}
       {hasEducation && (
         <View>
-          <Text style={headingStyle("education")}>Education</Text>
+          {heading("education", "Education")}
           {education.map((edu, i) => (
             <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
@@ -1863,38 +1859,29 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Skills (rendered above if skills-first) ── */}
       {skillsFirst ? null : skillsBlock}
 
-      {/* ── Languages ── */}
+      {/* ── Languages: "Name — Level, Name — Level" on one line, as live ── */}
       {hasLanguages && (
         <View>
-          <Text style={headingStyle("languages")}>Languages</Text>
-          <Text style={{ ...s.body, color: "#374151" }}>
-            {data.languages.map((lang, i, arr) => (
+          {heading("languages", "Languages")}
+          <Text style={small}>
+            {data.languages.map((lang, i) => (
               <Text key={lang.id}>
-                <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                  {lang.name}
-                </Text>
-                {lang.level
-                  ? ` — ${formatLanguageLevel(lang.level)}`
-                  : ""}
-                {i < arr.length - 1 ? " · " : ""}
+                {i > 0 ? ", " : ""}
+                <Text style={bold}>{lang.name}</Text>
+                {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
             ))}
           </Text>
         </View>
       )}
 
-      {/* ── Certifications ── */}
+      {/* ── Certifications: one line each, 4px apart ── */}
       {hasCertifications && (
         <View>
-          <Text style={headingStyle("certifications")}>Certifications</Text>
-          {data.certifications.map((cert) => (
-            <Text
-              key={cert.id}
-              style={{ ...s.body, color: "#374151", marginBottom: 3 }}
-            >
-              <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                {cert.name.trim()}
-              </Text>
+          {heading("certifications", "Certifications")}
+          {data.certifications.map((cert, i) => (
+            <Text key={cert.id} style={{ ...small, marginTop: i > 0 ? pt(4) : 0 }}>
+              <Text style={bold}>{cert.name.trim()}</Text>
               {cert.issuer ? ` · ${cert.issuer.trim()}` : ""}
               {cert.date ? ` · ${cert.date.trim()}` : ""}
             </Text>
@@ -1905,43 +1892,41 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       {/* ── Projects ── */}
       {hasProjects && (
         <View>
-          <Text style={headingStyle("projects")}>Projects</Text>
-          {projects.map((project) => {
+          {heading("projects", "Projects")}
+          {projects.map((project, i) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
-              <View key={project.id} style={{ marginBottom: pt(10) }} wrap={false}>
-                <Text
-                  style={{
-                    fontFamily: fonts.bold, fontWeight: 700,
-                    fontSize: 8.6 * theme.fontScale,
-                    color: "#111827",
-                  }}
-                >
-                  {project.name?.trim() || "Project"}
-                </Text>
+              <View key={project.id} style={{ marginTop: i > 0 ? pt(10) : 0 }} wrap={false}>
+                <Text style={entryTitle}>{project.name?.trim() || "Project"}</Text>
                 {showLink && (
                   <Text
                     style={{
-                      fontSize: 7.5 * theme.fontScale,
-                      color: "#6B7280",
-                      marginTop: 1,
+                      fontSize: pt(10) * fs,
+                      lineHeight: rootLine,
+                      color: ATS_MUTED,
+                      marginTop: pt(1),
                     }}
                   >
                     {"("}
                     <Link
                       src={normalizeHref(project.link)}
-                      style={{
-                        fontSize: 7.5 * theme.fontScale,
-                        color: "#6B7280",
-                        textDecoration: "none",
-                      }}
+                      style={{ fontSize: pt(10) * fs, color: ATS_MUTED, textDecoration: "none" }}
                     >
                       {project.link!.trim()}
                     </Link>
                     {")"}
                   </Text>
                 )}
-                <BulletList bullets={project.bullets ?? []} s={s} styles={atsBullets} />
+                <BulletList
+                  bullets={project.bullets ?? []}
+                  s={s}
+                  styles={{
+                    list: { marginTop: pt(3), paddingLeft: pt(16) - BULLET_DOT_WIDTH },
+                    item: { marginBottom: 0 },
+                    dot: { width: BULLET_DOT_WIDTH, fontSize: small.fontSize, color: ATS_TEXT },
+                    text: small,
+                  }}
+                />
               </View>
             );
           })}
@@ -3250,44 +3235,6 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
    PROFESSIONAL PDF LAYOUT (centered single-column; with/without photo)
    ═══════════════════════════════════════════════════════════ */
 
-const ProPdfHeading = ({
-  children,
-  accent,
-  fontScale,
-  spaceScale,
-  fonts,
-}: {
-  children: string;
-  accent: string;
-  fontScale: number;
-  spaceScale: number;
-  fonts: PdfFontPair;
-}) => (
-  <View
-    style={{
-      marginTop: 14 * spaceScale,
-      marginBottom: 8,
-      paddingBottom: 3,
-      borderBottomWidth: 1.5,
-      borderBottomColor: accent,
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 9 * fontScale,
-        fontFamily: fonts.bold, fontWeight: 700,
-        color: "#111827",
-        // Live 0.14em; capped for the text layer (see safeTracking).
-        letterSpacing: safeTracking(1, 9 * fontScale),
-        textTransform: "uppercase",
-        textAlign: "center",
-      }}
-    >
-      {children}
-    </Text>
-  </View>
-);
-
 const ProfessionalPDFLayout = ({
   data,
   withPhoto,
@@ -3295,23 +3242,79 @@ const ProfessionalPDFLayout = ({
   data: CvData;
   withPhoto: boolean;
 }) => {
+  /*
+   * Transcribed from lib/templates/professional.tsx (session 3, 2026-10-31).
+   * The live sheet is 11.5px × 1.5·lineScale on a 40·m / 44·m px page (30 /
+   * 33pt — wider margins than the shared 27 / 24pt page, so the layout pads
+   * the difference and wraps where the preview wraps). Every size is the live
+   * px value through pt(), every line box the live ratio × lineScale (the
+   * root 1.5 where the live element inherits it), spaceScale only on the
+   * heading's top gap, and nothing is left to inherit the page's resolved
+   * line box (see LH_NORMAL). Before this pass the download reused the Classic
+   * sheet and put a second section gap (s.twoCol) above the Languages /
+   * Certifications row, which at density 5 pushed that row to page 2
+   * (PDF_FIDELITY.md rank 4).
+   */
   const theme = resolveTheme(data.settings, "#1f2937");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  const m = theme.marginScale;
+  // On a white page, accent is used only as text/border → use the readable form.
+  const accent = theme.accentText;
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  const regular: Style = { fontFamily: fonts.regular, fontWeight: 400 };
+  const rootLine = 1.5 * ls;
+  /** text-[11.5px] leading-[1.5] text-slate-700 — skills, languages. */
+  const body: Style = { fontSize: pt(11.5) * fs, lineHeight: rootLine, color: SLATE_700 };
+  /** text-[11px] text-slate-500 at the root line box — dates, location, notes. */
+  const small: Style = { fontSize: pt(11) * fs, lineHeight: rootLine, color: SLATE_500 };
+  /** text-[11px] leading-[1.5] text-slate-700 — bullets. */
+  const bulletText: Style = { fontSize: pt(11) * fs, lineHeight: rootLine, color: SLATE_700 };
+  const bulletStyles: BulletStyles = {
+    // list-disc pl-4 space-y-1, marker slate-400; the <ul> sits in the
+    // role's space-y-1 flow, so the gap above it is the entry's own.
+    list: { marginTop: 0, paddingLeft: pt(16) - BULLET_DOT_WIDTH },
+    item: { marginBottom: 0 },
+    gap: pt(4),
+    dot: { width: BULLET_DOT_WIDTH, fontSize: pt(11) * fs, lineHeight: rootLine, color: SLATE_400 },
+    text: bulletText,
+  };
+  /** Live headingStyle: 11px bold 0.14em uppercase centred over a 1.5px accent rule. */
+  const heading = (label: string, first = false) => (
+    <PdfHeading
+      fonts={fonts}
+      v={{
+        fontSize: pt(11) * fs,
+        lineHeight: rootLine,
+        color: "#111827",
+        letterSpacing: 0.14 * pt(11) * fs,
+        uppercase: true,
+        textAlign: "center",
+        ruleColor: accent,
+        ruleWidth: pt(1.5),
+        paddingBottom: pt(4),
+        marginBottom: pt(10),
+        marginTop: first ? 0 : pt(18) * sp,
+      }}
+    >
+      {label}
+    </PdfHeading>
+  );
   const eduVariant: EducationVariant = {
-    joiner: " \u00B7 ",
+    joiner: " · ",
     schoolInline: true,
-    titleStyle: s.entryTitle,
-    dateStyle: s.entryDate,
-    schoolStyle: { ...s.entryCompany, color: SLATE_600 },
-    notesStyle: s.entrySubtext,
+    titleStyle: { ...bold, fontSize: pt(12) * fs, lineHeight: rootLine, color: SLATE_800 },
+    dateStyle: small,
+    schoolStyle: { ...regular, color: SLATE_600 },
+    notesStyle: small,
     attested: "line",
-    attestedStyle: { fontSize: pt(11) * theme.fontScale, color: GREEN_700 },
+    attestedStyle: { fontSize: pt(11) * fs, lineHeight: rootLine, color: GREEN_700 },
     attestedRequiresBody: true,
     gap: pt(12),
   };
-  // On a white page, accent is used only as text/border → use the readable form.
-  const accent = theme.accentText;
   const name =
     `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
   const headline = data.personal.headline?.trim() || "";
@@ -3345,77 +3348,105 @@ const ProfessionalPDFLayout = ({
     data.personal.website?.trim()
       ? shortenDisplayUrl(data.personal.website.trim())
       : "",
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
+  // Live: text-[11.5px] leading-[1.5] centred, items joined by "  •  ".
+  const skillLine = (list: typeof data.skills) => (
+    <Text style={{ ...body, textAlign: "center" }}>
+      {list.map((sk) => sk.name).join("  •  ")}
+    </Text>
+  );
   const skillsSection = hasSkills ? (
     <>
       {generalSkills.length > 0 && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Skills</ProPdfHeading>
-          <Text style={{ ...s.body, textAlign: "center" }}>
-            {generalSkills.map((sk) => sk.name).join("   •   ")}
-          </Text>
+          {heading("Skills")}
+          {skillLine(generalSkills)}
         </View>
       )}
       {technicalSkills.length > 0 && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Technical Skills</ProPdfHeading>
-          <Text style={{ ...s.body, textAlign: "center" }}>
-            {technicalSkills.map((sk) => sk.name).join("   •   ")}
-          </Text>
+          {heading("Technical Skills")}
+          {skillLine(technicalSkills)}
         </View>
       )}
     </>
   ) : null;
 
   return (
-    <View>
-      {/* Centered header */}
-      <View style={{ alignItems: "center", paddingBottom: 4 }}>
+    // Live page padding is 40·m / 44·m px; the shared page gives 27 / 24pt.
+    <View style={{ paddingTop: (pt(40) - 27) * m, paddingHorizontal: (pt(44) - 24) * m }}>
+      {/* Centered header: photo / NAME / headline / contact / essentials chips */}
+      <View style={{ alignItems: "center", paddingBottom: pt(6) }}>
         {photo ? (
           <Image
             src={photo}
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
+              width: pt(84),
+              height: pt(84),
+              borderRadius: pt(42),
               objectFit: "cover",
-              borderWidth: 1.5,
+              borderWidth: pt(2),
               borderColor: accent,
-              marginBottom: 6,
+              marginBottom: pt(10),
             }}
           />
         ) : null}
         <Text
           style={{
-            fontSize: 20 * theme.fontScale,
+            ...bold,
+            fontSize: pt(28) * fs,
             // Explicit line height: without it the name inherits the page's
             // 8.6pt × 1.45 ≈ 12.5pt line box, so the 20pt glyphs overflow it
             // and the headline below prints across the name (fidelity run
             // 2026-10-31). Mirrors professional.tsx (1.15 × lineScale).
-            lineHeight: 1.15 * theme.lineScale,
-            fontFamily: fonts.bold, fontWeight: 700,
+            lineHeight: 1.15 * ls,
             color: "#111827",
-            letterSpacing: 1,
+            letterSpacing: pt(1),
             textAlign: "center",
           }}
         >
           {name.toUpperCase()}
         </Text>
         {headline ? (
-          <Text style={{ fontSize: 10 * theme.fontScale, color: accent, marginTop: 3, textAlign: "center" }}>
+          // Live weight 500; the PDF faces ship 400/700 and regular is nearer.
+          <Text
+            style={{
+              fontSize: pt(12.5) * fs,
+              lineHeight: rootLine,
+              color: accent,
+              marginTop: pt(5),
+              letterSpacing: safeTracking(0.02 * pt(12.5) * fs, pt(12.5) * fs),
+              textAlign: "center",
+            }}
+          >
             {headline}
           </Text>
         ) : null}
         {contactBits.length > 0 ? (
-          <Text style={{ fontSize: 8 * theme.fontScale, color: SLATE_500, marginTop: 4, textAlign: "center" }}>
-            {contactBits.join("   •   ")}
+          // Live: 10.5px slate-500 runs 6px apart around a slate-300 "•".
+          <Text
+            style={{
+              fontSize: pt(10.5) * fs,
+              lineHeight: rootLine,
+              color: SLATE_500,
+              marginTop: pt(7),
+              textAlign: "center",
+            }}
+          >
+            {contactBits.map((bit, i) => (
+              <Text key={i}>
+                {i > 0 ? <Text style={{ color: SLATE_300 }}>{"  •  "}</Text> : null}
+                {bit}
+              </Text>
+            ))}
           </Text>
         ) : null}
         <PdfChips
           items={essentialChips.map((c) => ({ label: `${c.label}:`, value: c.value }))}
           v={{
-            fontSize: pt(9.5) * theme.fontScale,
+            fontSize: pt(9.5) * fs,
+            lineHeight: rootLine,
             color: "#374151",
             backgroundColor: "#F3F4F6",
             borderColor: "#E5E7EB",
@@ -3432,8 +3463,8 @@ const ProfessionalPDFLayout = ({
 
       {hasSummary && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Summary</ProPdfHeading>
-          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+          {heading("Summary")}
+          <Text style={{ ...body, lineHeight: 1.55 * ls }}>{data.personal.summary?.trim()}</Text>
         </View>
       )}
 
@@ -3441,24 +3472,30 @@ const ProfessionalPDFLayout = ({
 
       {hasExperience && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Experience</ProPdfHeading>
-          {experience.map((role) => (
-            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-              <View style={s.entryRow}>
-                <Text style={{ ...s.entryTitle, flex: 1 }}>
+          {heading("Experience")}
+          {experience.map((role, i) => (
+            // space-y-3 between roles; inside a role space-y-1 between the
+            // title row, the location line and the bullet list.
+            <View key={role.id} style={{ marginTop: i > 0 ? pt(12) : 0 }} minPresenceAhead={48}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: pt(12) }}>
+                <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: 1.35 * ls, color: SLATE_800, flex: 1 }}>
                   {role.role?.trim() || "Role"}
                   {role.company ? (
-                    <Text style={s.entryCompany}>{` | ${role.company.trim()}`}</Text>
+                    <Text style={{ ...regular, color: SLATE_600 }}>{` | ${role.company.trim()}`}</Text>
                   ) : null}
                 </Text>
-                <Text style={s.entryDate}>
+                <Text style={{ ...small, flexShrink: 0, textAlign: "right" }}>
                   {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                 </Text>
               </View>
               {role.location?.trim() ? (
-                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
+                <Text style={{ ...small, marginTop: pt(4) }}>{role.location.trim()}</Text>
               ) : null}
-              <BulletList bullets={role.bullets} s={s} />
+              <BulletList
+                bullets={role.bullets}
+                s={s}
+                styles={{ ...bulletStyles, list: { ...bulletStyles.list, marginTop: pt(4) } }}
+              />
             </View>
           ))}
         </View>
@@ -3466,7 +3503,7 @@ const ProfessionalPDFLayout = ({
 
       {hasEducation && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Education</ProPdfHeading>
+          {heading("Education")}
           {education.map((edu, i) => (
             <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
           ))}
@@ -3476,29 +3513,36 @@ const ProfessionalPDFLayout = ({
       {skillsFirst ? null : skillsSection}
 
       {(hasLanguages || hasCertifications) && (
-        <View style={s.twoCol}>
+        // Live: a two-column grid with a 24px gap and NO margin of its own —
+        // each column's heading carries the section gap.
+        <View style={{ flexDirection: "row", gap: pt(24) }}>
           {hasLanguages && (
-            <View style={s.twoColItem}>
-              <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Languages</ProPdfHeading>
-              <Text style={{ ...s.body, textAlign: "center" }}>
-                {data.languages
-                  .map(
-                    (lang) =>
-                      `${lang.name}${lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}`,
-                  )
-                  .join("   •   ")}
+            <View style={{ flex: 1 }}>
+              {heading("Languages")}
+              <Text style={{ ...body, textAlign: "center" }}>
+                {data.languages.map((lang, i) => (
+                  <Text key={lang.id}>
+                    <Text style={bold}>{lang.name}</Text>
+                    {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
+                    {i < data.languages.length - 1 ? "  •  " : ""}
+                  </Text>
+                ))}
               </Text>
             </View>
           )}
           {hasCertifications && (
-            <View style={s.twoColItem}>
-              <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Certifications</ProPdfHeading>
-              {data.certifications.map((cert) => (
-                <Text key={cert.id} style={{ ...s.body, textAlign: "center" }}>
-                  {cert.name.trim()}
-                  {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
-                    ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
-                    : ""}
+            <View style={{ flex: 1 }}>
+              {heading("Certifications")}
+              {data.certifications.map((cert, i) => (
+                <Text
+                  key={cert.id}
+                  style={{ fontSize: pt(11) * fs, lineHeight: 1.45 * ls, color: SLATE_700, textAlign: "center", marginTop: i > 0 ? pt(4) : 0 }}
+                >
+                  <Text style={bold}>{cert.name.trim()}</Text>
+                  <Text style={{ color: SLATE_500 }}>
+                    {cert.issuer?.trim() ? ` | ${cert.issuer.trim()}` : ""}
+                    {cert.date?.trim() ? ` | ${cert.date.trim()}` : ""}
+                  </Text>
                 </Text>
               ))}
             </View>
@@ -3508,27 +3552,22 @@ const ProfessionalPDFLayout = ({
 
       {hasProjects && (
         <View>
-          <ProPdfHeading fonts={fonts} accent={accent} fontScale={theme.fontScale} spaceScale={theme.spaceScale}>Projects</ProPdfHeading>
-          {projects.map((project) => (
-            <View key={project.id} style={s.entryBlock} wrap={false}>
-              <Text style={s.entryTitle}>
+          {heading("Projects")}
+          {projects.map((project, i) => (
+            <View key={project.id} style={{ marginTop: i > 0 ? pt(8) : 0 }} wrap={false}>
+              <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: rootLine, color: SLATE_800 }}>
                 {project.name?.trim() || "Project"}
                 {shouldShowProjectLink(project.link) ? (
                   // Live: 10.5px normal slate-500, 4px after the name.
                   <Link
                     src={normalizeHref(project.link)}
-                    style={{
-                      ...s.entryCompany,
-                      fontSize: pt(10.5) * theme.fontScale,
-                      color: SLATE_500,
-                      textDecoration: "none",
-                    }}
+                    style={{ ...regular, fontSize: pt(10.5) * fs, color: SLATE_500, textDecoration: "none" }}
                   >
                     {` ${shortenDisplayUrl(project.link!.trim())}`}
                   </Link>
                 ) : null}
               </Text>
-              <BulletList bullets={project.bullets ?? []} s={s} />
+              <BulletList bullets={project.bullets ?? []} s={s} styles={bulletStyles} />
             </View>
           ))}
         </View>
@@ -3546,23 +3585,24 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const fs = theme.fontScale;
+  const ls = theme.lineScale;
   const eduVariant: EducationVariant = {
     joiner: " \u2014 ",
-    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
-    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
-    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827", lineHeight: LH_NORMAL },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280", lineHeight: LH_NORMAL },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText, lineHeight: LH_NORMAL },
+    notesStyle: { fontSize: pt(10) * fs, color: "#6B7280", lineHeight: LH_NORMAL },
     attested: "line",
-    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700, lineHeight: LH_NORMAL },
     attestedRequiresBody: true,
     notesAfterAttested: true,
     gap: pt(10),
   };
   const expVariant: ExperienceVariant = {
-    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280" },
-    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
-    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#6B7280" },
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#111827", lineHeight: LH_NORMAL },
+    dateStyle: { fontSize: pt(10) * fs, color: "#6B7280", lineHeight: LH_NORMAL },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText, lineHeight: LH_NORMAL },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#6B7280", lineHeight: LH_NORMAL },
     separator: " \u00B7 ",
     bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
     bulletsMarginTop: pt(4),
@@ -3594,7 +3634,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const contactItems: Array<{ text: string; href?: string; fontSize?: number }> = [];
   if (data.personal.email?.trim()) {
     const email = data.personal.email.trim();
-    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 24 ? 6.4 * theme.fontScale : undefined });
+    contactItems.push({ text: email, href: `mailto:${email}`, fontSize: email.length > 24 ? 6.4 * fs : undefined });
   }
   if (data.personal.phone?.trim())
     contactItems.push({ text: data.personal.phone.trim(), href: `tel:${data.personal.phone.trim()}` });
@@ -3623,11 +3663,14 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     fontFamily: fonts.bold, fontWeight: 700,
     color: onAccentMuted,
     letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    lineHeight: LH_NORMAL,
     marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
   const sideSection = { marginBottom: pt(18) * theme.spaceScale };
-  const sideText = { fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 };
+  // Live sidebar runs are 10px (7.5pt): About me × 1.6, Contact and
+  // Languages × 1.5, Details × 1.45; the gaps are the live column gaps.
+  const sideText = { fontSize: pt(10) * fs, color: onAccentMuted, lineHeight: 1.5 * ls };
   // onyx.tsx MainHeading: 11px bold 0.1em #1f2937 uppercase over a 1.5px
   // accent rule, pb 3px, mb 9px, mt 18px*sp except the first section.
   const firstMain = hasExperience
@@ -3644,6 +3687,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
   const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
     {
       fontSize: pt(11) * fs,
+      lineHeight: LH_NORMAL,
       color: "#1F2937",
       letterSpacing: 0.1 * pt(11) * fs,
       uppercase: true,
@@ -3687,15 +3731,15 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         }}
       >
         {showPhoto && data.personal.photo ? (
-          <View style={{ alignItems: "center", marginBottom: 12 }}>
+          <View style={{ alignItems: "center", marginBottom: pt(16) }}>
             <Image
               src={data.personal.photo}
               style={{
-                width: 84,
-                height: 84,
-                borderRadius: data.settings.photoShape === "square" ? 8 : 42,
+                width: pt(108),
+                height: pt(108),
+                borderRadius: data.settings.photoShape === "square" ? pt(10) : pt(54),
                 objectFit: "cover",
-                borderWidth: 2,
+                borderWidth: pt(3),
                 borderColor: bandBorder,
               }}
             />
@@ -3708,13 +3752,14 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {headline ? (
           <Text
             style={{
-              fontSize: 8 * theme.fontScale,
+              fontSize: pt(11) * fs,
+              lineHeight: 1.4 * ls,
               color: onAccentMuted,
               textAlign: "center",
-              marginTop: 3,
+              marginTop: pt(5),
               paddingBottom: pt(14),
               marginBottom: pt(14),
-              borderBottomWidth: 0.5,
+              borderBottomWidth: 0.75,
               borderBottomColor: bandBorder,
             }}
           >
@@ -3725,7 +3770,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasSummary && (
           <View style={sideSection}>
             <Text style={sideLabel}>ABOUT ME</Text>
-            <Text style={{ fontSize: 7.8 * theme.fontScale, color: onAccentMuted, lineHeight: 1.55 * theme.lineScale }}>
+            <Text style={{ ...sideText, lineHeight: 1.6 * ls }}>
               {data.personal.summary?.trim()}
             </Text>
           </View>
@@ -3739,12 +3784,12 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
                 <Link
                   key={i}
                   src={item.href}
-                  style={{ ...sideText, textDecoration: "none", ...(item.fontSize ? { fontSize: item.fontSize } : {}) }}
+                  style={{ ...sideText, marginTop: i > 0 ? pt(4) : 0, textDecoration: "none", ...(item.fontSize ? { fontSize: item.fontSize } : {}) }}
                 >
                   {item.text}
                 </Link>
               ) : (
-                <Text key={i} style={sideText}>
+                <Text key={i} style={{ ...sideText, marginTop: i > 0 ? pt(4) : 0 }}>
                   {item.text}
                 </Text>
               ),
@@ -3755,8 +3800,8 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasLanguages && (
           <View style={sideSection}>
             <Text style={sideLabel}>LANGUAGES</Text>
-            {data.languages.map((lang) => (
-              <Text key={lang.id} style={sideText}>
+            {data.languages.map((lang, i) => (
+              <Text key={lang.id} style={{ ...sideText, marginTop: i > 0 ? pt(3) : 0 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: onAccent }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
@@ -3767,9 +3812,10 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {essentialChips.length > 0 && (
           <View>
             <Text style={sideLabel}>DETAILS</Text>
-            {essentialChips.map((chip) => (
-              <Text key={chip.label} style={sideText}>
-                <Text style={{ color: onAccentMuted, fontFamily: fonts.bold, fontWeight: 700 }}>{chip.label}: </Text>
+            {essentialChips.map((chip, i) => (
+              <Text key={chip.label} style={{ ...sideText, lineHeight: 1.45 * ls, marginTop: i > 0 ? pt(4) : 0 }}>
+                {/* Live: the label is bold in the band's full text colour. */}
+                <Text style={{ color: onAccent, fontFamily: fonts.bold, fontWeight: 700 }}>{chip.label}: </Text>
                 {chip.value}
               </Text>
             ))}
@@ -3777,8 +3823,9 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column (live padding 30px*m) ── */}
-      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
+      {/* ── Main column: live padding 30px·m on every side, so pull the
+          column up and out by the difference to the 27/24pt page padding ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m, marginTop: (pt(30) - 27) * m, marginRight: (pt(30) - 24) * m }}>
         {hasExperience && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("experience")}>Experience</PdfHeading>
@@ -3804,6 +3851,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
               items={data.skills.map((sk) => ({ value: sk.name }))}
               v={{
                 fontSize: pt(10.5) * fs,
+                lineHeight: LH_NORMAL,
                 color: "#374151",
                 backgroundColor: "#F3F4F6",
                 borderColor: "#E5E7EB",
@@ -3819,12 +3867,13 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasCertifications && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
-            {data.certifications.map((cert) => (
-              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
-                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
-                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
-                  : ""}
+            {data.certifications.map((cert, i) => (
+              <Text key={cert.id} style={{ fontSize: pt(11) * fs, lineHeight: 1.45 * ls, color: "#374151", marginTop: i > 0 ? pt(4) : 0 }}>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: "#111827" }}>{cert.name.trim()}</Text>
+                <Text style={{ color: "#6B7280" }}>
+                  {cert.issuer?.trim() ? ` | ${cert.issuer.trim()}` : ""}
+                  {cert.date?.trim() ? ` | ${cert.date.trim()}` : ""}
+                </Text>
               </Text>
             ))}
           </View>
@@ -3833,9 +3882,9 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
         {hasProjects && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
-            {projects.map((project) => (
-              <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>
+            {projects.map((project, i) => (
+              <View key={project.id} style={{ marginTop: i > 0 ? pt(10) : 0 }} wrap={false}>
+                <Text style={{ fontSize: pt(11.5) * fs, lineHeight: LH_NORMAL, fontFamily: fonts.bold, fontWeight: 700, color: "#111827" }}>
                   {project.name?.trim() || "Project"}
                   {shouldShowProjectLink(project.link) ? (
                     // Live: 10px normal in the accent, 6px after the name.
@@ -3853,7 +3902,16 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
                     </Link>
                   ) : null}
                 </Text>
-                <BulletList bullets={project.bullets ?? []} s={s} />
+                <BulletList
+                  bullets={project.bullets ?? []}
+                  s={s}
+                  styles={{
+                    list: { marginTop: pt(3), paddingLeft: pt(14) - BULLET_DOT_WIDTH },
+                    item: { marginBottom: 0 },
+                    dot: { width: BULLET_DOT_WIDTH, fontSize: pt(11) * fs, color: "#374151" },
+                    text: { fontSize: pt(11) * fs, lineHeight: 1.55 * ls, color: "#374151" },
+                  }}
+                />
               </View>
             ))}
           </View>
@@ -3873,23 +3931,24 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
   const fs = theme.fontScale;
+  const ls = theme.lineScale;
   const eduVariant: EducationVariant = {
     joiner: " \u2014 ",
-    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
-    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
-    notesStyle: { fontSize: pt(10) * fs, color: "#78716C" },
+    titleStyle: { fontSize: pt(11.5) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524", lineHeight: LH_NORMAL },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C", lineHeight: LH_NORMAL },
+    schoolStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText, lineHeight: LH_NORMAL },
+    notesStyle: { fontSize: pt(10) * fs, color: "#78716C", lineHeight: LH_NORMAL },
     attested: "line",
-    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700 },
+    attestedStyle: { fontSize: pt(9.5) * fs, color: GREEN_700, lineHeight: LH_NORMAL },
     attestedRequiresBody: true,
     notesAfterAttested: true,
     gap: pt(10),
   };
   const expVariant: ExperienceVariant = {
-    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" },
-    dateStyle: { fontSize: pt(10) * fs, color: "#78716C" },
-    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText },
-    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#78716C" },
+    roleStyle: { fontSize: pt(12) * fs, fontFamily: fonts.bold, fontWeight: 700, color: "#292524", lineHeight: LH_NORMAL },
+    dateStyle: { fontSize: pt(10) * fs, color: "#78716C", lineHeight: LH_NORMAL },
+    companyStyle: { fontSize: pt(11) * fs, fontFamily: fonts.bold, fontWeight: 700, color: theme.accentText, lineHeight: LH_NORMAL },
+    locationStyle: { fontSize: pt(11) * fs, fontFamily: fonts.regular, fontWeight: 400, color: "#78716C", lineHeight: LH_NORMAL },
     separator: " \u00B7 ",
     bulletText: { fontSize: pt(11) * fs, lineHeight: 1.55 * theme.lineScale, color: "#44403C" },
     bulletsMarginTop: pt(4),
@@ -3955,6 +4014,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
     fontFamily: fonts.bold, fontWeight: 700,
     color: SIDE_MUTED,
     letterSpacing: safeTracking(0.14 * pt(9) * fs, pt(9) * fs), // see Executive
+    lineHeight: LH_NORMAL,
     marginBottom: pt(7),
     textTransform: "uppercase" as const,
   };
@@ -3976,6 +4036,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
   const mainHeading = withTopGap<Omit<HeadingVariant, "marginTop">>(
     {
       fontSize: pt(11) * fs,
+      lineHeight: LH_NORMAL,
       color: "#292524",
       letterSpacing: 0.1 * pt(11) * fs,
       uppercase: true,
@@ -4019,15 +4080,15 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         }}
       >
         {showPhoto && data.personal.photo ? (
-          <View style={{ alignItems: "center", marginBottom: 12 }}>
+          <View style={{ alignItems: "center", marginBottom: pt(16) }}>
             <Image
               src={data.personal.photo}
               style={{
-                width: 88,
-                height: 88,
-                borderRadius: data.settings.photoShape === "square" ? 8 : 44,
+                width: pt(110),
+                height: pt(110),
+                borderRadius: data.settings.photoShape === "square" ? pt(10) : pt(55),
                 objectFit: "cover",
-                borderWidth: 2,
+                borderWidth: pt(3),
                 borderColor: bandBorder,
               }}
             />
@@ -4040,14 +4101,15 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {headline ? (
           <Text
             style={{
-              fontSize: 8 * theme.fontScale,
+              fontSize: pt(11) * fs,
+              lineHeight: 1.4 * ls,
               color: onAccentMuted,
               fontFamily: fonts.bold, fontWeight: 700,
               textAlign: "center",
-              marginTop: 3,
+              marginTop: pt(4),
               paddingBottom: pt(14),
               marginBottom: pt(14),
-              borderBottomWidth: 0.5,
+              borderBottomWidth: 0.75,
               borderBottomColor: bandBorder,
             }}
           >
@@ -4058,12 +4120,12 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {personalDetails.length > 0 && (
           <View style={sideSection}>
             <Text style={sideLabel}>PERSONAL DETAILS</Text>
-            {personalDetails.map((d) => (
-              <View key={d.label} style={{ marginBottom: 4 }}>
-                <Text style={{ fontSize: 6.5 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: SIDE_MUTED, letterSpacing: 0.4 }}>
+            {personalDetails.map((d, i) => (
+              <View key={d.label} style={{ marginTop: i > 0 ? pt(6) : 0 }}>
+                <Text style={{ fontSize: pt(8.5) * fs, lineHeight: 1.4 * ls, fontFamily: fonts.bold, fontWeight: 700, color: SIDE_MUTED, letterSpacing: 0.04 * pt(8.5) * fs }}>
                   {d.label.toUpperCase()}
                 </Text>
-                <Text style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.4 * theme.lineScale }}>{d.value}</Text>
+                <Text style={{ fontSize: pt(10) * fs, color: SIDE_TEXT, lineHeight: 1.4 * ls }}>{d.value}</Text>
               </View>
             ))}
           </View>
@@ -4077,12 +4139,12 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
                 <Link
                   key={i}
                   src={item.href}
-                  style={{ fontSize: (item.fontSize ?? 7.8) * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 2, textDecoration: "none" }}
+                  style={{ fontSize: (item.fontSize ?? pt(10)) * fs, color: SIDE_MUTED, lineHeight: 1.5 * ls, marginTop: i > 0 ? pt(4) : 0, textDecoration: "none" }}
                 >
                   {item.text}
                 </Link>
               ) : (
-                <Text key={i} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 2 }}>
+                <Text key={i} style={{ fontSize: pt(10) * fs, color: SIDE_MUTED, lineHeight: 1.5 * ls, marginTop: i > 0 ? pt(4) : 0 }}>
                   {item.text}
                 </Text>
               ),
@@ -4093,8 +4155,8 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasLanguages && (
           <View>
             <Text style={sideLabel}>LANGUAGES</Text>
-            {data.languages.map((lang) => (
-              <Text key={lang.id} style={{ fontSize: 7.8 * theme.fontScale, color: SIDE_TEXT, lineHeight: 1.5 * theme.lineScale, marginBottom: 1 }}>
+            {data.languages.map((lang, i) => (
+              <Text key={lang.id} style={{ fontSize: pt(10) * fs, color: SIDE_MUTED, lineHeight: 1.5 * ls, marginTop: i > 0 ? pt(3) : 0 }}>
                 <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SIDE_TEXT }}>{lang.name}</Text>
                 {lang.level ? ` — ${formatLanguageLevel(lang.level)}` : ""}
               </Text>
@@ -4103,12 +4165,13 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Main column (live padding 30px*m) ── */}
-      <View style={{ flex: 1, paddingLeft: pt(30) * m }}>
+      {/* ── Main column: live padding 30px·m on every side, so pull the
+          column up and out by the difference to the 27/24pt page padding ── */}
+      <View style={{ flex: 1, paddingLeft: pt(30) * m, marginTop: (pt(30) - 27) * m, marginRight: (pt(30) - 24) * m }}>
         {hasSummary && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("summary")}>About Me</PdfHeading>
-            <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+            <Text style={{ fontSize: pt(11) * fs, lineHeight: 1.6 * ls, color: "#44403C" }}>{data.personal.summary?.trim()}</Text>
           </View>
         )}
 
@@ -4137,6 +4200,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
               items={data.skills.map((sk) => ({ value: sk.name }))}
               v={{
                 fontSize: pt(10.5) * fs,
+                lineHeight: LH_NORMAL,
                 color: "#44403C",
                 backgroundColor: "#F5F0E6",
                 borderColor: "#E2D8C4",
@@ -4152,12 +4216,13 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasCertifications && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("certifications")}>Certifications</PdfHeading>
-            {data.certifications.map((cert) => (
-              <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: SLATE_800 }}>{cert.name.trim()}</Text>
-                {[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).length
-                  ? ` | ${[cert.issuer?.trim(), cert.date?.trim()].filter(Boolean).join(" · ")}`
-                  : ""}
+            {data.certifications.map((cert, i) => (
+              <Text key={cert.id} style={{ fontSize: pt(11) * fs, lineHeight: 1.45 * ls, color: "#44403C", marginTop: i > 0 ? pt(4) : 0 }}>
+                <Text style={{ fontFamily: fonts.bold, fontWeight: 700, color: "#292524" }}>{cert.name.trim()}</Text>
+                <Text style={{ color: "#78716C" }}>
+                  {cert.issuer?.trim() ? ` | ${cert.issuer.trim()}` : ""}
+                  {cert.date?.trim() ? ` | ${cert.date.trim()}` : ""}
+                </Text>
               </Text>
             ))}
           </View>
@@ -4166,9 +4231,9 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
         {hasProjects && (
           <View>
             <PdfHeading fonts={fonts} v={mainHeading("projects")}>Projects</PdfHeading>
-            {projects.map((project) => (
-              <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>
+            {projects.map((project, i) => (
+              <View key={project.id} style={{ marginTop: i > 0 ? pt(10) : 0 }} wrap={false}>
+                <Text style={{ fontSize: pt(11.5) * fs, lineHeight: LH_NORMAL, fontFamily: fonts.bold, fontWeight: 700, color: "#292524" }}>
                   {project.name?.trim() || "Project"}
                   {shouldShowProjectLink(project.link) ? (
                     // Live: 10px normal in the accent, 6px after the name.
@@ -4186,7 +4251,16 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
                     </Link>
                   ) : null}
                 </Text>
-                <BulletList bullets={project.bullets ?? []} s={s} />
+                <BulletList
+                  bullets={project.bullets ?? []}
+                  s={s}
+                  styles={{
+                    list: { marginTop: pt(3), paddingLeft: pt(14) - BULLET_DOT_WIDTH },
+                    item: { marginBottom: 0 },
+                    dot: { width: BULLET_DOT_WIDTH, fontSize: pt(11) * fs, color: "#44403C" },
+                    text: { fontSize: pt(11) * fs, lineHeight: 1.55 * ls, color: "#44403C" },
+                  }}
+                />
               </View>
             ))}
           </View>

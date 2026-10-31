@@ -9,7 +9,14 @@
 //     the top of page 2+ and the foot of page 1 until 2026-10-25;
 //  3. page counts, for the log;
 //  4. the Harvard graduate persona (harvard-persona.pdf) is ONE page — the
-//     template's whole point (template audit 2026-10, shortlist item 4).
+//     template's whole point (template audit 2026-10, shortlist item 4);
+//  5. no two text runs overprint each other — a react-pdf <Text> that sets no
+//     lineHeight inherits the page's RESOLVED 12.47pt box whatever its size,
+//     so a 20pt name printed over its headline (PDF_FIDELITY.md rank 1) and
+//     every un-set run in a layout sits in the wrong box (session 3,
+//     2026-10-31). Checked on the pdf.js text layer: two runs on one page
+//     whose boxes overlap by more than half their height and by more than 1pt
+//     horizontally.
 // Plain ESM on purpose: pdfjs-dist ships ESM and the smoke script is compiled
 // to CommonJS.
 import fs from 'node:fs';
@@ -35,12 +42,21 @@ for (const f of files) {
   const data = new Uint8Array(fs.readFileSync(path.join(dir, f)));
   const doc = await getDocument({ data, useSystemFonts: true, disableFontFace: true }).promise;
   const band = Object.entries(BANDS).find(([id]) => f === `${id}.pdf` || f.startsWith(`${id}-`))?.[1];
-  const report = { file: f, pages: doc.numPages, neon: 0, bands: [] };
+  const report = { file: f, pages: doc.numPages, neon: 0, bands: [], overprints: [] };
   const pagesWithBand = new Set();
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const pageWidth = page.view[2] - page.view[0];
     const pageHeight = page.view[3] - page.view[1];
+    const text = (await page.getTextContent()).items.filter((it) => "str" in it && it.str.trim());
+    const boxes = text.map((it) => ({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width, h: it.height || Math.hypot(it.transform[2], it.transform[3]) }));
+    for (let a = 0; a < boxes.length; a++) for (let b = a + 1; b < boxes.length; b++) {
+      const A = boxes[a], B = boxes[b];
+      const minH = Math.min(A.h, B.h);
+      if (minH <= 0 || Math.abs(A.y - B.y) >= 0.5 * minH) continue;
+      const xOverlap = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x);
+      if (xOverlap > 1) report.overprints.push({ page: p, a: A.str.slice(0, 30), b: B.str.slice(0, 30), xOverlap: +xOverlap.toFixed(1) });
+    }
     const ops = await page.getOperatorList();
     for (let i = 0; i < ops.fnArray.length; i++) {
       const fn = ops.fnArray[i], args = ops.argsArray[i];
@@ -75,9 +91,10 @@ for (const f of files) {
   }
   const bandOk = band ? pagesWithBand.size === doc.numPages : true;
   const onePageOk = f === 'harvard-persona.pdf' ? doc.numPages === 1 : true;
-  const ok = report.neon === 0 && bandOk && onePageOk;
+  const overprintOk = report.overprints.length === 0;
+  const ok = report.neon === 0 && bandOk && onePageOk && overprintOk;
   if (!ok) failures++;
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${f}: pages=${report.pages} neonColourOps=${report.neon}${band ? ` bandPages=${pagesWithBand.size}/${doc.numPages}` : ''}${onePageOk ? '' : ' (expected one page)'}`);
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${f}: pages=${report.pages} neonColourOps=${report.neon}${band ? ` bandPages=${pagesWithBand.size}/${doc.numPages}` : ''}${onePageOk ? '' : ' (expected one page)'}${overprintOk ? '' : ` OVERPRINT ${JSON.stringify(report.overprints.slice(0, 3))}`}`);
 }
 console.log(failures ? `FAILURES: ${failures}` : 'ALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);
