@@ -3,6 +3,7 @@
 // reviewed by the user and mapped into CvData by fieldMapper.ts.
 
 import type { LanguageLevel } from "../types/cv";
+import { ImportParseError, type ImportErrorReason } from "./importErrors";
 
 export type ParsedContact = {
   name?: string;
@@ -102,25 +103,12 @@ export type ParsedDocument = {
   unplaced?: string[];
 };
 
-/** Why a parse failed - lets the UI route each failure mode differently
- *  instead of collapsing everything into an empty review screen
- *  (audit UX-18). */
-export type ImportFailureKind =
-  /** File opened but yielded (almost) no text - typical of scanned/image
-   *  PDFs that would need OCR. */
-  | "empty-text"
-  /** The file could not be opened/decoded at all. */
-  | "corrupt-file";
-
-export class ImportParseError extends Error {
-  constructor(
-    public kind: ImportFailureKind,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ImportParseError";
-  }
-}
+/** Why a parse failed. Since 2026-10-31 the kinds are the closed taxonomy in
+ *  importErrors.ts (one value per `cv_import_failed.error_reason`); the two
+ *  original kinds map as "empty-text" → no_text_layer / empty_text and
+ *  "corrupt-file" → corrupt_pdf / corrupt_docx / encrypted_pdf / ... */
+export type ImportFailureKind = ImportErrorReason;
+export { ImportParseError };
 
 /** Swappable parser adapter interface - implement to add new import sources.
  *  parse() THROWS ImportParseError on failure (it used to swallow errors and

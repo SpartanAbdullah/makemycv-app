@@ -8,8 +8,62 @@
  */
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
+import http from "node:http";
 
-import { responseText } from "./anthropic";
+import {
+  ANTHROPIC_PARSE_TIMEOUT_MS,
+  ANTHROPIC_TIMEOUT_MS,
+  anthropicSignal,
+  isTimeoutError,
+  responseText,
+} from "./anthropic";
+
+describe("anthropicSignal / isTimeoutError (2026-10-31 bounded upstream wait)", () => {
+  test("caps are ordered: small routes < parse route < parse maxDuration", () => {
+    assert.ok(ANTHROPIC_TIMEOUT_MS < ANTHROPIC_PARSE_TIMEOUT_MS);
+    assert.ok(ANTHROPIC_PARSE_TIMEOUT_MS < 60_000);
+  });
+
+  test("a fetch against a server that never answers rejects at the cap", async () => {
+    // The server accepts the connection and then says nothing — the exact
+    // shape of a stalled upstream that, before the signal, held every AI
+    // route open until the platform killed the function.
+    const server = http.createServer(() => {
+      /* never respond */
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const { port } = server.address() as { port: number };
+    const cap = 120;
+    const started = Date.now();
+    let caught: unknown = null;
+    try {
+      await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+        method: "POST",
+        body: "{}",
+        signal: anthropicSignal(cap),
+      });
+    } catch (err) {
+      caught = err;
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    const elapsed = Date.now() - started;
+    assert.ok(caught, "fetch must reject");
+    assert.ok(isTimeoutError(caught), `rejection must read as a timeout, got ${String(caught)}`);
+    assert.ok(elapsed >= cap - 5, `rejected too early: ${elapsed}ms`);
+    assert.ok(elapsed < cap + 1500, `rejected too late: ${elapsed}ms`);
+  });
+
+  test("isTimeoutError ignores ordinary failures", () => {
+    assert.equal(isTimeoutError(new Error("Anthropic API error: 500")), false);
+    assert.equal(isTimeoutError(new TypeError("fetch failed")), false);
+    assert.equal(isTimeoutError(null), false);
+    assert.equal(isTimeoutError("TimeoutError"), false);
+    assert.equal(isTimeoutError({ name: "TimeoutError" }), true);
+    assert.equal(isTimeoutError({ name: "AbortError" }), true);
+  });
+});
 
 describe("responseText", () => {
   test("skips a leading thinking block", () => {

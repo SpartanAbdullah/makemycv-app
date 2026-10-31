@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
-import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "@/lib/server/anthropic";
+import {
+  CLAUDE_EFFORT,
+  CLAUDE_MODEL,
+  UPSTREAM_TIMEOUT_BODY,
+  UPSTREAM_TIMEOUT_STATUS,
+  anthropicSignal,
+  isTimeoutError,
+  responseText,
+} from "@/lib/server/anthropic";
 import {
   checkRateLimit,
   getClientIp,
@@ -126,6 +134,7 @@ async function callHaiku(apiKey: string, jobText: string): Promise<string> {
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUser(jobText) }],
     }),
+    signal: anthropicSignal(),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "Unknown API error");
@@ -177,7 +186,11 @@ export async function POST(request: Request) {
         const raw = await callHaiku(apiKey, clipped);
         const parsed = coerceRequirements(extractJsonObject(raw));
         if (!isEmpty(parsed)) requirements = parsed;
-      } catch {
+      } catch (err) {
+        // A timeout is not retried — the user has already waited 25 s.
+        if (isTimeoutError(err)) {
+          return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
+        }
         // fall through to retry / final guard
       }
     }

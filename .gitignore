@@ -51,3 +51,15 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# pdf-fidelity harness output (scripts/pdf-fidelity.mjs)
+.fidelity-pdfs/
+.pdf-fidelity-build/
+
+# perf measurements (scripts/perf-measure.mjs)
+/.perf-results
+# arabic PDF smoke output (scripts/arabic-smoke.tsx)
+.arabic-smoke/
+.arabic-smoke-build/
+# ad-hoc react-pdf probes
+.lh-probe/

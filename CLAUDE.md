@@ -19,7 +19,14 @@ Three things, and only these three:
    one place that decides what leaves the browser); `{{number}}` placeholders
    block copy/download until the user fills them in. Entry points: the Review
    step and a nudge under the JD Match score.
-3. **Customised LinkedIn recruiter outreach message** — planned, **not built**.
+3. **Customised LinkedIn recruiter outreach message** — v1 shipped 2026-10-31
+   (`/linkedin-message`). Same architecture as the cover letter with a smaller
+   excerpt (`lib/linkedinMessage/payload.ts`: headline, latest role + ≤2
+   bullets, ≤3 skills, visa/availability — no name, no summary) plus the pasted
+   job / recruiter text (required). 60–90-word message or a ≤200-character
+   connection note, copy-only, `{{number}}` placeholders block copy, and the
+   route answers 422 when the model refuses because the paste is not a job /
+   recruiter context. Entry points: the Review step and the JD Match nudge.
 
 **We are not a job board and we do not aggregate job postings.** Features that
 ingest, list, search or recommend live vacancies are out of scope. A job
@@ -61,12 +68,13 @@ brand-level UI changes rather than re-deriving them.
 
 This app (app.makemycv.ae): `/builder` (the CV builder, entry
 `components/builder/BuilderShell.tsx`), `/jd-match`, `/cover-letter`,
-`/resume-checker`, `/preview`. Server routes live in `app/api/` (`ai-improve`,
-`jd-match`, `cover-letter`, `resume-checker`, `coupons`, `health`, and the
-feedback trio `rating`, `ratings/summary`, `subscribe`), rate-limited and
-spend-capped through `lib/server/`. Everything CV-shaped stays
-client-side (see privacy below) — the cover letter is the one disclosed
-exception, and it sends an excerpt, not the CV.
+`/linkedin-message`, `/resume-checker`, `/preview`. Server routes live in
+`app/api/` (`ai-improve`, `jd-match`, `cover-letter`, `linkedin-message`,
+`resume-checker`, `coupons`, `health`, and the feedback trio `rating`,
+`ratings/summary`, `subscribe`), rate-limited and spend-capped through
+`lib/server/`. Everything CV-shaped stays client-side (see privacy below) —
+the cover letter and the LinkedIn message are the two disclosed exceptions,
+and each sends an excerpt, not the CV.
 
 ---
 
@@ -94,7 +102,11 @@ implementation detail.
   `lib/coverLetter/payload.ts` (headline, summary, latest role + ≤4 bullets,
   ≤12 skill names, visa/availability — never contact details or the photo),
   the page says so above the button, and the privacy policy on www names it.
-  Widening that excerpt means updating all three.
+  Widening that excerpt means updating all three. The LinkedIn message
+  (2026-10-31) is the second, with a smaller excerpt in
+  `lib/linkedinMessage/payload.ts` (headline, latest role + ≤2 bullets, ≤3
+  skill names, visa/availability — no name, summary, contact details or
+  photo) plus the pasted job / recruiter text; same three places to update.
 
 - **Feedback data (2026-10) is the one thing we store about people**, and it
   lives in Supabase (EU region) behind the service-role key in
@@ -183,6 +195,15 @@ Apply the same reasoning to any future per-skill visibility state.
 - Every rendered template root carries `.cv-print`, which remaps generic
   typography inside a CV. Check `.cv-print` and its print-media block in
   `globals.css` when changing global type rules.
+- **Arabic (2026-10-31, `docs/arabic-pdf.md`).** The PDF cannot use a font
+  stack and cannot take raw Arabic letters: `components/pdf/CVDocument.tsx`
+  imports `Text` / `Link` from `components/pdf/ArabicText.tsx`, which shapes
+  any Arabic-bearing run into presentation forms (`lib/pdf/arabicText.ts`)
+  and sets it in Vazirmatn as ONE run. Never import react-pdf's `Text` into a
+  layout directly, never put `fontFamily` arrays in a style, and call
+  `warmPdfFonts()` after registering fonts in any new Node renderer. The
+  preview gets the same face through the `'Vazirmatn CV'` @font-face
+  (`unicode-range`-limited) that sits first in the `--cv-font-*` stacks.
 
 ---
 
@@ -269,6 +290,20 @@ npm run build
   every template three times (fixture, tripled experience, density extremes)
   and `scripts/pdf-ops-check.mjs` fails on alpha colours or a missing band.
   Verify parity with pdf.js text extraction, not by eye.
+- **Every PDF `<Text>` sets its own `lineHeight`.** react-pdf does not resolve a
+  line box from the run's own size: a `<Text>` without `lineHeight` inherits the
+  page's already-resolved 8.6 × 1.45 = 12.47pt box whatever its font size (a 20pt
+  name overprints its headline; a 9pt label sits in a box too tall), while the
+  live templates inherit Tailwind's `html { line-height: 1.5 }` on every run that
+  sets none. Use `LH_NORMAL` (1.5) in `CVDocument.tsx` for those runs and the live
+  ratio × `lineScale` where the template sets one. `scripts/pdf-ops-check.mjs`
+  fails on overprinting runs. `npm run fidelity:pdf` (needs `next start -p 3000`
+  and Chrome) puts every template's preview next to its PDF and fails when a cell
+  regresses against `scripts/pdf-fidelity-baseline.json` — lower a cell's baseline
+  when a fix improves it; `--persona=bilingual | arabic-only | arabic-first |
+  arabic-name | arabic-dense` are the Arabic checks and `npm run smoke:arabic`
+  is the Arabic text-layer guard (see `docs/arabic-pdf.md` and
+  `docs/ai-mission/PDF_FIDELITY.md` in the parent folder).
 - **Anything that changes layout on blur needs `smoke:builder`.** A helper line
   that appears when a field loses focus moves the Continue button during the
   user's own click and the click is lost (2026-10 audit F01). `FieldError` has a

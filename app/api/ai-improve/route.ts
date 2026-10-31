@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
-import { CLAUDE_EFFORT, CLAUDE_MODEL, responseText } from "@/lib/server/anthropic";
+import {
+  CLAUDE_EFFORT,
+  CLAUDE_MODEL,
+  UPSTREAM_TIMEOUT_BODY,
+  UPSTREAM_TIMEOUT_STATUS,
+  anthropicSignal,
+  isTimeoutError,
+  responseText,
+} from "@/lib/server/anthropic";
 import {
   checkRateLimit,
   getClientIp,
@@ -267,6 +275,9 @@ export async function POST(request: Request) {
         system,
         messages: [{ role: "user", content: user }],
       }),
+      // Bounded: a stalled upstream answers 504 in 25 s instead of holding
+      // the user's spinner until the platform kills the function.
+      signal: anthropicSignal(),
     });
 
     if (!res.ok) {
@@ -297,7 +308,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ results, type: body.type });
-  } catch {
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

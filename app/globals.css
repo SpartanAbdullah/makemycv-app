@@ -120,9 +120,15 @@
 
   /* CV template faces — the pre-reskin stacks, frozen for the product output
      (FONT_FAMILY_MAP in lib/templates/theme.ts). */
-  --cv-font-body:    var(--font-inter), 'Inter', system-ui, sans-serif;
-  --cv-font-display: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
-  --cv-font-serif:   var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  /* 'Vazirmatn CV' is the Arabic face the PDF embeds (public/fonts/pdf,
+     lib/pdf/fonts.ts). Its @font-face below is limited to the Arabic blocks
+     by unicode-range, so it sits FIRST in each stack without touching a Latin
+     glyph — it must precede the next/font families because their
+     metric-adjusted Arial fallback face carries Arabic glyphs of its own and
+     would otherwise win the per-glyph fallback. (session 4, 2026-10-31) */
+  --cv-font-body:    'Vazirmatn CV', var(--font-inter), 'Inter', system-ui, sans-serif;
+  --cv-font-display: 'Vazirmatn CV', var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif;
+  --cv-font-serif:   'Vazirmatn CV', var(--font-instrument), 'Instrument Serif', Georgia, 'Times New Roman', serif;
 
   /* ─── Brand tokens (May 2026 handoff) ──────────────────────
      Source of truth for marketing surfaces, social cards, and
@@ -323,6 +329,29 @@ body {
   --font-body: var(--cv-font-body);
   --font-display: var(--cv-font-display);
   --font-serif: var(--cv-font-serif);
+}
+
+/* The Arabic CV face, the SAME two static files the PDF embeds
+   (public/fonts/pdf/vazirmatn-*.ttf, Vazirmatn 33.003, SIL OFL 1.1 — licence
+   beside them). unicode-range keeps it to the Arabic blocks, so Latin stays
+   Inter / Bricolage / Instrument Serif and the files are only fetched when a
+   CV actually contains Arabic. Plain @font-face rather than next/font so the
+   range restriction and the shared file are explicit. (session 4) */
+@font-face {
+  font-family: 'Vazirmatn CV';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/pdf/vazirmatn-400.ttf') format('truetype');
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Vazirmatn CV';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/pdf/vazirmatn-700.ttf') format('truetype');
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 /* ─── Builder v3 utility classes ───────────────────────────── */

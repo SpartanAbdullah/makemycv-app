@@ -20,6 +20,54 @@ export const CLAUDE_MODEL = "claude-haiku-5-5";
 
 export const CLAUDE_EFFORT = "low";
 
+// Upper bound on ONE Messages API call (2026-10-31, performance review).
+//
+// Before this, no route passed a signal to fetch(), so a stalled upstream
+// held the request open until the platform killed the function — 60 s on
+// /api/resume-checker/parse (maxDuration) and the platform default (minutes)
+// everywhere else — while the client spinner kept turning: the hooks have no
+// timeout of their own and render whatever `error` the route finally sends,
+// or "Something went wrong" when the platform's 504 has no JSON body.
+//
+// Observed latency for these prompts on Haiku at low effort is single-digit
+// seconds (≤ 2048 output tokens), and 10–25 s for the parse route (up to
+// 100k chars in, 8192 tokens out). The caps below are 3–5× those, so they
+// fire only when something is genuinely wrong — and then the user gets a
+// sentence and a retry button in 25 s instead of a dead spinner.
+export const ANTHROPIC_TIMEOUT_MS = 25_000;
+/** The parse route: largest prompt, maxDuration 60 — leave room for KV. */
+export const ANTHROPIC_PARSE_TIMEOUT_MS = 45_000;
+
+/** Signal to pass as fetch's `signal` for a Claude call. */
+export function anthropicSignal(ms: number = ANTHROPIC_TIMEOUT_MS): AbortSignal {
+  return AbortSignal.timeout(ms);
+}
+
+/**
+ * True when `err` is the abort fetch throws on `AbortSignal.timeout` — a
+ * DOMException named "TimeoutError" (undici / browsers) or "AbortError"
+ * (older runtimes abort without the distinct name).
+ */
+export function isTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = (err as { name?: unknown }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/**
+ * Body of the 504 every route answers when the upstream call times out.
+ * `error` is what the AI hooks render for a non-429 failure; `message`
+ * mirrors it for consumers that read that field instead.
+ */
+export const UPSTREAM_TIMEOUT_BODY = {
+  error:
+    "The AI service is taking longer than usual to answer. Nothing was lost — please try again in a moment.",
+  message:
+    "The AI service is taking longer than usual to answer. Nothing was lost — please try again in a moment.",
+} as const;
+
+export const UPSTREAM_TIMEOUT_STATUS = 504;
+
 type ContentBlock = { type?: unknown; text?: unknown };
 
 /**

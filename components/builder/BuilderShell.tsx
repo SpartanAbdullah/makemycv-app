@@ -28,8 +28,18 @@ import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
-import { ImportParseError } from "../../lib/importers/adapter";
-import { countSectionsFilled } from "../../lib/importers/fieldMapper";
+import {
+  gateImportFile,
+  importErrorMessage,
+  importFileType,
+  toImportParseError,
+  type ImportErrorReason,
+} from "../../lib/importers/importErrors";
+import {
+  countSectionsFilled,
+  hasUsableContent,
+  mapParsedToCv,
+} from "../../lib/importers/fieldMapper";
 import type { ParsedDocument } from "../../lib/importers/adapter";
 
 // Code-split the rare paths out of /builder's first paint (audit PERF-6):
@@ -852,6 +862,36 @@ export const BuilderShell = ({
     trackOncePerSession("mmcv_evt_builder_start", "builder_start");
   }, [data, hydrated]);
 
+  // template_selected: every change of template after hydration, whichever
+  // surface made it (Review gallery, preview modal, drawer chevrons, import).
+  // The first post-hydration value is the baseline, not a selection.
+  const templateBaselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    const id = data.settings.templateId ?? "classic";
+    if (templateBaselineRef.current === null) {
+      templateBaselineRef.current = id;
+      return;
+    }
+    if (id === templateBaselineRef.current) return;
+    templateBaselineRef.current = id;
+    track("template_selected", { template: id });
+  }, [data.settings.templateId, hydrated]);
+
+  // cv_preview_viewed: once per session per surface — the fullscreen overlay
+  // on desktop, the Preview toggle on mobile. The always-visible desktop
+  // column is not a deliberate view and is not counted.
+  useEffect(() => {
+    if (previewOpen) {
+      trackOncePerSession("mmcv_evt_preview_fullscreen", "cv_preview_viewed", { surface: "fullscreen" });
+    }
+  }, [previewOpen]);
+  useEffect(() => {
+    if (mobileView === "preview") {
+      trackOncePerSession("mmcv_evt_preview_mobile", "cv_preview_viewed", { surface: "mobile" });
+    }
+  }, [mobileView]);
+
   // No step is ever "locked" any more (audit UX-1/UX-2): the old gating made
   // skipped steps unreachable except by walking Back N times. Beads show
   // honest state and navigate freely. Guided-feedback layering (2026-06):
@@ -922,6 +962,11 @@ export const BuilderShell = ({
     for (const step of builderSteps) {
       if (step.id === "review") continue; // derived — would be noise
       if (!prev[step.id] && completionMap[step.id]) {
+        // Funnel: the section flipped to complete in this session. Same
+        // once-per-session rule as builder_step so a reload cannot recount.
+        trackOncePerSession(`mmcv_evt_section_${step.id}`, "cv_section_completed", {
+          step_id: step.id,
+        });
         try {
           const key = `mmcv_done_toast_${step.id}`;
           if (window.sessionStorage.getItem(key)) continue;
@@ -979,6 +1024,15 @@ export const BuilderShell = ({
     // Re-arm: a card dismissed after the last export must come back for
     // this one. "Every successful export" is the agreed frequency.
     setSupportCardOpen(false);
+    // Attempt counter for the export funnel: cv_export_started → cv_export.
+    // The gap between the two is the render-failure rate. Backups excluded
+    // for the same reason as below.
+    if (kind !== "json") {
+      track("cv_export_started", {
+        format: kind,
+        template: data.settings.templateId ?? "classic",
+      });
+    }
     try {
       if (kind === "json") {
         downloadCvBackup(data);
@@ -1068,42 +1122,53 @@ export const BuilderShell = ({
       ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     triggerFileInput(accept, async (file) => {
-      const isDocx =
-        /\.docx$/i.test(file.name) ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      const source = isDocx ? "DOCX" : "PDF";
+      // Extension bucket only (never the name) — this is the `file_type`
+      // analytics param and the routing key. Anything not pdf/docx stops at
+      // the gate below, so a mislabelled pick can no longer report as a
+      // corrupt PDF (it did until 2026-10-31: the PDF branch was the
+      // fallback for every other type).
+      const fileType = importFileType(file.name);
+      const source = fileType === "docx" ? "DOCX" : "PDF";
+
+      // The one place a failed file import is recorded. Every failure path
+      // below ends here exactly once, with a reason from the closed set in
+      // lib/importers/importErrors.ts and nothing else about the file.
+      const failImport = (reason: ImportErrorReason, message: string) => {
+        setImportState({ phase: "idle" });
+        track("cv_import_failed", { file_type: fileType, error_reason: reason });
+        setErrorMsg(message);
+      };
+
+      const gate = gateImportFile(file);
+      if (gate) {
+        failImport(gate.kind, gate.message);
+        return;
+      }
+
       setImportState({ phase: "parsing", source });
       try {
         // Adapters (and the textParser they pull in) load on first import,
         // not at builder first paint (audit PERF-6).
-        const adapter = isDocx
-          ? (await import("../../lib/importers/docxAdapter")).docxAdapter
-          : (await import("../../lib/importers/pdfAdapter")).pdfAdapter;
+        const adapter =
+          fileType === "docx"
+            ? (await import("../../lib/importers/docxAdapter")).docxAdapter
+            : (await import("../../lib/importers/pdfAdapter")).pdfAdapter;
         const parsed = await adapter.parse(file);
+        // Partial-import guard: a parse with nothing usable used to open
+        // MappingReview in its "No fields could be extracted" state with the
+        // Import button disabled (or, worse, with a "1 section" that was only
+        // the document's first line taken for a name) — a dead end that
+        // recorded nothing. Say so here instead, with a next step, and count it.
+        if (!hasUsableContent(mapParsedToCv(parsed))) {
+          failImport("mapping_empty", importErrorMessage("mapping_empty"));
+          return;
+        }
         setImportState({ phase: "review", source, parsed });
       } catch (err) {
         // Typed failures route to specific guidance (audit UX-18); the file
         // is untouched and the user stays in the builder — never a dead end.
-        setImportState({ phase: "idle" });
-        // file_type is the picker's routing, not a detected MIME type: PDF
-        // is the fallback branch, so a mislabelled file reports as "pdf".
-        track("cv_import_failed", {
-          file_type: source.toLowerCase(),
-          error_reason:
-            err instanceof ImportParseError ? err.kind : "unknown",
-        });
-        if (err instanceof ImportParseError) {
-          setErrorMsg(
-            err.kind === "empty-text"
-              ? `${err.message} You can also try the free AI Resume Checker, which handles more layouts.`
-              : err.message,
-          );
-        } else {
-          setErrorMsg(
-            `Could not read your ${source} file. Check the file and try again — or fill in your details below.`,
-          );
-        }
+        const e = toImportParseError(err);
+        failImport(e.kind, e.message);
       }
     });
   };
@@ -1259,7 +1324,10 @@ export const BuilderShell = ({
               padding: "10px 24px",
             }}
           >
-            <p style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}>
+            <p
+              data-testid={errorMsg ? "import-error" : "download-error"}
+              style={{ fontSize: 13, color: "var(--ff-red)", fontWeight: 500 }}
+            >
               {errorMsg ?? downloadError}
             </p>
             <button

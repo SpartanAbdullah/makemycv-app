@@ -238,3 +238,28 @@ export function countSectionsFilled(partial: Partial<CvData>): number {
     partial.projects?.length ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 }
+
+/**
+ * Whether a mapped import carries anything worth reviewing. Stricter than
+ * `countSectionsFilled() > 0`: a name alone is not usable — the parser lifts
+ * the first line of ANY document as a name, so a mis-picked meeting note or a
+ * cover letter would otherwise open the review with "1 section" and import
+ * a stranger's first words as the candidate. Contact details (email/phone), a
+ * summary, or any list section count. BuilderShell reports `mapping_empty`
+ * when this is false (2026-10-31).
+ */
+export function hasUsableContent(partial: Partial<CvData>): boolean {
+  const p = partial.personal;
+  return Boolean(
+    p?.email ||
+      p?.phone ||
+      p?.summary ||
+      p?.linkedin ||
+      partial.experience?.length ||
+      partial.education?.length ||
+      partial.skills?.length ||
+      partial.languages?.length ||
+      partial.certifications?.length ||
+      partial.projects?.length,
+  );
+}

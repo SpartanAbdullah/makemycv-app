@@ -35,6 +35,20 @@ const eslintConfig = defineConfig([
     // Generated PDFs from scripts/pdf-smoke.tsx.
     ".smoke-pdfs/**",
 
+    // pdf-fidelity harness (scripts/pdf-fidelity.mjs, 2026-10-31): compiled
+    // render script + output PDFs. Gitignored, but the `.*-test-build/**`
+    // glob above does not match `.pdf-fidelity-build`, so a checkout that has
+    // run the harness reported 167 errors from transient tsc output.
+    ".pdf-fidelity-build/**",
+    ".fidelity-pdfs/**",
+
+    // Arabic PDF smoke (scripts/arabic-smoke.tsx, 2026-10-31): compiled
+    // render script + output PDFs / rasters, and the ad-hoc react-pdf probe
+    // folder used while investigating. All gitignored.
+    ".arabic-smoke-build/**",
+    ".arabic-smoke/**",
+    ".lh-probe/**",
+
     // Agent worktrees / scratch. Note the .gitignore entry intended to cover
     // this is corrupted (a UTF-16 fragment with a space between every
     // character, so it matches nothing) — see audit A-W5-053. Ignoring here

@@ -16,6 +16,7 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { downloadCvBackup } from "../../../lib/utils/download";
+import { containsArabic } from "../../../lib/pdf/arabicText";
 import { readCvBackup } from "../../../lib/utils/localStorage";
 import { settingsForTemplate, templates, type TemplateBadge } from "../../../lib/templates";
 import { TemplateRibbon } from "../../templates/TemplateBadges";
@@ -534,6 +535,28 @@ export const ReviewStep = ({
             >
               PDF is best for applications. DOCX is editable.
             </p>
+            {/* Arabic disclosure (session 4, 2026-10-31): the PDF path shapes
+                Arabic itself and sets it in Vazirmatn as one run per line —
+                docs/arabic-pdf.md lists what that costs. Say so where the
+                download starts, not after the file is sent. */}
+            {containsArabic(JSON.stringify(data)) && (
+              <p
+                role="note"
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: "var(--ff-faint)",
+                  textAlign: "center",
+                  marginTop: 0,
+                }}
+              >
+                This CV contains Arabic. The PDF sets it in the same Arabic face
+                as the preview; a line that mixes Arabic and English prints
+                entirely in that face, and some applicant-tracking systems may
+                not match Arabic keywords from a PDF. The .docx export keeps the
+                text exactly as typed.
+              </p>
+            )}
             {/* Free CV-vs-job diagnosis — a natural next step once the CV is
                 built. Routes to the standalone JD Match page; the CV stays in
                 this browser and only the pasted job text is sent. */}
@@ -555,6 +578,16 @@ export const ReviewStep = ({
             >
               <Icon name="edit" size={14} />
               Write a cover letter
+            </Link>
+            {/* LinkedIn recruiter message (product #3, 2026-10-31) — same
+                peer offer, same disclosure-before-send pattern on its page. */}
+            <Link
+              href="/linkedin-message"
+              className="cv-btn-secondary"
+              style={{ width: "100%", textDecoration: "none" }}
+            >
+              <Icon name="linkedin" size={14} />
+              Message the recruiter on LinkedIn
             </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />

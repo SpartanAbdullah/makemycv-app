@@ -1,0 +1,301 @@
+{
+  "note": "Accepted preview-vs-PDF fidelity numbers per cell for `scripts/pdf-fidelity.mjs --gate` (npm run fidelity:pdf): PDF page count, text parity, page-1 block diff and whether the section order survives the PDF text layer. Regenerate from a run's results.json after a deliberate layout change; lower a cell when a fix improves it so it cannot drift back.",
+  "date": "2026-10-31",
+  "pdfjs": "4.10.38",
+  "cells": {
+    "classic-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.55,
+      "orderMatch": true
+    },
+    "classic-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.63,
+      "orderMatch": true
+    },
+    "classic-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 1.48,
+      "orderMatch": true
+    },
+    "modern-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 1.03,
+      "orderMatch": true
+    },
+    "modern-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.65,
+      "orderMatch": true
+    },
+    "modern-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 1.07,
+      "orderMatch": false
+    },
+    "executive-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 99.3,
+      "blockDiffPct": 7.4,
+      "orderMatch": true
+    },
+    "executive-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 99.3,
+      "blockDiffPct": 2.05,
+      "orderMatch": true
+    },
+    "executive-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 99.3,
+      "blockDiffPct": 5.71,
+      "orderMatch": true
+    },
+    "ats-clean-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 10.51,
+      "orderMatch": true
+    },
+    "ats-clean-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 7.19,
+      "orderMatch": true
+    },
+    "ats-clean-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 10.26,
+      "orderMatch": true
+    },
+    "harvard-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 3.56,
+      "orderMatch": true
+    },
+    "harvard-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 12.48,
+      "orderMatch": true
+    },
+    "harvard-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 10.14,
+      "orderMatch": true
+    },
+    "gulf-standard-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 4.83,
+      "orderMatch": true
+    },
+    "gulf-standard-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 1.79,
+      "orderMatch": true
+    },
+    "gulf-standard-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 7.34,
+      "orderMatch": true
+    },
+    "chronicle-natural": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 6.64,
+      "orderMatch": true
+    },
+    "chronicle-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 2.58,
+      "orderMatch": true
+    },
+    "chronicle-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 9.69,
+      "orderMatch": true
+    },
+    "exec-split-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 98.5,
+      "blockDiffPct": 7.44,
+      "orderMatch": true
+    },
+    "exec-split-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 98.5,
+      "blockDiffPct": 5.5,
+      "orderMatch": true
+    },
+    "exec-split-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 98.5,
+      "blockDiffPct": 11.06,
+      "orderMatch": true
+    },
+    "corp-sidebar-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 9.26,
+      "orderMatch": true
+    },
+    "corp-sidebar-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 6.6,
+      "orderMatch": true
+    },
+    "corp-sidebar-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 13.6,
+      "orderMatch": true
+    },
+    "onyx-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.79,
+      "orderMatch": true
+    },
+    "onyx-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.55,
+      "orderMatch": true
+    },
+    "onyx-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 9.92,
+      "orderMatch": true
+    },
+    "sandstone-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 5.59,
+      "orderMatch": true
+    },
+    "sandstone-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.66,
+      "orderMatch": true
+    },
+    "sandstone-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 1.11,
+      "orderMatch": true
+    },
+    "banner-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 9.35,
+      "orderMatch": true
+    },
+    "banner-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 7.8,
+      "orderMatch": true
+    },
+    "banner-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 9.75,
+      "orderMatch": true
+    },
+    "professional-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 2.29,
+      "orderMatch": true
+    },
+    "professional-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 1.82,
+      "orderMatch": true
+    },
+    "professional-dense": {
+      "pdfPages": 2,
+      "previewPages": 2,
+      "parityPct": 100,
+      "blockDiffPct": 2.16,
+      "orderMatch": true
+    },
+    "professional-photo-natural": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 2.56,
+      "orderMatch": true
+    },
+    "professional-photo-compact": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 2.74,
+      "orderMatch": true
+    },
+    "professional-photo-dense": {
+      "pdfPages": 1,
+      "previewPages": 1,
+      "parityPct": 100,
+      "blockDiffPct": 0.81,
+      "orderMatch": true
+    }
+  }
+}

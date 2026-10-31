@@ -6,6 +6,7 @@ import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
 import PostReportTipJar from "@/components/resume-checker/PostReportTipJar";
+import ReportAtsTextPreview from "@/components/resume-checker/ReportAtsTextPreview";
 import { RatingStrip } from "@/components/feedback/RatingStrip";
 import { Logo } from "@/components/Logo";
 import { SUPPORT_URL } from "@/lib/config/support";
@@ -132,6 +133,9 @@ export default async function ReportPage({
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <ScoreSidebar score={score} reportId={reportId} />
           <div className="space-y-4">
+            {/* "What the ATS sees" (B3) — client-only; renders only in the
+                tab that uploaded the file (sessionStorage carry-over). */}
+            <ReportAtsTextPreview reportId={reportId} />
             {score.categories.map((cat) => (
               <CategoryCard key={cat.id} category={cat} />
             ))}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getPreviewProfile } from "@/lib/data/preview-profiles";
+import { getPersonaProfile, getPreviewProfile } from "@/lib/data/preview-profiles";
 import { getTemplateById } from "@/lib/templates";
 
 /**
@@ -23,12 +23,18 @@ export default async function TemplatePreviewPage({
   searchParams,
 }: {
   params: Promise<{ templateId: string }>;
-  searchParams: Promise<{ photo?: string; density?: string }>;
+  searchParams: Promise<{ photo?: string; density?: string; persona?: string }>;
 }) {
   const { templateId } = await params;
-  const { photo, density } = await searchParams;
+  const { photo, density, persona } = await searchParams;
   const template = getTemplateById(templateId);
-  const profile = getPreviewProfile(template.id);
+  // ?persona=bilingual | arabic-only | arabic-first | arabic-name | arabic-dense
+  // swaps in a SYNTHETIC Arabic persona — review tooling for the PDF-fidelity
+  // harness and the Arabic smoke (scripts/pdf-fidelity.mjs --persona=…,
+  // npm run smoke:arabic), never a marketing capture. Unknown ids fall back
+  // to the template's own persona.
+  const profile =
+    (persona && getPersonaProfile(template.id, persona)) || getPreviewProfile(template.id);
   // ?photo=0 renders the same template without its photo — the marketing
   // site shows both variants so users can compare with/without.
   const withPhoto =
