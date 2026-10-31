@@ -4,6 +4,12 @@ import ExampleReportPreview from "@/components/resume-checker/ExampleReportPrevi
 import { Logo } from "@/components/Logo";
 import { JsonLd } from "@/components/seo/JsonLd";
 import {
+  CHECKLIST,
+  CHECKLIST_CATEGORY_COUNT,
+  CHECKLIST_SIGNAL_COUNT,
+} from "@/lib/resumeChecker/checklist";
+import type { ScoreCategoryId } from "@/lib/resumeChecker/types";
+import {
   SITE_NAME,
   appWebSiteSchema,
   breadcrumbListSchema,
@@ -54,10 +60,18 @@ export const metadata: Metadata = {
   },
 };
 
-type Check = { title: string; description: string; icon: React.ReactNode };
+type Check = {
+  id: ScoreCategoryId;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+};
 
+// One card per score category; the itemised rules under each card come from
+// lib/resumeChecker/checklist.ts, which is pinned to the engine by a test.
 const CHECKS: Check[] = [
   {
+    id: "content",
     title: "Content",
     description: "Summary depth, bullet quality, quantified impact.",
     icon: (
@@ -68,6 +82,7 @@ const CHECKS: Check[] = [
     ),
   },
   {
+    id: "sections",
     title: "Section Structure",
     description: "Right sections, complete fields, recruiter-scannable.",
     icon: (
@@ -77,6 +92,7 @@ const CHECKS: Check[] = [
     ),
   },
   {
+    id: "atsEssentials",
     title: "ATS Essentials",
     description: "Parseable format, clean dates, no tables or images.",
     icon: (
@@ -87,6 +103,7 @@ const CHECKS: Check[] = [
     ),
   },
   {
+    id: "design",
     title: "Design & Formatting",
     description: "Length, skills coverage, visual hierarchy.",
     icon: (
@@ -223,31 +240,79 @@ export default function ResumeCheckerPage() {
         </div>
       </section>
 
-      {/* WHAT WE CHECK */}
-      <section className="border-t border-line bg-paper py-16 md:py-20">
+      {/* WHAT THIS CHECKS (B2) — server-rendered, itemised. The rule lines
+          and the count come from lib/resumeChecker/checklist.ts, which a
+          unit test pins to the sub-signals in lib/scoreEngine.ts, so the
+          number printed here is the number the engine runs. */}
+      <section
+        id="what-this-checks"
+        aria-labelledby="what-this-checks-title"
+        className="border-t border-line bg-paper py-16 md:py-20"
+      >
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center font-display text-3xl font-bold text-slate-900">
-            What we check
+          <h2
+            id="what-this-checks-title"
+            className="text-center font-display text-3xl font-bold text-slate-900"
+          >
+            What this checks
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-600">
-            Four categories, same rubric, every CV.
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600">
+            {CHECKLIST_SIGNAL_COUNT} checks in {CHECKLIST_CATEGORY_COUNT} categories
+            &mdash; the same rubric for every CV, listed in full. Lines marked
+            &ldquo;parser&rdquo; depend on how the text came out of your file
+            and are only scored here, not in the builder.
           </p>
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {CHECKS.map((c) => (
-              <div
-                key={c.title}
-                className="rounded-2xl bg-paper p-5 shadow-float"
-              >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-ff-accent-soft text-ff-accent-dark">
-                  {c.icon}
+            {CHECKS.map((c) => {
+              const group = CHECKLIST.find((g) => g.category === c.id);
+              const items = group?.items ?? [];
+              const n = items.reduce((s, i) => s + i.ids.length, 0);
+              return (
+                <div
+                  key={c.title}
+                  className="rounded-2xl bg-paper p-5 shadow-float"
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-ff-accent-soft text-ff-accent-dark">
+                    {c.icon}
+                  </div>
+                  <h3 className="font-display text-base font-semibold text-slate-900">
+                    {c.title}{" "}
+                    <span className="text-sm font-medium text-slate-500">· {n}</span>
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">{c.description}</p>
+                  <ul className="mt-3 space-y-1.5 border-t border-line pt-3 text-[13px] leading-snug text-slate-700">
+                    {items.map((item) => (
+                      <li key={item.ids.join("+")} className="flex gap-2">
+                        <span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-ff-accent" />
+                        <span>
+                          {item.label}
+                          {item.parserOnly ? (
+                            <span className="ml-1.5 rounded-md border border-line bg-paper-2 px-1.5 py-px font-mono text-[10px] uppercase tracking-wide text-slate-500">
+                              parser
+                            </span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <h3 className="font-display text-base font-semibold text-slate-900">
-                  {c.title}
-                </h3>
-                <p className="mt-1 text-sm text-slate-600">{c.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {/* The file sentence — every clause is verifiable in code:
+              components/resume-checker/UploadDropzone.tsx (browser
+              extraction, text-only POST), lib/resumeChecker/parse.ts
+              (Anthropic call), lib/resumeChecker/storage.ts (KV, 24 h TTL,
+              text kept server-side with the report), app/api/resume-checker/
+              parse/route.ts (no account, per-IP limits). */}
+          <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-slate-600">
+            <span className="font-semibold text-slate-800">What happens to your file:</span>{" "}
+            your browser extracts the text and only that text is sent to our
+            server, where an AI model (Anthropic) structures it and the rules
+            above score it; the text and the report are stored for 24 hours so
+            the link works, then expire. The file itself never leaves your
+            device, and no account is created.
+          </p>
         </div>
       </section>
 

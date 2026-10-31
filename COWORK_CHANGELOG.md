@@ -16,6 +16,35 @@ Format:
 
 ---
 
+## [2026-10-31 10:05] Checker page: itemised "What this checks" list + the file sentence (FEATURE_BACKLOG B2)
+
+**Goal:** B2 — replace the four one-line category cards on `/resume-checker` with the full list of rules the
+engine runs, and say in one verifiable sentence what happens to the file. Also the groundwork for
+retiring the employer-ATS claims on www (PROPOSAL-checker-claims.md): a count that is derived from code.
+**Files:**
+- created: `lib/resumeChecker/checklist.ts` — `CHECKLIST` (4 groups, 33 lines covering 44 engine
+  sub-signal ids: Content C1–C14, Sections S4/S5/S7–S11, ATS Essentials A1–A14, Design D1–D9), with the
+  thresholds the engine uses and `parserOnly` on the five layout/spelling signals (C12, C13, A3, A4, A5)
+  that only the checker can score; `CHECKLIST_SIGNAL_COUNT` (44) and `CHECKLIST_CATEGORY_COUNT` (4).
+- created: `lib/resumeChecker/checklist.test.ts` — reads `lib/scoreEngine.ts` and asserts the listed ids
+  equal the `sig("…")` ids in the engine (each once), that `parserOnly` matches the engine's `conditional`
+  flag, and that ids sit under their category. A rule added or removed in the engine fails `test:unit`
+  until the page list is updated, so the printed count cannot drift.
+- edited: `app/resume-checker/page.tsx` — section renamed "What this checks"; sub-line "44 checks in 4
+  categories — the same rubric for every CV, listed in full" (numbers from the constants, not typed);
+  each category card now carries its count and an itemised `<ul>` (server-rendered, `parser` badge on
+  the conditional lines); one "What happens to your file" paragraph: browser extracts the text, only the
+  text is sent, an AI model (Anthropic) structures it, the rules score it, text + report stored 24 h so
+  the link works, then expire, file never leaves the device, no account. Each clause checked against
+  `UploadDropzone.tsx`, `lib/resumeChecker/parse.ts`, `storage.ts` (`TTL_SECONDS = 86400`, `rawText`
+  stored server-side with the report) and `app/api/resume-checker/parse/route.ts`.
+**Notes / risks / follow-up:** there was no "60+ checks" claim in this app (grep); the old sub-line "Four
+categories, same rubric, every CV" was true and is kept in spirit. The www copy for the checker lives in
+`makemycv-site` and still needs the same list/count if it states one. Verified on `next dev -p 3300`:
+the list and the count are in the server HTML (no JS needed), axe clean on the page. Wording follows the
+truthfulness rule — every line says what the check looks for in the document.
+**Suggested commit:** feat(checker): itemised "What this checks" list pinned to the score engine
+
 ## [2026-10-31 09:20] Checker: "What the ATS sees" text-extraction preview (FEATURE_BACKLOG B3)
 
 **Goal:** B3 from the mission backlog — the competitor research scored a visible "what the parser reads" view
