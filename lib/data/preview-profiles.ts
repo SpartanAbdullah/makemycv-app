@@ -1075,6 +1075,10 @@ export const ARABIC_PERSONA_IDS = [
   "arabic-first",
   "arabic-name",
   "arabic-dense",
+  // session 6 (E8.7): what session-5 production verification showed
+  "arabic-dense2",
+  "arabic-midline",
+  "urdu-name",
 ] as const;
 export type ArabicPersonaId = (typeof ARABIC_PERSONA_IDS)[number];
 
@@ -1216,6 +1220,104 @@ function arabicOnlyProfile(base: CvData, dense: boolean): CvData {
   };
 }
 
+/* ── Session 6 (E8.7) personas ──────────────────────────────────────────
+   arabic-dense2: the session-5 "Dense-2" shape — six Arabic roles, two
+   Arabic education entries with notes, and a comma-joined skills list that
+   mixes Arabic and Latin items; reaches page 2 in every layout.
+   arabic-midline: Arabic-first bullets with Latin and numbers in the MIDDLE
+   and at the END ("… (Power BI) …", "… SAP IBP", "12%") — the lines an LTR
+   base used to scramble (ARABIC_PRODUCTION §3).
+   urdu-name: an Urdu CV whose name ends in an isolated heh goal (ہ, U+FBA6
+   is not in Vazirmatn — E8.4) with the Urdu letters ٹ ڈ ڑ ک گ ں ھ ے ۓ. */
+
+export const AR_MIDLINE_BULLETS = [
+  "صمّم لوحات متابعة (Power BI) لمستوى الخدمة في 3 مستودعات",
+  "خفّض المخزون الاحتياطي بنسبة 12% بعد تطبيق نظام SAP IBP",
+  "قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب إلى 94% عبر 4 مستودعات في جبل علي",
+];
+
+function arabicDense2Profile(base: CvData): CvData {
+  const dense = arabicOnlyProfile(base, true);
+  return {
+    ...dense,
+    experience: dense.experience.map((e, i) => ({
+      ...e,
+      bullets: i === 0 ? [...AR_MIDLINE_BULLETS.slice(0, 2), ...e.bullets.slice(0, 5)] : e.bullets,
+    })),
+    education: [
+      {
+        id: "ar2-edu-1",
+        school: "جامعة الشارقة",
+        degree: "ماجستير في إدارة سلاسل الإمداد",
+        field: "اللوجستيات",
+        startDate: "2014",
+        endDate: "2016",
+        notes: "رسالة عن تحسين المخزون في الموانئ الخليجية",
+      },
+      {
+        id: "ar2-edu-2",
+        school: "جامعة الإمارات العربية المتحدة",
+        degree: "بكالوريوس في الهندسة الصناعية",
+        field: "",
+        startDate: "2009",
+        endDate: "2013",
+        notes: "مرتبة الشرف الأولى",
+      },
+    ],
+    skills: [
+      "تخطيط الطلب",
+      "إدارة المخزون",
+      "SAP IBP",
+      "Power BI",
+      "التفاوض مع الموردين",
+      "الامتثال الجمركي",
+      "تحليل البيانات",
+      "إدارة المستودعات",
+    ].map((name, i) => ({ id: `ar2-sk-${i}`, name })),
+  };
+}
+
+function arabicMidlineProfile(base: CvData): CvData {
+  const ar = arabicOnlyProfile(base, false);
+  return {
+    ...ar,
+    personal: { ...ar.personal, email: "arabic-midline.synthetic@email.ae" },
+    experience: ar.experience.map((e, i) => ({
+      ...e,
+      bullets: i === 0 ? [...AR_MIDLINE_BULLETS, ...e.bullets.slice(0, 1)] : e.bullets.slice(0, 2),
+    })),
+  };
+}
+
+function urduNameProfile(base: CvData): CvData {
+  const ar = arabicOnlyProfile(base, false);
+  return {
+    ...ar,
+    personal: {
+      ...ar.personal,
+      firstName: "طاہرہ",
+      lastName: "ملک",
+      headline: "سینئر سپلائی چین تجزیہ کار",
+      email: "urdu-name.synthetic@email.ae",
+      location: "دبئی، متحدہ عرب امارات",
+      summary: "سپلائی چین کے لیے منصوبہ بندی اور تجزیہ",
+      nationality: "پاکستانی",
+      visaStatus: "رہائشی ویزا",
+      availability: "ایک مہینے میں",
+      drivingLicense: "",
+    },
+    experience: ar.experience.slice(0, 2).map((e, i) => ({
+      ...e,
+      role: ["سپلائی چین تجزیہ کار", "گودام نگران"][i] ?? e.role,
+      company: ["گلف لاجسٹکس سروسز", "ٹرک اینڈ ڈیلیوری کمپنی"][i] ?? e.company,
+      bullets: [
+        "ہر مہینے کے لیے مانگ کی پیشگوئی تیار کی اور درستگی 94% تک پہنچائی",
+        "ٹرک، ڈرائیور اور گودام کے اخراجات میں کمی کی؛ نئے راستے بناۓ اور منافع بڑھایا",
+      ],
+    })),
+  };
+}
+
 function arabicFirstProfile(base: CvData): CvData {
   const ar = arabicOnlyProfile(base, false);
   return {
@@ -1298,6 +1400,12 @@ export function getPersonaProfile(templateId: string, persona: string): CvData |
       return arabicFirstProfile(base);
     case "arabic-name":
       return arabicNameProfile(base);
+    case "arabic-dense2":
+      return arabicDense2Profile(base);
+    case "arabic-midline":
+      return arabicMidlineProfile(base);
+    case "urdu-name":
+      return urduNameProfile(base);
     default:
       return null;
   }

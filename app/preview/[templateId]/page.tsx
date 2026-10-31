@@ -29,6 +29,7 @@ export default async function TemplatePreviewPage({
   const { photo, density, persona } = await searchParams;
   const template = getTemplateById(templateId);
   // ?persona=bilingual | arabic-only | arabic-first | arabic-name | arabic-dense
+  //   | arabic-dense2 | arabic-midline | urdu-name (session 6)
   // swaps in a SYNTHETIC Arabic persona — review tooling for the PDF-fidelity
   // harness and the Arabic smoke (scripts/pdf-fidelity.mjs --persona=…,
   // npm run smoke:arabic), never a marketing capture. Unknown ids fall back

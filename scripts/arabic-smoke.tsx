@@ -1,12 +1,14 @@
 /**
  * Arabic PDF smoke — the render half (session 4, 2026-10-31).
  *
- * Renders every registered template with the four synthetic Arabic personas
+ * Renders every registered template with the synthetic Arabic personas
  * (lib/data/preview-profiles.ts ARABIC_PERSONA_IDS: arabic-only,
- * arabic-first, arabic-name, arabic-dense) with the real faces embedded, and
+ * arabic-first, arabic-name, arabic-dense, and since session 6 arabic-dense2,
+ * arabic-midline, urdu-name) with the real faces embedded, and
  * writes .arabic-smoke/<template>-<persona>.pdf plus a manifest that lists,
- * per file, the Arabic words the text layer must contain and the page count
- * the dense persona must reach. scripts/arabic-smoke-check.mjs (chained in
+ * per file, the Arabic words the text layer must contain, the WHOLE Arabic
+ * lines it must reproduce in reading order (session 6, E8.7) and the page
+ * count the dense personas must reach. scripts/arabic-smoke-check.mjs (chained in
  * `npm run smoke:arabic`) extracts and rasterises each file with pdf.js.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -15,7 +17,7 @@ import { createElement } from "react";
 import ReactPDF from "@react-pdf/renderer";
 import { CVDocument } from "../components/pdf/CVDocument";
 import { ARABIC_PERSONA_IDS, getPersonaProfile } from "../lib/data/preview-profiles";
-import { containsArabic } from "../lib/pdf/arabicText";
+import { containsArabic, firstStrongDirection } from "../lib/pdf/arabicText";
 import { registerPdfFontsFromDir, warmPdfFonts } from "../lib/pdf/fonts";
 import { templates } from "../lib/templates";
 import type { CvData } from "../lib/types/cv";
@@ -25,11 +27,14 @@ import type { CvData } from "../lib/types/cv";
  * companies, bullets, schools and degrees. Skills, languages, certificates
  * and projects are left out because sidebar layouts cap or drop them.
  */
-function expectedArabicWords(data: CvData): string[] {
+/** Harvard prints no headline (live template and PDF alike). */
+const NO_HEADLINE = new Set(["harvard"]);
+
+function expectedArabicWords(data: CvData, templateId: string): string[] {
   const strings = [
     data.personal.firstName,
     data.personal.lastName,
-    data.personal.headline,
+    NO_HEADLINE.has(templateId) ? "" : data.personal.headline,
     data.personal.summary,
     ...data.experience.flatMap((e) => [e.role, e.company, ...e.bullets]),
     ...data.education.flatMap((e) => [e.school, e.degree]),
@@ -42,6 +47,24 @@ function expectedArabicWords(data: CvData): string[] {
     }
   }
   return [...words];
+}
+
+/**
+ * Arabic-first strings that must come back from the text layer WHOLE and in
+ * reading order after NFKC (session 6, E8.7): name, headline, roles,
+ * companies, bullets, schools, degrees. Session 5 found bullets that kept
+ * every word but lost their order (or lost words split across text-show
+ * operators); a word list cannot see that, a whole-line comparison can.
+ * Latin-first strings are left to the Latin smoke.
+ */
+function expectedArabicLines(data: CvData, templateId: string): string[] {
+  const strings = [
+    `${data.personal.firstName} ${data.personal.lastName}`,
+    NO_HEADLINE.has(templateId) ? "" : data.personal.headline,
+    ...data.experience.flatMap((e) => [e.role, e.company, ...e.bullets]),
+    ...data.education.flatMap((e) => [e.school, e.degree]),
+  ];
+  return [...new Set(strings.map((s) => s.trim()).filter((s) => s && firstStrongDirection(s) === "rtl"))];
 }
 
 /** Every string in the CV, for the text-layer junk check. */
@@ -67,6 +90,7 @@ async function main() {
     persona: string;
     file: string;
     words: string[];
+    lines: string[];
     minPages: number;
     inputText: string;
   }> = [];
@@ -82,8 +106,9 @@ async function main() {
         template: t.id,
         persona,
         file,
-        words: expectedArabicWords(data),
-        minPages: persona === "arabic-dense" ? 2 : 1,
+        words: expectedArabicWords(data, t.id),
+        lines: expectedArabicLines(data, t.id),
+        minPages: persona === "arabic-dense" || persona === "arabic-dense2" ? 2 : 1,
         inputText: allText(data),
       });
       console.log(`rendered ${file}`);

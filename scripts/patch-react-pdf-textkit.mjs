@@ -30,6 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 export const MARKER = "makemycv-textkit-visual-runs v1";
 
@@ -140,7 +141,7 @@ export function textkitFile(cwd = process.cwd()) {
   return { file: path.join(path.dirname(pkgJson), "lib", "textkit.js"), version: pkg.version };
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+const isMain = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   try {
     const { file, version } = textkitFile();

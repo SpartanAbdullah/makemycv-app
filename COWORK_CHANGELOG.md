@@ -25,6 +25,25 @@ Format:
 
 ---
 
+## [2026-11-01 01:40] smoke:arabic: Dense-2, mid-line Latin, Urdu name, whole-line reading-order check (session 6, E8.7)
+
+**Goal:** E8.7 — make the staging smoke cover what session-5 production verification found: the Dense-2 shape (page 2
+with Arabic education and mixed skills), Arabic-first bullets with Latin mid-line, an Urdu name, and lines that keep
+every word but lose their order (the old word check could not see that).
+**Files:**
+- edited: `lib/data/preview-profiles.ts` — personas `arabic-dense2`, `arabic-midline`, `urdu-name` (synthetic).
+- edited: `scripts/arabic-smoke.tsx` — whole Arabic-first lines per persona in the manifest; Dense-2 must reach page 2;
+  Harvard (no headline, live and PDF) is not expected to print one.
+- edited: `scripts/arabic-smoke-check.mjs` — every Arabic-first line whole and in reading order in the content-ordered
+  pdf.js items after NFKC (spacing ignored; brackets one class; lines pdf.js reads as LTR held to the word check);
+  no standard-14 fallback font embedded.
+- edited: `scripts/pdf-fidelity.mjs`, `app/preview/[templateId]/page.tsx` — accept the three new persona ids.
+- edited: `scripts/patch-react-pdf-textkit.mjs` — entry check via `fileURLToPath`.
+- edited: `docs/arabic-pdf.md` — Checks; the two pdf.js extraction limits (mirrored brackets, Latin-majority lines).
+**Notes / risks / follow-up:** 98/98 files pass. With the unpatched textkit the word check still passes every file and
+the new line check fails 84 of 98 — it guards E8.1.
+**Suggested commit:** test(pdf): smoke:arabic covers Dense-2, mid-line Latin, Urdu and whole-line order (E8.7)
+
 ## [2026-11-01 01:10] Arabic PDF: role stays bold and company regular on one line; room under Arabic names (session 6, E8.5 + E8.6)
 
 **Goal:** E8.5 — Classic's "role | company" line printed entirely bold when it contained Arabic (the session-4 one-run

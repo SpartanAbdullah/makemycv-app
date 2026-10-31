@@ -44,7 +44,7 @@ const DAY = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD
 const PERSONA = opt("persona");
 // bilingual = session-3 overlay; arabic-* = the session-4 Arabic PDF suite
 // (lib/data/preview-profiles.ts getPersonaProfile).
-const PERSONAS = ["bilingual", "arabic-only", "arabic-first", "arabic-name", "arabic-dense"];
+const PERSONAS = ["bilingual", "arabic-only", "arabic-first", "arabic-name", "arabic-dense", "arabic-dense2", "arabic-midline", "urdu-name"];
 if (PERSONA && !PERSONAS.includes(PERSONA)) throw new Error(`unknown --persona=${PERSONA} (one of ${PERSONAS.join(", ")})`);
 const OUT_DIR = path.resolve(process.env.FIDELITY_OUT || path.join(ROOT, "..", "_cowork", `pdf-fidelity-${DAY}${PERSONA ? `-${PERSONA}` : ""}`));
 const BASELINE_FILE = path.join(ROOT, "scripts", "pdf-fidelity-baseline.json");

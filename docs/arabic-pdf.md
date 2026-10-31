@@ -109,6 +109,14 @@ fidelity composites) and the "Session 4 — Arabic" section of
   a mixed line still depends on the tool (see the session-6 matrix in
   `docs/ai-mission/ARABIC_PRODUCTION_2026-10-31.md` in the parent folder), and
   pdfminer-based parsers still read Arabic in visual (reversed) order.
+  Two pdf.js behaviours the PDF cannot change: brackets in a right-to-left
+  line are drawn as the mirrored glyph (textkit's bidi mirroring, as every
+  RTL renderer does) and pdf.js does not un-mirror them, so "(IFRS)" reads
+  ")IFRS(" — a glyph has one ToUnicode entry, shared with the real ")"; and
+  pdf.js reads a line with fewer than 30 % right-to-left characters as
+  left-to-right, so an Arabic-first line that is mostly Latin ("مدير مالي
+  أول | Senior Finance Manager (CPA)") comes back with its segments in
+  visual order (Latin first). Every word is still there.
 - **One face per Arabic-bearing line.** Since session 6 (E8.5) nested
   `<Text>` / `<Link>` children of an Arabic-bearing `<Text>` stay their own
   runs — Classic's bold role next to a regular company keeps both weights, a
@@ -159,7 +167,8 @@ fidelity composites) and the "Session 4 — Arabic" section of
   in this face is drawn like the Arabic isolated ه — so "طاہرہ" prints in
   Vazirmatn and the text layer keeps the Urdu letter. ٹ ڈ ڑ ک گ ں ھ ہ ی ے ۓ
   are rendered and checked (`scripts/arabic-glyphs.test.mjs` asserts every
-  emitted form is in both cuts). ۂ is
+  emitted form is in both cuts; `smoke:arabic` renders the `urdu-name`
+  persona in all 14 templates with no fallback font). ۂ is
   decomposed to ہ + hamza above so it joins. Still **not** shaped: Arabic-
   script letters without presentation forms in the table (ۃ U+06C3, ۀ U+06C0,
   Sindhi / Pashto / Kurdish letters) print in their isolated shape mid-word;
@@ -170,14 +179,28 @@ fidelity composites) and the "Session 4 — Arabic" section of
 ## Checks
 
 - `npm run test:unit` — `lib/pdf/arabicText.test.ts` (forms, lam-alef,
-  marks, tatweel / ZWNJ, Persian letters, Latin ligatures, NFKC round-trip).
-- `npm run smoke:arabic` — renders 14 templates × `arabic-only`,
-  `arabic-first`, `arabic-name`, `arabic-dense` (`lib/data/preview-profiles.ts`),
-  checks every Arabic word of each persona in the pdf.js text layer after
-  NFKC, no U+FFFD, no junk characters, page counts (dense ≥ 2 pages with
-  Arabic on page 2), and writes page-1 (and page-2) rasters to
-  `.arabic-smoke/`.
+  marks, tatweel / ZWNJ, Persian and Urdu letters, Latin ligatures, NFKC
+  round-trip, multi-run shaping, first-strong direction).
+- `npm run test:arabic-glyphs` — every form the shaper emits, plus Arabic /
+  Urdu digits and punctuation, exists in both Vazirmatn cuts.
+- `npm run test:textkit-patch` — the installed textkit is patched, and a real
+  render keeps every Arabic word of mixed lines whole in one pdf.js item.
+- `npm run smoke:arabic` — renders 14 templates × 7 personas: `arabic-only`,
+  `arabic-first`, `arabic-name`, `arabic-dense`, and since session 6
+  `arabic-dense2` (six roles, two Arabic education entries, mixed
+  Arabic/Latin skills, ≥ 2 pages), `arabic-midline` (Arabic-first bullets
+  with "(Power BI)", "SAP IBP", "12%"), `urdu-name` ("طاہرہ ملک", Urdu
+  headline / roles / bullets) — `lib/data/preview-profiles.ts`. Checks every
+  Arabic word in the pdf.js text layer after NFKC; every Arabic-first line
+  (name, headline, roles, companies, bullets, schools, degrees) WHOLE and in
+  reading order in the content-ordered pdf.js items after NFKC (spacing
+  ignored; brackets compared as one class; lines pdf.js reads as LTR — under
+  30 % right-to-left characters — held to the word check); no standard-14
+  fallback font embedded; no U+FFFD or junk; page counts (dense personas ≥ 2
+  pages with Arabic on page 2). Writes page-1 (and page-2) rasters to
+  `.arabic-smoke/`. On the unpatched textkit the word check passes and the
+  line check fails 84 of 98 files.
 - `node scripts/pdf-fidelity.mjs --persona=<id>` — preview next to PDF for
-  any of the five personas; `npm run fidelity:pdf` is the Latin gate and must
+  any of the eight personas; `npm run fidelity:pdf` is the Latin gate and must
   stay byte-identical.
 - `/preview/<template>?persona=arabic-only` etc. for a human look.
