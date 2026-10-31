@@ -25,6 +25,23 @@ Format:
 
 ---
 
+## [2026-11-01 00:30] Import: a cover letter picked by mistake gets a pointer to /cover-letter (D8 follow-up)
+
+**Goal:** the optional D8 follow-up (IMPORT_MONITORING.md §8.3, backlog E11.D8): a cover letter with a contact header
+imported as a CV with only contact details and no word that it is a letter. In-flow discovery of product #2, peer
+tone, never a block.
+**Files:**
+- edited: `lib/importers/fieldMapper.ts`: `looksLikeCoverLetter(parsed)`: no role, no degree, and a "Dear …" / "To whom
+  it may concern" line among the unplaced lines.
+- edited: `components/import/MappingReview.tsx`: one line under the header, "This file reads like a cover letter rather
+  than a CV. To write one for a specific role, try the cover letter tool." (link to `/cover-letter`,
+  `data-testid="import-cover-letter-hint"`). The import itself is unchanged.
+- edited: `scripts/import-fixtures.test.mjs` (true for s5-cover-letter-contact.pdf, false for text-cv.pdf),
+  `scripts/import-smoke.mjs` (hint shown with the link for the letter, absent for text-cv.pdf).
+**Notes / risks / follow-up:** a letter with no contact line still ends in `mapping_empty` with the generic copy
+(case 10b); a letter-specific failure message would need a copy variant, not done. No analytics.
+**Suggested commit:** feat(import): point a cover letter picked by mistake at /cover-letter
+
 ## [2026-11-01 00:20] Import: an Arabic repeat of a role in an English CV is not a third card (rtl-mixed.docx)
 
 **Goal:** session-5 remaining item: `rtl-mixed.docx` (English CV with Arabic lines) imported a third experience card

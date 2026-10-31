@@ -9,7 +9,12 @@ import type {
   CvExperience,
   CvPersonal,
 } from "../../lib/types/cv";
-import { countSectionsFilled, mapParsedToCv } from "../../lib/importers/fieldMapper";
+import Link from "next/link";
+import {
+  countSectionsFilled,
+  looksLikeCoverLetter,
+  mapParsedToCv,
+} from "../../lib/importers/fieldMapper";
 import { getDir } from "../../lib/utils/rtl";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "../ui/ModalCloseButton";
@@ -334,6 +339,25 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 {parsed.pagesSkipped.total} pages. Anything after page{" "}
                 {parsed.pagesSkipped.read} is not in this review; add it in the
                 builder after importing.
+              </p>
+            )}
+            {/* Session 6 (D8 follow-up): a cover letter picked by mistake. A
+                pointer, not a block: the contact lines still import. */}
+            {looksLikeCoverLetter(parsed) && (
+              <p
+                className="mt-2 text-sm text-slate-600"
+                data-testid="import-cover-letter-hint"
+              >
+                This file reads like a cover letter rather than a CV. To write
+                one for a specific role, try the{" "}
+                <Link
+                  href="/cover-letter"
+                  className="underline underline-offset-2"
+                  style={{ color: "var(--ff-accent-dark)", fontWeight: 600 }}
+                >
+                  cover letter tool
+                </Link>
+                .
               </p>
             )}
             {sectionCount > 0 && (

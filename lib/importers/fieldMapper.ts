@@ -263,3 +263,18 @@ export function hasUsableContent(partial: Partial<CvData>): boolean {
       partial.projects?.length,
   );
 }
+
+/** A letter's opening line ("Dear Hiring Manager,", "To whom it may concern"). */
+const LETTER_OPENING_RE = /^(?:dear\s+\S|to\s+whom\s+it\s+may\s+concern)/i;
+
+/**
+ * Session 6 (D8 follow-up): the file reads like a cover letter, not a CV: a
+ * letter's salutation is among the lines nothing could place, and no role or
+ * degree was found. Describes the document only; drives a one-line pointer
+ * to /cover-letter in MappingReview. Never blocks the import.
+ */
+export function looksLikeCoverLetter(parsed: ParsedDocument): boolean {
+  if ((parsed.experience?.length ?? 0) > 0) return false;
+  if ((parsed.education?.length ?? 0) > 0) return false;
+  return (parsed.unplaced ?? []).some((l) => LETTER_OPENING_RE.test(l.trim()));
+}

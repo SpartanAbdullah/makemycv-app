@@ -68,6 +68,8 @@ const CASES = [
   ["arabic-export-classic.pdf", "import"],
   // Session 6 (D7a): 31 pages, one past MAX_PDF_PAGES.
   ["s5-31-pages.pdf", "import"],
+  // Session 6: a cover letter with a contact header (matrix case 10a).
+  ["s5-cover-letter-contact.pdf", "import"],
   // Session 6 (D11): extension / bytes mismatch (matrix cases 9a / 9b).
   ["s5-docx-bytes.pdf", "corrupt_pdf"],
   ["s5-pdf-bytes.docx", "corrupt_docx"],
@@ -84,6 +86,11 @@ const EXPECT_MESSAGE = {
 const EXPECT_PAGES_SKIPPED = {
   "s5-31-pages.pdf": /We read the first 30 of 31 pages/,
   "text-cv.pdf": null,
+};
+// Session 6: a letter gets a pointer to /cover-letter; a CV does not.
+const EXPECT_COVER_HINT = {
+  "s5-cover-letter-contact.pdf": true,
+  "text-cv.pdf": false,
 };
 
 // Experience cards the review must show (D1, 2026-10-31). Both files hold two
@@ -164,6 +171,13 @@ async function runCase(name, file, expected) {
           const shown = (await line.isVisible().catch(() => false)) ? ((await line.textContent()) ?? "").trim() : null;
           if (want ? shown && want.test(shown) : shown === null) ok(`${name}: pages-skipped line ${want ? `"${shown}"` : "absent"} (D7a)`);
           else fail(`${name}: pages-skipped line (D7a)`, `expected ${want ?? "none"}, got ${JSON.stringify(shown)}`);
+        }
+        if (name in EXPECT_COVER_HINT) {
+          const hint = review.getByTestId("import-cover-letter-hint");
+          const shown = await hint.isVisible().catch(() => false);
+          const href = shown ? await hint.getByRole("link").getAttribute("href").catch(() => null) : null;
+          if (EXPECT_COVER_HINT[name] ? shown && href === "/cover-letter" : !shown) ok(`${name}: cover-letter hint ${shown ? `shown → ${href}` : "absent"}`);
+          else fail(`${name}: cover-letter hint`, `expected ${EXPECT_COVER_HINT[name] ? "shown" : "absent"}, shown=${shown} href=${href}`);
         }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});

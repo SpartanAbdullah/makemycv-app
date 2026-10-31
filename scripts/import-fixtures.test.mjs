@@ -26,7 +26,7 @@ const build = (p) => require(path.join(root, ".test-build", "importers", p));
 
 const { parsePdfBytes, extractPdfText } = build("pdfAdapter.js");
 const { parseDocxBytes, extractDocxText } = build("docxAdapter.js");
-const { mapParsedToCv, countSectionsFilled, hasUsableContent } = build("fieldMapper.js");
+const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter } = build("fieldMapper.js");
 const { gateImportFile, importFileType, importErrorMessage, IMPORT_ERROR_REASONS, ImportParseError } =
   build("importErrors.js");
 
@@ -214,6 +214,10 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const p = r.partial?.personal ?? {};
   check("s5-cover-letter-contact.pdf", "name and email read", p.firstName === "Noor" && p.email === "noor.testwell@example.com", p);
   check("s5-cover-letter-contact.pdf", "salutation is not the headline (D8)", !/dear/i.test(p.headline ?? ""), p.headline);
+  // Session 6: the review points a letter at /cover-letter.
+  check("s5-cover-letter-contact.pdf", "looksLikeCoverLetter (session 6)", looksLikeCoverLetter(r.parsed) === true);
+  const cv = await runImport("text-cv.pdf", bytesOf("text-cv.pdf"));
+  check("text-cv.pdf", "a CV is not a cover letter (session 6)", looksLikeCoverLetter(cv.parsed) === false);
 }
 
 {
