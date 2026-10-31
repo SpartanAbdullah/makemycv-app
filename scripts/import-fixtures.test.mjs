@@ -172,6 +172,10 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   // "supervisors." as the Company or a bullet of its own).
   check("s5-long-wrapped.pdf", "bullet 1 joined across the wrap (D2)", exp[0]?.bullets?.[0]?.endsWith("140 technicians and 9 supervisors."), exp[0]?.bullets?.[0]);
   check("s5-long-wrapped.pdf", "first 4 bullets of every role are whole sentences (D2)", exp.every((e) => e.bullets.slice(0, 4).every((b) => /^[A-Z]/.test(b) && /\.$/.test(b))), exp.map((e) => e.bullets.slice(0, 4)));
+  // D9 (session 6): the skills line wraps after "Budget"; it is one skill.
+  const skills = (r.partial?.skills ?? []).map((s) => s.name ?? s);
+  check("s5-long-wrapped.pdf", "\"Budget Control\" is one skill (D9)", skills.includes("Budget Control") && !skills.includes("Budget") && !skills.includes("Control"), skills);
+  check("s5-long-wrapped.pdf", "10 skills, as written (D9)", skills.length === 10, skills);
 }
 {
   const r = await expectImport("s5-header-table.docx", 6);

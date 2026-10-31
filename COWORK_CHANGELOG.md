@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-10-31 23:40] Import: a skill list wrapped across two PDF lines keeps its items whole (session 5 D9)
+
+**Goal:** Minor defect D9 (IMPORT_MONITORING.md §8.3): "… · SLA Reporting · Budget" / "Control · Civil Defence …"
+imported as the two skills "Budget" and "Control".
+**Files:**
+- edited: `lib/importers/textParser.ts`: `parseTextToDocument(text, { softWrapped })`; `joinWrappedListLines` runs on
+  the Skills and Languages buffers before `flattenList`. A line joins the next only when it is a list (≥2 separators)
+  not ending in a separator, ran to the right margin (≥75% of the widest line in the document), the next line does not
+  open with a separator, bullet or "Label:", and the joined item stays item-sized (≤4 words, ≤40 chars).
+- edited: `lib/importers/pdfAdapter.ts`: passes `{ softWrapped: true }` (DOCX and the resume-checker path do not:
+  a Word paragraph break is the author's).
+- edited: `scripts/parser-fixtures.test.cjs` (wrapped list joined; DOCX not joined; guards for a short author-broken
+  line, a "Label:" line and a run-on), `scripts/import-fixtures.test.mjs` (s5-long-wrapped.pdf: "Budget Control", 10
+  skills).
+**Notes / risks / follow-up:** the margin test is character-count based; a PDF whose widest line is an outlier (merged
+two-column line) just disables the join, the safe direction.
+**Suggested commit:** fix(import): join skill lists wrapped across PDF lines (D9)
+
 ## [2026-10-31 23:30] Import: the review says when pages past 30 were not read (session 5 D7a)
 
 **Goal:** Minor defect D7(a) (IMPORT_MONITORING.md §8.3): a PDF longer than `MAX_PDF_PAGES` (30) imported with the

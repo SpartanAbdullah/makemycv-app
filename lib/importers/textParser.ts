@@ -931,6 +931,78 @@ function parseCertificationsBlock(lines: string[]): ParsedCertification[] {
 
 // ── Skills / Languages block parsing ─────────────────────────────────────────
 
+const LIST_SEP_RE = /[,;|·•]/;
+const LIST_SEP_GLOBAL_RE = /[,;|·•]/g;
+
+/** Options for text that comes from a PDF text layer. */
+export type ParseTextOptions = {
+  /**
+   * The text was laid out by a renderer that wraps lines at the right margin
+   * (a PDF). Only then can two physical lines be halves of one item; DOCX
+   * text (mammoth) has one paragraph per line and never wraps.
+   */
+  softWrapped?: boolean;
+};
+
+/** A physical line at least this share of the widest line ran to the margin. */
+const WRAP_FILL_RATIO = 0.75;
+
+/**
+ * Widest line in the document, in characters: the stand-in for the text
+ * column when the source is soft-wrapped; 0 (= never treat a line as
+ * wrapped) otherwise. A single over-long line only makes the test stricter.
+ */
+function wrapWidthOf(lines: string[], opts: ParseTextOptions): number {
+  if (!opts.softWrapped) return 0;
+  return lines.reduce((m, l) => Math.max(m, l.length), 0);
+}
+
+/** Did this physical line run to the right margin (so the renderer wrapped it)? */
+function reachesMargin(line: string, wrapWidth: number): boolean {
+  return wrapWidth > 0 && line.length >= wrapWidth * WRAP_FILL_RATIO;
+}
+
+/**
+ * D9 (session 5): a separator list that wraps in a PDF splits the item at the
+ * wrap ("… · SLA Reporting · Budget" / "Control · Civil Defence …" gave the
+ * skills "Budget" and "Control"). Join a line to the next when ALL hold:
+ *  - the line is a list (≥2 separators) and does not end with a separator;
+ *  - it ran to the right margin (so the break is the renderer's, not the
+ *    author's: an author-broken list stops short of the margin);
+ *  - the next line does not start with a separator, a bullet, or a "Label:";
+ *  - the item the join produces is still item-sized (≤4 words, ≤40 chars).
+ * Two real skills on either side of an author's line break fail the margin
+ * test; a run-on fails the size test. No-op unless `wrapWidth` > 0.
+ */
+function joinWrappedListLines(lines: string[], wrapWidth: number): string[] {
+  if (wrapWidth <= 0) return lines;
+  const out: string[] = [];
+  let prevPhysical: string | undefined;
+  for (const line of lines) {
+    if (prevPhysical !== undefined && isWrappedListPair(prevPhysical, line, wrapWidth)) {
+      out[out.length - 1] = `${out[out.length - 1]} ${line}`;
+    } else {
+      out.push(line);
+    }
+    prevPhysical = line;
+  }
+  return out;
+}
+
+/** `prev` and `next` are consecutive PHYSICAL lines of one list block. */
+function isWrappedListPair(prev: string, next: string, wrapWidth: number): boolean {
+  if ((prev.match(LIST_SEP_GLOBAL_RE)?.length ?? 0) < 2) return false;
+  if (/[,;|·•]\s*$/.test(prev)) return false;
+  if (!reachesMargin(prev, wrapWidth)) return false;
+  if (/^\s*[,;|·•]/.test(next) || isBulletLine(next)) return false;
+  const head = next.split(LIST_SEP_RE)[0].trim();
+  if (!head || head.includes(":")) return false;
+  const tail = prev.split(LIST_SEP_RE).pop()?.trim() ?? "";
+  if (!tail) return false;
+  const joined = `${tail} ${head}`;
+  return joined.length <= 40 && joined.split(/\s+/).length <= 4;
+}
+
 function flattenList(lines: string[]): string[] {
   return lines
     .flatMap((l) => l.split(/[,;|·•]/))
@@ -1571,7 +1643,10 @@ function harvestContact(lines: string[]): {
 
 // ── Public entry point ───────────────────────────────────────────────────────
 
-export function parseTextToDocument(text: string): ParsedDocument {
+export function parseTextToDocument(
+  text: string,
+  opts: ParseTextOptions = {},
+): ParsedDocument {
   // Normalise: split, trim, drop empty. We keep an index-aligned array so the
   // contact harvester can mark lines as consumed.
   const rawLines = text.split(/\r?\n/);
@@ -1674,12 +1749,15 @@ export function parseTextToDocument(text: string): ParsedDocument {
   // dropped — nothing the parser detects gets discarded any more.
   result.projects = parseProjectsBlock(buffers.projects);
 
-  result.skills = flattenList(buffers.skills);
+  // D9: rejoin list items the PDF renderer wrapped across two lines (PDF only,
+  // see joinWrappedListLines for the guards).
+  const wrapWidth = wrapWidthOf(lines, opts);
+  result.skills = flattenList(joinWrappedListLines(buffers.skills, wrapWidth));
 
   // Languages: `languages` stays the plain name list (its consumers all read
   // names), and `languageDetails` carries the same entries with the stated
   // proficiency mapped to CvLanguage.level. The two are index-aligned.
-  const parsedLanguages = flattenList(buffers.languages)
+  const parsedLanguages = flattenList(joinWrappedListLines(buffers.languages, wrapWidth))
     .map(parseLanguageEntry)
     .filter((l) => l.name);
   result.languages = parsedLanguages.map((l) => l.name);

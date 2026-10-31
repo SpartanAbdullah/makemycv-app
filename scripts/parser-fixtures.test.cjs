@@ -56,8 +56,8 @@ const run = (name) => {
 
 // Inline-text variant of `run` for targeted single-behaviour checks that don't
 // warrant a whole fixture file. Same parser, same reporting.
-const runText = (label, text) => {
-  const doc = parseTextToDocument(text);
+const runText = (label, text, opts) => {
+  const doc = parseTextToDocument(text, opts);
   if (process.env.DUMP) {
     console.log(`\n===== ${label} (inline) =====`);
     console.log(JSON.stringify(doc, null, 2));
@@ -888,6 +888,60 @@ const runText = (label, text) => {
   ].join("\n"));
   check(f, "salutation skipped as name", d.contact.name === "Noor Testwell", d.contact.name);
   check(f, "salutation skipped as headline", d.contact.headline === "Facilities Manager", d.contact.headline);
+}
+
+/* ── D9 (session 6): skill lists wrapped across two PDF lines ─────────────
+   The PDF adapter passes { softWrapped: true }; the widest line stands in for
+   the text column. "Budget" / "Control" is one skill the renderer wrapped. */
+const D9_HEAD = [
+  "Noor Testwell",
+  "noor.testwell@example.com",
+  "SUMMARY",
+  // 115 chars: the widest line, i.e. the column width for the wrap test.
+  "Facilities operations manager with eleven years across mixed-use towers, a 210-bed hospital and a university campus.",
+  "SKILLS",
+];
+const D9_WRAPPED = [
+  "CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · SLA Reporting · Budget",
+  "Control · Civil Defence Compliance · Energy Management · Contract Negotiation · Team Leadership",
+];
+{
+  const f = "d9-wrapped-skill-list (inline, PDF)";
+  const d = runText(f, [...D9_HEAD, ...D9_WRAPPED].join("\n"), { softWrapped: true });
+  check(f, "\"Budget Control\" is one skill", d.skills.includes("Budget Control"), d.skills);
+  check(f, "no \"Budget\" / \"Control\" halves", !d.skills.includes("Budget") && !d.skills.includes("Control"), d.skills);
+  check(f, "10 skills", d.skills.length === 10, d.skills);
+}
+{
+  // Same lines from a DOCX (no soft wraps): left alone — a Word paragraph
+  // break is the author's.
+  const f = "d9-not-soft-wrapped (inline, DOCX)";
+  const d = runText(f, [...D9_HEAD, ...D9_WRAPPED].join("\n"));
+  check(f, "no join without softWrapped", d.skills.includes("Budget") && d.skills.includes("Control"), d.skills);
+}
+{
+  // Guard: an author-broken list stops short of the margin — two real skills.
+  const f = "d9-guard-short-line (inline, PDF)";
+  const d = runText(f, [...D9_HEAD, "Python · SQL · Excel · Oracle Fusion", "Power BI · Tableau · SAP Ariba"].join("\n"), { softWrapped: true });
+  check(f, "\"Oracle Fusion\" and \"Power BI\" stay apart", d.skills.includes("Oracle Fusion") && d.skills.includes("Power BI"), d.skills);
+}
+{
+  // Guard: the next line opens with a "Label:" — a new list, not a wrap.
+  const f = "d9-guard-label (inline, PDF)";
+  const d = runText(f, [...D9_HEAD,
+    "Technical: CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · BMS Controls",
+    "Soft skills: Team Leadership · Negotiation",
+  ].join("\n"), { softWrapped: true });
+  check(f, "\"BMS Controls\" not joined to the next label", d.skills.some((s) => /BMS Controls$/.test(s)) && !d.skills.some((s) => /Controls Soft/.test(s)), d.skills);
+}
+{
+  // Guard: the join would make a run-on, not an item (> 4 words).
+  const f = "d9-guard-item-size (inline, PDF)";
+  const d = runText(f, [...D9_HEAD,
+    "CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · Preventive Maintenance Planning",
+    "Civil Defence Compliance · Energy Management",
+  ].join("\n"), { softWrapped: true });
+  check(f, "no 5-word joined item", d.skills.includes("Preventive Maintenance Planning") && d.skills.includes("Civil Defence Compliance"), d.skills);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

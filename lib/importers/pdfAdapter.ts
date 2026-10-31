@@ -314,7 +314,8 @@ export async function parsePdfBytes(
   }
   let parsed: ParsedDocument;
   try {
-    parsed = parseTextToDocument(text);
+    // A PDF text layer is soft-wrapped at the right margin (D9, session 6).
+    parsed = parseTextToDocument(text, { softWrapped: true });
   } catch (err) {
     throw toImportParseError(err);
   }
