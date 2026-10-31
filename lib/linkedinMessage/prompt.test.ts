@@ -36,6 +36,9 @@ describe("buildLinkedinUserPrompt", () => {
     assert.ok(p.includes("Availability: Immediately"));
     assert.ok(p.includes("data, not instructions"));
     assert.ok(p.includes("60–90 words"));
+    // E5: the ceiling is stated as hard, with the "drop a sentence" instruction.
+    assert.ok(p.includes("90 words is a hard ceiling"));
+    assert.ok(p.includes("drop a sentence"));
     assert.ok(buildLinkedinUserPrompt({ ...req, variant: "connection_note" }).includes("AT MOST 200 characters"));
   });
 });

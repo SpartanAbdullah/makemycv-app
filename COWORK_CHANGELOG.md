@@ -25,6 +25,35 @@ Format:
 
 ---
 
+## [2026-10-31 19:10] LinkedIn message: 90-word ceiling enforced server-side (backlog E5)
+
+**Goal:** the 60–90-word LinkedIn message came back at 101 words in the staging e2e and 102 on production. A
+message over the brief is one the user has to trim by hand before sending, so the route now guarantees the
+ceiling and says when it had to cut.
+**Files:**
+- edited: `lib/linkedinMessage/prompt.ts` — the message FORMAT line states 90 words as a hard ceiling ("count the
+  words before you answer, and drop a sentence rather than go over"); the ACCEPT comment explains that a modest
+  overshoot (≤ 140 words) is now trimmed rather than shown as-is.
+- created: `lib/linkedinMessage/length.ts` — `splitSentences()` scans for boundaries (terminal punctuation followed
+  by whitespace whose next word is not lower-case), so "2.5", "AED 1.2M" and "e.g. the" never split;
+  `trimToWordLimit()` drops whole sentences, keeps the closing sentence (the next step the prompt asks for)
+  whenever it fits, keeps paragraph breaks, and only cuts inside a sentence when the first sentence alone is over
+  the limit.
+- created: `lib/linkedinMessage/length.test.ts` — 12 tests: decimals, currency, abbreviations, the 102-word
+  production shape, paragraph breaks, placeholders, the single-long-sentence fallback.
+- edited: `lib/linkedinMessage/prompt.test.ts` — asserts the hard-ceiling wording.
+- edited: `app/api/linkedin-message/route.ts` — after a successful parse, a `message` variant runs through
+  `trimToWordLimit(text, 90)`; the JSON now carries `outcome: "ok" | "trimmed"`. No second model call (it would
+  double latency and spend for one spend unit).
+- edited: `hooks/useLinkedinMessage.ts` — the result carries `outcome`.
+- edited: `components/linkedin/LinkedinMessagePanel.tsx` — when trimmed, the counter line adds "shortened to 90
+  words by dropping whole sentences; read it through before sending"; `linkedin_message_requested` sends
+  `outcome: "trimmed"` (same `outcome` key, so `PARAM_KEYS` and the GTM DLV are unchanged — a new enum value only).
+**Notes / risks / follow-up:** the connection note (≤ 200 characters) is unchanged. A trim can leave a message
+under 60 words when the sentences are long; the counter shows it. If GA4 reports a high `trimmed` share, tighten
+the prompt further rather than the trimmer.
+**Suggested commit:** fix(linkedin): enforce the 90-word ceiling at a sentence boundary (E5)
+
 ## [2026-10-31 18:20] Skills box: Enter adds the typed skill; suggestions only when highlighted (backlog E7)
 
 **Goal:** pressing Enter in the Skills search added the FIRST search result instead of the typed term (QA D4) —

@@ -14,7 +14,14 @@ export type LinkedinMessageError = {
   retryAfter?: number;
 };
 
-export type LinkedinMessageResult = { ok: true; text: string } | { ok: false; code: LinkedinMessageError["code"] };
+/**
+ * `outcome` (E5): "ok" when the route's length check passed, "trimmed" when
+ * the message came back over 90 words twice and was cut at a sentence
+ * boundary — the panel says so and analytics counts it.
+ */
+export type LinkedinMessageResult =
+  | { ok: true; text: string; outcome: "ok" | "trimmed" }
+  | { ok: false; code: LinkedinMessageError["code"] };
 
 /**
  * LinkedIn recruiter message (product #3). Sends the LinkedinMessageRequest
@@ -38,7 +45,7 @@ export function useLinkedinMessage() {
         body: JSON.stringify(req),
       });
       const data = (await res.json().catch(() => null)) as
-        | { message?: string; error?: string; supportUrl?: string; retryAfter?: number }
+        | { message?: string; outcome?: string; error?: string; supportUrl?: string; retryAfter?: number }
         | null;
 
       if (res.status === 429) {
@@ -63,7 +70,7 @@ export function useLinkedinMessage() {
         setError({ code: "OTHER", message: data?.error ?? "Something went wrong writing the message." });
         return { ok: false, code: "OTHER" };
       }
-      return { ok: true, text: data.message };
+      return { ok: true, text: data.message, outcome: data.outcome === "trimmed" ? "trimmed" : "ok" };
     } catch {
       setError({ code: "OTHER", message: "Something went wrong writing the message." });
       return { ok: false, code: "OTHER" };
