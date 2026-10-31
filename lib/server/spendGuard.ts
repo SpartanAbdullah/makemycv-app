@@ -10,7 +10,8 @@
 // Budget model: a call costs "units" that reflect relative Anthropic cost.
 // /api/resume-checker/parse sends up to 100k chars with max_tokens 4096, so it
 // costs 3 units; the other routes (ai-improve, jd-match, rewrite-bullet,
-// cover-letter) are small prompts with max_tokens ≤ 2048 and cost 1 unit each.
+// cover-letter, linkedin-message) are small prompts with max_tokens ≤ 2048
+// and cost 1 unit each.
 //
 // Backing store: the same @vercel/kv instance the per-IP limiters use — one
 // INCRBY per guarded call on a UTC-dated key ("aiGuard:daily:<yyyy-mm-dd>")

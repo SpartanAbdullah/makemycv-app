@@ -61,6 +61,9 @@ const PARAM_KEYS = [
   // value from one event can never ride along on the next
   "step_number", "step_id", "file_type", "error_reason", "merge_mode", "sections_filled",
   "outcome", "with_job_text", "placeholders", "cta_location", "template_id", "cups",
+  // linkedin_message_requested / linkedin_message_copied (2026-10-31):
+  // variant = "message" | "connection_note"; over_cap = note longer than 200.
+  "variant", "over_cap",
 ] as const;
 const PARAM_RESET: Record<(typeof PARAM_KEYS)[number], undefined> = Object.fromEntries(
   PARAM_KEYS.map((k) => [k, undefined]),

@@ -556,6 +556,16 @@ export const ReviewStep = ({
               <Icon name="edit" size={14} />
               Write a cover letter
             </Link>
+            {/* LinkedIn recruiter message (product #3, 2026-10-31) — same
+                peer offer, same disclosure-before-send pattern on its page. */}
+            <Link
+              href="/linkedin-message"
+              className="cv-btn-secondary"
+              style={{ width: "100%", textDecoration: "none" }}
+            >
+              <Icon name="linkedin" size={14} />
+              Message the recruiter on LinkedIn
+            </Link>
             <div style={{ textAlign: "center" }}>
               <ShareScoreCard total={score.total} />
             </div>

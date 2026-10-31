@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { stashCoverLetterSeed } from "../coverletter/CoverLetterPanel";
+import { stashLinkedinMessageSeed } from "../linkedin/LinkedinMessagePanel";
 import { bindCvStorage, useCvStore } from "../../lib/store/cvStore";
 import { useJdMatch } from "../../hooks/useJdMatch";
 import { inferRoleFamily } from "../../lib/data/roleFamily";
@@ -790,17 +791,25 @@ export const JdMatchPanel = () => {
                   )}
 
                   {/* Friendly in-flow discovery (CLAUDE.md): the cover letter
-                      is offered as a peer would, once there is a role to
-                      write for. The role title + pasted ad travel in
-                      sessionStorage; the CV never does. */}
+                      and the LinkedIn message are offered as a peer would,
+                      once there is a role to write for. The role title +
+                      pasted ad travel in sessionStorage; the CV never does. */}
                   <p style={{ fontSize: 13, color: "var(--ff-muted)", margin: 0, lineHeight: 1.5 }}>
-                    Did you know? You can also get a short cover letter written for this role from your CV.{" "}
+                    Did you know? You can also get a short cover letter, or a LinkedIn message to the recruiter, written for
+                    this role from your CV.{" "}
                     <Link
                       href="/cover-letter"
                       onClick={() => stashCoverLetterSeed({ jobTitle: result.jobTitle ?? undefined, jobText: analyzedText })}
                       style={{ color: "var(--ff-accent-dark)", fontWeight: 600 }}
                     >
-                      Write it →
+                      Write the letter →
+                    </Link>{" "}
+                    <Link
+                      href="/linkedin-message"
+                      onClick={() => stashLinkedinMessageSeed({ jobText: analyzedText })}
+                      style={{ color: "var(--ff-accent-dark)", fontWeight: 600 }}
+                    >
+                      Write the message →
                     </Link>
                   </p>
 

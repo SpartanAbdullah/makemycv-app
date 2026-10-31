@@ -125,6 +125,61 @@ missing email is reported as "the text has no email address", never as a claim a
 sessionStorage record holds the CV text per tab until the tab closes — same device, same browser, never
 sent. `npm run test:migrate` does not exist in package.json (migrate.test.ts runs under `test:unit`).
 **Suggested commit:** feat(checker): "What the ATS sees" extracted-text preview with lost-content notes
+## [2026-10-31 08:30] LinkedIn recruiter message v1 — `/linkedin-message`, written from a disclosed CV excerpt
+
+**Goal:** Product #3 in CLAUDE.md (docs/ai-mission/AI_FEATURES.md #1), planned since May and never built. A
+60–90-word first-person message to the recruiter / hiring manager about one pasted role — or a ≤200-character
+connection-request note — generated from the user's own CV with the cover letter's truthfulness contract
+(`{{number}}` placeholders, refusal is a valid output) and the same disclosure-before-send pattern. Copy-only.
+**Files:**
+- created: `lib/linkedinMessage/payload.ts` (+ `payload.test.ts`, 7 tests) — THE place that decides what leaves
+  the browser: headline, latest non-blank role (title, company, ≤2 bullets ≤200 chars), ≤3 skill names, visa +
+  availability. No name, contact details, LinkedIn handle, photo, summary, dates, education, certifications or
+  languages (the test pins the exact key set). The pasted job / recruiter text is REQUIRED (≥30 chars, ≤3,000).
+  Client builds it, server re-parses and re-clips it (`parseLinkedinMessageRequest`); an unknown `variant`
+  falls back to `message`.
+- created: `lib/linkedinMessage/prompt.ts` (+ `prompt.test.ts`, 6 tests) — system prompt (UK English, first
+  person, no flattery, no invented facts or names, `{{number}}` for any figure not in the excerpt, REFUSE with
+  `{"refusal": …}` when the paste is not a job / recruiter context, paste treated as data), per-variant format
+  instruction, and `parseLinkedinModelOutput` (fence-tolerant JSON, placeholder normalisation, refusal
+  surfaced as its own outcome, length tolerance 35–140 words / ≤240 chars so the route retries wild misses).
+  Pure so the refusal and validation paths are tested without an API key.
+- created: `app/api/linkedin-message/route.ts` — Haiku 5.5 via `CLAUDE_MODEL`/`CLAUDE_EFFORT`, per-IP 6/24h +
+  2/60s (`mmcv_li_daily` / `mmcv_li_burst`), 1 spend unit through `takeSpendUnits`, retry-once, 400 on an
+  unusable body, 422 `{error:"refused"}` on a model refusal, 502 when nothing usable came back.
+- created: `hooks/useLinkedinMessage.ts` — fetch + RATE_LIMITED / REFUSED / OTHER; `generate` returns the
+  outcome so the panel logs it without a re-render.
+- created: `components/linkedin/LinkedinMessagePanel.tsx` — paste box with live `n / 3,000` count, Format
+  toggle (Message 60–90 words / Connection note ≤200 chars, `aria-pressed`), disclosure box computed from the
+  live excerpt, result with `PlaceholderText`, Edit toggle, Copy disabled while a placeholder remains, live
+  word/char count (red + "LinkedIn will cut this off" when a note exceeds 200), refusal shown as a plain
+  `role=status` line, empty-CV guide. Reads the JD Match seed (`stashLinkedinMessageSeed`,
+  `makemycv:linkedinMessageSeed` in sessionStorage) in the state initialiser — the form mounts only after
+  `hydrated`, so no setState-in-effect and no SSR mismatch. `track("linkedin_message_requested" |
+  "linkedin_message_copied")` with enum params only (`variant`, `outcome`, `placeholders`, `over_cap`).
+- created: `app/linkedin-message/page.tsx` — noindex, same shell as `/cover-letter`.
+- edited: `components/builder/steps/ReviewStep.tsx` — "Message the recruiter on LinkedIn" under "Write a cover letter".
+- edited: `components/jdmatch/JdMatchPanel.tsx` — the peer nudge now offers both ("Write the letter → · Write
+  the message →"); the message link seeds only the pasted ad. The CV still never leaves JD Match.
+- edited: `lib/analytics.ts` — `PARAM_KEYS` + `variant`, `over_cap`.
+- edited: `lib/server/spendGuard.ts` — comment counts six 1-unit routes.
+- edited: `eslint.config.mjs` — `.pdf-fidelity-build/**` and `.fidelity-pdfs/**` ignored. The fidelity
+  harness (dea8944) writes compiled JS there; in a checkout that has run it, `npm run lint` reported 167
+  errors from that transient output (the `.*-test-build/**` glob does not match the name). Real count was
+  and is 11 warnings.
+- edited: `CLAUDE.md` — product #3 marked shipped, route map, privacy section names the second excerpt.
+**Notes / risks / follow-up:** Gates: tsc clean, lint 11/11 (no new warnings), test:unit 445/445 (incl. 13 new),
+test:parser 191/191, migrate 26/26, `next build`, `smoke:builder` 27/27 (every PASS the script emits; the earlier "28" counted a step that prints none) against `next start -p 3200`, plus an ad-hoc Playwright pass over `/linkedin-message` itself (18/18: empty-CV guide, disclosure lists headline / latest role with 2 bullets / 3 skills / visa line, Generate gated on CV + ≥30-char paste, Format toggle `aria-pressed`, the captured POST body has exactly `cv`/`jobText`/`variant` and no name/email/phone/summary/dates, 429 renders as `role=alert`, axe 0 violations).
+No `ANTHROPIC_API_KEY` on this machine, so the live route was NOT exercised end to end: the route's input
+validation (400) and "API not configured" (500) paths were checked over HTTP against the production build,
+and the refusal / placeholder / length paths against canned model replies in `prompt.test.ts`. First live
+run should confirm Haiku respects the `{"refusal": …}` contract and the 200-char note cap. **Owner, same
+release:** add the LinkedIn message to the AI-features paragraph of `makemycv-site/app/privacy/page.tsx`
+(lines ~155–166 name the cover letter writer and its excerpt) — not touched from this worktree. Also: two new
+GTM triggers + tags (`linkedin_message_requested`, `linkedin_message_copied`) and the `variant` / `over_cap`
+Data Layer Variables. Not done in v1: tone options, a per-recruiter name field (deliberately — the model may
+only use a name that appears in the paste).
+**Suggested commit:** feat(linkedin): recruiter outreach message from a disclosed CV excerpt
 
 ## [2026-10-31 06:15] PDF fidelity harness (preview vs PDF, 14 × 3) + Professional name/headline overprint fix
 

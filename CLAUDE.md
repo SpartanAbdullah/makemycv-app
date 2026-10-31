@@ -19,7 +19,14 @@ Three things, and only these three:
    one place that decides what leaves the browser); `{{number}}` placeholders
    block copy/download until the user fills them in. Entry points: the Review
    step and a nudge under the JD Match score.
-3. **Customised LinkedIn recruiter outreach message** — planned, **not built**.
+3. **Customised LinkedIn recruiter outreach message** — v1 shipped 2026-10-31
+   (`/linkedin-message`). Same architecture as the cover letter with a smaller
+   excerpt (`lib/linkedinMessage/payload.ts`: headline, latest role + ≤2
+   bullets, ≤3 skills, visa/availability — no name, no summary) plus the pasted
+   job / recruiter text (required). 60–90-word message or a ≤200-character
+   connection note, copy-only, `{{number}}` placeholders block copy, and the
+   route answers 422 when the model refuses because the paste is not a job /
+   recruiter context. Entry points: the Review step and the JD Match nudge.
 
 **We are not a job board and we do not aggregate job postings.** Features that
 ingest, list, search or recommend live vacancies are out of scope. A job
@@ -61,12 +68,13 @@ brand-level UI changes rather than re-deriving them.
 
 This app (app.makemycv.ae): `/builder` (the CV builder, entry
 `components/builder/BuilderShell.tsx`), `/jd-match`, `/cover-letter`,
-`/resume-checker`, `/preview`. Server routes live in `app/api/` (`ai-improve`,
-`jd-match`, `cover-letter`, `resume-checker`, `coupons`, `health`, and the
-feedback trio `rating`, `ratings/summary`, `subscribe`), rate-limited and
-spend-capped through `lib/server/`. Everything CV-shaped stays
-client-side (see privacy below) — the cover letter is the one disclosed
-exception, and it sends an excerpt, not the CV.
+`/linkedin-message`, `/resume-checker`, `/preview`. Server routes live in
+`app/api/` (`ai-improve`, `jd-match`, `cover-letter`, `linkedin-message`,
+`resume-checker`, `coupons`, `health`, and the feedback trio `rating`,
+`ratings/summary`, `subscribe`), rate-limited and spend-capped through
+`lib/server/`. Everything CV-shaped stays client-side (see privacy below) —
+the cover letter and the LinkedIn message are the two disclosed exceptions,
+and each sends an excerpt, not the CV.
 
 ---
 
@@ -94,7 +102,11 @@ implementation detail.
   `lib/coverLetter/payload.ts` (headline, summary, latest role + ≤4 bullets,
   ≤12 skill names, visa/availability — never contact details or the photo),
   the page says so above the button, and the privacy policy on www names it.
-  Widening that excerpt means updating all three.
+  Widening that excerpt means updating all three. The LinkedIn message
+  (2026-10-31) is the second, with a smaller excerpt in
+  `lib/linkedinMessage/payload.ts` (headline, latest role + ≤2 bullets, ≤3
+  skill names, visa/availability — no name, summary, contact details or
+  photo) plus the pasted job / recruiter text; same three places to update.
 
 - **Feedback data (2026-10) is the one thing we store about people**, and it
   lives in Supabase (EU region) behind the service-role key in
