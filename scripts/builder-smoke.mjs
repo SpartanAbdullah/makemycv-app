@@ -136,6 +136,36 @@ await continueOnce(page, /Continue to Skills/, "skills");
 const skillBox = page.getByLabel("Search skills, or describe what you do");
 await skillBox.fill("Fleet management");
 await skillBox.press("Enter");
+// E7 (QA D4): Enter adds what was TYPED. Before the fix it added the first
+// suggestion instead — a silent substitution of a competency claim.
+{
+  const typedChip = page.getByRole("button", { name: "Remove Fleet management", exact: true });
+  if (await typedChip.waitFor({ timeout: 3000 }).then(() => true).catch(() => false)) {
+    ok('Skills: Enter adds the typed "Fleet management" as written');
+  } else {
+    const chips = await page.getByRole("button", { name: /^Remove / }).allTextContents().catch(() => []);
+    fail('Skills: Enter adds the typed "Fleet management" as written', `chips: ${JSON.stringify(chips)}`);
+  }
+}
+// …and a suggestion is taken only when the arrow keys highlighted it.
+{
+  await skillBox.fill("excel");
+  const firstOption = page.getByRole("option").first();
+  const present = await firstOption.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+  const optionName = present ? ((await firstOption.locator("span").first().textContent()) ?? "").trim() : "";
+  if (!optionName) {
+    console.log('INFO  Skills: no suggestion for "excel" in this build — arrow-key check skipped');
+    await skillBox.fill("");
+  } else {
+    await skillBox.press("ArrowDown");
+    const selected = await firstOption.getAttribute("aria-selected");
+    await skillBox.press("Enter");
+    const pickedChip = page.getByRole("button", { name: `Remove ${optionName}`, exact: true });
+    const added = await pickedChip.waitFor({ timeout: 3000 }).then(() => true).catch(() => false);
+    if (selected === "true" && added) ok(`Skills: ArrowDown + Enter adds the highlighted suggestion "${optionName}"`);
+    else fail(`Skills: ArrowDown + Enter adds the highlighted suggestion "${optionName}"`, `aria-selected=${selected}, chip added=${added}`);
+  }
+}
 await continueOnce(page, "Continue →", "languages");
 await continueOnce(page, "Continue →", "certifications");
 await continueOnce(page, "Skip for now", "projects");

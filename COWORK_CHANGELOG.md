@@ -25,6 +25,31 @@ Format:
 
 ---
 
+## [2026-10-31 18:20] Skills box: Enter adds the typed skill; suggestions only when highlighted (backlog E7)
+
+**Goal:** pressing Enter in the Skills search added the FIRST search result instead of the typed term (QA D4) —
+"Fleet management" became whichever bank entry ranked first, a silent substitution of a competency claim on a
+document the user submits to an employer. Suggestions are options, never corrections (CLAUDE.md truthfulness rules).
+**Files:**
+- created: `lib/skills/enterKey.ts` — the pure rule: `resolveEnter(query, results, highlighted)` returns the typed
+  text (trimmed) unless a suggestion index is highlighted; `moveHighlight()` clamps ArrowDown/ArrowUp over the
+  pickable rows (-1 = "as written", no wrap); `pickableResults()` drops `alreadyHave` notes.
+- created: `lib/skills/enterKey.test.ts` — 10 tests incl. the reported bug, trimming, the alreadyHave skip and
+  stale highlights.
+- edited: `components/builder/steps/SkillsStep.tsx` — `highlighted` state reset on every keystroke; ArrowDown /
+  ArrowUp move it; Enter goes through `resolveEnter` (a highlighted suggestion still passes the licence guard and
+  `addSkill`'s duplicate check exactly as a click would); the input carries `aria-controls` (only while the listbox
+  is rendered) and `aria-activedescendant`; option rows get ids, `aria-selected` and a visible highlight; the
+  "Add … as written" row shows an "Enter ↵" hint (or "↑ for as written" when a row is highlighted).
+- edited: `scripts/builder-smoke.mjs` — after typing "Fleet management" + Enter it asserts the chip `Remove Fleet
+  management` exists (typed text, not a substitute), then types "excel", ArrowDown, Enter and asserts the
+  highlighted option (aria-selected=true) is the chip that was added.
+**Notes / risks / follow-up:** The Add button and the "as written" row were already typed-text paths; only the Enter
+key changed. Dedupe is unchanged (`addSkill` → "X is already on your list"). No `role="combobox"` was added — the
+textbox + listbox pairing with `aria-activedescendant` is valid ARIA and keeps the axe surface in `smoke:builder`
+unchanged.
+**Suggested commit:** fix(skills): Enter adds the typed skill, suggestions only via arrow keys (E7)
+
 ## [2026-10-31 18:05] Consent banner no longer covers modal dialogs (backlog E9)
 
 **Goal:** on production at 1440×900 the cookie-consent banner (fixed bottom, `z-index: 1000`) sat on top of the
