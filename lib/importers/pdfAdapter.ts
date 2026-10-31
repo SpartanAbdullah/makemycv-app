@@ -121,6 +121,10 @@ function reconstructLines(items: PdfTextItemLike[]): string[] {
   });
 }
 
+/** A line that is only a page number: "Page 2 of 31", "Page 3", "2 / 5", "- 4 -". */
+const PAGE_FOOTER_RE =
+  /^(?:page\s+\d+(?:\s*(?:of|\/)\s*\d+)?|\d+\s*(?:of|\/)\s*\d+|[-–—]\s*\d+\s*[-–—])$/i;
+
 /* ── pdf.js plumbing ────────────────────────────────────────────────────── */
 
 /** The slice of pdfjs-dist this module uses. Structural so the Node suite can
@@ -187,7 +191,11 @@ export async function extractPdfText(
     for (let pageNum = 1; pageNum <= Math.min(pages, maxPages); pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
-      const lines = reconstructLines(content.items as PdfTextItemLike[]);
+      // D7b (session 5): "Page 2 of 3" footers sat inside the Experience
+      // section and became phantom roles; a page-number line carries nothing.
+      const lines = reconstructLines(content.items as PdfTextItemLike[]).filter(
+        (l) => !PAGE_FOOTER_RE.test(l),
+      );
       pageTexts.push(lines.join("\n"));
     }
     return { text: pageTexts.join("\n\n"), pages };

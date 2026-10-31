@@ -205,6 +205,15 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   check("s5-cover-letter-contact.pdf", "salutation is not the headline (D8)", !/dear/i.test(p.headline ?? ""), p.headline);
 }
 
+{
+  // D7b: session-5 matrix case 7 — 31 pages with "Page N of 31" footers.
+  // The footers used to become 10 phantom roles ("Page 2 of 31" …).
+  const r = await runImport("s5-31-pages.pdf", bytesOf("s5-31-pages.pdf"));
+  const exp = r.partial?.experience ?? [];
+  check("s5-31-pages.pdf", "no \"Page N of M\" roles or bullets (D7b)", !/Page \d+ of \d+/.test(JSON.stringify(exp)), exp.map((e) => e.role));
+  check("s5-31-pages.pdf", "the one real role, dated, 2 bullets", exp.length === 1 && exp[0]?.startDate === "Mar 2021" && exp[0]?.bullets.length === 2, exp);
+}
+
 /* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
    s5-arabic-majority.pdf = session-5 matrix case 3 (Arabic headings, Latin
    email line, Vazirmatn shaped by react-pdf). arabic-export-classic.pdf = a

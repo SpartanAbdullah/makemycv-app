@@ -25,6 +25,21 @@ Format:
 
 ---
 
+## [2026-10-31 22:50] Import: "Page N of M" footers no longer become roles (session 5 D7b)
+
+**Goal:** Minor defect D7(b) (IMPORT_MONITORING.md §8.3): page-number footer lines were not stripped, so a CV whose
+"Page 1 of 2" footer fell inside Experience got a phantom role or bullet (the 31-page fixture got 10 roles named
+"Page x of 31").
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` — `extractPdfText` drops lines that are only a page number
+  (`PAGE_FOOTER_RE`: "Page 2", "Page 2 of 31", "Page 2/31", "2 of 31", "2 / 31", "- 2 -"). Shared with the
+  /resume-checker client extraction.
+- created: `__fixtures__/import/s5-31-pages.pdf` (matrix case 7, persona "Noor Testwell").
+- edited: `scripts/import-fixtures.test.mjs` — no "Page N of M" in experience; the one real role, dated, 2 bullets.
+**Notes / risks / follow-up:** D7(a) is still open: pages past `MAX_PDF_PAGES` (30) are dropped with no message
+(this fixture's page 31 holds skills and education). Needs a `truncated` flag and a MappingReview line.
+**Suggested commit:** fix(import): drop page-number footer lines from PDF text (D7b)
+
 ## [2026-10-31 22:40] Import: a letter's salutation is never the headline or the name (session 5 D8)
 
 **Goal:** Minor defect D8 (IMPORT_MONITORING.md §8.3): a cover letter with a contact header imported with Headline =
