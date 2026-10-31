@@ -2,12 +2,15 @@ import {
   Document,
   Page,
   View,
-  Text,
   Image,
   StyleSheet,
-  Link,
   Font,
 } from "@react-pdf/renderer";
+// Text and Link come through the Arabic-aware wrappers: a run that contains
+// Arabic is shaped into presentation forms and set in the Arabic family as
+// ONE run (session 4, 2026-10-31 — see ArabicText.tsx and
+// lib/pdf/arabicText.ts); Latin-only runs are returned untouched.
+import { Link, Text } from "./ArabicText";
 import type { Style } from "@react-pdf/types";
 import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";

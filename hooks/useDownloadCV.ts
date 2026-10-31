@@ -32,8 +32,13 @@ export async function downloadCV(
     // Register Inter / Bricolage / Instrument Serif for react-pdf so the PDF
     // uses the same face as the on-screen preview (audit F09). Idempotent;
     // falls back to Helvetica if it ever fails.
-    const { registerPdfFonts } = await import("../lib/pdf/fonts");
+    const { registerPdfFonts, warmPdfFonts } = await import("../lib/pdf/fonts");
+    const { containsArabic } = await import("../lib/pdf/arabicText");
     registerPdfFonts();
+    // Pre-create the glyphs before the first subset (fontkit caches a glyph
+    // with the code points of its FIRST creation — see lib/pdf/fonts.ts);
+    // the Arabic face is only fetched when the CV contains Arabic.
+    await warmPdfFonts(containsArabic(JSON.stringify(data)));
 
     const doc = createElement(CVDocument, { data, plan, templateId });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
