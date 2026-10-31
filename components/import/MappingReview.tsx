@@ -9,7 +9,7 @@ import type {
   CvExperience,
   CvPersonal,
 } from "../../lib/types/cv";
-import { mapParsedToCv } from "../../lib/importers/fieldMapper";
+import { countSectionsFilled, mapParsedToCv } from "../../lib/importers/fieldMapper";
 import { getDir } from "../../lib/utils/rtl";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "../ui/ModalCloseButton";
@@ -268,15 +268,12 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
   };
 
   // ── Counts (footer button label + "no data" message) ───────────────────
-  const sectionCount = [
-    edited.personal?.firstName || edited.personal?.email ? 1 : 0,
-    edited.experience?.length ?? 0,
-    edited.education?.length ?? 0,
-    edited.skills?.length ? 1 : 0,
-    edited.languages?.length ? 1 : 0,
-    edited.certifications?.length ? 1 : 0,
-    edited.projects?.length ? 1 : 0,
-  ].reduce((a, b) => a + b, 0);
+  // D12 (session 5): the same count as the confirm toast and the
+  // `sections_filled` analytics param — Work experience and Education are one
+  // section each however many entries they hold. The button used to count
+  // every role and degree ("Import (13 sections)" for what the toast then
+  // called 6).
+  const sectionCount = countSectionsFilled(edited);
 
   const hasPersonal = Boolean(
     edited.personal &&

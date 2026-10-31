@@ -25,6 +25,17 @@ Format:
 
 ---
 
+## [2026-10-31 22:10] Import review: the button counts sections like the toast does (session 5 D12)
+
+**Goal:** Minor defect D12 (IMPORT_MONITORING.md §8.3): MappingReview's button counted every role and degree as a
+section ("Import (12 sections)") while the confirm toast and the `sections_filled` param said 6.
+**Files:**
+- edited: `components/import/MappingReview.tsx` — `sectionCount = countSectionsFilled(edited)` (the toast's and the
+  analytics param's own function), so the three can no longer drift.
+- edited: `scripts/import-smoke.mjs` — every import case asserts the button's number equals the push's
+  `sections_filled`.
+**Suggested commit:** fix(import): review button counts sections the way the toast does (D12)
+
 ## [2026-10-31 22:00] Import: Arabic PDFs keep the name, in base letters (session 5 D4, backlog E8.3)
 
 **Goal:** Major defect D4 (IMPORT_MONITORING.md §8.3) and the Arabic round-trip loss

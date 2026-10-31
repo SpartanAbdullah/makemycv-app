@@ -165,6 +165,13 @@ async function runCase(name, file, expected) {
   } else if (expected === "import") {
     if (pushes[0].event === "cv_import" && outcome.startsWith("review:") && outcome !== "review:empty") ok(`${label} — ${outcome}`);
     else fail(label, `outcome=${outcome}; ${summary}`);
+    // D12 (2026-10-31): the review button counts sections the way the push
+    // and the toast do — Work experience / Education are one section each.
+    const shown = Number(outcome.match(/\((\d+) section/)?.[1] ?? NaN);
+    if (pushes[0].event === "cv_import") {
+      if (shown === pushes[0].sections_filled) ok(`${name}: button count ${shown} = sections_filled`);
+      else fail(`${name}: button count = sections_filled`, `button ${shown}, push ${pushes[0].sections_filled}`);
+    }
   } else if (pushes[0].event === "cv_import_failed" && pushes[0].error_reason === expected && REASONS.has(expected)) {
     ok(`${label} — "${message.slice(0, 90)}"`);
   } else {
