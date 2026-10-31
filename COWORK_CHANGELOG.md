@@ -25,6 +25,29 @@ Format:
 
 ---
 
+## [2026-10-31 20:10] Import: a Word file gets the same 45 s read deadline as a PDF (session 7)
+
+**Goal:** IMPORT_MONITORING §8.6 "still open": a DOCX import had no read deadline. On a stalled connection the adapter /
+mammoth chunk kept "Reading your DOCX" up indefinitely, while a PDF gave up at 45 s (D10).
+**Files:**
+- edited: `lib/importers/importErrors.ts` - `DOCX_TIMEOUT_MS` (= `PDF_TIMEOUT_MS`), `DOCX_TIMEOUT_COPY` ("Reading this Word
+  file took too long…" — the reason's default copy names a PDF and suggests a Word version), `withDeadline` takes an
+  optional message.
+- edited: `lib/importers/docxAdapter.ts` - `docxAdapter.parse` honours `deadlineAt` over the mammoth chunk, the file read
+  and the extraction (`parseDocxBytes(…, { deadlineAt })`); the checker's `extractDocxTextInBrowser` gets its own 45 s
+  budget, like `extractPdfTextInBrowser`.
+- edited: `components/builder/BuilderShell.tsx` - the budget starts at the pick for both formats; the docxAdapter chunk
+  load is inside it.
+- edited: `lib/importers/adapter.ts` - interface comment.
+- created: `lib/importers/docxDeadline.test.ts` - a mammoth that never answers rejects with `timeout` and the Word copy
+  at the deadline; same budget as PDF; the no-deadline Node path still reads.
+- edited: `scripts/import-smoke.mjs` - `checkDocxUnderDeadline`: every script chunk requested after the builder is
+  ready is held 60 s; expects the slow-read hint at ~8 s and `cv_import_failed(timeout)` with the Word copy at ~45 s
+  (adds ~46 s to the smoke and to the production monitor).
+**Notes / risks / follow-up:** `error_reason` stays `timeout` (no new analytics value). The slow-read hint was already
+format-agnostic. mammoth cannot be aborted; after the deadline its result is ignored.
+**Suggested commit:** fix(import): Word imports get the same read deadline and timeout as PDF
+
 ## [2026-10-31 19:40] Import: Arabic right-to-left runs read in order; our Arabic Classic export round-trips again (session 7, E11.R2)
 
 **Goal:** backlog E11.R2. Since E8.2 the Arabic-first Classic export lays "role | company" and the bullet markers out

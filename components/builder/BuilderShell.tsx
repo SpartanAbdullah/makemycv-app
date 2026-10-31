@@ -29,6 +29,8 @@ import { useUiStore } from "../../lib/store/uiStore";
 import dynamic from "next/dynamic";
 import { PreviewPanel } from "../preview/PreviewPanel";
 import {
+  DOCX_TIMEOUT_COPY,
+  DOCX_TIMEOUT_MS,
   PDF_TIMEOUT_MS,
   SLOW_READ_HINT_MS,
   gateImportFile,
@@ -1173,14 +1175,24 @@ export const BuilderShell = ({
       const startedAt = Date.now();
       // D10 (session 6): the PDF budget starts at the pick, so loading the
       // adapter chunk, pdf.js and the worker probe count against it too.
-      const deadlineAt = startedAt + PDF_TIMEOUT_MS;
+      // Session 7: a Word file gets the same budget (it had none), with its
+      // own timeout copy.
+      const deadlineAt =
+        startedAt + (fileType === "docx" ? DOCX_TIMEOUT_MS : PDF_TIMEOUT_MS);
       setImportState({ phase: "parsing", source, startedAt });
       try {
         // Adapters (and the textParser they pull in) load on first import,
         // not at builder first paint (audit PERF-6).
         const adapter =
           fileType === "docx"
-            ? (await import("../../lib/importers/docxAdapter")).docxAdapter
+            ? (
+                await withDeadline(
+                  import("../../lib/importers/docxAdapter"),
+                  deadlineAt,
+                  undefined,
+                  DOCX_TIMEOUT_COPY,
+                )
+              ).docxAdapter
             : (
                 await withDeadline(
                   import("../../lib/importers/pdfAdapter"),
