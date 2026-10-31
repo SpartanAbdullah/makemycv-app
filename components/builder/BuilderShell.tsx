@@ -1122,6 +1122,9 @@ export const BuilderShell = ({
       ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     triggerFileInput(accept, async (file) => {
+      // D5 (session 5): a new pick starts clean. The previous failure's bar
+      // used to stay up behind the next file's review, and after Cancel.
+      setErrorMsg(null);
       // Extension bucket only (never the name) — this is the `file_type`
       // analytics param and the routing key. Anything not pdf/docx stops at
       // the gate below, so a mislabelled pick can no longer report as a

@@ -25,6 +25,17 @@ Format:
 
 ---
 
+## [2026-10-31 22:20] Import: a new pick clears the previous failure message (session 5 D5)
+
+**Goal:** Minor defect D5 (IMPORT_MONITORING.md §8.3): after a failed import the red bar stayed on screen behind the
+next file's review and after Cancel; only "Dismiss" cleared it.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` — `handleImport` calls `setErrorMsg(null)` first thing in the picker
+  callback.
+- edited: `scripts/import-smoke.mjs` — new fresh-context check: `not-a-cv.pdf` (mapping_empty, no Dismiss), then
+  `text-cv.pdf`; the bar must be hidden with the review open and after Cancel. `pickInPlace()` helper.
+**Suggested commit:** fix(builder): clear the previous import error when a new file is picked (D5)
+
 ## [2026-10-31 22:10] Import review: the button counts sections like the toast does (session 5 D12)
 
 **Goal:** Minor defect D12 (IMPORT_MONITORING.md §8.3): MappingReview's button counted every role and degree as a

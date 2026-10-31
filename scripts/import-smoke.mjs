@@ -351,8 +351,55 @@ async function checkImportAfterTyping() {
   }
 }
 
+/** Pick `file` on the CURRENT page (no navigation) through the Import button. */
+async function pickInPlace(pg, file) {
+  let fc = null;
+  for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+    const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+    await pg.getByRole("button", { name: /Import existing CV/ }).click();
+    fc = await chooser;
+  }
+  if (fc) await fc.setFiles(file);
+  return !!fc;
+}
+
+// ── A failure bar does not outlive the next pick (session 5 D5) ───────────
+// Production 2026-10-31: after a mapping_empty failure the red bar stayed on
+// screen behind the next file's review and after Cancel (only "Dismiss"
+// cleared it). The case loop above clicks Dismiss after every file, which is
+// why it never saw this. Fresh context, no Dismiss.
+async function checkErrorClearedByNextPick() {
+  const label = "stale error (D5): a new pick clears the previous failure";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    const errorBar = pg.getByTestId("import-error");
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "not-a-cv.pdf")))) return fail(label, "file chooser never opened");
+    if (!(await errorBar.waitFor({ timeout: 30000 }).then(() => true).catch(() => false))) {
+      return fail(label, "not-a-cv.pdf showed no error bar");
+    }
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened (2nd pick)");
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      return fail(label, "the review for text-cv.pdf never opened");
+    }
+    const withReview = await errorBar.isVisible().catch(() => false);
+    await review.getByRole("button", { name: /^Cancel$/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    const afterCancel = await errorBar.isVisible().catch(() => false);
+    if (withReview || afterCancel) fail(label, `error bar visible: with review=${withReview}, after Cancel=${afterCancel}`);
+    else ok(`${label} — bar gone with the review open and after Cancel`);
+  } finally {
+    await c.close();
+  }
+}
+
 for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
 await checkImportAfterTyping();
+await checkErrorClearedByNextPick();
 
 // ── pdf.js worker network scenarios ────────────────────────────────────────
 // The worker choice is cached per page lifetime and runCase() navigates, so
