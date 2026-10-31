@@ -25,6 +25,34 @@ Format:
 
 ---
 
+## [2026-10-31 15:15] Ops: daily production monitor + AI-route failures now reach Vercel's error clusters (session 6)
+
+**Goal:** production stability review (docs/ai-mission/PRODUCTION_STABILITY_2026-10-31.md). Vercel is on Hobby:
+runtime logs last 1 hour and only `console.error` lines survive 7 days (as error clusters). The AI routes answered
+502/503/504 without logging anything, so a revoked key, an exhausted Anthropic balance or a spent daily cap left no
+trace at all. And nothing exercised production after a release except a person running the smokes.
+**Files:**
+- edited: `lib/server/logRouteError.ts` - new `logAiFailure(route, kind, err?)`: one `console.error` line
+  `[route] ai_<timeout|upstream|unparseable|spend_cap|internal>`; prints Anthropic's own error body (status + JSON,
+  ≤300 chars) and reduces every other error to its name, because model output and payloads can hold CV text.
+- created: `lib/server/logRouteError.test.ts` - 4 tests incl. "a non-Anthropic message is never printed".
+- edited: `app/api/{ai-improve,cover-letter,linkedin-message,jd-match,jd-match/rewrite-bullet,resume-checker/parse}/route.ts`
+  - call it on timeout / upstream failure / unusable output / 500; parse also logs a failed `saveReport`.
+  `lib/server/spendGuard.ts` - `spendCapResponse` logs `ai_spend_cap` (covers every AI route).
+  `ai-improve` no longer returns Anthropic's raw error text to the browser (now the same sentence as the other routes).
+- created: `.github/workflows/prod-monitor.yml` - daily 04:00 UTC + dispatch + push-on-change: `/api/health`, 6
+  public URLs, `smoke:builder`, `smoke:import`, `smoke:checker` against https://app.makemycv.ae (one retry each),
+  screenshots + logs as artifacts, one open `prod-monitor` issue on failure (closed on recovery), job fails.
+- created: `scripts/monitor-screenshots.mjs` - full-page PNGs of the 5 public pages, analytics blocked.
+- edited: `scripts/builder-smoke.mjs`, `scripts/checker-smoke.mjs` - `SMOKE_BLOCK_ANALYTICS=1` aborts GTM / GA /
+  doubleclick / Speed Insights requests (default unchanged); dataLayer assertions unaffected.
+**Notes / risks / follow-up:** `schedule:` only fires from `main`; until the next release the monitor runs by hand
+(`gh workflow run prod-monitor.yml --ref stagingmmc`). Runs from stagingmmc use stagingmmc's smoke scripts, which
+can be ahead of production (a new import expectation fails there until it ships). No AI call is made: the checker
+smoke stubs `/api/resume-checker/parse`. Verification: tsc, lint 11/11, `npm test` 3 suites, the three smokes against
+production with `SMOKE_BLOCK_ANALYTICS=1` all passed locally.
+**Suggested commit:** feat(ops): daily production monitor + log AI-route failures
+
 ## [2026-10-31 22:50] Import: "Page N of M" footers no longer become roles (session 5 D7b)
 
 **Goal:** Minor defect D7(b) (IMPORT_MONITORING.md §8.3): page-number footer lines were not stripped, so a CV whose

@@ -62,6 +62,14 @@ async function launch() {
 
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+// Monitor mode: same switch as builder-smoke.mjs — keeps GA4 / Speed Insights
+// off the wire when this runs against production. Default: unchanged.
+if (process.env.SMOKE_BLOCK_ANALYTICS === "1") {
+  await ctx.route(
+    /googletagmanager\.com|google-analytics\.com|analytics\.google\.com|doubleclick\.net|vercel-insights\.com/,
+    (route) => route.abort("blockedbyclient"),
+  );
+}
 const page = await ctx.newPage();
 
 // Everything that leaves the page, so the "no new data leaves" assertion is

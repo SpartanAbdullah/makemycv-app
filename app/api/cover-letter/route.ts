@@ -13,6 +13,9 @@ import {
 import { checkRateLimit, getClientIp, makeLimiter } from "@/lib/server/rateLimit";
 import { parseCoverLetterRequest, type CoverLetterRequest } from "@/lib/coverLetter/payload";
 import { normalizePlaceholders } from "@/lib/ai/placeholders";
+import { logAiFailure } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/cover-letter";
 
 /**
  * Cover letter v1 (2026-10-24, audit WP-9 — product #2 in CLAUDE.md).
@@ -167,6 +170,7 @@ export async function POST(request: Request) {
 
     let letter: string | null = null;
     let apiFailed = false;
+    let lastErr: unknown;
     for (let attempt = 0; attempt < 2 && letter === null; attempt++) {
       try {
         const raw = await callHaiku(apiKey, req);
@@ -176,19 +180,23 @@ export async function POST(request: Request) {
         // A timeout is not retried: the user has already waited 25 s, and a
         // second attempt would double that behind the same spinner.
         if (isTimeoutError(err)) {
+          logAiFailure(ROUTE, "timeout");
           return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
         }
         apiFailed = true;
+        lastErr = err;
       }
     }
     if (letter === null) {
+      logAiFailure(ROUTE, apiFailed ? "upstream" : "unparseable", apiFailed ? lastErr : undefined);
       return NextResponse.json(
         { error: apiFailed ? "Couldn't reach the writing service. Please try again." : "Couldn't write a letter from this. Try adding a summary or a role to your CV." },
         { status: 502 },
       );
     }
     return NextResponse.json({ letter: normalizePlaceholders(letter) });
-  } catch {
+  } catch (err) {
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -24,6 +24,9 @@ import {
   makeLimiter,
 } from "@/lib/server/rateLimit";
 import type { StoredReport } from "@/lib/resumeChecker/types";
+import { logAiFailure, logRouteError } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/resume-checker/parse";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -148,6 +151,7 @@ export async function POST(request: Request) {
       );
     }
     if (e?.kind === "claude-timeout") {
+      logAiFailure(ROUTE, "timeout");
       // Bounded upstream wait (lib/server/anthropic.ts): the user gets this
       // sentence after 45 s instead of a spinner until the 60 s maxDuration
       // kills the function with a body-less 504.
@@ -163,6 +167,9 @@ export async function POST(request: Request) {
       );
     }
     if (e?.kind === "claude-failed") {
+      // e.message is Anthropic's error body or an extraction error name —
+      // logAiFailure prints the former only, never CV text.
+      logAiFailure(ROUTE, "upstream", new Error(String(e.message ?? "")));
       return NextResponse.json(
         {
           error:
@@ -172,6 +179,7 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json(
       { error: "Unexpected error while parsing.", requestId },
       { status: 500 },
@@ -195,6 +203,7 @@ export async function POST(request: Request) {
     await saveReport(reportId, stored);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Storage error";
+    logRouteError(`${ROUTE} saveReport`, err);
     return NextResponse.json(
       { error: `Couldn't save the report: ${message}`, requestId },
       { status: 500 },

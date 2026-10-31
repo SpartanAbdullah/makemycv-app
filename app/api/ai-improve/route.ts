@@ -17,6 +17,9 @@ import {
 } from "@/lib/server/rateLimit";
 import type { RoleFamily } from "@/lib/data/roleFamily";
 import { normalizePlaceholders } from "@/lib/ai/placeholders";
+import { logAiFailure } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/ai-improve";
 
 type AIType = "bullets" | "skills" | "summary";
 
@@ -282,8 +285,11 @@ export async function POST(request: Request) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "Unknown API error");
+      // The upstream body goes to the log, not to the browser: it used to be
+      // returned verbatim, which showed users Anthropic's internal error text.
+      logAiFailure(ROUTE, "upstream", new Error(`Anthropic API error: ${res.status} — ${errText}`));
       return NextResponse.json(
-        { error: `Anthropic API error: ${res.status} — ${errText}` },
+        { error: "Couldn't reach the writing service. Please try again." },
         { status: 502 },
       );
     }
@@ -301,6 +307,7 @@ export async function POST(request: Request) {
       : [];
 
     if (results.length === 0) {
+      logAiFailure(ROUTE, "unparseable");
       return NextResponse.json(
         { error: "Failed to parse AI response" },
         { status: 500 },
@@ -310,8 +317,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ results, type: body.type });
   } catch (err) {
     if (isTimeoutError(err)) {
+      logAiFailure(ROUTE, "timeout");
       return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
     }
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

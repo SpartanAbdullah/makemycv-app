@@ -37,6 +37,7 @@
 
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
+import { logAiFailure } from "./logRouteError";
 
 const SUPPORT_URL = "https://www.makemycv.ae/support";
 
@@ -150,6 +151,10 @@ export async function takeSpendUnits(units: number): Promise<SpendVerdict> {
  */
 export function spendCapResponse(retryAfterSeconds: number) {
   const safeRetryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
+  // Every AI route refuses through here, so this one line is how a spent cap
+  // (or a KV outage draining the per-instance fallback bucket) shows up in
+  // Vercel's runtime-error clusters (logAiFailure, lib/server/logRouteError.ts).
+  logAiFailure("spendGuard", "spend_cap");
   const friendly =
     "Our free AI tools are in unusually high demand and have hit today's " +
     "overall usage limit. Please try again later — the limit resets daily. " +

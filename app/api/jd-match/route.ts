@@ -16,6 +16,9 @@ import {
   makeLimiter,
 } from "@/lib/server/rateLimit";
 import type { JdRequirements } from "@/lib/jdMatch/types";
+import { logAiFailure } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/jd-match";
 
 /**
  * JD Match extraction endpoint (Phase A, free diagnosis).
@@ -181,6 +184,7 @@ export async function POST(request: Request) {
 
     // First attempt + one retry on invalid/empty JSON (hardened parser).
     let requirements: JdRequirements | null = null;
+    let lastErr: unknown;
     for (let attempt = 0; attempt < 2 && !requirements; attempt++) {
       try {
         const raw = await callHaiku(apiKey, clipped);
@@ -189,13 +193,19 @@ export async function POST(request: Request) {
       } catch (err) {
         // A timeout is not retried — the user has already waited 25 s.
         if (isTimeoutError(err)) {
+          logAiFailure(ROUTE, "timeout");
           return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
         }
+        lastErr = err;
         // fall through to retry / final guard
       }
     }
 
     if (!requirements) {
+      // An Anthropic error is logged with its status; an empty or unparseable
+      // extraction is logged by kind only (the JD text never reaches the log).
+      const upstream = lastErr instanceof Error && lastErr.message.startsWith("Anthropic API error");
+      logAiFailure(ROUTE, upstream ? "upstream" : "unparseable", lastErr);
       return NextResponse.json(
         { error: "Couldn't read that job description. Try pasting the full text." },
         { status: 502 },
@@ -203,7 +213,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ requirements });
-  } catch {
+  } catch (err) {
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
