@@ -8,10 +8,12 @@
 // global 503.
 //
 // Budget model: a call costs "units" that reflect relative Anthropic cost.
-// /api/resume-checker/parse sends up to 100k chars with max_tokens 4096, so it
-// costs 3 units; the other routes (ai-improve, jd-match, rewrite-bullet,
-// cover-letter, linkedin-message) are small prompts with max_tokens ≤ 2048
-// and cost 1 unit each.
+// /api/resume-checker/parse sends up to 100k chars with max_tokens 8192
+// (PARSE_MAX_TOKENS in anthropic.ts), so it costs 3 units; the other routes
+// (ai-improve, jd-match, rewrite-bullet, cover-letter, linkedin-message) are
+// small prompts with max_tokens ≤ 2048 and cost 1 unit each. Both ceilings
+// were doubled together in the Haiku 5.5 migration, so the ratio the weight
+// was reasoned from is unchanged.
 //
 // Backing store: the same @vercel/kv instance the per-IP limiters use — one
 // INCRBY per guarded call on a UTC-dated key ("aiGuard:daily:<yyyy-mm-dd>")

@@ -38,6 +38,21 @@ export const ANTHROPIC_TIMEOUT_MS = 25_000;
 /** The parse route: largest prompt, maxDuration 60 — leave room for KV. */
 export const ANTHROPIC_PARSE_TIMEOUT_MS = 45_000;
 
+// Output ceiling of the checker's parse call (/api/resume-checker/parse).
+//
+// The parse answers with the whole CV as JSON, bullets copied verbatim, so its
+// output grows with the CV. It was 4096 on Haiku 4.5; the 5.5 migration
+// (eeb7112) doubled every route's ceiling because thinking tokens count
+// toward max_tokens and the tokenizer counts the same text as ~30% more
+// tokens — the small routes went 1024 → 2048 and this one 4096 → 8192. The
+// ratio to the small routes (4×) is unchanged, and so is the 3-unit spend
+// weight (PARSE_SPEND_UNITS in spendGuard.ts) that was reasoned from it.
+// max_tokens is a ceiling, not a charge: output is billed as generated.
+// Lowering it would cut long CVs off mid-JSON and drop them to the heuristic
+// fallback; raising it changes the worst-case cost and needs the spend weight
+// revisited. Pinned by anthropic.test.ts.
+export const PARSE_MAX_TOKENS = 8192;
+
 /** Signal to pass as fetch's `signal` for a Claude call. */
 export function anthropicSignal(ms: number = ANTHROPIC_TIMEOUT_MS): AbortSignal {
   return AbortSignal.timeout(ms);

@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-10-31 19:00] Checker parse: one pinned output ceiling, comments and spend weight agree (session 7)
+
+**Goal:** stabilisation finding (PRODUCTION_STABILITY_2026-10-31 §2.3 item 3): `/api/resume-checker/parse` sends
+`max_tokens` 8192 while the route and spend-guard comments said 4096, and the 3-unit spend weight was reasoned from 4096.
+**Files:**
+- edited: `lib/server/anthropic.ts` - `PARSE_MAX_TOKENS = 8192`, with the reasoning: the Haiku 5.5 migration (`eeb7112`)
+  doubled every route's ceiling together (small routes 1024 → 2048, parse 4096 → 8192) for thinking tokens and the ~30%
+  larger token counts, so the parse : small-route ratio (4×) the 3-unit weight was reasoned from is unchanged.
+- edited: `lib/resumeChecker/parse.ts` - sends `PARSE_MAX_TOKENS` instead of the literal.
+- edited: `lib/server/spendGuard.ts`, `app/api/resume-checker/parse/route.ts` - comments now say 8192.
+- edited: `lib/server/anthropic.test.ts` - pins the constant at 8192, fails on a numeric `max_tokens` literal in
+  `parse.ts`, and fails when the spend-guard / route comments state a parse ceiling other than the constant.
+**Notes / risks / follow-up:** no behaviour or cost change: 8192 has been in production since 2026-10-10, and it is a
+ceiling, not a charge (output is billed as generated). Kept rather than lowered because the parse answers with the
+whole CV as JSON (bullets verbatim) and a cut-off answer falls back to the heuristic parser. Raising it later means
+revisiting `PARSE_SPEND_UNITS`.
+**Suggested commit:** fix(checker): pin the parse max_tokens at 8192 and make the cost comments agree
+
 ## [2026-11-01 02:50] Arabic bullets: Banner / Chronicle / Harvard mirror the live list padding (session 6, follow-up)
 
 **Goal:** after the RTL-marker fix the Harvard dense Arabic cells dropped from ok to check in the fidelity harness

@@ -9,10 +9,13 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   ANTHROPIC_PARSE_TIMEOUT_MS,
   ANTHROPIC_TIMEOUT_MS,
+  PARSE_MAX_TOKENS,
   anthropicSignal,
   isTimeoutError,
   responseText,
@@ -104,5 +107,35 @@ describe("responseText", () => {
     assert.equal(responseText({}), "");
     assert.equal(responseText({ content: "not an array" }), "");
     assert.equal(responseText({ content: [null, { type: "text" }] }), "");
+  });
+});
+
+describe("checker parse output ceiling (2026-10-31 cost consistency)", () => {
+  const src = (...p: string[]) =>
+    fs.readFileSync(path.join(process.cwd(), ...p), "utf8");
+
+  test("PARSE_MAX_TOKENS is pinned at 8192", () => {
+    // Changing this changes the worst-case cost of every checker parse; the
+    // 3-unit spend weight in lib/server/spendGuard.ts was reasoned from it.
+    assert.equal(PARSE_MAX_TOKENS, 8192);
+  });
+
+  test("the parse call sends the constant, not a literal", () => {
+    const parse = src("lib", "resumeChecker", "parse.ts");
+    assert.match(parse, /max_tokens:\s*PARSE_MAX_TOKENS\b/);
+    assert.doesNotMatch(parse, /max_tokens:\s*\d/);
+  });
+
+  test("the spend weight and its comments agree with the ceiling", () => {
+    const guard = src("lib", "server", "spendGuard.ts");
+    const route = src("app", "api", "resume-checker", "parse", "route.ts");
+    assert.match(guard, /export const PARSE_SPEND_UNITS = 3;/);
+    for (const text of [guard, route]) {
+      const stated = [...text.matchAll(/max_tokens (\d+)/g)].map((m) => Number(m[1]));
+      assert.ok(stated.length > 0);
+      for (const n of stated) {
+        if (n > 2048) assert.equal(n, PARSE_MAX_TOKENS);
+      }
+    }
   });
 });
