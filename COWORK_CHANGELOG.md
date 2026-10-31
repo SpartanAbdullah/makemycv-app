@@ -25,6 +25,25 @@ Format:
 
 ---
 
+## [2026-11-01 00:20] Import: an Arabic repeat of a role in an English CV is not a third card (rtl-mixed.docx)
+
+**Goal:** session-5 remaining item: `rtl-mixed.docx` (English CV with Arabic lines) imported a third experience card
+for "أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى الآن)", the Arabic translation of role 1. The
+bare year made it a dated header; the Arabic month and "حتى الآن" (until now) are not date tokens, so the card's
+Company was "فالكون لإدارة المرافق، أبوظبي (مارس" and its start "2021".
+**Files:**
+- edited: `lib/importers/textParser.ts`: `isMostlyArabicScript`, `isLatinMajorityBlock`; in a Latin-majority
+  Experience block, a mostly-Arabic line that would start a new role after a Latin role is returned as a leftover and
+  shown in "We couldn't place this" (copyable, not dropped).
+- edited: `scripts/import-fixtures.test.mjs` (rtl-mixed.docx: exactly 2 roles, the Arabic line unplaced; was ≥2),
+  `scripts/parser-fixtures.test.cjs` (the repeat is unplaced; an Arabic-majority block keeps its Arabic roles),
+  `scripts/import-smoke.mjs` (rtl-mixed.docx review shows 2 cards), `docs/import-errors.md`.
+**Notes / risks / follow-up:** a genuinely separate Arabic-only role in an otherwise English CV now lands in "We
+couldn't place this" instead of a card with bracket debris. Arabic bullets inside a role (02-mixed-lang.pdf) and
+Arabic-majority CVs (arabic-export-classic.pdf) are unchanged. Arabic date tokens are not parsed (an Arabic parser is a
+feature, backlog E8).
+**Suggested commit:** fix(import): keep an Arabic repeat of a role out of the experience cards
+
 ## [2026-11-01 00:10] Import: an unmarked PDF paragraph comes back as one bullet, not one per line (session 5 remaining)
 
 **Goal:** session-5 remaining item (IMPORT_MONITORING.md §8.5, backlog E11.D2 note): an unmarked paragraph under a role

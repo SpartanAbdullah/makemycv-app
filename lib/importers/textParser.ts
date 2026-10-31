@@ -495,6 +495,28 @@ function isParagraphContinuation(prev: string, line: string, wrapWidth: number):
   return !hasDates && splitHeaderParts(line).length < 2;
 }
 
+const ARABIC_SCRIPT_GLOBAL_RE = /[؀-ۿݐ-ݿ]/g;
+const LATIN_LETTER_GLOBAL_RE = /[A-Za-zÀ-ɏ]/g;
+
+/** Mostly Arabic-script letters (Arabic, Urdu, Persian), Latin at most a third. */
+function isMostlyArabicScript(line: string): boolean {
+  const ar = line.match(ARABIC_SCRIPT_GLOBAL_RE)?.length ?? 0;
+  const lat = line.match(LATIN_LETTER_GLOBAL_RE)?.length ?? 0;
+  return ar >= 3 && ar >= 0.7 * (ar + lat);
+}
+
+/** Lines that are mostly Latin vs mostly Arabic script: a Latin block has at
+ *  least twice as many (and at least two) Latin lines. */
+function isLatinMajorityBlock(lines: string[]): boolean {
+  let latin = 0;
+  let arabic = 0;
+  for (const l of lines) {
+    if (isMostlyArabicScript(l)) arabic++;
+    else if ((l.match(LATIN_LETTER_GLOBAL_RE)?.length ?? 0) >= 3) latin++;
+  }
+  return latin >= 2 && latin >= 2 * arabic;
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -520,7 +542,17 @@ function isParagraphContinuation(prev: string, line: string, wrapWidth: number):
 function parseExperienceBlock(
   lines: string[],
   wrapWidth = 0,
+  /** Lines kept out of the entries; the caller shows them as unplaced. */
+  leftovers: string[] = [],
 ): ParsedExperience[] {
+  // Session 6 (rtl-mixed.docx): bilingual English CVs repeat a role in Arabic
+  // ("أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى
+  // الآن)"). The bare year made it a dated header, so it became a third card
+  // with Company "…أبوظبي (مارس" (the Arabic month and "until now" are not
+  // date tokens). In a Latin-majority block, an Arabic line that would START
+  // a role after a Latin role goes to "We couldn't place this" instead.
+  // Arabic bullets inside a role, and Arabic-majority CVs, are untouched.
+  const latinBlock = isLatinMajorityBlock(lines);
   const entries: ParsedExperience[] = [];
   let current: ParsedExperience | null = null;
   let pendingDates: string[] | null = null;
@@ -708,6 +740,18 @@ function parseExperienceBlock(
     // "Dubai | Mar 2021 - Present" used to become two cards (card 2's Role =
     // the city, and in DOCX its Company = the first unmarked bullet).
     if (looksLikeNewHeader && current && hasInlineDates && mergeDatedTail(current, line)) {
+      continue;
+    }
+
+    if (
+      looksLikeNewHeader &&
+      latinBlock &&
+      current &&
+      (current.role || current.company) &&
+      !isMostlyArabicScript(`${current.role ?? ""} ${current.company ?? ""}`) &&
+      isMostlyArabicScript(line)
+    ) {
+      leftovers.push(line);
       continue;
     }
 
@@ -1795,7 +1839,15 @@ export function parseTextToDocument(
   const wrapWidth = wrapWidthOf(lines, opts);
 
   result.summary = buffers.summary.join(" ").replace(/\s{2,}/g, " ").trim();
-  result.experience = parseExperienceBlock(buffers.experience, wrapWidth);
+  const experienceLeftovers: string[] = [];
+  result.experience = parseExperienceBlock(
+    buffers.experience,
+    wrapWidth,
+    experienceLeftovers,
+  );
+  if (experienceLeftovers.length > 0) {
+    result.unplaced = [...(result.unplaced ?? []), ...experienceLeftovers];
+  }
   result.education = parseEducationBlock(buffers.education);
   result.certifications = parseCertificationsBlock(buffers.certifications);
   // A detected Projects section used to be buffered and then silently

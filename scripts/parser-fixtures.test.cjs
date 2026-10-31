@@ -986,5 +986,34 @@ const P_WRAPPED = [
   check(f, "2 roles; the second header is not appended to a bullet", d.experience.length === 2 && d.experience[1]?.role === "Assistant Facilities Manager", d.experience.map((e) => e.role));
 }
 
+/* ── Session 6: Arabic repeat of a role in an English CV (rtl-mixed.docx) ── */
+const AR_REPEAT = "أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى الآن)";
+{
+  const f = "s6-arabic-repeat-in-english-block (inline)";
+  const d = runText(f, [
+    "Layla Haddad", "layla@example.com", "Experience",
+    "Senior Procurement Specialist - Falcon Facilities Management", "Abu Dhabi | Mar 2021 - Present",
+    "Ran 60+ tenders a year for MEP and soft-services contracts worth AED 40M.",
+    "Procurement Officer - Oasis Build Contracting", "Dubai | Jun 2017 - Feb 2021",
+    "Sourced materials for 12 residential projects on schedule and within budget.",
+    AR_REPEAT,
+  ].join("\n"));
+  check(f, "2 roles, no Arabic third card", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "the Arabic line is unplaced, not dropped", (d.unplaced ?? []).includes(AR_REPEAT), d.unplaced);
+}
+{
+  // Guard: in an Arabic-majority Experience block an Arabic role line is a role.
+  const f = "s6-arabic-block-keeps-roles (inline)";
+  const d = runText(f, [
+    "Reem Al Hashimi", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية | Jan 2023 - Present",
+    "• قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب",
+    "• خفّض المخزون الاحتياطي بنسبة 12%",
+    "منسق مشتريات | شركة الواحة للمقاولات | Jun 2019 - Dec 2022",
+    "• أدار عقود الموردين",
+  ].join("\n"));
+  check(f, "both Arabic roles kept", d.experience.length === 2 && d.experience[1]?.role === "منسق مشتريات", d.experience.map((e) => e.role));
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

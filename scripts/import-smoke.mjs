@@ -93,6 +93,8 @@ const EXPECT_PAGES_SKIPPED = {
 const EXPECT_ROLES = {
   "text-cv.pdf": 2,
   "two-column-table.docx": 2,
+  // Session 6: its Arabic repeat of role 1 is unplaced, not a third card.
+  "rtl-mixed.docx": 2,
   "s5-long-wrapped.pdf": 3,
   "s5-header-table.docx": 3,
 };

@@ -149,11 +149,14 @@ await expectImport("plain-helvetica-cv.pdf", 5);
 {
   const r = await expectImport("rtl-mixed.docx", 5);
   check("rtl-mixed.docx", "Latin name survives the Arabic line", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
-  // The two English roles merge with their "City | Dates" lines (D1); the
-  // Arabic role line is still read as a third role — reviewable, not a failure.
+  // The two English roles merge with their "City | Dates" lines (D1).
   check("rtl-mixed.docx", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
   const exp = r.partial?.experience ?? [];
   check("rtl-mixed.docx", "English roles not split (cards 1-2 are the dated roles)", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.startDate === "Mar 2021" && exp[1]?.role === "Procurement Officer" && exp[1]?.startDate === "Jun 2017", exp.map((e) => [e.role, e.startDate]));
+  // Session 6: the Arabic repeat of role 1 used to become a third card
+  // (Company "…أبوظبي (مارس", start "2021"). It is unplaced text now.
+  check("rtl-mixed.docx", "exactly 2 roles: the Arabic repeat is not a third card", exp.length === 2, exp.map((e) => e.role));
+  check("rtl-mixed.docx", "the Arabic role line is in \"We couldn't place this\"", (r.parsed?.unplaced ?? []).some((l) => l.startsWith("أخصائية مشتريات أولى")), r.parsed?.unplaced);
 }
 /* ── session 5 production-matrix fixtures (2026-10-31) ─────────────────────
    Copied from _cowork/session5/import/fixtures/ (synthetic persona "Noor

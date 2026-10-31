@@ -150,7 +150,10 @@ for a cross-origin worker was refused.
   has no dates and no bullets yet is merged into that role
   (`mergeDatedTail` in `textParser.ts`). text-cv.pdf and two-column-table.docx
   now give 2 roles; `test:import` and `smoke:import` assert the exact count.
-  rtl-mixed.docx still adds a third card for its Arabic role line.
+  rtl-mixed.docx's Arabic repeat of role 1 no longer adds a third card
+  (session 6): in a Latin-majority Experience block, a mostly-Arabic line
+  that would start a new role after a Latin role goes to "We couldn't place
+  this". Arabic bullets inside a role and Arabic-majority CVs are unchanged.
 - **Scans need OCR**; none is offered, and the copy does not promise one.
 - **DOCX produced by Google Docs / LibreOffice / Canva** could not be generated
   here; mammoth is known to read Google Docs and LibreOffice output, and the
