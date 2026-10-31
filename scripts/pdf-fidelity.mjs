@@ -102,7 +102,7 @@ window.compare = async ({ png, pdfUrl, W, H, tol, block }) => {
       const rtl = l.length > 0 && l.every((it) => it.dir === "rtl");
       text += (rtl ? [...grp].reverse() : grp).map((it) => it.str).join(""); } grp = []; grpDir = null; text += sep; };
     items.forEach((it, i) => { const nx = items[i + 1]; const d = lettered(it.str) ? it.dir : null;
-      if (grp.length && d && grpDir && d !== grpDir) flush("");
+      if (grp.length && d && grpDir && d !== grpDir) flush(" "); // a word never spans a direction change
       grp.push(it); if (d) grpDir = d;
       if (it.hasEOL || !nx) flush("\\n"); else if (nx.transform[4] - (it.transform[4] + it.width) > 0.9) flush(" "); });
     text += "\\n";
