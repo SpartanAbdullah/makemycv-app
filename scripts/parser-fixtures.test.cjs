@@ -690,5 +690,205 @@ const runText = (label, text) => {
   check(f, "heavy vehicle", d.uae?.drivingLicense === "Heavy Vehicle", d.uae);
 }
 
+/* ── D1 (session 5, 2026-10-31): dated line under the title ─────────────
+   Every role whose dates sat on the line below the title became two cards
+   (card 2's Role = the city; in DOCX its Company = the first bullet). */
+{
+  const f = "d1-title-then-company-city-dates (inline)";
+  const d = runText(f, [
+    "Layla Haddad",
+    "layla@example.com",
+    "Experience",
+    "Senior Procurement Specialist",
+    "Falcon Facilities Management · Abu Dhabi · Mar 2021 - Present",
+    "Ran 60+ tenders a year.",
+    "Procurement Officer",
+    "Oasis Build Contracting · Dubai · Jun 2017 - Feb 2021",
+    "Sourced materials for 12 projects.",
+  ].join("\n"));
+  check(f, "2 roles, not 4", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "role 1 title", d.experience[0]?.role === "Senior Procurement Specialist", d.experience[0]?.role);
+  check(f, "role 1 company", d.experience[0]?.company === "Falcon Facilities Management", d.experience[0]?.company);
+  check(f, "role 1 location", d.experience[0]?.location === "Abu Dhabi", d.experience[0]?.location);
+  check(f, "role 1 dates + current", d.experience[0]?.startDate === "Mar 2021" && d.experience[0]?.isCurrent === true, d.experience[0]);
+  check(f, "role 2 dates", d.experience[1]?.startDate === "Jun 2017" && d.experience[1]?.endDate === "Feb 2021", d.experience[1]);
+  check(f, "bullets stay with their role", d.experience[0]?.bullets?.length === 1 && d.experience[1]?.bullets?.length === 1, d.experience.map((e) => e.bullets));
+}
+{
+  const f = "d1-title-company-then-city-dates (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "noor@example.com",
+    "Experience",
+    "Senior Facilities Operations Manager - Falcon Facilities Management",
+    "Dubai | Mar 2021 - Present",
+    "Directed hard and soft services for a 14-tower portfolio.",
+    "Cut reactive work orders by 31% in 18 months.",
+    "Facilities Manager - Oasis Healthcare Estates",
+    "Abu Dhabi | Jan 2017 - Feb 2021",
+    "Ran facilities for a 210-bed hospital.",
+  ].join("\n"));
+  check(f, "2 roles", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "role 1 company kept", d.experience[0]?.company === "Falcon Facilities Management", d.experience[0]?.company);
+  check(f, "city is the location, not a role", d.experience[0]?.location === "Dubai" && d.experience[1]?.location === "Abu Dhabi", d.experience.map((e) => e.location));
+  check(f, "first unmarked bullet is a bullet, not the company", d.experience[0]?.bullets?.[0]?.startsWith("Directed"), d.experience[0]?.bullets);
+  check(f, "role 2 dates", d.experience[1]?.startDate === "Jan 2017" && d.experience[1]?.endDate === "Feb 2021", d.experience[1]);
+}
+{
+  // Guard: a role with no dates and no bullets followed by a DATED ROLE line
+  // is two roles — the second line carries a job title, so it is not a tail.
+  const f = "d1-guard-next-dated-role (inline)";
+  const d = runText(f, [
+    "Omar Khan",
+    "omar@example.com",
+    "Experience",
+    "Volunteer Coordinator - Red Crescent",
+    "Operations Manager | Acme LLC | Jan 2020 - Present",
+    "• Built the ops team.",
+  ].join("\n"));
+  check(f, "stays 2 roles", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "dates stay on the dated role", !d.experience[0]?.startDate && d.experience[1]?.startDate === "Jan 2020", d.experience.map((e) => e.startDate));
+}
+
+/* ── D2 (session 5): wrapped marked bullets in PDFs ──────────────────────── */
+{
+  const f = "d2-wrapped-bullets (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "noor@example.com",
+    "Experience",
+    "Senior Facilities Operations Manager — Falcon Facilities Management",
+    "Dubai | Mar 2021 - Present",
+    "• Directed hard and soft services for a 14-tower portfolio with 140 technicians and 9",
+    "supervisors.",
+    "• Cut reactive work orders by 31% by moving 1,900 assets onto a planned-maintenance",
+    "calendar in the CAFM system.",
+    "• Held 99.2% SLA compliance and passed every Dubai Civil Defence inspection without a",
+    "finding over 36 consecutive months, across",
+    "2.4 million sq ft.",
+    "Facilities Manager — Oasis Healthcare Estates",
+    "Abu Dhabi | Jan 2017 - Feb 2021",
+    "• Ran facilities for a 210-bed hospital",
+  ].join("\n"));
+  const b = d.experience[0]?.bullets ?? [];
+  check(f, "2 roles", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "3 bullets on role 1 (wraps joined)", b.length === 3, b);
+  check(f, "bullet 1 ends with its wrapped tail", b[0]?.endsWith("140 technicians and 9 supervisors."), b[0]);
+  check(f, "bullet 2 joined", b[1]?.endsWith("planned-maintenance calendar in the CAFM system."), b[1]);
+  check(f, "three-line bullet joined (lower-case + number starts)", b[2]?.endsWith("across 2.4 million sq ft."), b[2]);
+  check(f, "company not taken from a wrapped tail", d.experience[0]?.company === "Falcon Facilities Management", d.experience[0]?.company);
+}
+{
+  // Guard: bullets WITHOUT full stops are common; the next role must not be
+  // swallowed into the last bullet.
+  const f = "d2-guard-unpunctuated-bullets (inline)";
+  const d = runText(f, [
+    "Layla Haddad",
+    "layla@example.com",
+    "Experience",
+    "Senior Procurement Specialist",
+    "Falcon Facilities Management · Abu Dhabi · Mar 2021 - Present",
+    "• Ran 60+ tenders a year",
+    "• Cut vendor lead time from 18 to 14 days",
+    "Procurement Officer",
+    "Oasis Build Contracting · Dubai · Jun 2017 - Feb 2021",
+    "• Sourced materials for 12 projects",
+    "Acme Trading LLC",
+    "Buyer",
+    "2015 - 2017",
+    "• Raised purchase orders",
+  ].join("\n"));
+  check(f, "3 roles", d.experience.length === 3, d.experience.map((e) => e.role));
+  check(f, "role 1 keeps 2 bullets", d.experience[0]?.bullets?.length === 2, d.experience[0]?.bullets);
+  check(f, "role 2 title not appended to a bullet", d.experience[1]?.role === "Procurement Officer", d.experience[1]?.role);
+  check(f, "company-first role not appended to a bullet", !/Acme/.test((d.experience[1]?.bullets ?? []).join(" ")), d.experience[1]?.bullets);
+}
+
+/* ── D3 (session 5): "Degree, School (2018 - 2020)" ───────────────────────
+   Stripping the dates left "( - )"; its " - " split off ")" as the school. */
+{
+  const f = "d3-degree-comma-school-brackets (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "noor@example.com",
+    "Experience",
+    "Operations Manager | Acme LLC (Jan 2020 – Present)",
+    "• Built the ops team.",
+    "Education",
+    "MSc Facilities Management, Heriot-Watt University Dubai (2018 - 2020)",
+    "BEng Mechanical Engineering, University of Sharjah (2010 - 2014)",
+    "Master of Engineering, School of Engineering, Imperial College London [2008 to 2009]",
+  ].join("\n"));
+  const e = d.education;
+  check(f, "3 degrees", e.length === 3, e);
+  check(f, "degree 1 split from its school", e[0]?.degree === "MSc Facilities Management" && e[0]?.school === "Heriot-Watt University Dubai", e[0]);
+  check(f, "degree 1 dates kept", e[0]?.startDate === "2018" && e[0]?.endDate === "2020", e[0]);
+  check(f, "degree 2", e[1]?.degree === "BEng Mechanical Engineering" && e[1]?.school === "University of Sharjah", e[1]);
+  check(f, "no bracket debris anywhere", !/[()[\]]/.test(e.flatMap((x) => [x.degree, x.school, x.field]).filter(Boolean).join(" ")), e);
+  check(f, "school with a faculty before it", e[2]?.degree === "Master of Engineering" && /Imperial College London/.test(e[2]?.school ?? ""), e[2]);
+  check(f, "experience: company without the empty bracket", d.experience[0]?.company === "Acme LLC" && d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+
+/* ── D4 (session 5): name heuristic on Arabic text (post-NFKC) ──────────── */
+{
+  // A bullet line ahead of the real name (pdf.js line order on an Arabic
+  // PDF) must not become the name; nor may a line with digits.
+  const f = "d4-arabic-name (inline)";
+  const d = runText(f, [
+    "• إدارة الخدمات الفنية لمحفظة من 14 برجاً",
+    "نور تستويل",
+    "مديرة عمليات المرافق الأولى",
+    "noor.testwell@example.com | +971 50 123 4567",
+  ].join("\n"));
+  check(f, "name is the Arabic name line", d.contact.name === "نور تستويل", d.contact.name);
+  check(f, "headline is the Arabic line under it", d.contact.headline === "مديرة عمليات المرافق الأولى", d.contact.headline);
+}
+{
+  const f = "d4-latin-name-arabic-second-line (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "نور تستويل",
+    "Senior Facilities Operations Manager",
+    "noor.testwell@example.com",
+  ].join("\n"));
+  check(f, "Latin name kept", d.contact.name === "Noor Testwell", d.contact.name);
+  check(f, "Arabic transliteration is NOT the headline", d.contact.headline === "Senior Facilities Operations Manager", d.contact.headline);
+}
+{
+  // Visual-order (mirrored) Arabic, as pdf.js returns Chrome-printed PDFs.
+  const f = "d4-visual-order-arabic (inline)";
+  const d = runText(f, [
+    "اددح ىليل",
+    "تايرتشم ةيئاصخأ",
+    "layla.haddad@example.com",
+    "صخلملا",
+    "ةيئاصخأ تايرتشم ةربخب عبس تاونس",
+  ].join("\n"));
+  check(f, "mirrored Arabic is not adopted as the name", !d.contact.name, d.contact.name);
+}
+{
+  const f = "d4-headline-skips-dated-lines (inline)";
+  const d = runText(f, [
+    "Omar Khan",
+    "omar@example.com",
+    "Consultant — Acme LLC 2019 - 2021",
+  ].join("\n"));
+  check(f, "a dated role line is not the headline", d.contact.headline === undefined, d.contact.headline);
+}
+
+/* ── D8 (session 5): salutations are never the name or the headline ─────── */
+{
+  const f = "d8-salutation (inline)";
+  const d = runText(f, [
+    "Dear Hiring Manager,",
+    "Noor Testwell",
+    "noor.testwell@example.com",
+    "Dear Recruitment Manager,",
+    "Facilities Manager",
+  ].join("\n"));
+  check(f, "salutation skipped as name", d.contact.name === "Noor Testwell", d.contact.name);
+  check(f, "salutation skipped as headline", d.contact.headline === "Facilities Manager", d.contact.headline);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

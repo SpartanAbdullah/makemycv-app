@@ -60,7 +60,24 @@ const CASES = [
   ["arabic-only.pdf", "import"],
   ["not-a-cv.pdf", "mapping_empty"],
   ["large-25mb.pdf", "too_large"],
+  // Session 5 production-matrix shapes (2026-10-31): wrapped bullets, Word
+  // header + table, Arabic headings, our own Arabic export round-tripped.
+  ["s5-long-wrapped.pdf", "import"],
+  ["s5-header-table.docx", "import"],
+  ["s5-arabic-majority.pdf", "import"],
+  ["arabic-export-classic.pdf", "import"],
 ];
+
+// Experience cards the review must show (D1, 2026-10-31). Both files hold two
+// roles whose dates sit on the line under the title; until the fix the review
+// showed four cards and this smoke still passed, because it only checked that
+// a review opened and one push fired.
+const EXPECT_ROLES = {
+  "text-cv.pdf": 2,
+  "two-column-table.docx": 2,
+  "s5-long-wrapped.pdf": 3,
+  "s5-header-table.docx": 3,
+};
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mmcv-import-smoke-"));
 const largePath = path.join(tmp, "large-25mb.pdf");
@@ -70,6 +87,9 @@ const browser = await chromium.launch({ channel: "chrome" }).catch(() => chromiu
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
 page.on("pageerror", (e) => console.log(`      pageerror: ${e.message.slice(0, 160)}`));
+// The consent banner only mounts when the build has NEXT_PUBLIC_GTM_ID; keep
+// Google's script off the wire so the smoke stays local when it does.
+await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
 
 const rows = [];
 
@@ -112,6 +132,12 @@ async function runCase(name, file, expected) {
         await review.getByRole("button", { name: /^Cancel$/ }).click();
       } else {
         outcome = `review:${label.replace(/^Import\s*/, "")}`;
+        if (EXPECT_ROLES[name] !== undefined) {
+          const text = (await review.textContent()) ?? "";
+          const roles = Number(text.match(/Work experience \((\d+)\)/)?.[1] ?? 0);
+          if (roles === EXPECT_ROLES[name]) ok(`${name}: review shows ${roles} experience cards`);
+          else fail(`${name}: review shows ${EXPECT_ROLES[name]} experience cards`, `got ${roles}`);
+        }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }
@@ -139,6 +165,13 @@ async function runCase(name, file, expected) {
   } else if (expected === "import") {
     if (pushes[0].event === "cv_import" && outcome.startsWith("review:") && outcome !== "review:empty") ok(`${label} — ${outcome}`);
     else fail(label, `outcome=${outcome}; ${summary}`);
+    // D12 (2026-10-31): the review button counts sections the way the push
+    // and the toast do — Work experience / Education are one section each.
+    const shown = Number(outcome.match(/\((\d+) section/)?.[1] ?? NaN);
+    if (pushes[0].event === "cv_import") {
+      if (shown === pushes[0].sections_filled) ok(`${name}: button count ${shown} = sections_filled`);
+      else fail(`${name}: button count = sections_filled`, `button ${shown}, push ${pushes[0].sections_filled}`);
+    }
   } else if (pushes[0].event === "cv_import_failed" && pushes[0].error_reason === expected && REASONS.has(expected)) {
     ok(`${label} — "${message.slice(0, 90)}"`);
   } else {
@@ -151,6 +184,253 @@ async function runCase(name, file, expected) {
 for (const [name, expected] of CASES) {
   await runCase(name, name === "large-25mb.pdf" ? largePath : path.join(FIXTURE_DIR, name), expected);
 }
+
+// ── Consent banner vs the Import button (backlog E9) ───────────────────────
+// Found on production 2026-10-31: the cookie banner (z-index 1000, fixed at
+// the bottom) covered MappingReview's Import button at 1440×900 and at
+// 1366×768 until the visitor answered it (1920×1080 was clear). Each size
+// gets a FRESH context with NO mmcv_consent cookie, opens the review for
+// text-cv.pdf and asks the browser what actually sits at the button's
+// centre. The banner only renders when the build has NEXT_PUBLIC_GTM_ID;
+// without it the hit test still runs but cannot exercise the overlap, and
+// the run says so.
+const CONSENT_VIEWPORTS = [
+  [1366, 768],
+  [1440, 900],
+];
+
+/** Open the builder, pick `file` through the real Import button and wait for
+ *  the review dialog. Returns the dialog locator, or null. */
+async function openReview(pg, file) {
+  await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+  await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+  let fc = null;
+  for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+    const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+    await pg.getByRole("button", { name: /Import existing CV/ }).click();
+    fc = await chooser;
+  }
+  if (!fc) return null;
+  await fc.setFiles(file);
+  const review = pg.getByRole("dialog", { name: /Import from/ });
+  return (await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false)) ? review : null;
+}
+
+let bannerEverSeen = false;
+async function checkConsentOverlap(width, height) {
+  const label = `consent-overlap ${width}×${height}`;
+  const c = await browser.newContext({ viewport: { width, height } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    if ((await c.cookies()).some((k) => k.name === "mmcv_consent")) {
+      fail(label, "fresh context already carries mmcv_consent");
+      return;
+    }
+    const banner = pg.getByRole("region", { name: "Cookie settings" });
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    // Client-only render; give hydration a beat before concluding it is absent.
+    await pg.waitForTimeout(800);
+    const bannerUp = await banner.isVisible().catch(() => false);
+    bannerEverSeen ||= bannerUp;
+    // openReview() navigates again; the banner stays up (no cookie was set).
+    const review = await openReview(pg, path.join(FIXTURE_DIR, "text-cv.pdf"));
+    if (!review) {
+      fail(label, "the import review never opened");
+      return;
+    }
+    const btn = review.getByRole("button", { name: /^Import/ });
+    const box = await btn.boundingBox();
+    if (!box) {
+      fail(label, "Import button has no box");
+      return;
+    }
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+    const hit = await pg.evaluate(
+      ([px, py]) => {
+        const el = document.elementFromPoint(px, py);
+        const button = el?.closest("button");
+        return {
+          isImport: !!button && /^Import/.test(button.textContent?.trim() ?? ""),
+          under: el ? `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[aria-label=${el.getAttribute("aria-label")}]` : ""}` : "null",
+          inBanner: !!el?.closest('[role="region"][aria-label="Cookie settings"]'),
+        };
+      },
+      [x, y],
+    );
+    const where = `button centre (${Math.round(x)}, ${Math.round(y)})`;
+    if (!hit.isImport) {
+      fail(label, `${where} is ${hit.under}${hit.inBanner ? " (inside the cookie banner)" : ""}`);
+      return;
+    }
+    // The banner must come back once the dialog closes — it yields, it is not dismissed.
+    await review.getByRole("button", { name: /^Cancel$/ }).click();
+    const back = bannerUp ? await banner.isVisible({ timeout: 3000 }).catch(() => false) : null;
+    if (bannerUp && !back) {
+      fail(label, "the banner did not return after the dialog closed");
+      return;
+    }
+    ok(`${label}: Import button is the element at its own centre — ${where}; banner ${bannerUp ? "was up, hidden while the dialog was open, back after Cancel" : "not rendered by this build (no NEXT_PUBLIC_GTM_ID)"}`);
+  } finally {
+    await c.close();
+  }
+}
+
+// ── Import after typing on the Personal step (production QA P1) ───────────
+// 2026-10-31: typing on the Personal step, then importing, left the form on
+// the typed values while the store and preview showed the import; the next
+// keystroke wrote the stale name / email back over the import and it
+// survived a reload. The step now re-syncs whenever the store changes from
+// outside the form. Fresh context; reads the persisted CV, not the DOM.
+async function checkImportAfterTyping() {
+  const label = "import after typing (P1): imported personal fields survive the next keystroke";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByLabel(/First name/).waitFor({ timeout: 30000 });
+    await pg.getByLabel(/First name/).fill("Placeholder");
+    await pg.waitForTimeout(900); // form debounce (250 ms) + storage debounce (500 ms)
+
+    // Same page, no navigation: openReview() would reload, so pick in place.
+    let fc = null;
+    for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+      const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+      await pg.getByRole("button", { name: /Import existing CV/ }).click();
+      fc = await chooser;
+    }
+    if (!fc) {
+      fail(label, "file chooser never opened");
+      return;
+    }
+    await fc.setFiles(path.join(FIXTURE_DIR, "text-cv.pdf"));
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      fail(label, "the import review never opened");
+      return;
+    }
+    await review.getByRole("radio", { name: /Replace current CV/ }).check().catch(() => {});
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+
+    const formFirst = await pg.getByLabel(/First name/).inputValue().catch(() => "");
+    if (formFirst === "Layla") ok("import after typing (P1): the form shows the imported first name");
+    else fail("import after typing (P1): the form shows the imported first name", `First name field is "${formFirst}"`);
+
+    // One keystroke in another field, then let both debounces run.
+    const phone = pg.getByLabel(/^Phone/);
+    await phone.click();
+    await phone.press("End");
+    await phone.pressSequentially("1");
+    await pg.waitForTimeout(1200);
+
+    const stored = await pg.evaluate(() => {
+      try {
+        const raw = JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null");
+        const p = raw?.personal ?? raw?.data?.personal ?? {};
+        return { firstName: p.firstName ?? "", lastName: p.lastName ?? "", email: p.email ?? "", phone: p.phone ?? "" };
+      } catch {
+        return null;
+      }
+    });
+    if (
+      stored &&
+      stored.firstName === "Layla" &&
+      stored.lastName === "Haddad" &&
+      stored.email === "layla.haddad@example.com" &&
+      stored.phone.endsWith("1")
+    ) {
+      ok(`${label} — stored ${JSON.stringify(stored)}`);
+    } else {
+      fail(label, `stored ${JSON.stringify(stored)}`);
+    }
+  } finally {
+    await c.close();
+  }
+}
+
+/** Pick `file` on the CURRENT page (no navigation) through the Import button. */
+async function pickInPlace(pg, file) {
+  let fc = null;
+  for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+    const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+    await pg.getByRole("button", { name: /Import existing CV/ }).click();
+    fc = await chooser;
+  }
+  if (fc) await fc.setFiles(file);
+  return !!fc;
+}
+
+// ── A failure bar does not outlive the next pick (session 5 D5) ───────────
+// Production 2026-10-31: after a mapping_empty failure the red bar stayed on
+// screen behind the next file's review and after Cancel (only "Dismiss"
+// cleared it). The case loop above clicks Dismiss after every file, which is
+// why it never saw this. Fresh context, no Dismiss.
+async function checkErrorClearedByNextPick() {
+  const label = "stale error (D5): a new pick clears the previous failure";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    const errorBar = pg.getByTestId("import-error");
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "not-a-cv.pdf")))) return fail(label, "file chooser never opened");
+    if (!(await errorBar.waitFor({ timeout: 30000 }).then(() => true).catch(() => false))) {
+      return fail(label, "not-a-cv.pdf showed no error bar");
+    }
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened (2nd pick)");
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      return fail(label, "the review for text-cv.pdf never opened");
+    }
+    const withReview = await errorBar.isVisible().catch(() => false);
+    await review.getByRole("button", { name: /^Cancel$/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    const afterCancel = await errorBar.isVisible().catch(() => false);
+    if (withReview || afterCancel) fail(label, `error bar visible: with review=${withReview}, after Cancel=${afterCancel}`);
+    else ok(`${label} — bar gone with the review open and after Cancel`);
+  } finally {
+    await c.close();
+  }
+}
+
+// ── The confirm toast survives the first import of a session (D6) ─────────
+// Production 2026-10-31: the "Imported N sections" toast was replaced within
+// ~300 ms by the "<Section> section done ✓" toasts the import itself
+// triggered (replace-not-stack), so a first import showed only "Languages
+// section done ✓". Fresh context = fresh sessionStorage = first import.
+async function checkFirstImportToast() {
+  const label = "first-import toast (D6): the confirm toast is the one left on screen";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened");
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      return fail(label, "the review never opened");
+    }
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(1500); // past the ~300 ms in which the section toasts used to land
+    const confirm = await pg.getByText(/Imported \d+ sections? — review the steps below/).isVisible().catch(() => false);
+    const sectionDone = await pg.getByText(/section done ✓/).count();
+    if (confirm && sectionDone === 0) ok(`${label} — "Imported … sections" visible, no section-done toast`);
+    else fail(label, `confirm toast visible=${confirm}, section-done toasts=${sectionDone}`);
+  } finally {
+    await c.close();
+  }
+}
+
+for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
+await checkImportAfterTyping();
+await checkErrorClearedByNextPick();
+await checkFirstImportToast();
 
 // ── pdf.js worker network scenarios ────────────────────────────────────────
 // The worker choice is cached per page lifetime and runCase() navigates, so
@@ -186,6 +466,8 @@ for (const r of rows) {
       (r.message ? `\n  ${"".padEnd(30)} message="${r.message}"` : ""),
   );
 }
+
+if (!bannerEverSeen) console.log("INFO  consent-overlap: the banner was never visible in this run — the hit tests passed, but to exercise the overlap build with NEXT_PUBLIC_GTM_ID set (e.g. GTM-SMOKE01)");
 
 await browser.close();
 fs.rmSync(tmp, { recursive: true, force: true });

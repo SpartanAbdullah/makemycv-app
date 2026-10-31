@@ -11,13 +11,18 @@ import {
   responseText,
 } from "@/lib/server/anthropic";
 import { checkRateLimit, getClientIp, makeLimiter } from "@/lib/server/rateLimit";
-import { parseLinkedinMessageRequest, type LinkedinMessageRequest } from "@/lib/linkedinMessage/payload";
+import {
+  MESSAGE_WORDS,
+  parseLinkedinMessageRequest,
+  type LinkedinMessageRequest,
+} from "@/lib/linkedinMessage/payload";
 import {
   LINKEDIN_SYSTEM_PROMPT,
   buildLinkedinUserPrompt,
   parseLinkedinModelOutput,
   type LinkedinModelOutcome,
 } from "@/lib/linkedinMessage/prompt";
+import { trimToWordLimit } from "@/lib/linkedinMessage/length";
 
 /**
  * LinkedIn recruiter message (2026-10-31 — product #3 in CLAUDE.md).
@@ -156,7 +161,20 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
-    return NextResponse.json({ message: outcome.text, variant: req.variant });
+    // Length enforcement (backlog E5). The brief is 60–90 words and the model
+    // overshot it in both e2e runs (101, 102). The prompt now states 90 as a
+    // hard ceiling; when a draft still runs over, it is cut here at a sentence
+    // boundary (never inside "2.5" or "AED 1.2M") and the response says so
+    // (`outcome: "trimmed"`) so the UI can flag it and analytics can count it.
+    // No second model call: it would double latency and spend for one unit.
+    let text = outcome.text;
+    let lengthOutcome: "ok" | "trimmed" = "ok";
+    if (req.variant === "message") {
+      const cut = trimToWordLimit(text, MESSAGE_WORDS.max);
+      text = cut.text;
+      if (cut.trimmed) lengthOutcome = "trimmed";
+    }
+    return NextResponse.json({ message: text, variant: req.variant, outcome: lengthOutcome });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

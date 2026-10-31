@@ -111,9 +111,19 @@ function reconstructLines(items: PdfTextItemLike[]): string[] {
       const w = item.width ?? text.length * (medianHeight * 0.5);
       prevEndX = startX + w;
     }
-    return out.replace(/[ \t]+/g, " ").trim();
+    // NFKC (D4 / backlog E8.3, 2026-10-31): Arabic set by our own PDF export
+    // (and by Chrome's print) comes out of pdf.js as presentation forms
+    // (U+FB50–U+FEFF), which no parser regex counts as Arabic letters — the
+    // real name was skipped and every Arabic value was stored as glyph codes.
+    // NFKC maps them back to the base letters (and unfolds Latin ligatures
+    // such as "ﬁ"). Visual word order of RTL runs is NOT repaired here.
+    return out.normalize("NFKC").replace(/[ \t]+/g, " ").trim();
   });
 }
+
+/** A line that is only a page number: "Page 2 of 31", "Page 3", "2 / 5", "- 4 -". */
+const PAGE_FOOTER_RE =
+  /^(?:page\s+\d+(?:\s*(?:of|\/)\s*\d+)?|\d+\s*(?:of|\/)\s*\d+|[-–—]\s*\d+\s*[-–—])$/i;
 
 /* ── pdf.js plumbing ────────────────────────────────────────────────────── */
 
@@ -181,7 +191,11 @@ export async function extractPdfText(
     for (let pageNum = 1; pageNum <= Math.min(pages, maxPages); pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
-      const lines = reconstructLines(content.items as PdfTextItemLike[]);
+      // D7b (session 5): "Page 2 of 3" footers sat inside the Experience
+      // section and became phantom roles; a page-number line carries nothing.
+      const lines = reconstructLines(content.items as PdfTextItemLike[]).filter(
+        (l) => !PAGE_FOOTER_RE.test(l),
+      );
       pageTexts.push(lines.join("\n"));
     }
     return { text: pageTexts.join("\n\n"), pages };

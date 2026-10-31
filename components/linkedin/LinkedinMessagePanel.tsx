@@ -140,6 +140,8 @@ const LinkedinMessageForm = () => {
   const [messageVariant, setMessageVariant] = useState<LinkedinMessageVariant>("message");
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // The route cut the draft at a sentence boundary to stay within 90 words (E5).
+  const [trimmed, setTrimmed] = useState(false);
 
   const excerpt = useMemo(() => buildLinkedinCvExcerpt(cv), [cv]);
   const cvUsable = linkedinExcerptIsUsable(excerpt);
@@ -160,10 +162,11 @@ const LinkedinMessageForm = () => {
       setMessage(out.text);
       setMessageVariant(req.variant);
       setEditing(false);
+      setTrimmed(out.outcome === "trimmed");
     }
     track("linkedin_message_requested", {
       variant: req.variant,
-      outcome: out.ok ? "ok" : out.code === "REFUSED" ? "refused" : out.code === "RATE_LIMITED" ? "rate_limited" : "error",
+      outcome: out.ok ? out.outcome : out.code === "REFUSED" ? "refused" : out.code === "RATE_LIMITED" ? "rate_limited" : "error",
       placeholders: out.ok ? countPlaceholders(out.text) : 0,
     });
   };
@@ -335,7 +338,7 @@ const LinkedinMessageForm = () => {
           >
             {messageVariant === "connection_note"
               ? `${chars} / ${CONNECTION_NOTE_MAX_CHARS} characters${overCap ? " — LinkedIn will cut this off; trim it before sending" : ""}`
-              : `${words} words · ${chars} characters`}
+              : `${words} words · ${chars} characters${trimmed ? ` — shortened to ${MESSAGE_WORDS.max} words by dropping whole sentences; read it through before sending` : ""}`}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <button type="button" className="cv-btn-secondary" onClick={() => setEditing((v) => !v)}>

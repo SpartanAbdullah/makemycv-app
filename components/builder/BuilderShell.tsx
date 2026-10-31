@@ -954,11 +954,17 @@ export const BuilderShell = ({
   // has hydrated so a returning user's already-complete sections don't
   // toast on load.
   const prevCompletionRef = useRef<Record<string, boolean> | null>(null);
+  // D6 (session 5): set by handleImportConfirm. Sections completed BY an
+  // import are still tracked and marked as toasted, but do not toast — with
+  // replace-not-stack toasts they used to wipe the "Imported N sections"
+  // message within ~300 ms on the first import of a session.
+  const importConfirmedAtRef = useRef(0);
   useEffect(() => {
     if (!hydrated) return;
     const prev = prevCompletionRef.current;
     prevCompletionRef.current = completionMap;
     if (!prev) return;
+    const fromImport = Date.now() - importConfirmedAtRef.current < 2000;
     for (const step of builderSteps) {
       if (step.id === "review") continue; // derived — would be noise
       if (!prev[step.id] && completionMap[step.id]) {
@@ -974,6 +980,7 @@ export const BuilderShell = ({
         } catch {
           /* sessionStorage unavailable — still toast, once per mount */
         }
+        if (fromImport) continue;
         pushToast(`${step.title} section done ✓`, {
           tone: "success",
           duration: 3000,
@@ -1122,6 +1129,9 @@ export const BuilderShell = ({
       ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     triggerFileInput(accept, async (file) => {
+      // D5 (session 5): a new pick starts clean. The previous failure's bar
+      // used to stay up behind the next file's review, and after Cancel.
+      setErrorMsg(null);
       // Extension bucket only (never the name) — this is the `file_type`
       // analytics param and the routing key. Anything not pdf/docx stops at
       // the gate below, so a mislabelled pick can no longer report as a
@@ -1177,6 +1187,8 @@ export const BuilderShell = ({
     partial: Partial<CvData>,
     mode: "replace" | "merge",
   ) => {
+    // Before the store write: the section-done effect it triggers reads this.
+    importConfirmedAtRef.current = Date.now();
     importCvVersion(partial, mode);
     // Snapshot the "before" for the TopBar delta. Zustand set() is synchronous,
     // so this reads the CV that importCvVersion just wrote. This path sets no

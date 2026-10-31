@@ -76,7 +76,11 @@ fidelity composites) and the "Session 4 — Arabic" section of
   Word display and copy them correctly and NFKC maps them back, but an ATS
   that matches Arabic keywords byte-for-byte without normalising will not
   match. The Review step says so when the CV contains Arabic. The `.docx`
-  export is untouched (Word shapes the original letters).
+  export is untouched (Word shapes the original letters). Our own importer
+  NFKC-normalises every extracted PDF line (`lib/importers/pdfAdapter.ts`,
+  2026-10-31), so re-importing an exported Arabic CV keeps the name, headline
+  and role in base letters (`__fixtures__/import/arabic-export-classic.pdf`).
+  Long Arabic lines split across `TJ` operators can still lose words.
 - **One run per line.** Inside a `<Text>` that contains Arabic, a nested bold
   label loses its weight, a `<Link>` loses its hyperlink (text stays), Latin
   words are set in Vazirmatn's Latin instead of Inter / Bricolage / Instrument

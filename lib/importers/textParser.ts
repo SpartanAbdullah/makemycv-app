@@ -376,6 +376,102 @@ function looksLikeCompany(text: string): boolean {
   );
 }
 
+// Brackets left empty once their dates are stripped: "(2018 - 2020)" became
+// "(  -  )", whose " - " splitHeaderParts then read as a field separator, so
+// the school came back as ")" and the degree as "…, Heriot-Watt University ("
+// (D3, session 5 production matrix).
+const EMPTY_BRACKETS_RE =
+  /[([]\s*(?:[-–—/,.]+|to|till|until|thru|through)?\s*[)\]]/gi;
+
+/** A header line with its dates, "present" token and the brackets that held
+ *  them removed. Collapses 3+ whitespace to 2 so the DOCX-style two-space
+ *  field separator survives for splitHeaderParts. */
+function stripHeaderDates(line: string): string {
+  return line
+    .replace(DATE_TOKEN_RE, " ")
+    .replace(PRESENT_RE, " ")
+    .replace(EMPTY_BRACKETS_RE, " ")
+    .replace(/[ \t]{3,}/g, "  ")
+    .trim();
+}
+
+/** A header part with something readable in it — drops the "-" / "(" debris a
+ *  stripped date range can leave between separators. */
+function hasWordChar(part: string): boolean {
+  // Any script: Arabic arrives as presentation forms (U+FB50–U+FEFF) from
+  // our own PDF export, which the usual [؀-ۿ] range does not cover.
+  return /[\p{L}\p{N}]/u.test(part);
+}
+
+/**
+ * D1 (session 5): fold a dated line into the role above it when that role is
+ * still only a title — no dates, no bullets yet. The line is then the tail of
+ * the header ("Company · City · Mar 2021 - Present" or "City | dates"), so
+ * its dates go onto the role, a place goes to `location`, and the rest fills
+ * an empty `company`. Returns false (caller starts a new entry as before)
+ * when the line carries something that cannot be placed — a second role
+ * title, more names than there are empty fields, or a sentence.
+ */
+function mergeDatedTail(entry: ParsedExperience, line: string): boolean {
+  if (!(entry.role?.trim() || entry.company?.trim())) return false;
+  if (entry.startDate || entry.endDate || entry.isCurrent) return false;
+  if (entry.bullets && entry.bullets.length > 0) return false;
+  const dates = extractDates(line);
+  if (dates.length === 0) return false;
+
+  const parts = splitHeaderParts(trimTrailingSeparator(stripHeaderDates(line))).filter(
+    hasWordChar,
+  );
+  const places: string[] = [];
+  const names: string[] = [];
+  for (const p of parts) (looksLikeLocation(p) ? places : names).push(p);
+  // A job title in the tail means this line opens the next role.
+  if (names.some((p) => looksLikeRole(p) && !looksLikeCompany(p))) return false;
+  if (names.some((p) => p.length > 70 || /[.!?]$/.test(p))) return false;
+
+  let company = entry.company?.trim() ? entry.company : undefined;
+  let location = entry.location?.trim() ? entry.location : undefined;
+  for (const n of names) {
+    if (!company) company = n;
+    else if (!location) location = n;
+    else return false;
+  }
+  for (const p of places) {
+    if (!location) location = p;
+    else if (!company) company = p;
+    else return false;
+  }
+
+  const hasPresent = PRESENT_RE.test(line);
+  entry.company = company;
+  entry.location = location;
+  entry.startDate = dates[0];
+  entry.endDate = dates[1] ?? (hasPresent ? "Present" : undefined);
+  entry.isCurrent = hasPresent;
+  return true;
+}
+
+/**
+ * D2 (session 5): does `line` read as the wrapped second half of the marked
+ * bullet above it (which has no closing punctuation)? Yes when it starts in
+ * lower case, or with a number that is not a date ("140 technicians…"), or
+ * starts upper case but ends a sentence and carries none of the marks of a
+ * new role (dates, a separator, a job title). A short capitalised line with
+ * no full stop ("Procurement Officer", "Acme LLC") stays a header — bullets
+ * without full stops are common and the next role must not be swallowed.
+ */
+function isBulletContinuation(line: string): boolean {
+  if (isBulletLine(line)) return false;
+  if (detectSection(line)) return false;
+  if (/^[a-z]/.test(line)) return true;
+  const hasDates = extractDates(line).length > 0 || PRESENT_RE.test(line);
+  if (/^[\d(&%+]/.test(line)) return !hasDates;
+  if (hasDates) return false;
+  if (splitHeaderParts(line).length >= 2) return false;
+  if (looksLikeRole(line) && line.length < 60) return false;
+  return /[.!?]["')\]]?$/.test(line);
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -403,6 +499,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   let current: ParsedExperience | null = null;
   let pendingDates: string[] | null = null;
   let pendingPresent = false;
+  // True while the last line handled was a marked bullet (or a wrapped line
+  // appended to one). See isBulletContinuation.
+  let bulletOpen = false;
 
   const pushCurrent = () => {
     if (!current) return;
@@ -433,14 +532,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   const startEntryFromLine = (line: string) => {
     const dates = extractDates(line);
     const hasPresent = PRESENT_RE.test(line);
-    // Strip dates and the "present" token. Collapse 3+ whitespace to 2 so the
-    // DOCX-style two-space field separator survives for splitHeaderParts.
-    const cleaned = line
-      .replace(DATE_TOKEN_RE, " ")
-      .replace(PRESENT_RE, " ")
-      .replace(/[ \t]{3,}/g, "  ")
-      .trim();
-    const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
+    // Strip dates, the "present" token and the brackets that held them.
+    const cleaned = stripHeaderDates(line);
+    const parts = splitHeaderParts(trimTrailingSeparator(cleaned)).filter(hasWordChar);
 
     let role: string | undefined;
     let company: string | undefined;
@@ -498,6 +592,25 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       }
       current.bullets = current.bullets ?? [];
       current.bullets.push(stripBulletPrefix(line));
+      bulletOpen = true;
+      continue;
+    }
+
+    // D2 (session 5): a marked bullet that wraps in a PDF arrives as two
+    // lines, and the second half became the role's Company ("supervisors.")
+    // or a bullet of its own. While the last marked bullet has no closing
+    // punctuation, a line that reads as its continuation is appended to it.
+    const wasOpen = bulletOpen;
+    bulletOpen = false;
+    if (
+      wasOpen &&
+      current?.bullets?.length &&
+      !/[.!?]["')\]]?$/.test(current.bullets[current.bullets.length - 1]) &&
+      isBulletContinuation(line)
+    ) {
+      const last = current.bullets.length - 1;
+      current.bullets[last] = `${current.bullets[last]} ${line}`;
+      bulletOpen = true;
       continue;
     }
 
@@ -540,6 +653,15 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
         line.length < 80 &&
         !/[.!?]$/.test(line) &&
         !startsWithActionVerb);
+
+    // D1 (2026-10-31): the dated line UNDER a title is the tail of that
+    // header, not a second role. "Senior Procurement Specialist" /
+    // "Falcon FM · Abu Dhabi · Mar 2021 - Present" and "Role - Company" /
+    // "Dubai | Mar 2021 - Present" used to become two cards (card 2's Role =
+    // the city, and in DOCX its Company = the first unmarked bullet).
+    if (looksLikeNewHeader && current && hasInlineDates && mergeDatedTail(current, line)) {
+      continue;
+    }
 
     if (looksLikeNewHeader) {
       pushCurrent();
@@ -618,6 +740,28 @@ function matchAttestingBody(line: string): string {
 
 // ── Education block parser ───────────────────────────────────────────────────
 
+const INSTITUTION_RE =
+  /\b(?:university|college|institute|institution|school|academy|polytechnic|conservatoire)\b/i;
+
+/**
+ * D3 (session 5): "MSc Facilities Management, Heriot-Watt University Dubai"
+ * is degree + school joined by a comma, which splitHeaderParts never splits.
+ * Split a part that names a degree at the LAST comma whose right-hand side
+ * names an institution (and whose left-hand side does not); anything else is
+ * returned unchanged.
+ */
+function splitDegreeSchool(part: string): string[] {
+  if (!DEGREE_KEYWORDS_RE.test(part) || !part.includes(",")) return [part];
+  for (let i = part.lastIndexOf(","); i > 0; i = part.lastIndexOf(",", i - 1)) {
+    const left = part.slice(0, i).trim();
+    const right = part.slice(i + 1).trim();
+    if (left && right && INSTITUTION_RE.test(right) && !INSTITUTION_RE.test(left)) {
+      return [left, right];
+    }
+  }
+  return [part];
+}
+
 function parseEducationBlock(lines: string[]): ParsedEducation[] {
   const entries: ParsedEducation[] = [];
   let current: ParsedEducation | null = null;
@@ -695,12 +839,10 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
     if (looksLikeNewHeader) {
       pushCurrent();
 
-      const cleaned = line
-        .replace(DATE_TOKEN_RE, " ")
-        .replace(PRESENT_RE, " ")
-        .replace(/[ \t]{3,}/g, "  ")
-        .trim();
-      const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
+      const cleaned = stripHeaderDates(line);
+      const parts = splitHeaderParts(trimTrailingSeparator(cleaned))
+        .filter(hasWordChar)
+        .flatMap(splitDegreeSchool);
 
       let school: string | undefined;
       let degree: string | undefined;
@@ -1213,6 +1355,36 @@ function parseProjectsBlock(lines: string[]): ParsedProject[] {
 
 const CONTACT_SCAN_DEPTH = 30;
 
+/** A letter's salutation line — never a name or a headline. */
+const SALUTATION_RE =
+  /^(?:dear|to\s+whom\s+it\s+may\s+concern|hello|hi|greetings|good\s+(?:morning|afternoon|day))\b/i;
+
+/** Base Arabic-script letters (after the PDF adapter's NFKC). */
+const ARABIC_LETTER_RE = /[ؠ-يٱ-ۓ]/;
+
+/**
+ * True when the document's Arabic reads in VISUAL order (letters reversed),
+ * which is how pdf.js returns Chrome-printed Arabic: "ليلى حداد" arrives as
+ * "اددح ىليل". Our own react-pdf export extracts in logical order. Signal:
+ * ة / ى only ever END a word and "ال" STARTS one, so in reversed text words
+ * begin with ة / ى and end with "لا". Reversed Arabic must not be adopted as
+ * the name or headline — an empty field is honest, a mirrored name is not.
+ */
+function arabicLooksVisualOrder(lines: string[]): boolean {
+  let logical = 0;
+  let visual = 0;
+  for (const line of lines) {
+    if (!line || !ARABIC_LETTER_RE.test(line)) continue;
+    for (const raw of line.split(/\s+/)) {
+      const w = raw.replace(/[^ؠ-يٱ-ۓ]/g, "");
+      if (w.length < 3) continue;
+      if (/[ةى]$/.test(w) || /^ال/.test(w)) logical++;
+      if (/^[ةى]/.test(w) || /لا$/.test(w)) visual++;
+    }
+  }
+  return visual >= 2 && visual > logical;
+}
+
 function harvestContact(lines: string[]): {
   contact: NonNullable<ParsedDocument["contact"]>;
   nameLine: number;
@@ -1301,6 +1473,8 @@ function harvestContact(lines: string[]): {
     if (matchedSomething) consumed.add(i);
   }
 
+  const arabicVisual = arabicLooksVisualOrder(lines);
+
   // Name: the first non-consumed, short, alphabetic line in the top depth
   // that doesn't look like a section header or contact value.
   for (let i = 0; i < depth; i++) {
@@ -1314,6 +1488,12 @@ function harvestContact(lines: string[]): {
     if (sec) break;
     if (line.length > 70) continue;
     if (line.match(EMAIL_RE) || line.match(GENERIC_URL_RE) || line.match(PHONE_RE)) continue;
+    // D4 (session 5): a name is never a bullet and never carries a number.
+    // On an Arabic PDF the first line the letter test accepted was a bullet,
+    // so First name became "•" and Last name a whole sentence.
+    if (isBulletLine(line) || /^[•·●◦▪■*›▸▶►★]/.test(line) || /\d/.test(line)) continue;
+    if (arabicVisual && ARABIC_LETTER_RE.test(line)) continue;
+    if (SALUTATION_RE.test(line)) continue;
     // Must contain at least one alphabetic char and not look like a headline / sentence.
     if (!/[A-Za-zÀ-ɏ؀-ۿ]/.test(line)) continue;
     // Likely headline if it's a known job title.
@@ -1335,6 +1515,12 @@ function harvestContact(lines: string[]): {
   // skip any already-consumed contact lines, and accept a line that reads like a
   // job title or carries a title separator ("Accountant | CMA Candidate").
   if (nameLine >= 0 && !contact.headline) {
+    // D4 (session 5): an Arabic CV's headline is the Arabic line right under
+    // an Arabic name — the English role-word test can never accept it, and
+    // the scan used to run on into the (unrecognised) Arabic sections and
+    // take a dated role line as the headline because it held an em dash.
+    const arabicName = ARABIC_LETTER_RE.test(contact.name ?? "");
+    let firstCandidate = true;
     for (let i = nameLine + 1; i < depth; i++) {
       if (consumed.has(i)) continue;
       const line = lines[i]?.trim();
@@ -1352,6 +1538,25 @@ function harvestContact(lines: string[]): {
       ) {
         continue;
       }
+      const wasFirst = firstCandidate;
+      firstCandidate = false;
+      if (
+        wasFirst &&
+        arabicName &&
+        ARABIC_LETTER_RE.test(line) &&
+        !/[A-Za-z\d]/.test(line) &&
+        !isBulletLine(line) &&
+        line.length <= 60
+      ) {
+        contact.headline = line;
+        consumed.add(i);
+        break;
+      }
+      // D8 (session 5): a cover letter's "Dear Hiring Manager," was taken as
+      // the headline (it holds the role word "manager").
+      if (SALUTATION_RE.test(line)) continue;
+      // A headline carries no dates; a dated line is a role or a degree.
+      if (extractDates(line).length > 0) continue;
       const titleish = looksLikeRole(line) || /\s[|·•—–]\s/.test(line);
       if (titleish) {
         contact.headline = line;

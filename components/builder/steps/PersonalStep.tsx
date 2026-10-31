@@ -142,21 +142,33 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
     watch,
     reset,
     setValue,
-    formState: { errors, isDirty },
+    formState: { errors },
   } = useForm<CvPersonal>({
     resolver: zodResolver(personalSchema),
     defaultValues: personal,
   });
 
+  // Store → form. lastSerializedRef holds the owned fields as this form last
+  // wrote them, so a store value that differs came from OUTSIDE the form — a
+  // CV import, storage hydration, a reset — and the form must take it even
+  // after the user has typed (production QA P1, 2026-10-31: the old
+  // `if (!isDirty) reset()` skipped exactly that case, and the next keystroke
+  // wrote the stale typed name / email back over the imported CV). A pending
+  // debounced write from before the change is dropped, not flushed, for the
+  // same reason. The form's own writes match the ref, so typing never resets.
   useEffect(() => {
-    if (!isDirty) reset(personal);
-  }, [personal, reset, isDirty]);
-
-  useEffect(() => {
-    lastSerializedRef.current = serializeOwned(
+    const serialized = serializeOwned(
       personal as unknown as Record<string, unknown>,
     );
-  }, [personal]);
+    if (serialized === lastSerializedRef.current) return;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    flushRef.current = null;
+    lastSerializedRef.current = serialized;
+    reset(personal);
+  }, [personal, reset]);
 
   useEffect(() => {
     const subscription = watch((value) => {
@@ -167,18 +179,22 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
         if (nextSerialized !== lastSerializedRef.current) {
           lastSerializedRef.current = nextSerialized;
           // Merge THIS step's fields over the live store instead of replacing
-          // the whole personal slice (audit A-W1-014). Once the user types,
-          // isDirty stays true and the reset() above never re-syncs, so RHF
-          // keeps its mount-time snapshot forever. Fields this step does not
-          // own — photo and showPhoto, which are written directly to the store
-          // by handlePhotoChange / handleToggleChange — were absent from that
-          // snapshot, so the old whole-slice write silently wiped a photo the
-          // user had just uploaded.
+          // the whole personal slice (audit A-W1-014). Fields this step does
+          // not own — photo and showPhoto, which are written directly to the
+          // store by handlePhotoChange / handleToggleChange — are absent from
+          // the form's snapshot, so the old whole-slice write silently wiped a
+          // photo the user had just uploaded.
           const current = useCvStore.getState().data.personal;
-          updateSection("personal", {
+          const merged = {
             ...current,
             ...pickOwned(value as Record<string, unknown>),
-          } as CvPersonal);
+          } as CvPersonal;
+          // What the store will hold, so the store → form effect above
+          // recognises this write as the form's own.
+          lastSerializedRef.current = serializeOwned(
+            merged as unknown as Record<string, unknown>,
+          );
+          updateSection("personal", merged);
         }
       };
       flushRef.current = commit;

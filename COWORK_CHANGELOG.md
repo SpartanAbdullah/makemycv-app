@@ -25,6 +25,293 @@ Format:
 
 ---
 
+## [2026-10-31 22:50] Import: "Page N of M" footers no longer become roles (session 5 D7b)
+
+**Goal:** Minor defect D7(b) (IMPORT_MONITORING.md §8.3): page-number footer lines were not stripped, so a CV whose
+"Page 1 of 2" footer fell inside Experience got a phantom role or bullet (the 31-page fixture got 10 roles named
+"Page x of 31").
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` — `extractPdfText` drops lines that are only a page number
+  (`PAGE_FOOTER_RE`: "Page 2", "Page 2 of 31", "Page 2/31", "2 of 31", "2 / 31", "- 2 -"). Shared with the
+  /resume-checker client extraction.
+- created: `__fixtures__/import/s5-31-pages.pdf` (matrix case 7, persona "Noor Testwell").
+- edited: `scripts/import-fixtures.test.mjs` — no "Page N of M" in experience; the one real role, dated, 2 bullets.
+**Notes / risks / follow-up:** D7(a) is still open: pages past `MAX_PDF_PAGES` (30) are dropped with no message
+(this fixture's page 31 holds skills and education). Needs a `truncated` flag and a MappingReview line.
+**Suggested commit:** fix(import): drop page-number footer lines from PDF text (D7b)
+
+## [2026-10-31 22:40] Import: a letter's salutation is never the headline or the name (session 5 D8)
+
+**Goal:** Minor defect D8 (IMPORT_MONITORING.md §8.3): a cover letter with a contact header imported with Headline =
+"Dear Hiring Manager," (the line holds the role word "manager").
+**Files:**
+- edited: `lib/importers/textParser.ts` — `SALUTATION_RE` (Dear / To whom it may concern / Hello / Hi / Greetings /
+  Good morning…): `harvestContact` skips such lines as name and as headline.
+- created: `__fixtures__/import/s5-cover-letter-contact.pdf` (matrix case 10a, persona "Noor Testwell").
+- edited: `scripts/import-fixtures.test.mjs`, `scripts/parser-fixtures.test.cjs` — salutation not the headline / name.
+**Notes / risks / follow-up:** the letter still imports as a CV with contact only (correct contact, letter text in
+"We couldn't place this"). Saying "this looks like a cover letter → /cover-letter" is a product call (mapping_empty
+variant), not done.
+**Suggested commit:** fix(import): never take a letter's salutation as the headline (D8)
+
+## [2026-10-31 22:30] Import: the confirm toast is no longer wiped on the first import of a session (session 5 D6)
+
+**Goal:** Minor defect D6 (IMPORT_MONITORING.md §8.3): on the first import of a browser session the "Imported N
+sections — review the steps below…" toast was replaced within ~300 ms by the "<Section> section done ✓" toasts the
+import itself triggered (same `success` tone, replace-not-stack); the user saw only "Languages section done ✓".
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` — `handleImportConfirm` stamps `importConfirmedAtRef` before the store
+  write; the section-done effect, within 2 s of that stamp, still sends `cv_section_completed` and sets the
+  sessionStorage marks but does not push the toast.
+- edited: `scripts/import-smoke.mjs` — fresh-context check: after confirming text-cv.pdf, the confirm toast is visible
+  1.5 s later and no "section done ✓" toast is.
+**Notes / risks / follow-up:** sections completed by an import never get their own celebration toast in that session
+(their marks are set), which is the intent — the import toast already says what landed.
+**Suggested commit:** fix(builder): keep the import confirmation toast on the first import (D6)
+
+## [2026-10-31 22:20] Import: a new pick clears the previous failure message (session 5 D5)
+
+**Goal:** Minor defect D5 (IMPORT_MONITORING.md §8.3): after a failed import the red bar stayed on screen behind the
+next file's review and after Cancel; only "Dismiss" cleared it.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` — `handleImport` calls `setErrorMsg(null)` first thing in the picker
+  callback.
+- edited: `scripts/import-smoke.mjs` — new fresh-context check: `not-a-cv.pdf` (mapping_empty, no Dismiss), then
+  `text-cv.pdf`; the bar must be hidden with the review open and after Cancel. `pickInPlace()` helper.
+**Suggested commit:** fix(builder): clear the previous import error when a new file is picked (D5)
+
+## [2026-10-31 22:10] Import review: the button counts sections like the toast does (session 5 D12)
+
+**Goal:** Minor defect D12 (IMPORT_MONITORING.md §8.3): MappingReview's button counted every role and degree as a
+section ("Import (12 sections)") while the confirm toast and the `sections_filled` param said 6.
+**Files:**
+- edited: `components/import/MappingReview.tsx` — `sectionCount = countSectionsFilled(edited)` (the toast's and the
+  analytics param's own function), so the three can no longer drift.
+- edited: `scripts/import-smoke.mjs` — every import case asserts the button's number equals the push's
+  `sections_filled`.
+**Suggested commit:** fix(import): review button counts sections the way the toast does (D12)
+
+## [2026-10-31 22:00] Import: Arabic PDFs keep the name, in base letters (session 5 D4, backlog E8.3)
+
+**Goal:** Major defect D4 (IMPORT_MONITORING.md §8.3) and the Arabic round-trip loss
+(ARABIC_PRODUCTION_2026-10-31.md §4/§6.3). pdf.js returns Arabic as presentation forms (U+FB50–U+FEFF), which the
+name test did not count as letters: the real Arabic name was skipped and the first line holding a harakat mark was
+taken instead — a bullet, giving First name "•" and Last name a sentence; every Arabic value was stored as glyph codes.
+Re-importing a CV exported from our own Classic template lost first and last name.
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts` — `reconstructLines` returns each line `.normalize("NFKC")` (also covers the
+  /resume-checker client extraction, which uses the same function).
+- edited: `lib/importers/textParser.ts` — `harvestContact`: the name loop skips bullet lines and lines with digits;
+  an Arabic line directly under an Arabic name is the headline; the headline scan skips dated lines (a dated
+  "Role — Company" line was being taken because of its em dash); `arabicLooksVisualOrder()` detects mirrored Arabic
+  (Chrome-printed PDFs: words starting with ة/ى) and then never adopts an Arabic line as the name, so NFKC does not
+  turn `arabic-only.pdf` into a mirrored name "اددح ىليل".
+- created: `__fixtures__/import/s5-arabic-majority.pdf` (matrix case 3, persona "Noor Testwell") and
+  `__fixtures__/import/arabic-export-classic.pdf` (`_cowork/session5/arabic/A-classic.pdf`, a builder Classic export,
+  synthetic persona "Reem Al Hashimi", example.com).
+- edited: `scripts/import-fixtures.test.mjs` — Arabic name, headline, role/company, and no presentation forms stored
+  for both; arabic-only.pdf must not get a mirrored Arabic name.
+- edited: `scripts/parser-fixtures.test.cjs` — Arabic name after a bullet line, Latin name with an Arabic
+  transliteration line, mirrored Arabic, dated headline candidate.
+- edited: `scripts/import-smoke.mjs` — the four session-5 fixtures are import cases (3 and 3 experience cards for the
+  two English ones).
+- edited: `docs/import-errors.md`, `docs/arabic-pdf.md` — importer NFKC noted.
+**Notes / risks / follow-up:** visual-order repair (reversing mirrored RTL runs) and the word loss in long Arabic lines
+(react-pdf splits them across `TJ` operators, E8.1) are not addressed; the Arabic bullet in 02-mixed-lang.pdf is now
+base letters but still in scrambled word order. NFKC also unfolds Latin ligatures, full-width forms and "…" → "...".
+**Suggested commit:** fix(import): NFKC Arabic PDF text and keep bullets out of the name (D4)
+
+## [2026-10-31 21:40] Import: "Degree, School (2018 - 2020)" gives the degree and the school (session 5 D3)
+
+**Goal:** Major defect D3 (IMPORT_MONITORING.md §8.3): every education line of the form "Degree, School (dates)" came
+back as Degree = "Degree, School (" and School = ")" — removing the dates left "( - )", whose " - " was split as a
+header separator, and the comma was never split. It printed "Heriot-Watt University Dubai ( | )" on the CV.
+**Files:**
+- edited: `lib/importers/textParser.ts` — `stripHeaderDates()` also removes brackets left empty by the date strip
+  (`EMPTY_BRACKETS_RE`: "( - )", "( – )", "[ to ]", "()"); experience and education headers drop parts with no letter
+  or digit (`hasWordChar`, now any script via `\p{L}\p{N}` — the earlier Latin/Arabic-block range dropped every part of
+  our own Arabic PDF export, whose letters are presentation forms); `parseEducationBlock` splits a degree part at the
+  last comma whose right side names an institution (`splitDegreeSchool`, University/College/Institute/School/Academy/
+  Polytechnic/Conservatoire).
+- edited: `scripts/parser-fixtures.test.cjs` — three degree lines (round and square brackets, a faculty before the
+  university) and an experience line with "(Jan 2020 – Present)".
+- edited: `scripts/import-fixtures.test.mjs` — text-cv.pdf and s5-header-table.docx degree/school values.
+**Notes / risks / follow-up:** "School, Degree" order and degree lines with no institution keyword after the comma
+are left as one degree string (reviewable), as before.
+**Suggested commit:** fix(import): split "Degree, School (dates)" and drop empty date brackets (D3)
+
+## [2026-10-31 21:20] Import: wrapped PDF bullets come back whole (session 5 D2)
+
+**Goal:** Major defect D2 (IMPORT_MONITORING.md §8.3): a marked bullet that wraps onto a second PDF line was cut in
+two — the tail became the role's Company ("supervisors.") or a separate bullet ("calendar in the CAFM system.").
+**Files:**
+- edited: `lib/importers/textParser.ts` — `parseExperienceBlock` keeps `bulletOpen` while the last line was a marked
+  bullet without closing punctuation; `isBulletContinuation()` appends the next line to it when it starts lower case,
+  starts with a non-date number, or starts upper case and ends a sentence without any sign of a new role (dates, a
+  header separator, a job title). A short capitalised line with no full stop ("Procurement Officer", "Acme LLC")
+  still starts the next role, because bullets without full stops are common.
+- edited: `scripts/parser-fixtures.test.cjs` — wrapped two- and three-line bullets, and a guard CV whose bullets have
+  no full stops followed by a title-only role and a company-first role.
+- edited: `scripts/import-fixtures.test.mjs` — s5-long-wrapped.pdf: bullet 1 ends "…9 supervisors.", the first four
+  bullets of every role are whole sentences.
+**Notes / risks / follow-up:** only MARKED bullets are joined. mammoth drops list markers, so DOCX is unaffected; an
+unmarked PDF paragraph (s5-long-wrapped.pdf's "Detailed … narrative" blocks) still arrives as one bullet per line.
+**Suggested commit:** fix(import): join a wrapped PDF bullet with its continuation line (D2)
+
+## [2026-10-31 21:00] Import: a role no longer splits into two cards when its dates sit under the title (session 5 D1, backlog E2)
+
+**Goal:** Major defect from the session-5 production import matrix (docs/ai-mission/IMPORT_MONITORING.md §8.3 D1).
+Every role whose dates were on the line below the title became two experience cards: card 1 title + company with no
+dates or bullets, card 2 with Role = the city and (in DOCX, where mammoth drops list markers) Company = the first
+bullet. The repo's own fixtures showed it (text-cv.pdf 2 roles → 4, two-column-table.docx 2 → 4) but the tests only
+asserted "≥ 2".
+**Files:**
+- edited: `lib/importers/textParser.ts` — `mergeDatedTail()`: in `parseExperienceBlock`, a line with inline dates
+  that would start a new entry is folded into the current one when that entry has a title/company but no dates and
+  no bullets yet. Dates go onto the role, a place (`looksLikeLocation`) fills `location`, other names fill an empty
+  `company`. It declines (old behaviour: new entry) when the line carries a job title, a sentence, or more names than
+  there are empty fields. `stripHeaderDates()` factors out the date-stripping step shared with `startEntryFromLine`.
+- edited: `scripts/parser-fixtures.test.cjs` — three inline cases: "Title" / "Company · City · dates",
+  "Title - Company" / "City | dates" with unmarked bullets, and a guard that a dateless role followed by a dated
+  role line stays two roles.
+- edited: `scripts/import-fixtures.test.mjs` — exact role counts and fields for text-cv.pdf, two-column-table.docx,
+  rtl-mixed.docx; new fixtures below.
+- created: `__fixtures__/import/s5-long-wrapped.pdf`, `__fixtures__/import/s5-header-table.docx` — copies of the
+  session-5 matrix cases 1 and 4 (`_cowork/session5/import/fixtures/01-long-6p.pdf`, `04-header-name-table.docx`;
+  synthetic persona "Noor Testwell", example.com).
+- edited: `scripts/import-smoke.mjs` — the review must show exactly 2 experience cards for text-cv.pdf and
+  two-column-table.docx.
+- edited: `docs/import-errors.md` — "Not fixed here" role-segmentation item marked fixed.
+**Notes / risks / follow-up:** LinkedIn-style "Company" / "Role" / "dates · City" also merges now (it split before);
+its role/company order is still as parsed. rtl-mixed.docx keeps a third card for its Arabic role line.
+**Suggested commit:** fix(import): merge a dated line under a role title into that role (D1)
+
+## [2026-10-31 20:05] Import after typing no longer gets overwritten by the stale form (production QA P1, backlog E10)
+
+**Goal:** Major defect from the production QA (docs/ai-mission/QA_PRODUCTION_2026-10-31.md, P1). A visitor who typed
+on the Personal step and then imported a CV saw the import in the preview, but the form kept the typed values; the
+next keystroke wrote the stale first name, last name, email, phone and headline back over the import, and it
+survived a reload. Root cause: the step re-synced the form from the store only while the form was untouched
+(`if (!isDirty) reset(personal)`), the half of audit A-W1-014 that the photo fix did not cover.
+**Files:**
+- edited: `components/builder/steps/PersonalStep.tsx`, `components/builder/steps/UAEEssentialsStep.tsx` — the
+  store → form effect now compares the store's owned fields with what the form last wrote (`lastSerializedRef`).
+  A difference means the change came from outside the form (import, storage hydration, reset): the pending
+  debounced write is dropped (not flushed) and the form is `reset()` to the store. The form's own commit records
+  the merged value it writes, so typing never triggers a reset and there is no loop. `isDirty` is no longer read.
+- edited: `scripts/import-smoke.mjs` — new check: fresh context, type "Placeholder" in First name, import
+  `text-cv.pdf` (Replace), assert the First name field shows "Layla", type one character in Phone, then read
+  `makemycv:data` from localStorage and assert first/last name, email and the phone (+ the keystroke) are the
+  imported ones. Negative control: the same check against production fails exactly as the QA reported
+  (`firstName: "Placeholder"`, `email: ""`). The E9 consent check now runs in its own fresh context at
+  1366×768 and 1440×900 (the QA found 1366×768 also covered) and asserts the banner comes back after Cancel.
+**Notes / risks / follow-up:** a keystroke made in the ~250 ms before an import lands is discarded with the rest of
+the form state; the import is the newer intent. Summary, Experience, Education, Skills, Languages, Certifications
+and Projects still use `if (!isDirty) reset(...)`; today that is safe because the file import lives only on the
+Personal step and the report import runs on arrival, so none of them is mounted with typed edits when the store is
+replaced. Apply the same pattern if an import (or any other outside write) is ever offered on those steps. To
+exercise the banner in `smoke:import`, build with `NEXT_PUBLIC_GTM_ID=GTM-SMOKE01`.
+**Suggested commit:** fix(builder): re-sync Personal and UAE steps when an import changes the store (P1)
+
+## [2026-10-31 19:25] Checker dropzone: says what it accepts and what happens to the file; builder import errors (backlog E1)
+
+**Goal:** the /resume-checker dropzone said "max 5MB · no sign-up" while the builder import (same pdf.js / mammoth
+extraction) accepts 15 MB, did not say a scanned PDF will not work, and showed its own generic messages for
+failures the builder already names precisely (password-protected, damaged, old .doc, blocked PDF reader, timeout).
+**Files:**
+- edited: `components/resume-checker/UploadDropzone.tsx` —
+  - copy: "PDF or DOCX · up to 15 MB · text-based, not a scanned image", then "Processed in your browser — the file
+    never leaves your device. Only the extracted text is sent, and it is deleted after 24 hours." (matches the
+    page's "deleted after 24 hours" line and its "What happens to your file" paragraph). The number comes from
+    `MAX_IMPORT_BYTES`.
+  - validation: `gateImportFile()` (extension, empty, size) with the builder's copy; the MIME cross-check stays.
+  - extraction failures: `toImportParseError(err).message` for every typed reason; `parse_exception` keeps the
+    checker's own sentence because the builder copy points at the builder form.
+  - too little text: `MIN_TEXT_LENGTH` and `IMPORT_ERROR_COPY.no_text_layer` / `empty_text`.
+**Notes / risks / follow-up:** the size ceiling rises from 5 MB to 15 MB for the checker. Only the extracted text is
+posted, and the parse route still caps that text, so the server-side cost is unchanged. `.docm` now counts as Word
+(same as the builder).
+**Suggested commit:** fix(checker): dropzone states accepted files and data handling, builder import errors (E1)
+
+## [2026-10-31 19:10] LinkedIn message: 90-word ceiling enforced server-side (backlog E5)
+
+**Goal:** the 60–90-word LinkedIn message came back at 101 words in the staging e2e and 102 on production. A
+message over the brief is one the user has to trim by hand before sending, so the route now guarantees the
+ceiling and says when it had to cut.
+**Files:**
+- edited: `lib/linkedinMessage/prompt.ts` — the message FORMAT line states 90 words as a hard ceiling ("count the
+  words before you answer, and drop a sentence rather than go over"); the ACCEPT comment explains that a modest
+  overshoot (≤ 140 words) is now trimmed rather than shown as-is.
+- created: `lib/linkedinMessage/length.ts` — `splitSentences()` scans for boundaries (terminal punctuation followed
+  by whitespace whose next word is not lower-case), so "2.5", "AED 1.2M" and "e.g. the" never split;
+  `trimToWordLimit()` drops whole sentences, keeps the closing sentence (the next step the prompt asks for)
+  whenever it fits, keeps paragraph breaks, and only cuts inside a sentence when the first sentence alone is over
+  the limit.
+- created: `lib/linkedinMessage/length.test.ts` — 12 tests: decimals, currency, abbreviations, the 102-word
+  production shape, paragraph breaks, placeholders, the single-long-sentence fallback.
+- edited: `lib/linkedinMessage/prompt.test.ts` — asserts the hard-ceiling wording.
+- edited: `app/api/linkedin-message/route.ts` — after a successful parse, a `message` variant runs through
+  `trimToWordLimit(text, 90)`; the JSON now carries `outcome: "ok" | "trimmed"`. No second model call (it would
+  double latency and spend for one spend unit).
+- edited: `hooks/useLinkedinMessage.ts` — the result carries `outcome`.
+- edited: `components/linkedin/LinkedinMessagePanel.tsx` — when trimmed, the counter line adds "shortened to 90
+  words by dropping whole sentences; read it through before sending"; `linkedin_message_requested` sends
+  `outcome: "trimmed"` (same `outcome` key, so `PARAM_KEYS` and the GTM DLV are unchanged — a new enum value only).
+**Notes / risks / follow-up:** the connection note (≤ 200 characters) is unchanged. A trim can leave a message
+under 60 words when the sentences are long; the counter shows it. If GA4 reports a high `trimmed` share, tighten
+the prompt further rather than the trimmer.
+**Suggested commit:** fix(linkedin): enforce the 90-word ceiling at a sentence boundary (E5)
+
+## [2026-10-31 18:20] Skills box: Enter adds the typed skill; suggestions only when highlighted (backlog E7)
+
+**Goal:** pressing Enter in the Skills search added the FIRST search result instead of the typed term (QA D4) —
+"Fleet management" became whichever bank entry ranked first, a silent substitution of a competency claim on a
+document the user submits to an employer. Suggestions are options, never corrections (CLAUDE.md truthfulness rules).
+**Files:**
+- created: `lib/skills/enterKey.ts` — the pure rule: `resolveEnter(query, results, highlighted)` returns the typed
+  text (trimmed) unless a suggestion index is highlighted; `moveHighlight()` clamps ArrowDown/ArrowUp over the
+  pickable rows (-1 = "as written", no wrap); `pickableResults()` drops `alreadyHave` notes.
+- created: `lib/skills/enterKey.test.ts` — 10 tests incl. the reported bug, trimming, the alreadyHave skip and
+  stale highlights.
+- edited: `components/builder/steps/SkillsStep.tsx` — `highlighted` state reset on every keystroke; ArrowDown /
+  ArrowUp move it; Enter goes through `resolveEnter` (a highlighted suggestion still passes the licence guard and
+  `addSkill`'s duplicate check exactly as a click would); the input carries `aria-controls` (only while the listbox
+  is rendered) and `aria-activedescendant`; option rows get ids, `aria-selected` and a visible highlight; the
+  "Add … as written" row shows an "Enter ↵" hint (or "↑ for as written" when a row is highlighted).
+- edited: `scripts/builder-smoke.mjs` — after typing "Fleet management" + Enter it asserts the chip `Remove Fleet
+  management` exists (typed text, not a substitute), then types "excel", ArrowDown, Enter and asserts the
+  highlighted option (aria-selected=true) is the chip that was added.
+**Notes / risks / follow-up:** The Add button and the "as written" row were already typed-text paths; only the Enter
+key changed. Dedupe is unchanged (`addSkill` → "X is already on your list"). No `role="combobox"` was added — the
+textbox + listbox pairing with `aria-activedescendant` is valid ARIA and keeps the axe surface in `smoke:builder`
+unchanged.
+**Suggested commit:** fix(skills): Enter adds the typed skill, suggestions only via arrow keys (E7)
+
+## [2026-10-31 18:05] Consent banner no longer covers modal dialogs (backlog E9)
+
+**Goal:** on production at 1440×900 the cookie-consent banner (fixed bottom, `z-index: 1000`) sat on top of the
+MappingReview dialog's "Import (N sections)" button until the visitor answered it, so a first-time visitor on a
+short viewport could not finish an import (found by the production `smoke:import` run, session 4). Every modal in
+the app sits between z 60 and 200, so the same overlap applies to the export gate, the template preview, the JD
+Match dialog, the mobile preview overlay and the tip jar.
+**Files:**
+- edited: `app/globals.css` — one rule: `body:has([role="dialog"][aria-modal="true"]) [role="region"][aria-label="Cookie settings"] { display: none }`.
+  The banner is a non-modal region that nothing waits on, so while a modal dialog is open it yields and comes back
+  when the dialog closes. Chosen over six z-index bumps, and over editing `components/consent/ConsentBanner.tsx`,
+  which is a byte-identical copy of the site's file (CLAUDE.md: edit both) — the site has no modal dialogs, so the
+  shared file did not need to change.
+- edited: `scripts/import-smoke.mjs` — `checkConsentOverlap()`: in the first review that opens (the context has no
+  `mmcv_consent` cookie, viewport 1440×900) it asks `document.elementFromPoint` what sits at the Import button's
+  centre and fails unless it is the button; reports whether the banner was up before the dialog opened. GTM /
+  GA requests are aborted so a build with `NEXT_PUBLIC_GTM_ID` stays offline. Without a GTM id the banner does not
+  mount at all (`app/layout.tsx`), so the run prints an INFO line saying the overlap was not exercised — build with
+  `NEXT_PUBLIC_GTM_ID=GTM-SMOKE01` to exercise it.
+**Notes / risks / follow-up:** `:has()` is supported by every browser the app targets (Chrome 105+, Safari 15.4+,
+Firefox 121+); in an older browser the rule is ignored and behaviour is as before, never worse. A dialog that
+omits `aria-modal="true"` (none today — `ScoreChip`'s popover and `AIResultsModal` are not modal regions in that
+sense) would not trigger the rule; add the attribute rather than a z-index when one appears.
+**Suggested commit:** fix(consent): hide the cookie banner while a modal dialog is open (E9) + import-smoke hit test
+
 ## [2026-10-31 17:10] smoke:checker: allow the pdf.js worker HEAD probe in the privacy assertion
 
 **Goal:** `npm run smoke:checker` has been red since `45ade82` (this morning's import commit): the new

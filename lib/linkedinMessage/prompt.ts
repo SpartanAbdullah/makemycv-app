@@ -54,8 +54,9 @@ export const LINKEDIN_SYSTEM_PROMPT =
 
 const VARIANT_INSTRUCTION: Record<LinkedinMessageVariant, string> = {
   message:
-    `FORMAT: a direct message / InMail of ${MESSAGE_WORDS.min}–${MESSAGE_WORDS.max} words, ` +
-    `one or two short paragraphs, as {"message": "..."} with a blank line between paragraphs if two.`,
+    `FORMAT: a direct message / InMail of ${MESSAGE_WORDS.min}–${MESSAGE_WORDS.max} words. ` +
+    `${MESSAGE_WORDS.max} words is a hard ceiling: count the words before you answer, and drop a sentence ` +
+    `rather than go over. One or two short paragraphs, as {"message": "..."} with a blank line between paragraphs if two.`,
   connection_note:
     `FORMAT: a connection-request note of AT MOST ${CONNECTION_NOTE_MAX_CHARS} characters ` +
     `(LinkedIn cuts it off above that), one paragraph, as {"message": "..."}. Count the characters; shorter is better.`,
@@ -93,7 +94,8 @@ export const countWords = (s: string) => (s.trim().match(/\S+/g) ?? []).length;
  * live count. A message far outside 60–90 words, or a note far over 200
  * characters, is treated as unparseable so the route retries once rather
  * than shipping something the user cannot use. Modest overshoot is let
- * through — the UI shows the count and the user trims.
+ * through and the route cuts it to 90 words at a sentence boundary
+ * (lib/linkedinMessage/length.ts, backlog E5).
  */
 const ACCEPT = {
   message: { minWords: 35, maxWords: 140 },

@@ -63,6 +63,12 @@ import {
 import { describeEvidence, type SkillStatus } from "../../../lib/skills/evidence";
 import { planPastedSkills, type PastePlan } from "../../../lib/skills/paste";
 import {
+  NO_HIGHLIGHT,
+  moveHighlight,
+  pickableResults,
+  resolveEnter,
+} from "../../../lib/skills/enterKey";
+import {
   getSetAsideServerSnapshot,
   getSetAsideSnapshot,
   parkSkill,
@@ -144,6 +150,9 @@ export const SkillsStep = ({
   const setJdTarget = useCvStore((state) => state.setJdTarget);
 
   const [query, setQuery] = useState("");
+  // Which suggestion the arrow keys have landed on; -1 = none, so Enter adds
+  // the typed text as written (lib/skills/enterKey.ts, backlog E7).
+  const [highlighted, setHighlighted] = useState(NO_HIGHLIGHT);
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [openChipId, setOpenChipId] = useState<string | null>(null);
   const [pendingCredential, setPendingCredential] = useState<Suggestion | null>(null);
@@ -212,6 +221,10 @@ export const SkillsStep = ({
         : [],
     [query, liveCv, domain, jdTarget],
   );
+  /** The rows a highlight can land on (alreadyHave rows are notes). */
+  const options = useMemo(() => pickableResults(results), [results]);
+  const activeIndex = highlighted < options.length ? highlighted : NO_HIGHLIGHT;
+  const optionId = (i: number) => `skill-option-${i}`;
 
   /* ── Writes ──
    * Every mutation goes through here, and it updates BOTH the form (so the
@@ -429,19 +442,35 @@ export const SkillsStep = ({
                 autoComplete="off"
                 spellCheck={false}
                 value={query}
+                aria-controls={query.trim().length >= 2 ? "skill-suggestions" : undefined}
+                aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                 onChange={(e) => {
                   setQuery(sanitizeSkillLive(e.target.value));
+                  setHighlighted(NO_HIGHLIGHT);
                   setDuplicateOf(null);
                 }}
                 onPaste={handlePaste}
                 onKeyDown={(e) => {
+                  // Enter adds what was TYPED. A suggestion is only taken when
+                  // the arrow keys highlighted it — never substituted silently
+                  // (backlog E7, QA D4).
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    if (options.length === 0) return;
+                    e.preventDefault();
+                    setHighlighted(moveHighlight(activeIndex, e.key === "ArrowDown" ? 1 : -1, options.length));
+                    return;
+                  }
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    const first = results.find((r) => !r.alreadyHave);
-                    if (first) addSuggestion(first);
-                    else if (addSkill(query)) setQuery("");
+                    const action = resolveEnter(query, results, activeIndex);
+                    if (action.kind === "suggestion") addSuggestion(action.suggestion);
+                    else if (action.kind === "typed" && addSkill(action.name)) setQuery("");
+                    setHighlighted(NO_HIGHLIGHT);
                   }
-                  if (e.key === "Escape") setQuery("");
+                  if (e.key === "Escape") {
+                    setQuery("");
+                    setHighlighted(NO_HIGHLIGHT);
+                  }
                 }}
               />
             </div>
@@ -562,6 +591,7 @@ export const SkillsStep = ({
           {/* Results */}
           {query.trim().length >= 2 && (
             <div
+              id="skill-suggestions"
               role="listbox"
               aria-label="Skill suggestions"
               style={{
@@ -595,12 +625,15 @@ export const SkillsStep = ({
                     </p>
                   );
                 }
+                const optionIndex = options.indexOf(r);
+                const active = optionIndex === activeIndex;
                 return (
                   <button
                     key={r.name}
+                    id={optionId(optionIndex)}
                     type="button"
                     role="option"
-                    aria-selected={false}
+                    aria-selected={active}
                     onClick={() => addSuggestion(r)}
                     style={{
                       display: "block",
@@ -608,7 +641,8 @@ export const SkillsStep = ({
                       textAlign: "left",
                       padding: "11px 14px",
                       minHeight: 44,
-                      background: "transparent",
+                      background: active ? "var(--ff-accent-soft)" : "transparent",
+                      boxShadow: active ? "inset 3px 0 0 var(--ff-accent)" : undefined,
                       border: "none",
                       borderBottom: "1px solid var(--ff-line)",
                       cursor: "pointer",
@@ -661,7 +695,6 @@ export const SkillsStep = ({
                   if (addSkill(query)) setQuery("");
                 }}
                 style={{
-                  display: "block",
                   width: "100%",
                   textAlign: "left",
                   padding: "11px 14px",
@@ -672,9 +705,17 @@ export const SkillsStep = ({
                   fontSize: 13,
                   color: "var(--ff-ink-2)",
                   fontFamily: "var(--font-body)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
                 }}
               >
-                Add &ldquo;{query.trim()}&rdquo; as written
+                <span>Add &ldquo;{query.trim()}&rdquo; as written</span>
+                {/* Enter adds the typed text unless an arrow key picked a row. */}
+                <span aria-hidden="true" style={{ fontSize: 11, color: "var(--ff-muted)", whiteSpace: "nowrap" }}>
+                  {activeIndex < 0 ? "Enter ↵" : "↑ for as written"}
+                </span>
               </button>
             </div>
           )}

@@ -111,11 +111,16 @@ ${JSON.stringify(r.partial, null, 1)}`);
   const r = await expectImport("text-cv.pdf", 5);
   check("text-cv.pdf", "name", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
   check("text-cv.pdf", "email", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
-  // Known parser quality gap (not a failure): a "Company · City · Dates" line
-  // under the role title is split into a second entry, so the two roles come
-  // back as four. The review screen is where the user merges them. Tracked in
-  // docs/import-errors.md ("Not fixed here").
-  check("text-cv.pdf", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
+  // D1 (2026-10-31): the "Company · City · Dates" line under the title is the
+  // tail of that role. Until then the two roles came back as four cards and
+  // this check (">= 2") passed anyway — it is exact now.
+  const exp = r.partial?.experience ?? [];
+  check("text-cv.pdf", "exactly 2 roles (not 4)", exp.length === 2, exp.map((e) => e.role));
+  check("text-cv.pdf", "role 1 title/company/location", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.company === "Falcon Facilities Management" && exp[0]?.location === "Abu Dhabi", exp[0]);
+  check("text-cv.pdf", "every role has a start date and bullets", exp.every((e) => e.startDate && e.bullets.length > 0), exp.map((e) => [e.startDate, e.bullets.length]));
+  // D3: "BSc …, University of Sharjah (2013 - 2017)" used to give School ")".
+  const edu = r.partial?.education?.[0];
+  check("text-cv.pdf", "education degree / school split (D3)", edu?.degree === "BSc Supply Chain Management" && edu?.school === "University of Sharjah", edu);
   check("text-cv.pdf", "visa status read", /employment/i.test(r.partial?.personal?.visaStatus ?? ""), r.partial?.personal?.visaStatus);
 }
 await expectImport("plain-helvetica-cv.pdf", 5);
@@ -133,13 +138,50 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const r = await expectImport("two-column-table.docx", 5);
   check("two-column-table.docx", "email", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
   check("two-column-table.docx", "skills", (r.partial?.skills?.length ?? 0) >= 4, r.partial?.skills?.length);
+  // D1: "Role - Company" / "City | dates" — 2 roles, the city is the location
+  // and the first (marker-less) bullet is a bullet, not card 2's Company.
+  const exp = r.partial?.experience ?? [];
+  check("two-column-table.docx", "exactly 2 roles (not 4)", exp.length === 2, exp.map((e) => e.role));
+  check("two-column-table.docx", "role 1 company/location", exp[0]?.company === "Falcon Facilities Management" && exp[0]?.location === "Abu Dhabi", exp[0]);
+  check("two-column-table.docx", "first bullet stays a bullet", /^Ran 60\+ tenders/.test(exp[0]?.bullets?.[0] ?? ""), exp[0]?.bullets?.[0]);
+  check("two-column-table.docx", "every role has a start date", exp.every((e) => e.startDate), exp.map((e) => e.startDate));
 }
 {
   const r = await expectImport("rtl-mixed.docx", 5);
   check("rtl-mixed.docx", "Latin name survives the Arabic line", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
-  // Same split as text-cv.pdf ("City | Dates" line becomes an entry), plus the
-  // Arabic role line is read as a role — all reviewable, none a failure.
+  // The two English roles merge with their "City | Dates" lines (D1); the
+  // Arabic role line is still read as a third role — reviewable, not a failure.
   check("rtl-mixed.docx", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
+  const exp = r.partial?.experience ?? [];
+  check("rtl-mixed.docx", "English roles not split (cards 1-2 are the dated roles)", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.startDate === "Mar 2021" && exp[1]?.role === "Procurement Officer" && exp[1]?.startDate === "Jun 2017", exp.map((e) => [e.role, e.startDate]));
+}
+/* ── session 5 production-matrix fixtures (2026-10-31) ─────────────────────
+   Copied from _cowork/session5/import/fixtures/ (synthetic persona "Noor
+   Testwell"): s5-long-wrapped.pdf = case 1 (react-pdf, 6 pages, 3 roles × 4
+   wrapped bullets, "Title — Company" / "City | dates"), s5-header-table.docx
+   = case 4 (contact in the Word header, two-column table, mammoth drops the
+   list markers). */
+{
+  const r = await expectImport("s5-long-wrapped.pdf", 6);
+  const exp = r.partial?.experience ?? [];
+  check("s5-long-wrapped.pdf", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
+  check("s5-long-wrapped.pdf", "every role dated, located, with bullets (D1)", exp.every((e) => e.startDate && e.location && e.bullets.length >= 4), exp.map((e) => [e.startDate, e.location, e.bullets.length]));
+  check("s5-long-wrapped.pdf", "role 1 company", exp[0]?.company === "Falcon Facilities Management", exp[0]?.company);
+  // D2: the four marked bullets per role wrap onto a second PDF line; each must
+  // come back whole (it used to end "…140 technicians and 9", with
+  // "supervisors." as the Company or a bullet of its own).
+  check("s5-long-wrapped.pdf", "bullet 1 joined across the wrap (D2)", exp[0]?.bullets?.[0]?.endsWith("140 technicians and 9 supervisors."), exp[0]?.bullets?.[0]);
+  check("s5-long-wrapped.pdf", "first 4 bullets of every role are whole sentences (D2)", exp.every((e) => e.bullets.slice(0, 4).every((b) => /^[A-Z]/.test(b) && /\.$/.test(b))), exp.map((e) => e.bullets.slice(0, 4)));
+}
+{
+  const r = await expectImport("s5-header-table.docx", 6);
+  const exp = r.partial?.experience ?? [];
+  check("s5-header-table.docx", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
+  check("s5-header-table.docx", "4 bullets per role, first bullet not a Company (D1)", exp.every((e) => e.bullets.length === 4 && !/^(Directed|Ran|Supervised)/.test(e.company ?? "")), exp.map((e) => [e.company, e.bullets.length]));
+  check("s5-header-table.docx", "cities are locations", exp.map((e) => e.location).join(",") === "Dubai,Abu Dhabi,Sharjah", exp.map((e) => e.location));
+  const edu = r.partial?.education ?? [];
+  check("s5-header-table.docx", "schools are names, not \")\" (D3)", edu.map((e) => e.school).join(",") === "Heriot-Watt University Dubai,University of Sharjah", edu.map((e) => e.school));
+  check("s5-header-table.docx", "degrees without bracket debris (D3)", edu.map((e) => e.degree).join(",") === "MSc Facilities Management,BEng Mechanical Engineering", edu.map((e) => e.degree));
 }
 {
   // English-centric parser: the Arabic headings are not recognised, but the
@@ -147,6 +189,57 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const r = await runImport("arabic-only.pdf", bytesOf("arabic-only.pdf"));
   check("arabic-only.pdf", "partial import (no failure)", !r.reason, r.reason);
   check("arabic-only.pdf", "email found", r.partial?.personal?.email === "layla.haddad@example.com", r.partial?.personal?.email);
+  // Chrome-printed Arabic comes out of pdf.js in VISUAL order ("ليلى" as
+  // "ىليل"). Once NFKC made those letters visible to the name test (D4), the
+  // mirrored name must still not be adopted — empty is honest, mirrored is not.
+  check("arabic-only.pdf", "no mirrored Arabic name or headline (D4)", !/[؀-ۿ]/.test(`${r.partial?.personal?.firstName ?? ""}${r.partial?.personal?.lastName ?? ""}${r.partial?.personal?.headline ?? ""}`), r.partial?.personal);
+}
+
+{
+  // D8: session-5 matrix case 10a — a cover letter with a contact header.
+  // It still imports (contact is real), but "Dear Hiring Manager," is not the
+  // headline any more.
+  const r = await runImport("s5-cover-letter-contact.pdf", bytesOf("s5-cover-letter-contact.pdf"));
+  const p = r.partial?.personal ?? {};
+  check("s5-cover-letter-contact.pdf", "name and email read", p.firstName === "Noor" && p.email === "noor.testwell@example.com", p);
+  check("s5-cover-letter-contact.pdf", "salutation is not the headline (D8)", !/dear/i.test(p.headline ?? ""), p.headline);
+}
+
+{
+  // D7b: session-5 matrix case 7 — 31 pages with "Page N of 31" footers.
+  // The footers used to become 10 phantom roles ("Page 2 of 31" …).
+  const r = await runImport("s5-31-pages.pdf", bytesOf("s5-31-pages.pdf"));
+  const exp = r.partial?.experience ?? [];
+  check("s5-31-pages.pdf", "no \"Page N of M\" roles or bullets (D7b)", !/Page \d+ of \d+/.test(JSON.stringify(exp)), exp.map((e) => e.role));
+  check("s5-31-pages.pdf", "the one real role, dated, 2 bullets", exp.length === 1 && exp[0]?.startDate === "Mar 2021" && exp[0]?.bullets.length === 2, exp);
+}
+
+/* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
+   s5-arabic-majority.pdf = session-5 matrix case 3 (Arabic headings, Latin
+   email line, Vazirmatn shaped by react-pdf). arabic-export-classic.pdf = a
+   CV exported from the builder's Classic template with an Arabic name, role
+   and company (_cowork/session5/arabic/A-classic.pdf, synthetic persona
+   "Reem Al Hashimi", example.com). pdf.js returns both as presentation forms
+   (U+FB50–U+FEFF); the adapter NFKC-normalises them. */
+const PRESENTATION_FORMS = /[ﭐ-﷿ﹰ-﻿]/;
+{
+  const r = await runImport("s5-arabic-majority.pdf", bytesOf("s5-arabic-majority.pdf"));
+  const p = r.partial?.personal ?? {};
+  check("s5-arabic-majority.pdf", "imports (no failure)", !r.reason, r.reason);
+  check("s5-arabic-majority.pdf", "Arabic name read, not \"•\" (D4)", p.firstName === "نور" && p.lastName === "تستويل", [p.firstName, p.lastName]);
+  check("s5-arabic-majority.pdf", "Arabic headline is the line under the name (D4)", p.headline === "مديرة عمليات المرافق الأولى", p.headline);
+  check("s5-arabic-majority.pdf", "email", p.email === "noor.testwell@example.com", p.email);
+  check("s5-arabic-majority.pdf", "no presentation forms in any field or unplaced line (D4)", !PRESENTATION_FORMS.test(JSON.stringify([r.partial, r.parsed?.unplaced])));
+}
+{
+  const r = await runImport("arabic-export-classic.pdf", bytesOf("arabic-export-classic.pdf"));
+  const p = r.partial?.personal ?? {};
+  const exp = r.partial?.experience ?? [];
+  check("arabic-export-classic.pdf", "imports (no failure)", !r.reason, r.reason);
+  check("arabic-export-classic.pdf", "round trip keeps the Arabic first/last name (E8.3)", p.firstName === "ريم" && p.lastName === "الهاشمي", [p.firstName, p.lastName]);
+  check("arabic-export-classic.pdf", "headline", p.headline === "محللة سلسلة التوريد", p.headline);
+  check("arabic-export-classic.pdf", "role | company in base letters", exp[0]?.role === "محلل سلسلة التوريد" && exp[0]?.company === "شركة الخليج للخدمات اللوجستية" && exp[0]?.startDate === "Jan 2023", exp[0]);
+  check("arabic-export-classic.pdf", "no presentation forms stored (E8.3)", !PRESENTATION_FORMS.test(JSON.stringify(r.partial)));
 }
 
 /* ── documents that must fail with the right reason ────────────────────── */
