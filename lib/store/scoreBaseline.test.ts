@@ -17,8 +17,52 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
 
-import { parseStoredBaseline } from "./cvStore";
+import { parseStoredBaseline, writeStorage } from "./cvStore";
 import { SCORING_RUBRIC_VERSION } from "../scoreEngine";
+
+describe("writeStorage (2026-10-31: side records must not throw on quota)", () => {
+  // Node has no window; stand one in with a localStorage whose setItem fails
+  // the way Chrome's does at 5 MB per origin or in a private window.
+  const g = globalThis as unknown as { window?: unknown };
+  const withWindow = (setItem: (k: string, v: string) => void, fn: () => void) => {
+    const prev = g.window;
+    g.window = { localStorage: { setItem } };
+    try {
+      fn();
+    } finally {
+      if (prev === undefined) delete g.window;
+      else g.window = prev;
+    }
+  };
+
+  test("returns false instead of throwing when the write is refused", () => {
+    const quota = () => {
+      const e = new Error("exceeded the quota");
+      e.name = "QuotaExceededError";
+      throw e;
+    };
+    withWindow(quota, () => {
+      let result = true;
+      assert.doesNotThrow(() => {
+        result = writeStorage("makemycv:parseSignals", "{}");
+      });
+      assert.equal(result, false);
+    });
+  });
+
+  test("returns true and stores the value when the write lands", () => {
+    const seen: Record<string, string> = {};
+    withWindow((k, v) => { seen[k] = v; }, () => {
+      assert.equal(writeStorage("makemycv:scoreBaseline", "x"), true);
+      assert.equal(seen["makemycv:scoreBaseline"], "x");
+    });
+  });
+
+  test("is a no-op outside the browser", () => {
+    assert.equal(typeof (globalThis as { window?: unknown }).window, "undefined");
+    assert.equal(writeStorage("makemycv:isPro", "true"), false);
+  });
+});
 
 const valid = () =>
   JSON.stringify({

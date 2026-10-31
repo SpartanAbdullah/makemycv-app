@@ -337,6 +337,31 @@ const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 // condition can hide a feature while the product is free. localStorage keys
 // are still read so we don't trample old user state, but their values do not
 // gate anything yet.
+/**
+ * localStorage write that cannot throw (2026-10-31, reliability review).
+ *
+ * Four store actions wrote a side record (isPro, hasUsedFreeDownload,
+ * parseSignals, scoreBaseline) with a bare `setItem`. A QuotaExceededError or
+ * a private-mode refusal there threw out of the action BEFORE its `set()` ran,
+ * so the import flow that calls setParseSignals + captureScoreBaseline could
+ * die half-way with the error surfacing as a React event-handler crash rather
+ * than as the TopBar's "could not save" chip. The CV itself was never at risk
+ * (saveCvToStorage already returns false on failure), but a crash mid-import
+ * reads to the user as a lost import. These records are conveniences; losing
+ * one costs a re-import or a re-analyse, never work. Returns whether the
+ * write landed.
+ */
+export const writeStorage = (key: string, value: string): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    console.warn(`[makemycv] storage: could not write ${key} (quota or privacy mode)`);
+    return false;
+  }
+};
+
 const loadAccessState = (): AccessState => {
   if (typeof window === "undefined") {
     return {
@@ -383,13 +408,11 @@ export const useCvStore = create<CvStore>((set, get) => ({
   // Currently a no-op that always settles isPro=true; localStorage write
   // preserved so old code paths that still call it don't crash.
   setIsPro: (value) => {
-    if (typeof window !== "undefined")
-      window.localStorage.setItem(PRO_STORAGE_KEY, String(value));
+    writeStorage(PRO_STORAGE_KEY, String(value));
     set({ isPro: true, proAccessSource: "free" });
   },
   setHasUsedFreeDownload: (value) => {
-    if (typeof window !== "undefined")
-      window.localStorage.setItem(FREE_DL_STORAGE_KEY, String(value));
+    writeStorage(FREE_DL_STORAGE_KEY, String(value));
     set({ hasUsedFreeDownload: value });
   },
   // TODO: Remove applyCoupon/clearCoupon in next release. Coupon system is
@@ -429,15 +452,10 @@ export const useCvStore = create<CvStore>((set, get) => ({
   },
   importJson: (data) => set({ data }),
   setParseSignals: (signals) => {
-    if (typeof window !== "undefined") {
-      if (signals) {
-        window.localStorage.setItem(
-          PARSE_SIGNALS_STORAGE_KEY,
-          JSON.stringify(signals),
-        );
-      } else {
-        window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
-      }
+    if (signals) {
+      writeStorage(PARSE_SIGNALS_STORAGE_KEY, JSON.stringify(signals));
+    } else if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
     }
     set({ parseSignals: signals });
   },
@@ -485,12 +503,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
       // comparable, instead of silently subtracting across two rubrics.
       rubric: SCORING_RUBRIC_VERSION,
     };
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        SCORE_BASELINE_STORAGE_KEY,
-        JSON.stringify(baseline),
-      );
-    }
+    writeStorage(SCORE_BASELINE_STORAGE_KEY, JSON.stringify(baseline));
     set({ scoreBaseline: baseline });
   },
   importCvVersion: (partial, mode) => {
