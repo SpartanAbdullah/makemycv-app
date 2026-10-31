@@ -531,6 +531,8 @@ type EducationVariant = {
   /** Style of the school run (inline) or line (block). */
   schoolStyle: Style;
   notesStyle: Style;
+  /** Space above the notes line (pt); the live templates use 1px (default) or Classic's mt-1. */
+  notesMarginTop?: number;
   /** Own line under the school, inline after the school, or a bordered pill beside it. */
   attested: "line" | "inline" | "pill";
   attestedStyle: Style;
@@ -572,7 +574,7 @@ const EducationEntry = ({
   const dates = formatDateRange(edu.startDate, edu.endDate);
 
   const notesNode = notesLine ? (
-    <Text style={{ ...v.notesStyle, marginTop: 0.75 }}>{notesLine}</Text>
+    <Text style={{ ...v.notesStyle, marginTop: v.notesMarginTop ?? 0.75 }}>{notesLine}</Text>
   ) : null;
   const attestedLine =
     v.attested === "line" && showAttested ? (
@@ -826,22 +828,82 @@ const PdfHeading = ({
    ═══════════════════════════════════════════════════════════ */
 
 const ClassicPDFLayout = ({ data }: { data: CvData }) => {
+  /*
+   * Transcribed from lib/templates/classic.tsx (PDF_FIDELITY.md session 4,
+   * 2026-10-31). Every size is the live px value through pt(); every line
+   * box is explicit. Classic's root sets `leading-[calc(1.45*var(--lh))]`,
+   * a UNITLESS factor that every run without its own line-height inherits
+   * (headings, dates, entry rows, chips) — so the inherited box here is
+   * 1.45 × lineScale, not Tailwind's 1.5. fontScale on sizes, lineScale on
+   * line-heights, spaceScale only on the gap between sections (mt-6·sp),
+   * marginScale on the page padding via the router (live 36·m / 32·m px =
+   * the router's 27·m / 24·m pt). Before this pass the layout ran on the
+   * shared BASE_STYLES sheet: name 30px for 28, headline 15px for 14, chips
+   * 12px for 10, a 6pt header rule gap for the live 9 + 12, bullets 10pt
+   * further in than the live text, a trailing 9pt after every entry block
+   * and a 12.47pt page line box on every heading and row.
+   */
   const theme = resolveTheme(data.settings, "#1e5b54");
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const s = buildStyles(theme, fonts);
+  const fs = theme.fontScale;
+  const ls = theme.lineScale;
+  const sp = theme.spaceScale;
+  /** The live root leading: 1.45·lh, inherited as a factor by every run that sets none. */
+  const rootLine = 1.45 * ls;
+  const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
+  // Explicit regular face for runs nested INSIDE a bold Text (nested Text
+  // inherits the parent's font otherwise).
+  const regular: Style = { fontFamily: fonts.regular, fontWeight: 400 };
+  /** text-[11.5px] leading-[1.45] text-slate-700 — body, bullets, skills, languages, certs. */
+  const body: Style = { fontSize: pt(11.5) * fs, lineHeight: rootLine, color: SLATE_700 };
+  /** text-[11px] text-slate-500 — dates, locations, education notes. */
+  const small: Style = { fontSize: pt(11) * fs, lineHeight: rootLine, color: SLATE_500 };
+  /** text-[12px] font-semibold text-slate-800 — role, degree and project titles. */
+  const entryTitle: Style = { ...bold, fontSize: pt(12) * fs, lineHeight: rootLine, color: SLATE_800 };
+  /** section mt-6·sp; heading wrap border-b border-slate-200 pb-1; h2 12.5px semibold slate-800; content mt-2. */
+  const section: Style = { marginTop: pt(24) * sp };
+  const headingWrap: Style = {
+    borderBottomWidth: 0.75,
+    borderBottomColor: SLATE_200,
+    paddingBottom: pt(4),
+  };
+  const headingText: Style = { ...bold, fontSize: pt(12.5) * fs, lineHeight: rootLine, color: SLATE_800 };
+  const contentGap = pt(8);
+  const heading = (label: string) => (
+    <View style={headingWrap} minPresenceAhead={36}>
+      <Text style={headingText}>{label}</Text>
+    </View>
+  );
+  /** list-disc pl-4 space-y-1: text 16px in, the disc in that gutter in slate-400, 4px between items. */
+  const bulletStyles = (marginTop: number): BulletStyles => ({
+    list: { marginTop, paddingLeft: pt(16) - BULLET_DOT_WIDTH },
+    item: { marginBottom: 0 },
+    gap: pt(4),
+    dot: { width: BULLET_DOT_WIDTH, fontSize: body.fontSize, color: SLATE_400 },
+    text: body,
+  });
+
   // classic.tsx education: "Degree | School" (12px semibold / normal), then
-  // "Field | Notes" (11px slate-500), then "Attested — body" (12px green-700)
-  // only when a body was given; entries space-y-3.
+  // "Field | Notes" (11px slate-500, mt-1), then "Attested — body" (12px
+  // green-700 on a 16px·lh box, mt-0.5) only when a body was given; entries
+  // space-y-3.
   const eduVariant: EducationVariant = {
-    joiner: " \u00B7 ",
+    joiner: " · ",
     fieldOnNotesLine: true,
     schoolInline: true,
-    titleStyle: s.entryTitle,
-    dateStyle: s.entryDate,
-    schoolStyle: s.entryCompany,
-    notesStyle: s.entrySubtext,
+    titleStyle: entryTitle,
+    dateStyle: small,
+    schoolStyle: { ...regular, color: SLATE_700 },
+    notesStyle: small,
+    notesMarginTop: pt(4),
     attested: "line",
-    attestedStyle: { fontSize: pt(12) * theme.fontScale, color: GREEN_700 },
+    attestedStyle: {
+      fontSize: pt(12) * fs,
+      // leading-[calc(1rem*var(--lh))]: an ABSOLUTE 16px·lh box, not scaled by fontScale.
+      lineHeight: ((16 / 12) * ls) / fs,
+      color: GREEN_700,
+    },
     attestedRequiresBody: true,
     gap: pt(12),
   };
@@ -852,21 +914,17 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
     generalSkills.length > 0 || technicalSkills.length > 0 ? (
       <>
         {generalSkills.length > 0 && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Skills</Text>
-            </View>
-            <Text style={s.body}>
+          <View style={section}>
+            {heading("Skills")}
+            <Text style={{ ...body, marginTop: contentGap }}>
               {generalSkills.map((sk) => sk.name).join(", ")}
             </Text>
           </View>
         )}
         {technicalSkills.length > 0 && (
-          <View style={s.section}>
-            <View style={s.sectionHeadingWrap}>
-              <Text style={s.sectionHeading}>Technical Skills</Text>
-            </View>
-            <Text style={s.body}>
+          <View style={section}>
+            {heading("Technical Skills")}
+            <Text style={{ ...body, marginTop: contentGap }}>
               {technicalSkills.map((sk) => sk.name).join(", ")}
             </Text>
           </View>
@@ -918,206 +976,244 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const showPhoto = Boolean(
     data.personal.photo && data.personal.showPhoto && theme.photoVisible,
   );
+  /** text-[10.5px] leading-[1.375] text-slate-500 — the contact line (its emoji icons cannot be embedded). */
+  const contact: Style = { fontSize: pt(10.5) * fs, lineHeight: 1.375 * ls, color: SLATE_500 };
 
   return (
     <View>
-      {/* ── Header ── */}
-      <View style={s.headerRow}>
-        <View style={s.headerLeft}>
-          <View style={{ marginBottom: 2 }}>
-            <Text style={{ ...s.name, lineHeight: 1 * theme.lineScale }}>{name}</Text>
-          </View>
-          {data.personal.headline?.trim() ? (
-            <View style={{ marginBottom: 3 }}>
-              <Text style={{ ...s.headline, lineHeight: 1.2 * theme.lineScale }}>
-                {data.personal.headline.trim()}
-              </Text>
-            </View>
-          ) : null}
-          {contacts.length > 0 && (
-            <View style={s.contactRow}>
-              {contacts.map((item, i) => (
-                <View
-                  key={i}
-                  style={{ flexDirection: "row", alignItems: "center" }}
-                >
-                  {item.href ? (
-                    <Link src={item.href} style={s.contactLink}>
-                      {item.text}
-                    </Link>
-                  ) : (
-                    <Text style={s.contactItem}>{item.text}</Text>
-                  )}
-                  {i < contacts.length - 1 && (
-                    <Text style={s.contactSep}>|</Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-          {essentialChips.length > 0 && (
-            <View
+      {/* ── Header: border-b border-slate-200 pb-3 mb-4; left block flex-col
+          gap-1 with pr-24 reserved for the absolute 76px photo. No
+          marginBottom here: in CSS the header's mb-4 (16px) and the first
+          section's mt-6·sp (≥ 16.8px) are adjacent block margins and
+          COLLAPSE to the larger one; react-pdf would add both. ── */}
+      <View
+        style={{
+          borderBottomWidth: 0.75,
+          borderBottomColor: SLATE_200,
+          paddingBottom: pt(12),
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+          <View style={{ flex: 1, paddingRight: pt(96), gap: pt(4) }}>
+            <Text
               style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginTop: 3,
+                ...bold,
+                fontSize: pt(28) * fs,
+                lineHeight: 1.1 * ls,
+                letterSpacing: -0.025 * pt(28) * fs,
+                color: SLATE_900,
               }}
             >
-              {essentialChips.map((chip, i) => (
-                <View
-                  key={chip.label}
-                  style={{ flexDirection: "row", alignItems: "center" }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 9 * theme.fontScale,
-                      color: "#0F172A",
-                      fontWeight: 600,
-                    }}
+              {name}
+            </Text>
+            {data.personal.headline?.trim() ? (
+              // Live weight 500; the PDF faces ship 400/700 only.
+              <Text
+                style={{
+                  fontSize: pt(14) * fs,
+                  lineHeight: rootLine,
+                  color: SLATE_500,
+                  marginTop: pt(2),
+                }}
+              >
+                {data.personal.headline.trim()}
+              </Text>
+            ) : null}
+            {contacts.length > 0 && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  columnGap: pt(8),
+                  rowGap: pt(2),
+                  marginTop: pt(6),
+                }}
+              >
+                {contacts.map((item, i) => (
+                  <View
+                    key={i}
+                    style={{ flexDirection: "row", alignItems: "center" }}
                   >
-                    {chip.label}:
+                    {item.href ? (
+                      <Link src={item.href} style={{ ...contact, textDecoration: "underline" }}>
+                        {item.text}
+                      </Link>
+                    ) : (
+                      <Text style={contact}>{item.text}</Text>
+                    )}
+                    {i < contacts.length - 1 && (
+                      <Text style={{ ...contact, color: SLATE_300, marginLeft: pt(4) }}>|</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+            {essentialChips.length > 0 && (
+              // mt-1.5 text-[10px] leading-[1.375] text-slate-600; "Label:" semibold slate-800,
+              // a slate-300 middle dot with mx-1.5 between chips — one wrapping text run, as live.
+              <Text
+                style={{
+                  fontSize: pt(10) * fs,
+                  lineHeight: 1.375 * ls,
+                  color: SLATE_600,
+                  marginTop: pt(6),
+                }}
+              >
+                {essentialChips.map((chip, i) => (
+                  <Text key={chip.label}>
+                    <Text style={{ ...bold, color: SLATE_800 }}>{chip.label}:</Text>
+                    {` ${chip.value}`}
+                    {i < essentialChips.length - 1 ? (
+                      <Text style={{ color: SLATE_300 }}>{"  ·  "}</Text>
+                    ) : null}
                   </Text>
-                  <Text style={{ fontSize: 9 * theme.fontScale, color: "#475569", marginLeft: 2 }}>
-                    {chip.value}
-                  </Text>
-                  {i < essentialChips.length - 1 && (
-                    <Text style={{ ...s.contactSep, color: "#CBD5E1" }}>·</Text>
-                  )}
-                </View>
-              ))}
-            </View>
+                ))}
+              </Text>
+            )}
+          </View>
+          {showPhoto && data.personal.photo && (
+            <Image
+              src={data.personal.photo}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: pt(76),
+                height: pt(76),
+                borderRadius: data.settings.photoShape === "square" ? pt(8) : pt(38),
+                objectFit: "cover",
+                borderWidth: pt(2),
+                borderColor: SLATE_200,
+              }}
+            />
           )}
         </View>
-        {showPhoto && data.personal.photo && (
-          <Image src={data.personal.photo} style={{ ...s.photo, borderRadius: data.settings.photoShape === "square" ? 8 : 30 }} />
-        )}
       </View>
 
       {/* ── Summary ── */}
       {hasSummary && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Summary</Text>
-          </View>
-          <Text style={s.body}>{data.personal.summary?.trim()}</Text>
+        <View style={section}>
+          {heading("Summary")}
+          <Text style={{ ...body, marginTop: contentGap }}>{data.personal.summary?.trim()}</Text>
         </View>
       )}
 
       {/* ── Skills (hoisted above experience for skills-first domains) ── */}
       {isSkillsFirst(data.settings.domain) ? skillsBlock : null}
 
-      {/* ── Experience ── */}
+      {/* ── Experience: mt-2 space-y-3; each role space-y-1 ── */}
       {hasExperience && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Experience</Text>
-          </View>
-          {experience.map((role) => (
-            <View key={role.id} style={s.entryBlock} minPresenceAhead={48}>
-              <View style={s.entryRow}>
-                <Text style={{ ...s.entryTitle, flex: 1 }}>
-                  {role.role?.trim() || "Role"}
-                  {role.company ? (
-                    <Text style={s.entryCompany}>
-                      {` | ${role.company.trim()}`}
-                    </Text>
-                  ) : null}
-                </Text>
-                <Text style={s.entryDate}>
-                  {formatDateRange(
-                    role.startDate,
-                    role.endDate,
-                    role.isCurrent,
-                  )}
-                </Text>
+        <View style={section}>
+          {heading("Experience")}
+          <View style={{ marginTop: contentGap }}>
+            {experience.map((role, i) => (
+              <View key={role.id} style={{ marginTop: i > 0 ? pt(12) : 0 }} minPresenceAhead={48}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: pt(12),
+                  }}
+                >
+                  <Text style={{ ...entryTitle, lineHeight: 1.35 * ls, flex: 1 }}>
+                    {role.role?.trim() || "Role"}
+                    {role.company ? (
+                      <Text style={{ ...regular, color: SLATE_700 }}>
+                        {` | ${role.company.trim()}`}
+                      </Text>
+                    ) : null}
+                  </Text>
+                  <Text style={{ ...small, flexShrink: 0, textAlign: "right" }}>
+                    {formatDateRange(
+                      role.startDate,
+                      role.endDate,
+                      role.isCurrent,
+                    )}
+                  </Text>
+                </View>
+                {role.location?.trim() && (
+                  <Text style={{ ...small, marginTop: pt(4) }}>{role.location.trim()}</Text>
+                )}
+                <BulletList bullets={role.bullets} s={s} styles={bulletStyles(pt(4))} />
               </View>
-              {role.location?.trim() && (
-                <Text style={s.entrySubtext}>{role.location.trim()}</Text>
-              )}
-              <BulletList bullets={role.bullets} s={s} />
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       )}
 
-      {/* ── Education ── */}
+      {/* ── Education: mt-2 space-y-3 ── */}
       {hasEducation && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Education</Text>
+        <View style={section}>
+          {heading("Education")}
+          <View style={{ marginTop: contentGap }}>
+            {education.map((edu, i) => (
+              <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
+            ))}
           </View>
-          {education.map((edu, i) => (
-            <EducationEntry key={edu.id} edu={edu} v={eduVariant} index={i} />
-          ))}
         </View>
       )}
 
       {/* ── Skills (rendered above if skills-first) ── */}
       {isSkillsFirst(data.settings.domain) ? null : skillsBlock}
 
-      {/* ── Languages & Certifications ── */}
+      {/* ── Languages & Certifications: grid gap-6 md:grid-cols-2 ── */}
       {(hasLanguages || hasCertifications) && (
-        <View style={s.twoCol}>
+        <View style={{ ...section, flexDirection: "row", gap: pt(24) }}>
           {hasLanguages && (
-            <View style={s.twoColItem}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Languages</Text>
-              </View>
-              <Text style={s.body}>
+            <View style={{ flex: 1 }}>
+              {heading("Languages")}
+              <Text style={{ ...body, marginTop: contentGap }}>
                 {data.languages.map((lang, i, arr) => (
                   <Text key={lang.id}>
-                    <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                      {lang.name}
-                    </Text>
+                    <Text style={bold}>{lang.name}</Text>
                     {lang.level
                       ? ` — ${formatLanguageLevel(lang.level)}`
                       : ""}
-                    {i < arr.length - 1 ? "  |  " : ""}
+                    {i < arr.length - 1 ? " | " : ""}
                   </Text>
                 ))}
               </Text>
             </View>
           )}
           {hasCertifications && (
-            <View style={s.twoColItem}>
-              <View style={s.sectionHeadingWrap}>
-                <Text style={s.sectionHeading}>Certifications</Text>
+            <View style={{ flex: 1 }}>
+              {heading("Certifications")}
+              {/* mt-2 space-y-2 */}
+              <View style={{ marginTop: contentGap }}>
+                {data.certifications.map((cert, i) => (
+                  <Text key={cert.id} style={{ ...body, marginTop: i > 0 ? pt(8) : 0 }}>
+                    <Text style={bold}>{cert.name.trim()}</Text>
+                    <Text style={{ color: SLATE_500 }}>
+                      {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
+                      {cert.date ? ` | ${cert.date.trim()}` : ""}
+                    </Text>
+                  </Text>
+                ))}
               </View>
-              {data.certifications.map((cert) => (
-                <Text key={cert.id} style={{ ...s.body, marginBottom: 2 }}>
-                  <Text style={{ fontFamily: fonts.bold, fontWeight: 700 }}>
-                    {cert.name.trim()}
-                  </Text>
-                  <Text style={{ color: SLATE_500 }}>
-                    {cert.issuer ? ` | ${cert.issuer.trim()}` : ""}
-                    {cert.date ? ` | ${cert.date.trim()}` : ""}
-                  </Text>
-                </Text>
-              ))}
             </View>
           )}
         </View>
       )}
 
-      {/* ── Projects ── */}
+      {/* ── Projects: heading, first title mt-2, later projects mt-3, bullets flush under the title ── */}
       {hasProjects && (
-        <View style={s.section}>
-          <View style={s.sectionHeadingWrap}>
-            <Text style={s.sectionHeading}>Projects</Text>
-          </View>
-          {projects.map((project) => {
+        <View style={section}>
+          {heading("Projects")}
+          {projects.map((project, i) => {
             const showLink = shouldShowProjectLink(project.link);
             return (
-              <View key={project.id} style={s.entryBlock} wrap={false}>
-                <Text style={s.entryTitle}>
+              <View key={project.id} style={{ marginTop: i === 0 ? contentGap : pt(12) }} wrap={false}>
+                <Text style={entryTitle}>
                   {project.name?.trim() || "Project"}
                   {showLink ? (
-                    <Text style={{ ...s.entryCompany, color: SLATE_500 }}>
+                    <Text style={{ ...regular, color: SLATE_500 }}>
                       {" | "}
                       <Link
                         src={normalizeHref(project.link)}
                         style={{
-                          ...s.entryCompany,
+                          ...regular,
                           color: SLATE_500,
                           textDecoration: "underline",
                         }}
@@ -1127,7 +1223,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                     </Text>
                   ) : null}
                 </Text>
-                <BulletList bullets={project.bullets ?? []} s={s} />
+                <BulletList bullets={project.bullets ?? []} s={s} styles={bulletStyles(0)} />
               </View>
             );
           })}
