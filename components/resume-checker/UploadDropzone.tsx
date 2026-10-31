@@ -2,8 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { extractPdfTextInBrowser } from "@/lib/importers/pdfAdapter";
+import { extractPdfTextInBrowserDetailed } from "@/lib/importers/pdfAdapter";
 import { extractDocxTextInBrowser } from "@/lib/importers/docxAdapter";
+import AtsTextPreview from "./AtsTextPreview";
+import {
+  saveExtractionPreview,
+  type ExtractionKind,
+} from "@/lib/resumeChecker/extractionPreview";
+
+/** The text the browser pulled out of the file — shown as "What the ATS
+ *  sees" (B3) and the very same string that is posted for the report. */
+type Extracted = { text: string; kind: ExtractionKind; pages?: number; fileName: string };
 
 type Phase =
   | "idle"
@@ -35,6 +44,7 @@ export default function UploadDropzone() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [extracted, setExtracted] = useState<Extracted | null>(null);
 
   const isBusy = phase !== "idle" && phase !== "error";
 
@@ -93,14 +103,21 @@ export default function UploadDropzone() {
 
       setError(null);
       setFileName(file.name);
+      setExtracted(null);
       setPhase("extracting");
 
       const isDocx = file.name.toLowerCase().endsWith(".docx");
+      const kind: ExtractionKind = isDocx ? "docx" : "pdf";
       let rawText: string;
+      let pages: number | undefined;
       try {
-        rawText = isDocx
-          ? await extractDocxTextInBrowser(file)
-          : await extractPdfTextInBrowser(file);
+        if (isDocx) {
+          rawText = await extractDocxTextInBrowser(file);
+        } else {
+          const out = await extractPdfTextInBrowserDetailed(file);
+          rawText = out.text;
+          pages = out.pages;
+        }
       } catch {
         setError(
           isDocx
@@ -110,6 +127,11 @@ export default function UploadDropzone() {
         setPhase("error");
         return;
       }
+
+      // Show what came out BEFORE anything is sent — also on the too-short
+      // path, where seeing the handful of characters explains the error.
+      const preview: Extracted = { text: rawText, kind, pages, fileName: file.name };
+      setExtracted(preview);
 
       if (rawText.trim().length < 200) {
         setError(
@@ -147,6 +169,9 @@ export default function UploadDropzone() {
           return;
         }
 
+        // Carry the same text to the report page (this tab only) so the
+        // panel can sit next to the findings. Nothing is sent anywhere.
+        saveExtractionPreview({ ...preview, reportId: payload.reportId });
         router.push(`/resume-checker/report/${payload.reportId}`);
       } catch {
         setError("Network error. Check your connection and try again.");
@@ -189,6 +214,7 @@ export default function UploadDropzone() {
     setError(null);
     setPhase("idle");
     setFileName(null);
+    setExtracted(null);
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
@@ -219,6 +245,11 @@ export default function UploadDropzone() {
             ref={inputRef}
             id="resume-checker-file"
             type="file"
+            // Explicit name: while a file is being read the label's only
+            // text sits inside the role="status" live region, which does not
+            // name the input, and axe reports the control as unlabelled in
+            // exactly the state the checker smoke inspects (2026-10-31).
+            aria-label="Upload your CV (PDF or DOCX)"
             accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="sr-only"
             onChange={(e) => onFilesSelected(e.target.files)}
@@ -336,6 +367,22 @@ export default function UploadDropzone() {
             }
           />
         </div>
+
+        {/* "What the ATS sees" (B3): the extracted text, visible while the
+            report is being built and kept on the error path. Client-only,
+            on text already in the browser. */}
+        {extracted && (
+          <div className="mt-5">
+            <AtsTextPreview
+              text={extracted.text}
+              kind={extracted.kind}
+              pages={extracted.pages}
+              fileName={extracted.fileName}
+              surface="upload"
+              defaultOpen={phase === "error"}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

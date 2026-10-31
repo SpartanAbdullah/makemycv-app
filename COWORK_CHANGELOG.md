@@ -16,6 +16,52 @@ Format:
 
 ---
 
+## [2026-10-31 09:20] Checker: "What the ATS sees" text-extraction preview (FEATURE_BACKLOG B3)
+
+**Goal:** B3 from the mission backlog — the competitor research scored a visible "what the parser reads" view
+as the top checker differentiator. The browser already extracts the text before upload (pdf.js / mammoth);
+this shows that exact string to the user, with counts and notes about content that looks lost, before and
+alongside the server report. No new data leaves the browser: the panel renders the same `rawText` the
+dropzone was already posting, and the report-page copy travels in this tab's `sessionStorage` only.
+**Files:**
+- created: `lib/resumeChecker/extractionPreview.ts` — `analyseExtraction()` (chars/words/lines/pages +
+  lost-content notes: empty extraction; < 120 words per page on a multi-page PDF; U+FFFD / private-use
+  glyphs; letter-spaced headings; no email / no phone, with the Word header/footer cause named for DOCX —
+  mammoth drops headers) and the versioned `makemycv:checkerPreview` sessionStorage carry-over (shape
+  version 1, discards on mismatch or another report id). Copy describes the text, never the person.
+- created: `lib/resumeChecker/extractionPreview.test.ts` — 7 node:test cases (picked up by `test:unit`).
+- created: `components/resume-checker/AtsTextPreview.tsx` — the panel: heading + "N characters · N words ·
+  N lines · N pages · file", a 38 px "Show text / Hide text" pill, notes list in the severity tokens, and a
+  monospace `<pre>` (whitespace-pre-wrap, 26 rem max height) with the text in parser order. Fires
+  `checker_preview_viewed` (`surface`: `upload` | `report`, an existing DLV) once per mount when opened.
+- created: `components/resume-checker/ReportAtsTextPreview.tsx` — report-page mount; reads the carry-over
+  after hydration and renders nothing for anyone who did not upload in this tab (shared links).
+- edited: `components/resume-checker/UploadDropzone.tsx` — uses `extractPdfTextInBrowserDetailed` for the
+  page count, keeps the extracted text in state, shows the panel under the trust chips while the server
+  works (collapsed) and on the error path (open — a scanned PDF's 12 characters explain the message),
+  saves the carry-over right before `router.push`. Added `aria-label` to the file input: in the busy
+  state the label's only text is inside the `role="status"` live region, so axe flagged the control as
+  unlabelled (pre-existing, found by the new smoke). Upload flow, validation and consent copy untouched.
+- edited: `app/resume-checker/report/[reportId]/page.tsx` — mounts `ReportAtsTextPreview` above the
+  category cards.
+- edited: `lib/importers/pdfAdapter.ts` — `extractPdfTextInBrowserDetailed()` returns `{ text, pages }`;
+  `extractPdfTextInBrowser` now delegates to it (same text, builder import unchanged).
+- created: `scripts/checker-smoke.mjs` + `smoke:checker` script — uploads a PDF (`.smoke-pdfs/`,
+  `.fidelity-pdfs/` or `SMOKE_PDF`) with the parse route answered locally, asserts the panel, counts,
+  `<pre>` text, the dataLayer event, axe (serious/critical) with the panel open, the redirect, that the
+  ONLY non-GET request is the parse POST with body keys exactly `{fileName, rawText}`, and the
+  sessionStorage carry-over. Not a `test:*` script (needs a server + Chrome).
+**Notes / risks / follow-up:** verified against `next dev -p 3300` with the system Chrome: smoke green
+for a 2-page PDF (3,072 chars / 426 words / 2 pages, zero notes) and for a generated DOCX whose contact
+line sat in the Word header (notes: no email — headers/footers — and no phone, as intended); one real
+end-to-end run reached the report in 17 s and showed the same panel above the findings with
+`checker_preview_viewed{surface:report}`. `checker_preview_viewed` needs a trigger + GA4 tag published
+in GTM like every other event. The notes are heuristics on the text only (detect, never assert): a
+missing email is reported as "the text has no email address", never as a claim about the file. The
+sessionStorage record holds the CV text per tab until the tab closes — same device, same browser, never
+sent. `npm run test:migrate` does not exist in package.json (migrate.test.ts runs under `test:unit`).
+**Suggested commit:** feat(checker): "What the ATS sees" extracted-text preview with lost-content notes
+
 ## [2026-10-31 06:15] PDF fidelity harness (preview vs PDF, 14 × 3) + Professional name/headline overprint fix
 
 **Goal:** Phase 3 of the autonomous mission: a repeatable preview-vs-PDF comparison instead of eyeballing,

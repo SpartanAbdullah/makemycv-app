@@ -121,6 +121,19 @@ function reconstructLines(items: PdfTextItemLike[]): string[] {
  *   - the /resume-checker client-side pre-extraction
  */
 export async function extractPdfTextInBrowser(input: File): Promise<string> {
+  const { text } = await extractPdfTextInBrowserDetailed(input);
+  return text;
+}
+
+/**
+ * Same extraction as `extractPdfTextInBrowser`, plus the page count — the
+ * /resume-checker "what the ATS sees" panel needs it to say "very few words
+ * for a 2-page PDF" without reading the file twice. The text is byte-identical
+ * to what the builder import and the checker upload already use.
+ */
+export async function extractPdfTextInBrowserDetailed(
+  input: File,
+): Promise<{ text: string; pages: number }> {
   if (typeof window === "undefined") {
     throw new Error("extractPdfTextInBrowser must run in the browser");
   }
@@ -157,7 +170,7 @@ export async function extractPdfTextInBrowser(input: File): Promise<string> {
     pageTexts.push(lines.join("\n"));
   }
 
-  return pageTexts.join("\n\n");
+  return { text: pageTexts.join("\n\n"), pages: pdf.numPages };
 }
 
 export const pdfAdapter: ImportAdapter = {
