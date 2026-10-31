@@ -25,6 +25,25 @@ Format:
 
 ---
 
+## [2026-10-31 21:40] Import: "Degree, School (2018 - 2020)" gives the degree and the school (session 5 D3)
+
+**Goal:** Major defect D3 (IMPORT_MONITORING.md §8.3): every education line of the form "Degree, School (dates)" came
+back as Degree = "Degree, School (" and School = ")" — removing the dates left "( - )", whose " - " was split as a
+header separator, and the comma was never split. It printed "Heriot-Watt University Dubai ( | )" on the CV.
+**Files:**
+- edited: `lib/importers/textParser.ts` — `stripHeaderDates()` also removes brackets left empty by the date strip
+  (`EMPTY_BRACKETS_RE`: "( - )", "( – )", "[ to ]", "()"); experience and education headers drop parts with no letter
+  or digit (`hasWordChar`, now any script via `\p{L}\p{N}` — the earlier Latin/Arabic-block range dropped every part of
+  our own Arabic PDF export, whose letters are presentation forms); `parseEducationBlock` splits a degree part at the
+  last comma whose right side names an institution (`splitDegreeSchool`, University/College/Institute/School/Academy/
+  Polytechnic/Conservatoire).
+- edited: `scripts/parser-fixtures.test.cjs` — three degree lines (round and square brackets, a faculty before the
+  university) and an experience line with "(Jan 2020 – Present)".
+- edited: `scripts/import-fixtures.test.mjs` — text-cv.pdf and s5-header-table.docx degree/school values.
+**Notes / risks / follow-up:** "School, Degree" order and degree lines with no institution keyword after the comma
+are left as one degree string (reviewable), as before.
+**Suggested commit:** fix(import): split "Degree, School (dates)" and drop empty date brackets (D3)
+
 ## [2026-10-31 21:20] Import: wrapped PDF bullets come back whole (session 5 D2)
 
 **Goal:** Major defect D2 (IMPORT_MONITORING.md §8.3): a marked bullet that wraps onto a second PDF line was cut in

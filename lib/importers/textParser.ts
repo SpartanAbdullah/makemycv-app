@@ -376,13 +376,21 @@ function looksLikeCompany(text: string): boolean {
   );
 }
 
-/** A header line with its dates and "present" token removed. Collapses 3+
- *  whitespace to 2 so the DOCX-style two-space field separator survives for
- *  splitHeaderParts. */
+// Brackets left empty once their dates are stripped: "(2018 - 2020)" became
+// "(  -  )", whose " - " splitHeaderParts then read as a field separator, so
+// the school came back as ")" and the degree as "…, Heriot-Watt University ("
+// (D3, session 5 production matrix).
+const EMPTY_BRACKETS_RE =
+  /[([]\s*(?:[-–—/,.]+|to|till|until|thru|through)?\s*[)\]]/gi;
+
+/** A header line with its dates, "present" token and the brackets that held
+ *  them removed. Collapses 3+ whitespace to 2 so the DOCX-style two-space
+ *  field separator survives for splitHeaderParts. */
 function stripHeaderDates(line: string): string {
   return line
     .replace(DATE_TOKEN_RE, " ")
     .replace(PRESENT_RE, " ")
+    .replace(EMPTY_BRACKETS_RE, " ")
     .replace(/[ \t]{3,}/g, "  ")
     .trim();
 }
@@ -390,7 +398,9 @@ function stripHeaderDates(line: string): string {
 /** A header part with something readable in it — drops the "-" / "(" debris a
  *  stripped date range can leave between separators. */
 function hasWordChar(part: string): boolean {
-  return /[A-Za-z0-9À-ɏ؀-ۿ]/.test(part);
+  // Any script: Arabic arrives as presentation forms (U+FB50–U+FEFF) from
+  // our own PDF export, which the usual [؀-ۿ] range does not cover.
+  return /[\p{L}\p{N}]/u.test(part);
 }
 
 /**
@@ -522,9 +532,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   const startEntryFromLine = (line: string) => {
     const dates = extractDates(line);
     const hasPresent = PRESENT_RE.test(line);
-    // Strip dates and the "present" token.
+    // Strip dates, the "present" token and the brackets that held them.
     const cleaned = stripHeaderDates(line);
-    const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
+    const parts = splitHeaderParts(trimTrailingSeparator(cleaned)).filter(hasWordChar);
 
     let role: string | undefined;
     let company: string | undefined;
@@ -730,6 +740,28 @@ function matchAttestingBody(line: string): string {
 
 // ── Education block parser ───────────────────────────────────────────────────
 
+const INSTITUTION_RE =
+  /\b(?:university|college|institute|institution|school|academy|polytechnic|conservatoire)\b/i;
+
+/**
+ * D3 (session 5): "MSc Facilities Management, Heriot-Watt University Dubai"
+ * is degree + school joined by a comma, which splitHeaderParts never splits.
+ * Split a part that names a degree at the LAST comma whose right-hand side
+ * names an institution (and whose left-hand side does not); anything else is
+ * returned unchanged.
+ */
+function splitDegreeSchool(part: string): string[] {
+  if (!DEGREE_KEYWORDS_RE.test(part) || !part.includes(",")) return [part];
+  for (let i = part.lastIndexOf(","); i > 0; i = part.lastIndexOf(",", i - 1)) {
+    const left = part.slice(0, i).trim();
+    const right = part.slice(i + 1).trim();
+    if (left && right && INSTITUTION_RE.test(right) && !INSTITUTION_RE.test(left)) {
+      return [left, right];
+    }
+  }
+  return [part];
+}
+
 function parseEducationBlock(lines: string[]): ParsedEducation[] {
   const entries: ParsedEducation[] = [];
   let current: ParsedEducation | null = null;
@@ -807,12 +839,10 @@ function parseEducationBlock(lines: string[]): ParsedEducation[] {
     if (looksLikeNewHeader) {
       pushCurrent();
 
-      const cleaned = line
-        .replace(DATE_TOKEN_RE, " ")
-        .replace(PRESENT_RE, " ")
-        .replace(/[ \t]{3,}/g, "  ")
-        .trim();
-      const parts = splitHeaderParts(trimTrailingSeparator(cleaned));
+      const cleaned = stripHeaderDates(line);
+      const parts = splitHeaderParts(trimTrailingSeparator(cleaned))
+        .filter(hasWordChar)
+        .flatMap(splitDegreeSchool);
 
       let school: string | undefined;
       let degree: string | undefined;

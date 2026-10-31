@@ -804,5 +804,30 @@ const runText = (label, text) => {
   check(f, "company-first role not appended to a bullet", !/Acme/.test((d.experience[1]?.bullets ?? []).join(" ")), d.experience[1]?.bullets);
 }
 
+/* ── D3 (session 5): "Degree, School (2018 - 2020)" ───────────────────────
+   Stripping the dates left "( - )"; its " - " split off ")" as the school. */
+{
+  const f = "d3-degree-comma-school-brackets (inline)";
+  const d = runText(f, [
+    "Noor Testwell",
+    "noor@example.com",
+    "Experience",
+    "Operations Manager | Acme LLC (Jan 2020 – Present)",
+    "• Built the ops team.",
+    "Education",
+    "MSc Facilities Management, Heriot-Watt University Dubai (2018 - 2020)",
+    "BEng Mechanical Engineering, University of Sharjah (2010 - 2014)",
+    "Master of Engineering, School of Engineering, Imperial College London [2008 to 2009]",
+  ].join("\n"));
+  const e = d.education;
+  check(f, "3 degrees", e.length === 3, e);
+  check(f, "degree 1 split from its school", e[0]?.degree === "MSc Facilities Management" && e[0]?.school === "Heriot-Watt University Dubai", e[0]);
+  check(f, "degree 1 dates kept", e[0]?.startDate === "2018" && e[0]?.endDate === "2020", e[0]);
+  check(f, "degree 2", e[1]?.degree === "BEng Mechanical Engineering" && e[1]?.school === "University of Sharjah", e[1]);
+  check(f, "no bracket debris anywhere", !/[()[\]]/.test(e.flatMap((x) => [x.degree, x.school, x.field]).filter(Boolean).join(" ")), e);
+  check(f, "school with a faculty before it", e[2]?.degree === "Master of Engineering" && /Imperial College London/.test(e[2]?.school ?? ""), e[2]);
+  check(f, "experience: company without the empty bracket", d.experience[0]?.company === "Acme LLC" && d.experience[0]?.isCurrent === true, d.experience[0]);
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

@@ -118,6 +118,9 @@ ${JSON.stringify(r.partial, null, 1)}`);
   check("text-cv.pdf", "exactly 2 roles (not 4)", exp.length === 2, exp.map((e) => e.role));
   check("text-cv.pdf", "role 1 title/company/location", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.company === "Falcon Facilities Management" && exp[0]?.location === "Abu Dhabi", exp[0]);
   check("text-cv.pdf", "every role has a start date and bullets", exp.every((e) => e.startDate && e.bullets.length > 0), exp.map((e) => [e.startDate, e.bullets.length]));
+  // D3: "BSc …, University of Sharjah (2013 - 2017)" used to give School ")".
+  const edu = r.partial?.education?.[0];
+  check("text-cv.pdf", "education degree / school split (D3)", edu?.degree === "BSc Supply Chain Management" && edu?.school === "University of Sharjah", edu);
   check("text-cv.pdf", "visa status read", /employment/i.test(r.partial?.personal?.visaStatus ?? ""), r.partial?.personal?.visaStatus);
 }
 await expectImport("plain-helvetica-cv.pdf", 5);
@@ -176,6 +179,9 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   check("s5-header-table.docx", "3 roles, not 6 (D1)", exp.length === 3, exp.map((e) => e.role));
   check("s5-header-table.docx", "4 bullets per role, first bullet not a Company (D1)", exp.every((e) => e.bullets.length === 4 && !/^(Directed|Ran|Supervised)/.test(e.company ?? "")), exp.map((e) => [e.company, e.bullets.length]));
   check("s5-header-table.docx", "cities are locations", exp.map((e) => e.location).join(",") === "Dubai,Abu Dhabi,Sharjah", exp.map((e) => e.location));
+  const edu = r.partial?.education ?? [];
+  check("s5-header-table.docx", "schools are names, not \")\" (D3)", edu.map((e) => e.school).join(",") === "Heriot-Watt University Dubai,University of Sharjah", edu.map((e) => e.school));
+  check("s5-header-table.docx", "degrees without bracket debris (D3)", edu.map((e) => e.degree).join(",") === "MSc Facilities Management,BEng Mechanical Engineering", edu.map((e) => e.degree));
 }
 {
   // English-centric parser: the Arabic headings are not recognised, but the
