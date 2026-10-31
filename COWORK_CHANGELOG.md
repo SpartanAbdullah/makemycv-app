@@ -16,6 +16,36 @@ Format:
 
 ---
 
+## [2026-10-31 12:30] Public checklist endpoint so the marketing site can catch checker-count drift (Mission 8)
+
+**Goal:** www.makemycv.ae hard-codes "44 checks" and the per-category counts (its `WhatWeCheck`
+section and "40+ UAE-tuned checks" copy) while this repo derives them from `lib/resumeChecker/checklist.ts`,
+which `checklist.test.ts` pins to the score engine. Nothing connected the two repos, so an engine
+change here would leave the site quoting a stale number. This adds the app half of a one-way
+contract: a public JSON endpoint that the site's CI script compares its constants against.
+**Files:**
+- created: `lib/resumeChecker/checklistContract.ts` — `buildChecklistContract()` turns `CHECKLIST` into
+  `{ version: 1, count, categories: [{ id, label, count, items: [{ id, label, signals, parserOnly }] }] }`;
+  `count` per category = engine sub-signals (14 / 7 / 14 / 9 = 44), item `id` = the signal ids joined
+  with `+`. `CHECKLIST_CONTRACT_VERSION` is bumped only when the shape changes incompatibly.
+- created: `lib/resumeChecker/checklistContract.test.ts` — pins version 1, the fields the site script
+  reads, count = `CHECKLIST_SIGNAL_COUNT` = sum of categories, category order/ids mirror `checklist.ts`,
+  unique item ids / signals, JSON round-trip. Picked up by `npm run test:unit` automatically.
+- created: `app/api/resume-checker/checklist/route.ts` — GET (and OPTIONS 204), no inputs, no secrets:
+  `Cache-Control: public, max-age=3600, s-maxage=86400`, `Access-Control-Allow-Origin: *`. Returns the
+  payload above. Verified locally: 200, headers as listed, 44 checks in 4 categories.
+**Notes / risks / follow-up:** the site side (makemycv-site `lib/checkerChecklist.ts`,
+`scripts/check-checklist-contract.mjs`, `npm run check:checklist`, non-blocking CI job) treats a non-200
+from this URL as "skipped", so nothing breaks while this route is only on staging; once `stagingmmc`
+is merged to `main` the job starts comparing for real. The site's rendered list stays static (SEO) —
+this endpoint is a CI oracle, not a runtime dependency. Category labels are duplicated from
+`CATEGORY_META` in `scoreEngine.ts` (not exported; engine left untouched) — if those names change,
+change `CHECKLIST_CATEGORY_LABELS` too (the script matches on `id`, not label, so a label drift is
+cosmetic). Gates: `npx tsc --noEmit` clean, `npm run lint` 11/11 warnings, `npm test` all suites green.
+**Suggested commit:** feat(checker): public /api/resume-checker/checklist endpoint for the site's drift check
+
+---
+
 ## [2026-10-31 11:10] PDF fidelity ranks 2–3: ATS Clean bullet pitch, Onyx/Sandstone band widths + names
 
 **Goal:** the next two items of the ranked list in `docs/ai-mission/PDF_FIDELITY.md` (parent folder), each
