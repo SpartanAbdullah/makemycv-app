@@ -25,6 +25,33 @@ Format:
 
 ---
 
+## [2026-10-31 20:05] Import after typing no longer gets overwritten by the stale form (production QA P1, backlog E10)
+
+**Goal:** Major defect from the production QA (docs/ai-mission/QA_PRODUCTION_2026-10-31.md, P1). A visitor who typed
+on the Personal step and then imported a CV saw the import in the preview, but the form kept the typed values; the
+next keystroke wrote the stale first name, last name, email, phone and headline back over the import, and it
+survived a reload. Root cause: the step re-synced the form from the store only while the form was untouched
+(`if (!isDirty) reset(personal)`), the half of audit A-W1-014 that the photo fix did not cover.
+**Files:**
+- edited: `components/builder/steps/PersonalStep.tsx`, `components/builder/steps/UAEEssentialsStep.tsx` — the
+  store → form effect now compares the store's owned fields with what the form last wrote (`lastSerializedRef`).
+  A difference means the change came from outside the form (import, storage hydration, reset): the pending
+  debounced write is dropped (not flushed) and the form is `reset()` to the store. The form's own commit records
+  the merged value it writes, so typing never triggers a reset and there is no loop. `isDirty` is no longer read.
+- edited: `scripts/import-smoke.mjs` — new check: fresh context, type "Placeholder" in First name, import
+  `text-cv.pdf` (Replace), assert the First name field shows "Layla", type one character in Phone, then read
+  `makemycv:data` from localStorage and assert first/last name, email and the phone (+ the keystroke) are the
+  imported ones. Negative control: the same check against production fails exactly as the QA reported
+  (`firstName: "Placeholder"`, `email: ""`). The E9 consent check now runs in its own fresh context at
+  1366×768 and 1440×900 (the QA found 1366×768 also covered) and asserts the banner comes back after Cancel.
+**Notes / risks / follow-up:** a keystroke made in the ~250 ms before an import lands is discarded with the rest of
+the form state; the import is the newer intent. Summary, Experience, Education, Skills, Languages, Certifications
+and Projects still use `if (!isDirty) reset(...)`; today that is safe because the file import lives only on the
+Personal step and the report import runs on arrival, so none of them is mounted with typed edits when the store is
+replaced. Apply the same pattern if an import (or any other outside write) is ever offered on those steps. To
+exercise the banner in `smoke:import`, build with `NEXT_PUBLIC_GTM_ID=GTM-SMOKE01`.
+**Suggested commit:** fix(builder): re-sync Personal and UAE steps when an import changes the store (P1)
+
 ## [2026-10-31 19:25] Checker dropzone: says what it accepts and what happens to the file; builder import errors (backlog E1)
 
 **Goal:** the /resume-checker dropzone said "max 5MB · no sign-up" while the builder import (same pdf.js / mammoth

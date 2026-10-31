@@ -76,66 +76,11 @@ await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route
 
 const rows = [];
 
-// ── Consent banner vs the Import button (backlog E9) ───────────────────────
-// Found on production 2026-10-31: the cookie banner (z-index 1000, fixed at
-// the bottom) covered MappingReview's Import button at 1440×900 until the
-// visitor answered it. This context carries NO mmcv_consent cookie, so the
-// banner is up during every review below; the check asks the browser what
-// actually sits at the button's centre. Reported once per run.
-let consentChecked = false;
-let bannerSeen = false;
-async function checkConsentOverlap(btn) {
-  if (consentChecked) return;
-  const banner = page.getByRole("region", { name: "Cookie settings" });
-  const cookie = (await ctx.cookies()).some((c) => c.name === "mmcv_consent");
-  if (cookie) {
-    consentChecked = true;
-    console.log("INFO  consent-overlap: mmcv_consent is set in this context — check skipped");
-    return;
-  }
-  // `bannerSeen` was recorded by runCase() before the dialog opened (the fix
-  // hides the region while a modal is up, so it cannot be read here).
-  const bannerMounted = (await banner.count()) > 0;
-  consentChecked = true;
-  const box = await btn.boundingBox();
-  if (!box) {
-    fail("consent-overlap: Import button has a box", "boundingBox() returned null");
-    return;
-  }
-  const hit = await page.evaluate(
-    ([x, y]) => {
-      const el = document.elementFromPoint(x, y);
-      const button = el?.closest("button");
-      return {
-        isImport: !!button && /^Import/.test(button.textContent?.trim() ?? ""),
-        under: el ? `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[aria-label=${el.getAttribute("aria-label")}]` : ""}` : "null",
-        inBanner: !!el?.closest('[role="region"][aria-label="Cookie settings"]'),
-      };
-    },
-    [box.x + box.width / 2, box.y + box.height / 2],
-  );
-  const where = `button centre (${Math.round(box.x + box.width / 2)}, ${Math.round(box.y + box.height / 2)}) at 1440×900`;
-  if (hit.isImport) {
-    ok(`consent-overlap: Import button is the element at its own centre — ${where}; banner ${bannerSeen ? `was up before the dialog opened and is ${bannerMounted ? "hidden while it is open" : "unmounted"}` : "not rendered by this build (no NEXT_PUBLIC_GTM_ID)"}`);
-  } else {
-    fail("consent-overlap: Import button is the element at its own centre", `${where} is ${hit.under}${hit.inBanner ? " (inside the cookie banner)" : ""}`);
-  }
-}
-
 /** Pick `file` through the real Import button; record what happened. */
 async function runCase(name, file, expected) {
   await page.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
   await page.evaluate(() => { window.dataLayer = []; });
-  if (!consentChecked && !bannerSeen) {
-    // Client-only render; give hydration a beat before concluding it is absent.
-    const banner = page.getByRole("region", { name: "Cookie settings" });
-    bannerSeen = await banner.isVisible().catch(() => false);
-    if (!bannerSeen) {
-      await page.waitForTimeout(500);
-      bannerSeen = await banner.isVisible().catch(() => false);
-    }
-  }
 
   // The picker is a detached <input> created on click; before hydration the
   // button has no handler yet (seen against `next dev`), so retry the click
@@ -170,7 +115,6 @@ async function runCase(name, file, expected) {
         await review.getByRole("button", { name: /^Cancel$/ }).click();
       } else {
         outcome = `review:${label.replace(/^Import\s*/, "")}`;
-        await checkConsentOverlap(btn);
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }
@@ -211,6 +155,175 @@ for (const [name, expected] of CASES) {
   await runCase(name, name === "large-25mb.pdf" ? largePath : path.join(FIXTURE_DIR, name), expected);
 }
 
+// ── Consent banner vs the Import button (backlog E9) ───────────────────────
+// Found on production 2026-10-31: the cookie banner (z-index 1000, fixed at
+// the bottom) covered MappingReview's Import button at 1440×900 and at
+// 1366×768 until the visitor answered it (1920×1080 was clear). Each size
+// gets a FRESH context with NO mmcv_consent cookie, opens the review for
+// text-cv.pdf and asks the browser what actually sits at the button's
+// centre. The banner only renders when the build has NEXT_PUBLIC_GTM_ID;
+// without it the hit test still runs but cannot exercise the overlap, and
+// the run says so.
+const CONSENT_VIEWPORTS = [
+  [1366, 768],
+  [1440, 900],
+];
+
+/** Open the builder, pick `file` through the real Import button and wait for
+ *  the review dialog. Returns the dialog locator, or null. */
+async function openReview(pg, file) {
+  await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+  await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+  let fc = null;
+  for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+    const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+    await pg.getByRole("button", { name: /Import existing CV/ }).click();
+    fc = await chooser;
+  }
+  if (!fc) return null;
+  await fc.setFiles(file);
+  const review = pg.getByRole("dialog", { name: /Import from/ });
+  return (await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false)) ? review : null;
+}
+
+let bannerEverSeen = false;
+async function checkConsentOverlap(width, height) {
+  const label = `consent-overlap ${width}×${height}`;
+  const c = await browser.newContext({ viewport: { width, height } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    if ((await c.cookies()).some((k) => k.name === "mmcv_consent")) {
+      fail(label, "fresh context already carries mmcv_consent");
+      return;
+    }
+    const banner = pg.getByRole("region", { name: "Cookie settings" });
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    // Client-only render; give hydration a beat before concluding it is absent.
+    await pg.waitForTimeout(800);
+    const bannerUp = await banner.isVisible().catch(() => false);
+    bannerEverSeen ||= bannerUp;
+    // openReview() navigates again; the banner stays up (no cookie was set).
+    const review = await openReview(pg, path.join(FIXTURE_DIR, "text-cv.pdf"));
+    if (!review) {
+      fail(label, "the import review never opened");
+      return;
+    }
+    const btn = review.getByRole("button", { name: /^Import/ });
+    const box = await btn.boundingBox();
+    if (!box) {
+      fail(label, "Import button has no box");
+      return;
+    }
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+    const hit = await pg.evaluate(
+      ([px, py]) => {
+        const el = document.elementFromPoint(px, py);
+        const button = el?.closest("button");
+        return {
+          isImport: !!button && /^Import/.test(button.textContent?.trim() ?? ""),
+          under: el ? `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[aria-label=${el.getAttribute("aria-label")}]` : ""}` : "null",
+          inBanner: !!el?.closest('[role="region"][aria-label="Cookie settings"]'),
+        };
+      },
+      [x, y],
+    );
+    const where = `button centre (${Math.round(x)}, ${Math.round(y)})`;
+    if (!hit.isImport) {
+      fail(label, `${where} is ${hit.under}${hit.inBanner ? " (inside the cookie banner)" : ""}`);
+      return;
+    }
+    // The banner must come back once the dialog closes — it yields, it is not dismissed.
+    await review.getByRole("button", { name: /^Cancel$/ }).click();
+    const back = bannerUp ? await banner.isVisible({ timeout: 3000 }).catch(() => false) : null;
+    if (bannerUp && !back) {
+      fail(label, "the banner did not return after the dialog closed");
+      return;
+    }
+    ok(`${label}: Import button is the element at its own centre — ${where}; banner ${bannerUp ? "was up, hidden while the dialog was open, back after Cancel" : "not rendered by this build (no NEXT_PUBLIC_GTM_ID)"}`);
+  } finally {
+    await c.close();
+  }
+}
+
+// ── Import after typing on the Personal step (production QA P1) ───────────
+// 2026-10-31: typing on the Personal step, then importing, left the form on
+// the typed values while the store and preview showed the import; the next
+// keystroke wrote the stale name / email back over the import and it
+// survived a reload. The step now re-syncs whenever the store changes from
+// outside the form. Fresh context; reads the persisted CV, not the DOM.
+async function checkImportAfterTyping() {
+  const label = "import after typing (P1): imported personal fields survive the next keystroke";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByLabel(/First name/).waitFor({ timeout: 30000 });
+    await pg.getByLabel(/First name/).fill("Placeholder");
+    await pg.waitForTimeout(900); // form debounce (250 ms) + storage debounce (500 ms)
+
+    // Same page, no navigation: openReview() would reload, so pick in place.
+    let fc = null;
+    for (let attempt = 0; attempt < 6 && !fc; attempt++) {
+      const chooser = pg.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+      await pg.getByRole("button", { name: /Import existing CV/ }).click();
+      fc = await chooser;
+    }
+    if (!fc) {
+      fail(label, "file chooser never opened");
+      return;
+    }
+    await fc.setFiles(path.join(FIXTURE_DIR, "text-cv.pdf"));
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    if (!(await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      fail(label, "the import review never opened");
+      return;
+    }
+    await review.getByRole("radio", { name: /Replace current CV/ }).check().catch(() => {});
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+
+    const formFirst = await pg.getByLabel(/First name/).inputValue().catch(() => "");
+    if (formFirst === "Layla") ok("import after typing (P1): the form shows the imported first name");
+    else fail("import after typing (P1): the form shows the imported first name", `First name field is "${formFirst}"`);
+
+    // One keystroke in another field, then let both debounces run.
+    const phone = pg.getByLabel(/^Phone/);
+    await phone.click();
+    await phone.press("End");
+    await phone.pressSequentially("1");
+    await pg.waitForTimeout(1200);
+
+    const stored = await pg.evaluate(() => {
+      try {
+        const raw = JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null");
+        const p = raw?.personal ?? raw?.data?.personal ?? {};
+        return { firstName: p.firstName ?? "", lastName: p.lastName ?? "", email: p.email ?? "", phone: p.phone ?? "" };
+      } catch {
+        return null;
+      }
+    });
+    if (
+      stored &&
+      stored.firstName === "Layla" &&
+      stored.lastName === "Haddad" &&
+      stored.email === "layla.haddad@example.com" &&
+      stored.phone.endsWith("1")
+    ) {
+      ok(`${label} — stored ${JSON.stringify(stored)}`);
+    } else {
+      fail(label, `stored ${JSON.stringify(stored)}`);
+    }
+  } finally {
+    await c.close();
+  }
+}
+
+for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
+await checkImportAfterTyping();
+
 // ── pdf.js worker network scenarios ────────────────────────────────────────
 // The worker choice is cached per page lifetime and runCase() navigates, so
 // each scenario starts from a fresh document.
@@ -246,8 +359,7 @@ for (const r of rows) {
   );
 }
 
-if (!consentChecked) fail("consent-overlap", "no import review ever opened, so the Import-button hit test never ran");
-else if (!bannerSeen) console.log("INFO  consent-overlap: the banner was never visible in this run — the hit test passed, but to exercise the overlap build with NEXT_PUBLIC_GTM_ID set (e.g. GTM-SMOKE01)");
+if (!bannerEverSeen) console.log("INFO  consent-overlap: the banner was never visible in this run — the hit tests passed, but to exercise the overlap build with NEXT_PUBLIC_GTM_ID set (e.g. GTM-SMOKE01)");
 
 await browser.close();
 fs.rmSync(tmp, { recursive: true, force: true });
