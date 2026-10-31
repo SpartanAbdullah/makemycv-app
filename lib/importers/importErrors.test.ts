@@ -15,6 +15,7 @@ import {
   IMPORT_ERROR_REASONS,
   IMPORT_FILE_TYPES,
   ImportParseError,
+  MISMATCH_COPY,
   MAX_IMPORT_BYTES,
   classifyDocxError,
   classifyPdfError,
@@ -25,6 +26,7 @@ import {
   toImportParseError,
   unsupportedTypeMessage,
   withDeadline,
+  zipLooksLikeDocx,
 } from "./importErrors";
 
 describe("taxonomy", () => {
@@ -167,5 +169,20 @@ describe("withDeadline (D10, session 6)", () => {
   test("the work's own error passes through unchanged", async () => {
     const err = new ImportParseError("corrupt_pdf");
     await assert.rejects(withDeadline(Promise.reject(err), Date.now() + 1000), (e: unknown) => e === err);
+  });
+});
+
+describe("extension / bytes mismatch (D11, session 6)", () => {
+  const ascii = (s: string) => new Uint8Array(Buffer.from(s, "latin1"));
+  test("zipLooksLikeDocx finds a word/ entry name, not other zips", () => {
+    assert.equal(zipLooksLikeDocx(ascii("PK\u0003\u0004....[Content_Types].xml....word/document.xml")), true);
+    assert.equal(zipLooksLikeDocx(ascii("PK\u0003\u0004....[Content_Types].xml....xl/workbook.xml")), false);
+  });
+  test("the copy names the real type and keeps the advice for that type", () => {
+    assert.match(MISMATCH_COPY.pdfNamedDocx, /actually a PDF/);
+    assert.match(MISMATCH_COPY.pdfNamedDocx, /\.pdf/);
+    assert.doesNotMatch(MISMATCH_COPY.pdfNamedDocx, /save it again as \.docx/i);
+    assert.match(MISMATCH_COPY.docxNamedPdf, /actually a Word document/);
+    assert.match(MISMATCH_COPY.docNamedPdf, /Save As/);
   });
 });

@@ -68,7 +68,16 @@ const CASES = [
   ["arabic-export-classic.pdf", "import"],
   // Session 6 (D7a): 31 pages, one past MAX_PDF_PAGES.
   ["s5-31-pages.pdf", "import"],
+  // Session 6 (D11): extension / bytes mismatch (matrix cases 9a / 9b).
+  ["s5-docx-bytes.pdf", "corrupt_pdf"],
+  ["s5-pdf-bytes.docx", "corrupt_docx"],
 ];
+
+// D11 (session 6): the error bar names the real type for a renamed file.
+const EXPECT_MESSAGE = {
+  "s5-docx-bytes.pdf": /actually a Word document with a \.pdf name/,
+  "s5-pdf-bytes.docx": /actually a PDF with a \.docx name/,
+};
 
 // D7a (session 6): the review names the pages it read when the PDF is longer
 // than MAX_PDF_PAGES, and says nothing for a normal file.
@@ -190,6 +199,10 @@ async function runCase(name, file, expected) {
     }
   } else if (pushes[0].event === "cv_import_failed" && pushes[0].error_reason === expected && REASONS.has(expected)) {
     ok(`${label} — "${message.slice(0, 90)}"`);
+    if (EXPECT_MESSAGE[name]) {
+      if (EXPECT_MESSAGE[name].test(message)) ok(`${name}: copy names the real type (D11)`);
+      else fail(`${name}: copy names the real type (D11)`, `"${message}"`);
+    }
   } else {
     fail(label, `outcome=${outcome}; ${summary}; message="${message.slice(0, 90)}"`);
   }

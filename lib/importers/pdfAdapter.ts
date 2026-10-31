@@ -11,11 +11,14 @@ import type { ImportAdapter, ParsedDocument } from "./adapter";
 import {
   ImportParseError,
   MAX_PDF_PAGES,
+  MISMATCH_COPY,
   MIN_TEXT_LENGTH,
   PDF_TIMEOUT_MS,
   classifyPdfError,
+  sniffContainer,
   toImportParseError,
   withDeadline,
+  zipLooksLikeDocx,
 } from "./importErrors";
 import { parseTextToDocument } from "./textParser";
 
@@ -186,6 +189,15 @@ export async function extractPdfText(
   const maxPages = opts.maxPages ?? MAX_PDF_PAGES;
   // The caller's steps already used the whole budget: do not start pdf.js.
   if (Date.now() >= deadlineAt) throw new ImportParseError("timeout");
+  // D11 (session 5): a Word file renamed .pdf is not "damaged"; say what it
+  // is. Same reason (corrupt_pdf) as pdf.js would report, specific copy.
+  const container = sniffContainer(new Uint8Array(data));
+  if (container === "zip" && zipLooksLikeDocx(new Uint8Array(data))) {
+    throw new ImportParseError("corrupt_pdf", MISMATCH_COPY.docxNamedPdf);
+  }
+  if (container === "ole") {
+    throw new ImportParseError("corrupt_pdf", MISMATCH_COPY.docNamedPdf);
+  }
   pdfjs.GlobalWorkerOptions.workerSrc = opts.workerSrc;
 
   // pdf.js transfers (detaches) the buffer it receives — hand it a copy so

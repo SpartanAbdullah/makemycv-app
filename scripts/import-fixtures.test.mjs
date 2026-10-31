@@ -269,7 +269,36 @@ await expectReason("not-a-cv.pdf", "mapping_empty");
   await expectReason("large-25mb.pdf", "too_large", big.buffer.slice(big.byteOffset, big.byteOffset + big.byteLength));
 }
 // Bytes that are not a PDF at all, under a .pdf name (a renamed .docx).
-await expectReason("renamed.pdf", "corrupt_pdf", bytesOf("header-contact.docx"));
+{
+  const r = await expectReason("renamed.pdf", "corrupt_pdf", bytesOf("header-contact.docx"));
+  // D11 (session 6): the sniff knows it is a Word file; the copy says so.
+  check("renamed.pdf", "copy names the real type (D11)", /actually a Word document with a \.pdf name/.test(r.message ?? ""), r.message);
+}
+/* D11 (session 6): extension / bytes mismatch, session-5 matrix cases 9a / 9b
+   (s5-docx-bytes.pdf = .pdf name, DOCX bytes; s5-pdf-bytes.docx = .docx name,
+   PDF bytes). Reasons unchanged; the copy names the real type and the fix. */
+{
+  const r = await expectReason("s5-docx-bytes.pdf", "corrupt_pdf");
+  check("s5-docx-bytes.pdf", "\"actually a Word document … rename it to end in .docx\" (D11)", /actually a Word document/.test(r.message ?? "") && /\.docx/.test(r.message ?? ""), r.message);
+}
+{
+  const r = await expectReason("s5-pdf-bytes.docx", "corrupt_docx");
+  check("s5-pdf-bytes.docx", "\"actually a PDF … rename it to end in .pdf\" (D11)", /actually a PDF/.test(r.message ?? "") && /end in \.pdf/.test(r.message ?? ""), r.message);
+  check("s5-pdf-bytes.docx", "no Word-specific advice for a PDF (D11)", !/save it again as \.docx/i.test(r.message ?? ""), r.message);
+}
+{
+  // An old .doc (OLE2) renamed .pdf: the Save-As advice, reason still corrupt_pdf.
+  const r = await expectReason("legacy-renamed.pdf", "corrupt_pdf", bytesOf("legacy-doc-renamed.docx"));
+  check("legacy-renamed.pdf", "copy says older Word .doc (D11)", /older Word \.doc file with a \.pdf name/.test(r.message ?? ""), r.message);
+}
+{
+  // A zip that is not a Word file (e.g. a renamed .xlsx) keeps the generic copy.
+  const zip = Buffer.from(bytesOf("header-contact.docx"));
+  const s = zip.toString("latin1").replace(/word\//g, "xl/  ");
+  const notWord = Buffer.from(s, "latin1");
+  const r = await expectReason("other-zip.pdf", "corrupt_pdf", notWord.buffer.slice(notWord.byteOffset, notWord.byteOffset + notWord.byteLength));
+  check("other-zip.pdf", "non-Word zip keeps the generic copy", r.message === importErrorMessage("corrupt_pdf"), r.message);
+}
 // A damaged zip under a .docx name.
 {
   const b = Buffer.from(bytesOf("two-column-table.docx"));

@@ -25,6 +25,27 @@ Format:
 
 ---
 
+## [2026-11-01 00:00] Import: a renamed PDF / Word file is named for what it is (session 5 D11)
+
+**Goal:** Minor copy defect D11 (IMPORT_MONITORING.md §8.3): a .docx renamed .pdf got "may be damaged, re-export",
+and a PDF renamed .docx got "open it in Word and save it again as .docx" (wrong for a PDF), although the byte sniff
+already knew the real type.
+**Files:**
+- edited: `lib/importers/importErrors.ts`: `MISMATCH_COPY` (pdfNamedDocx / docxNamedPdf / docNamedPdf) and
+  `zipLooksLikeDocx` (a `word/` entry name in the first 64 KB).
+- edited: `lib/importers/docxAdapter.ts`: PDF bytes → `corrupt_docx` with "This file is actually a PDF with a .docx
+  name. Rename it to end in .pdf, or pick the original PDF, and import it again."
+- edited: `lib/importers/pdfAdapter.ts`: sniff before `getDocument`; a Word .docx zip → `corrupt_pdf` with "This file
+  is actually a Word document with a .pdf name…", an OLE .doc → `corrupt_pdf` with the Save-As advice. Other zips and
+  junk still reach pdf.js and keep the generic copy.
+- created: `__fixtures__/import/s5-docx-bytes.pdf`, `__fixtures__/import/s5-pdf-bytes.docx` (matrix cases 9a / 9b).
+- edited: `lib/importers/importErrors.test.ts`, `scripts/import-fixtures.test.mjs` (both fixtures, a renamed .doc, a
+  non-Word zip keeps the generic copy), `scripts/import-smoke.mjs` (both fixtures through the picker, copy checked),
+  `docs/import-errors.md`.
+**Notes / risks / follow-up:** `error_reason` values unchanged (corrupt_pdf / corrupt_docx), so GA4 series stay
+comparable.
+**Suggested commit:** fix(import): name the real type when a file's extension and bytes disagree (D11)
+
 ## [2026-10-31 23:50] Import: the 45 s PDF budget starts at the pick, and a slow read says so (session 5 D10)
 
 **Goal:** Minor defect D10 (IMPORT_MONITORING.md §8.3): on a 10 KiB/s link the user waited 57 s on "Reading your PDF"

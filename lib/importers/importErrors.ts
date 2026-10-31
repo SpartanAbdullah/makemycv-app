@@ -200,6 +200,42 @@ export function sniffContainer(bytes: Uint8Array): Container {
   return "unknown";
 }
 
+/** A zip whose entries include `word/…` — a Word .docx (as opposed to an
+ *  .xlsx, .pptx or any other zip). Entry names sit in plain ASCII in the
+ *  local file headers, which Word writes at the start of the archive. */
+export function zipLooksLikeDocx(bytes: Uint8Array): boolean {
+  const head = bytes.subarray(0, Math.min(bytes.length, 64 * 1024));
+  // "word/" = 77 6f 72 64 2f
+  for (let i = 0; i + 5 <= head.length; i++) {
+    if (
+      head[i] === 0x77 && head[i + 1] === 0x6f && head[i + 2] === 0x72 &&
+      head[i + 3] === 0x64 && head[i + 4] === 0x2f
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * D11 (session 5): the extension says one format, the bytes another. The
+ * byte sniff already knows which, so the copy names the real type and the
+ * fix (rename) instead of "damaged, re-export". The `error_reason` stays the
+ * one the adapter for the extension reports (corrupt_pdf / corrupt_docx), so
+ * analytics are unchanged.
+ */
+export const MISMATCH_COPY = {
+  /** .docx name, PDF bytes — reported as corrupt_docx. */
+  pdfNamedDocx:
+    "This file is actually a PDF with a .docx name. Rename it to end in .pdf, or pick the original PDF, and import it again.",
+  /** .pdf name, Word .docx bytes — reported as corrupt_pdf. */
+  docxNamedPdf:
+    "This file is actually a Word document with a .pdf name. Rename it to end in .docx, or pick the original Word file, and import it again.",
+  /** .pdf name, Word 97-2003 .doc bytes — reported as corrupt_pdf. */
+  docNamedPdf:
+    "This file is actually an older Word .doc file with a .pdf name. Open it in Word, choose Save As → Word Document (.docx), and import that file.",
+} as const;
+
 /** Map a pdf.js (or our own) exception to a reason. pdf.js sets `name` on
  *  every exception class explicitly, so it survives minification and the
  *  worker boundary. */
