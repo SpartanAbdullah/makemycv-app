@@ -1709,6 +1709,15 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
       </>
     ) : null;
 
+  // Live bullets (ats-clean.tsx ~440–460) are 11px × 1.55 with margin 0 →
+  // 12.8 pt pitch. The Classic sheet's 8.6 pt × 1.45 + marginBottom 3 gave
+  // 15.5 pt, so every bullet pushed the PDF ~2.7 pt lower than the preview
+  // (PDF_FIDELITY.md rank 2, 2026-10-31).
+  const atsBullets: BulletStyles = {
+    item: { marginBottom: 0 },
+    dot: { fontSize: pt(11) * theme.fontScale, color: "#374151" },
+    text: { fontSize: pt(11) * theme.fontScale, lineHeight: 1.55 * theme.lineScale, color: "#374151" },
+  };
   return (
     <View>
       {/* ── Header ── */}
@@ -1835,7 +1844,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                   {role.location?.trim() || ""}
                 </Text>
               )}
-              <BulletList bullets={role.bullets} s={s} />
+              <BulletList bullets={role.bullets} s={s} styles={atsBullets} />
             </View>
           ))}
         </View>
@@ -1932,7 +1941,7 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
                     {")"}
                   </Text>
                 )}
-                <BulletList bullets={project.bullets ?? []} s={s} />
+                <BulletList bullets={project.bullets ?? []} s={s} styles={atsBullets} />
               </View>
             );
           })}
@@ -3646,7 +3655,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
     pt(18) * theme.spaceScale,
     firstMain,
   );
-  const SIDEBAR_WIDTH = 172;
+  const SIDEBAR_WIDTH = pt(220); // live onyx.tsx: 220px (PDF_FIDELITY.md rank 3)
 
   return (
     <>
@@ -3693,7 +3702,7 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+        <Text style={{ fontSize: pt(21) * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.15 * theme.lineScale, letterSpacing: safeTracking(0.02 * pt(21) * theme.fontScale, pt(21) * theme.fontScale) }}>
           {firstName} {lastName}
         </Text>
         {headline ? (
@@ -3978,7 +3987,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
     pt(18) * theme.spaceScale,
     firstMain,
   );
-  const SIDEBAR_WIDTH = 180;
+  const SIDEBAR_WIDTH = pt(230); // live sandstone.tsx: 230px (PDF_FIDELITY.md rank 3)
 
   return (
     <>
@@ -4025,7 +4034,7 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         ) : null}
 
-        <Text style={{ fontSize: 14 * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
+        <Text style={{ fontSize: pt(20) * theme.fontScale, fontFamily: fonts.bold, fontWeight: 700, color: onAccent, textAlign: "center", lineHeight: 1.2 * theme.lineScale }}>
           {firstName} {lastName}
         </Text>
         {headline ? (

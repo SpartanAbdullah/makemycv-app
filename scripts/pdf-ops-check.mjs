@@ -23,8 +23,8 @@ const { getDocument, OPS } = pdfjs;
 // matched by "<id>.pdf" or "<id>-<variant>.pdf".
 const BANDS = {
   executive: { width: 150, side: 'left' },
-  onyx: { width: 172, side: 'left' },
-  sandstone: { width: 180, side: 'left' },
+  onyx: { width: 165, side: 'left' }, // pt(220) — live 220px (fidelity rank 3, 2026-10-31)
+  sandstone: { width: 172.5, side: 'left' }, // pt(230) — live 230px
   'corp-sidebar': { width: 165, side: 'right' },
 };
 

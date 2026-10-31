@@ -16,6 +16,41 @@ Format:
 
 ---
 
+## [2026-10-31 11:10] PDF fidelity ranks 2–3: ATS Clean bullet pitch, Onyx/Sandstone band widths + names
+
+**Goal:** the next two items of the ranked list in `docs/ai-mission/PDF_FIDELITY.md` (parent folder), each
+a transcription gap between the live template and its PDF layout (dual-render-path rule, CLAUDE.md).
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` —
+  - `ATSCleanPDFLayout`: both `BulletList` call sites (roles, projects) now pass `atsBullets`
+    (`text`/`dot` `pt(11)·fontScale`, `lineHeight 1.55·lineScale`, `#374151`; `item.marginBottom 0`) —
+    the live `ats-clean.tsx` ~440–460 values; the Classic sheet gave 8.6 pt × 1.45 + 3 pt per bullet.
+  - `OnyxPDFLayout`: `SIDEBAR_WIDTH = pt(220)` (165 pt, was 172) — live `onyx.tsx` 166 is 220px; the band's
+    inner column is now 132 pt like the live one. Sidebar name `pt(21)·fontScale`, `lineHeight 1.15`,
+    `letterSpacing` 0.02 em through `safeTracking` (was 14 pt / 1.2; live `onyx.tsx` 197).
+  - `SandstonePDFLayout`: `SIDEBAR_WIDTH = pt(230)` (172.5 pt, was 180) — live `sandstone.tsx` 178 is
+    230px; sidebar name `pt(20)·fontScale` (was 14; live `sandstone.tsx` 207 is 20px).
+- edited: `scripts/pdf-ops-check.mjs` — `BANDS.onyx.width 172 → 165`, `BANDS.sandstone.width 180 → 172.5`
+  (the ops check asserts the fixed band to ±1 pt on every page).
+**Notes / risks / follow-up:** live templates untouched (the doc names the PDF side as the wrong one in
+all three). `npm run smoke:pdf`: 42 PDFs, ALL CHECKS PASSED, band found on every Onyx/Sandstone page at the
+new widths. Fidelity harness re-run against `next start -p 3400` (`--only=ats-clean,onyx,sandstone`,
+output `_cowork/pdf-fidelity-2026-10-31-ranks2-3/`), page-1 pixel / block diff, before (PDF_FIDELITY.md
+matrix) → after:
+  - onyx: natural 10.70 / 12.18 → 8.94 / 9.32; compact 9.95 / 11.57 → 8.52 / 9.82; dense 13.57 / 22.55 →
+    11.81 / 18.18 (the vertical blue stripe along the band edge is gone from the composites).
+  - sandstone: natural 9.03 / 7.41 → 7.09 / 5.57; compact 8.55 / 8.91 → 7.06 / 7.65; dense 11.41 / 15.31 →
+    10.06 / 14.30.
+  - ats-clean: natural 10.44 / 17.14 → 10.67 / 21.33; compact 9.58 / 20.56 → 9.43 / 19.51; dense 10.80 /
+    21.67 → 10.68 / 22.04 — NOT improved. The bullet pitch now matches the preview (verified on the
+    composite: the two bullet blocks line up with themselves), but the PDF still sits lower from the
+    header on (the SUMMARY rule is ~16 pt lower in the PDF than in the preview), so with the bullets no
+    longer absorbing part of that offset the block metric moved sideways. The residual is the ATS Clean
+    header/section transcription (name/headline/contact block and the `s.body` paragraph metrics), i.e.
+    the doc's "cumulative drift" family (rank 5), not the bullet list; it needs its own pass. Text parity
+    100 % and page counts agree in all 9 cells before and after.
+**Suggested commit:** fix(pdf): ATS Clean bullet pitch; Onyx/Sandstone sidebar widths and names match live
+
 ## [2026-10-31 10:05] Checker page: itemised "What this checks" list + the file sentence (FEATURE_BACKLOG B2)
 
 **Goal:** B2 — replace the four one-line category cards on `/resume-checker` with the full list of rules the
