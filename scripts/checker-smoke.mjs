@@ -70,6 +70,11 @@ const outgoing = [];
 page.on("request", (req) => {
   const url = new URL(req.url());
   if (url.origin !== new URL(BASE).origin || req.method() === "GET") return;
+  // Since 45ade82 (2026-10-31) pdfAdapter.resolveWorkerSrc HEAD-probes the
+  // self-hosted pdf.js worker once per page before the first getDocument. A
+  // HEAD carries no body, so nothing of the CV leaves with it; it is not the
+  // payload this assertion guards. Everything else non-GET is still counted.
+  if (req.method() === "HEAD" && url.pathname === "/pdf.worker.min.mjs") return;
   outgoing.push({ path: url.pathname, body: req.postData() ?? "" });
 });
 
