@@ -2055,6 +2055,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
  * Tailwind semibold → the 700 cut (the PDF faces ship 400/700 only).
  */
 
+/** A4 width in pt; the live preview frame is 794px = 595.5pt at 96 DPI. */
+const A4_WIDTH_PT = 595.28;
 const MODERN_SLATE_100 = "#F1F5F9";
 const MODERN_EMERALD_50 = "#ECFDF5";
 const MODERN_EMERALD_200 = "#A7F3D0";
@@ -2098,6 +2100,15 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   const fonts = pdfFontPair(data.settings.fontFamily, pdfFontsReady());
   const fs = theme.fontScale;
   const ls = theme.lineScale;
+  /**
+   * modern.tsx sets every line-height as `leading-[calc(Xrem*var(--lh))]`:
+   * an ABSOLUTE px box scaled by the Line Height slider only, never by the
+   * font size. A react-pdf ratio multiplies the (fontScale-scaled) size, so
+   * the ratio must be divided by fontScale to land on the same box — before
+   * this (session 4, 2026-10-31) every Modern line was 10 % too tall at
+   * density 5 and 10 % too short at density 1, compounding down the column.
+   */
+  const absLine = (boxPx: number, fontPx: number) => ((boxPx / fontPx) * ls) / fs;
   // mt-[calc(1.5rem*var(--sp))] / space-y-[calc(1.5rem*var(--sp))] = 24px → 18pt
   const sectionGap = 18 * theme.spaceScale;
   // The live name is set in the display face (`font-display` → Bricolage)
@@ -2158,7 +2169,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   // h2: text-xs/4 font-semibold uppercase tracking-[0.2em] text-slate-500
   const heading: Style = {
     fontSize: 9 * fs,
-    lineHeight: (16 / 12) * ls,
+    lineHeight: absLine(16, 12),
     ...bold,
     textTransform: "uppercase",
     // Live tracking-[0.2em]; capped for the text layer (see safeTracking).
@@ -2168,7 +2179,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   // text-sm/5 text-slate-700 — paragraphs, bullets, languages, certs
   const body: Style = {
     fontSize: 10.5 * fs,
-    lineHeight: (20 / 14) * ls,
+    lineHeight: absLine(20, 14),
     color: SLATE_700,
   };
   // text-sm/5 font-semibold in the root's slate-900 — role, school, project
@@ -2176,7 +2187,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
   // text-xs/4 text-slate-500 — contact, company line, degree line
   const small: Style = {
     fontSize: 9 * fs,
-    lineHeight: (16 / 12) * ls,
+    lineHeight: absLine(16, 12),
     color: SLATE_500,
   };
 
@@ -2220,7 +2231,8 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           <Text
             style={{
               fontSize: 22.5 * fs,
-              lineHeight: 1.2 * ls,
+              // leading-[calc(2.25rem*var(--lh))] = 36px·lh over a 30px·fs face
+              lineHeight: absLine(36, 30),
               fontFamily: nameFont,
               fontWeight: 700,
               letterSpacing: -0.025 * 22.5 * fs,
@@ -2233,7 +2245,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             <Text
               style={{
                 fontSize: 10.5 * fs,
-                lineHeight: (20 / 14) * ls,
+                lineHeight: absLine(20, 14),
                 color: SLATE_500,
               }}
             >
@@ -2307,22 +2319,36 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
         )}
       </View>
 
-      {/* ── Body: grid-cols-[2fr_1fr] gap-8 → main column + 150pt aside ── */}
+      {/* ── Body: grid-cols-[2fr_1fr] gap-8 → a 2fr main column and a 1fr
+          track holding the 200px (150pt) aside at its start. The aside used
+          to be a fixed 150pt sibling, which handed the main column the rest
+          of the 1fr track (~20pt wider than live) and shifted the aside
+          right. Widths are resolved here exactly as the grid does (Yoga's
+          flexGrow split between a text column and a chip-wrap column did
+          not land on 2:1); the 1fr track is ≥ 169pt at every margin level,
+          so the aside's 200px minimum never binds. ── */}
       <View style={{ flexDirection: "row", gap: 24, marginTop: sectionGap }}>
         {/* ── Main column ── */}
-        <View style={{ flex: 2 }}>
+        <View style={{ width: ((A4_WIDTH_PT - 2 * 24 * theme.marginScale) - 24) * (2 / 3) }}>
+          {/* Sections are FLAT children of the column, not wrapped Views:
+              react-pdf honours a heading's minPresenceAhead only when the
+              heading has a previous sibling on the page (@react-pdf/layout
+              shouldBreak → breakingImprovesPresence), so a heading that
+              opened its own section View was orphaned at the foot of a page
+              (Certifications at density 5, session 4). The section gap sits
+              on the heading instead; nothing else moves. */}
           {hasSummary && (
-            <View style={gapFor(mainOrder, "profile")}>
-              <ModernHeading style={heading}>Profile</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(mainOrder, "profile") }}>Profile</ModernHeading>
               <Text style={{ ...body, marginTop: 6 }}>
                 {data.personal.summary?.trim()}
               </Text>
-            </View>
+            </>
           )}
 
           {hasExperience && (
-            <View style={gapFor(mainOrder, "experience")}>
-              <ModernHeading style={heading}>Experience</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(mainOrder, "experience") }}>Experience</ModernHeading>
               {/* mt-3 space-y-4; each role is a rounded-xl bordered card */}
               <View style={{ marginTop: 9 }}>
                 {experience.map((role, i) => {
@@ -2381,12 +2407,12 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   );
                 })}
               </View>
-            </View>
+            </>
           )}
 
           {hasLanguages && (
-            <View style={gapFor(mainOrder, "languages")}>
-              <ModernHeading style={heading}>Languages</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(mainOrder, "languages") }}>Languages</ModernHeading>
               {/* mt-3 space-y-2 */}
               <View style={{ marginTop: 9 }}>
                 {data.languages.map((lang, i) => (
@@ -2399,12 +2425,12 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   </Text>
                 ))}
               </View>
-            </View>
+            </>
           )}
 
           {hasCertifications && (
-            <View style={gapFor(mainOrder, "certifications")}>
-              <ModernHeading style={heading}>Certifications</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(mainOrder, "certifications") }}>Certifications</ModernHeading>
               {/* mt-3 space-y-2 */}
               <View style={{ marginTop: 9 }}>
                 {data.certifications.map((cert, i) => {
@@ -2422,7 +2448,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   );
                 })}
               </View>
-            </View>
+            </>
           )}
 
           {hasProjects && (
@@ -2466,11 +2492,12 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
           )}
         </View>
 
-        {/* ── Aside (live: 200px, flex-shrink 0) ── */}
-        <View style={{ width: 150, flexShrink: 0 }}>
+        {/* ── Aside: the 1fr track, with the live 200px / flex-shrink-0 column inside it ── */}
+        <View style={{ flex: 1 }}>
+        <View style={{ width: 150 }}>
           {hasEducation && (
-            <View style={gapFor(asideOrder, "education")}>
-              <ModernHeading style={heading}>Education</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(asideOrder, "education") }}>Education</ModernHeading>
               {/* mt-3 space-y-3 */}
               <View style={{ marginTop: 9 }}>
                 {education.map((edu, i) => {
@@ -2508,18 +2535,18 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                   );
                 })}
               </View>
-            </View>
+            </>
           )}
 
           {hasSkills && (
-            <View style={gapFor(asideOrder, "skills")}>
-              <ModernHeading style={heading}>Skills</ModernHeading>
+            <>
+              <ModernHeading style={{ ...heading, ...gapFor(asideOrder, "skills") }}>Skills</ModernHeading>
               {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
               <PdfChips
                 items={data.skills.map((sk) => ({ value: sk.name }))}
                 v={{
                   fontSize: 9 * fs,
-                  lineHeight: (16 / 12) * ls,
+                  lineHeight: absLine(16, 12),
                   color: SLATE_900,
                   backgroundColor: MODERN_SLATE_100,
                   borderRadius: 999,
@@ -2529,8 +2556,9 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                 }}
                 style={{ marginTop: 9 }}
               />
-            </View>
+            </>
           )}
+        </View>
         </View>
       </View>
     </View>
