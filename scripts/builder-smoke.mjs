@@ -52,6 +52,17 @@ async function continueOnce(page, name, expectStep) {
 
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+// Monitor mode (SMOKE_BLOCK_ANALYTICS=1, set by .github/workflows/prod-monitor.yml
+// when this runs against production): Google's tags and Vercel Speed Insights
+// never leave the browser, so a synthetic journey cannot reach GA4. The
+// dataLayer assertions below still pass — pushes land in window.dataLayer
+// whether or not GTM loads. Unset (the default), nothing changes locally.
+if (process.env.SMOKE_BLOCK_ANALYTICS === "1") {
+  await ctx.route(
+    /googletagmanager\.com|google-analytics\.com|analytics\.google\.com|doubleclick\.net|vercel-insights\.com/,
+    (route) => route.abort("blockedbyclient"),
+  );
+}
 // window.dataLayer is per-document, and this journey reloads the page on
 // purpose (persistence check). Mirror every event name into sessionStorage
 // before any app script runs, so the funnel assertion at the end sees the

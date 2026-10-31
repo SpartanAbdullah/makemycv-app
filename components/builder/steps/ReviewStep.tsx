@@ -16,7 +16,7 @@ import { useCvStore } from "../../../lib/store/cvStore";
 import { exportToDocx } from "../../../lib/utils/docxExport";
 import { downloadCV } from "../../../hooks/useDownloadCV";
 import { downloadCvBackup } from "../../../lib/utils/download";
-import { containsArabic } from "../../../lib/pdf/arabicText";
+import { containsArabic, unjoinedArabicLetters } from "../../../lib/pdf/arabicText";
 import { readCvBackup } from "../../../lib/utils/localStorage";
 import { settingsForTemplate, templates, type TemplateBadge } from "../../../lib/templates";
 import { TemplateRibbon } from "../../templates/TemplateBadges";
@@ -100,6 +100,8 @@ export const ReviewStep = ({
   onJump: (stepId: string) => void;
 }) => {
   const data = useCvStore((state) => state.data);
+  // Arabic-script letters the PDF shaper has no forms for (E8.4) — named in the Arabic note.
+  const unjoinedLetters = useMemo(() => unjoinedArabicLetters(JSON.stringify(data)), [data]);
   const parseSignals = useCvStore((state) => state.parseSignals);
   const updateSection = useCvStore((state) => state.updateSection);
 
@@ -555,6 +557,11 @@ export const ReviewStep = ({
                 entirely in that face, and some applicant-tracking systems may
                 not match Arabic keywords from a PDF. The .docx export keeps the
                 text exactly as typed.
+                {/* E8.4 (session 6): the Arabic, Persian and Urdu letters the
+                    shaper covers are rendered and checked; a letter it has no
+                    forms for is named here, not silently printed unjoined. */}
+                {unjoinedLetters.length > 0 &&
+                  ` These letters print unjoined in the PDF: ${unjoinedLetters.join(" ")}.`}
               </p>
             )}
             {/* Free CV-vs-job diagnosis — a natural next step once the CV is

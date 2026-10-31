@@ -101,6 +101,10 @@ export type ParsedDocument = {
    *  (taglines, headlines, decorative text). Surfaced in MappingReview as a
    *  copyable "we couldn't place this" bucket - never silently dropped. */
   unplaced?: string[];
+  /** Set by the PDF adapter when the file has more pages than it reads
+   *  (MAX_PDF_PAGES); MappingReview tells the user which pages were read.
+   *  Counts only, never document content. */
+  pagesSkipped?: { read: number; total: number };
 };
 
 /** Why a parse failed. Since 2026-10-31 the kinds are the closed taxonomy in
@@ -116,6 +120,11 @@ export { ImportParseError };
 export interface ImportAdapter {
   /** Human-readable source label */
   name: string;
-  /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste) */
-  parse(input: File | string): Promise<ParsedDocument>;
+  /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste).
+   *  `deadlineAt` (epoch ms) is the caller's budget for the whole read; the
+   *  PDF adapter honours it (session 6 D10), others may ignore it. */
+  parse(
+    input: File | string,
+    opts?: { deadlineAt?: number },
+  ): Promise<ParsedDocument>;
 }

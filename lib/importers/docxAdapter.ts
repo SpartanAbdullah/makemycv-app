@@ -9,6 +9,7 @@
 import type { ImportAdapter, ParsedDocument } from "./adapter";
 import {
   ImportParseError,
+  MISMATCH_COPY,
   MIN_TEXT_LENGTH,
   classifyDocxError,
   sniffContainer,
@@ -37,6 +38,12 @@ export async function extractDocxText(
   const container = sniffContainer(new Uint8Array(buffer));
   if (container === "ole") {
     throw new ImportParseError("unsupported_type", unsupportedTypeMessage("doc"));
+  }
+  // D11 (session 5): a PDF renamed .docx used to get "open it in Word and
+  // save it again as .docx", which does not fit a PDF. Same reason, the
+  // copy says what the file really is.
+  if (container === "pdf") {
+    throw new ImportParseError("corrupt_docx", MISMATCH_COPY.pdfNamedDocx);
   }
   if (container !== "zip") throw new ImportParseError("corrupt_docx");
 

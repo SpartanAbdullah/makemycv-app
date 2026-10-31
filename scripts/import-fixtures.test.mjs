@@ -26,7 +26,7 @@ const build = (p) => require(path.join(root, ".test-build", "importers", p));
 
 const { parsePdfBytes, extractPdfText } = build("pdfAdapter.js");
 const { parseDocxBytes, extractDocxText } = build("docxAdapter.js");
-const { mapParsedToCv, countSectionsFilled, hasUsableContent } = build("fieldMapper.js");
+const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter } = build("fieldMapper.js");
 const { gateImportFile, importFileType, importErrorMessage, IMPORT_ERROR_REASONS, ImportParseError } =
   build("importErrors.js");
 
@@ -149,11 +149,14 @@ await expectImport("plain-helvetica-cv.pdf", 5);
 {
   const r = await expectImport("rtl-mixed.docx", 5);
   check("rtl-mixed.docx", "Latin name survives the Arabic line", r.partial?.personal?.firstName === "Layla", r.partial?.personal?.firstName);
-  // The two English roles merge with their "City | Dates" lines (D1); the
-  // Arabic role line is still read as a third role — reviewable, not a failure.
+  // The two English roles merge with their "City | Dates" lines (D1).
   check("rtl-mixed.docx", "both roles present", (r.partial?.experience?.length ?? 0) >= 2, r.partial?.experience?.length);
   const exp = r.partial?.experience ?? [];
   check("rtl-mixed.docx", "English roles not split (cards 1-2 are the dated roles)", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.startDate === "Mar 2021" && exp[1]?.role === "Procurement Officer" && exp[1]?.startDate === "Jun 2017", exp.map((e) => [e.role, e.startDate]));
+  // Session 6: the Arabic repeat of role 1 used to become a third card
+  // (Company "…أبوظبي (مارس", start "2021"). It is unplaced text now.
+  check("rtl-mixed.docx", "exactly 2 roles: the Arabic repeat is not a third card", exp.length === 2, exp.map((e) => e.role));
+  check("rtl-mixed.docx", "the Arabic role line is in \"We couldn't place this\"", (r.parsed?.unplaced ?? []).some((l) => l.startsWith("أخصائية مشتريات أولى")), r.parsed?.unplaced);
 }
 /* ── session 5 production-matrix fixtures (2026-10-31) ─────────────────────
    Copied from _cowork/session5/import/fixtures/ (synthetic persona "Noor
@@ -172,6 +175,14 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   // "supervisors." as the Company or a bullet of its own).
   check("s5-long-wrapped.pdf", "bullet 1 joined across the wrap (D2)", exp[0]?.bullets?.[0]?.endsWith("140 technicians and 9 supervisors."), exp[0]?.bullets?.[0]);
   check("s5-long-wrapped.pdf", "first 4 bullets of every role are whole sentences (D2)", exp.every((e) => e.bullets.slice(0, 4).every((b) => /^[A-Z]/.test(b) && /\.$/.test(b))), exp.map((e) => e.bullets.slice(0, 4)));
+  // Session 6: each role ends with an UNMARKED 3-line narrative paragraph,
+  // which used to arrive as 3 bullets (one per PDF line). It is one bullet.
+  check("s5-long-wrapped.pdf", "exactly 5 bullets per role (4 marked + 1 narrative paragraph)", exp.every((e) => e.bullets.length === 5), exp.map((e) => e.bullets.length));
+  check("s5-long-wrapped.pdf", "the narrative paragraph is whole", exp.every((e) => /^Detailed .* narrative:/.test(e.bullets[4] ?? "") && (e.bullets[4] ?? "").endsWith("reused on the next site.")), exp.map((e) => e.bullets[4]));
+  // D9 (session 6): the skills line wraps after "Budget"; it is one skill.
+  const skills = (r.partial?.skills ?? []).map((s) => s.name ?? s);
+  check("s5-long-wrapped.pdf", "\"Budget Control\" is one skill (D9)", skills.includes("Budget Control") && !skills.includes("Budget") && !skills.includes("Control"), skills);
+  check("s5-long-wrapped.pdf", "10 skills, as written (D9)", skills.length === 10, skills);
 }
 {
   const r = await expectImport("s5-header-table.docx", 6);
@@ -203,6 +214,10 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const p = r.partial?.personal ?? {};
   check("s5-cover-letter-contact.pdf", "name and email read", p.firstName === "Noor" && p.email === "noor.testwell@example.com", p);
   check("s5-cover-letter-contact.pdf", "salutation is not the headline (D8)", !/dear/i.test(p.headline ?? ""), p.headline);
+  // Session 6: the review points a letter at /cover-letter.
+  check("s5-cover-letter-contact.pdf", "looksLikeCoverLetter (session 6)", looksLikeCoverLetter(r.parsed) === true);
+  const cv = await runImport("text-cv.pdf", bytesOf("text-cv.pdf"));
+  check("text-cv.pdf", "a CV is not a cover letter (session 6)", looksLikeCoverLetter(cv.parsed) === false);
 }
 
 {
@@ -212,6 +227,16 @@ await expectImport("plain-helvetica-cv.pdf", 5);
   const exp = r.partial?.experience ?? [];
   check("s5-31-pages.pdf", "no \"Page N of M\" roles or bullets (D7b)", !/Page \d+ of \d+/.test(JSON.stringify(exp)), exp.map((e) => e.role));
   check("s5-31-pages.pdf", "the one real role, dated, 2 bullets", exp.length === 1 && exp[0]?.startDate === "Mar 2021" && exp[0]?.bullets.length === 2, exp);
+  // D7a (session 6): page 31 is past MAX_PDF_PAGES. It used to be skipped
+  // with no trace; the parsed document now says 30 of 31 pages were read.
+  check("s5-31-pages.pdf", "pages skipped reported: 30 of 31 (D7a)", r.parsed?.pagesSkipped?.read === 30 && r.parsed?.pagesSkipped?.total === 31, r.parsed?.pagesSkipped);
+  const raw = await extractPdfText(bytesOf("s5-31-pages.pdf"), { pdfjs, workerSrc });
+  check("s5-31-pages.pdf", "extractPdfText: pages 31, pagesRead 30, truncated (D7a)", raw.pages === 31 && raw.pagesRead === 30 && raw.truncated === true, [raw.pages, raw.pagesRead, raw.truncated]);
+}
+{
+  // A document inside the cap carries no pagesSkipped at all.
+  const r = await runImport("s5-long-wrapped.pdf", bytesOf("s5-long-wrapped.pdf"));
+  check("s5-long-wrapped.pdf", "6 pages, nothing skipped (D7a)", !r.reason && r.parsed?.pagesSkipped === undefined, r.parsed?.pagesSkipped);
 }
 
 /* ── Arabic round trip (D4 / backlog E8.3) ───────────────────────────────
@@ -255,7 +280,36 @@ await expectReason("not-a-cv.pdf", "mapping_empty");
   await expectReason("large-25mb.pdf", "too_large", big.buffer.slice(big.byteOffset, big.byteOffset + big.byteLength));
 }
 // Bytes that are not a PDF at all, under a .pdf name (a renamed .docx).
-await expectReason("renamed.pdf", "corrupt_pdf", bytesOf("header-contact.docx"));
+{
+  const r = await expectReason("renamed.pdf", "corrupt_pdf", bytesOf("header-contact.docx"));
+  // D11 (session 6): the sniff knows it is a Word file; the copy says so.
+  check("renamed.pdf", "copy names the real type (D11)", /actually a Word document with a \.pdf name/.test(r.message ?? ""), r.message);
+}
+/* D11 (session 6): extension / bytes mismatch, session-5 matrix cases 9a / 9b
+   (s5-docx-bytes.pdf = .pdf name, DOCX bytes; s5-pdf-bytes.docx = .docx name,
+   PDF bytes). Reasons unchanged; the copy names the real type and the fix. */
+{
+  const r = await expectReason("s5-docx-bytes.pdf", "corrupt_pdf");
+  check("s5-docx-bytes.pdf", "\"actually a Word document … rename it to end in .docx\" (D11)", /actually a Word document/.test(r.message ?? "") && /\.docx/.test(r.message ?? ""), r.message);
+}
+{
+  const r = await expectReason("s5-pdf-bytes.docx", "corrupt_docx");
+  check("s5-pdf-bytes.docx", "\"actually a PDF … rename it to end in .pdf\" (D11)", /actually a PDF/.test(r.message ?? "") && /end in \.pdf/.test(r.message ?? ""), r.message);
+  check("s5-pdf-bytes.docx", "no Word-specific advice for a PDF (D11)", !/save it again as \.docx/i.test(r.message ?? ""), r.message);
+}
+{
+  // An old .doc (OLE2) renamed .pdf: the Save-As advice, reason still corrupt_pdf.
+  const r = await expectReason("legacy-renamed.pdf", "corrupt_pdf", bytesOf("legacy-doc-renamed.docx"));
+  check("legacy-renamed.pdf", "copy says older Word .doc (D11)", /older Word \.doc file with a \.pdf name/.test(r.message ?? ""), r.message);
+}
+{
+  // A zip that is not a Word file (e.g. a renamed .xlsx) keeps the generic copy.
+  const zip = Buffer.from(bytesOf("header-contact.docx"));
+  const s = zip.toString("latin1").replace(/word\//g, "xl/  ");
+  const notWord = Buffer.from(s, "latin1");
+  const r = await expectReason("other-zip.pdf", "corrupt_pdf", notWord.buffer.slice(notWord.byteOffset, notWord.byteOffset + notWord.byteLength));
+  check("other-zip.pdf", "non-Word zip keeps the generic copy", r.message === importErrorMessage("corrupt_pdf"), r.message);
+}
 // A damaged zip under a .docx name.
 {
   const b = Buffer.from(bytesOf("two-column-table.docx"));
@@ -280,6 +334,33 @@ await expectReason("empty.docx", "empty_file", new ArrayBuffer(0));
   check("timeout", "a hung pdf.js task reports timeout", reason === "timeout", reason);
 }
 {
+  // D10 (session 6): the caller's deadline (fixed when the pick started)
+  // governs. When loading pdf.js and probing the worker already used it up,
+  // extraction does not start at all; when part is left, only that part runs.
+  let opened = 0;
+  const counting = {
+    GlobalWorkerOptions: { workerSrc: "" },
+    getDocument: () => { opened++; return { promise: new Promise(() => {}), destroy: () => {} }; },
+  };
+  let reason;
+  try {
+    await extractPdfText(bytesOf("text-cv.pdf"), { pdfjs: counting, workerSrc: "x", deadlineAt: Date.now() - 1 });
+  } catch (err) {
+    reason = err.kind;
+  }
+  check("deadline", "a spent deadline reports timeout without opening the PDF (D10)", reason === "timeout" && opened === 0, [reason, opened]);
+  const t0 = Date.now();
+  reason = undefined;
+  try {
+    // timeoutMs alone would allow 60 s; the absolute deadline leaves 80 ms.
+    await extractPdfText(bytesOf("text-cv.pdf"), { pdfjs: counting, workerSrc: "x", timeoutMs: 60_000, deadlineAt: Date.now() + 80 });
+  } catch (err) {
+    reason = err.kind;
+  }
+  const took = Date.now() - t0;
+  check("deadline", "deadlineAt wins over timeoutMs (D10)", reason === "timeout" && took < 2000, [reason, took]);
+}
+{
   // A worker that never loads: pdf.js's own wording for the memoised failure.
   const broken = {
     GlobalWorkerOptions: { workerSrc: "" },
@@ -301,6 +382,7 @@ await expectReason("empty.docx", "empty_file", new ArrayBuffer(0));
   const data = bytesOf("text-cv.pdf");
   const r = await extractPdfText(data, { pdfjs, workerSrc, maxPages: 1 });
   check("page-cap", "page count reported", r.pages === 1, r.pages);
+  check("page-cap", "a 1-page file under a 1-page cap is not truncated", r.pagesRead === 1 && r.truncated === false, [r.pagesRead, r.truncated]);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

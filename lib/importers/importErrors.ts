@@ -77,6 +77,44 @@ export const PDF_TIMEOUT_MS = 45_000;
  *  mis-pick would otherwise run into the timeout instead of importing. */
 export const MAX_PDF_PAGES = 30;
 
+/** After this long on "Reading your PDF/DOCX" the import overlay adds a
+ *  "still reading your file…" line (D10, session 6). */
+export const SLOW_READ_HINT_MS = 8_000;
+
+/**
+ * Race `work` against an absolute deadline (epoch ms). On expiry the promise
+ * rejects with ImportParseError("timeout") and `onExpire` runs (e.g. to
+ * destroy a pdf.js task). A deadline already past rejects at once.
+ *
+ * D10 (session 6): the PDF budget used to start inside `extractPdfText`, so
+ * the adapter chunk, the pdf.js import and the worker probe that precede it
+ * were unbounded (57 s seen on a slow link with no timeout). Callers now fix
+ * the deadline when the pick starts and pass it down through every step.
+ */
+export function withDeadline<T>(
+  work: Promise<T>,
+  deadlineAt: number,
+  onExpire?: () => void,
+): Promise<T> {
+  const remaining = deadlineAt - Date.now();
+  if (remaining <= 0) {
+    onExpire?.();
+    // Keep a late rejection of `work` from surfacing as unhandled.
+    work.catch(() => {});
+    return Promise.reject(new ImportParseError("timeout"));
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new ImportParseError("timeout"));
+      onExpire?.();
+    }, remaining);
+  });
+  return Promise.race([work, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export class ImportParseError extends Error {
   constructor(
     public kind: ImportErrorReason,
@@ -161,6 +199,42 @@ export function sniffContainer(bytes: Uint8Array): Container {
   }
   return "unknown";
 }
+
+/** A zip whose entries include `word/…` — a Word .docx (as opposed to an
+ *  .xlsx, .pptx or any other zip). Entry names sit in plain ASCII in the
+ *  local file headers, which Word writes at the start of the archive. */
+export function zipLooksLikeDocx(bytes: Uint8Array): boolean {
+  const head = bytes.subarray(0, Math.min(bytes.length, 64 * 1024));
+  // "word/" = 77 6f 72 64 2f
+  for (let i = 0; i + 5 <= head.length; i++) {
+    if (
+      head[i] === 0x77 && head[i + 1] === 0x6f && head[i + 2] === 0x72 &&
+      head[i + 3] === 0x64 && head[i + 4] === 0x2f
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * D11 (session 5): the extension says one format, the bytes another. The
+ * byte sniff already knows which, so the copy names the real type and the
+ * fix (rename) instead of "damaged, re-export". The `error_reason` stays the
+ * one the adapter for the extension reports (corrupt_pdf / corrupt_docx), so
+ * analytics are unchanged.
+ */
+export const MISMATCH_COPY = {
+  /** .docx name, PDF bytes — reported as corrupt_docx. */
+  pdfNamedDocx:
+    "This file is actually a PDF with a .docx name. Rename it to end in .pdf, or pick the original PDF, and import it again.",
+  /** .pdf name, Word .docx bytes — reported as corrupt_pdf. */
+  docxNamedPdf:
+    "This file is actually a Word document with a .pdf name. Rename it to end in .docx, or pick the original Word file, and import it again.",
+  /** .pdf name, Word 97-2003 .doc bytes — reported as corrupt_pdf. */
+  docNamedPdf:
+    "This file is actually an older Word .doc file with a .pdf name. Open it in Word, choose Save As → Word Document (.docx), and import that file.",
+} as const;
 
 /** Map a pdf.js (or our own) exception to a reason. pdf.js sets `name` on
  *  every exception class explicitly, so it survives minification and the

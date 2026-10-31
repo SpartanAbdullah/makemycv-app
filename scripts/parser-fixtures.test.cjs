@@ -56,8 +56,8 @@ const run = (name) => {
 
 // Inline-text variant of `run` for targeted single-behaviour checks that don't
 // warrant a whole fixture file. Same parser, same reporting.
-const runText = (label, text) => {
-  const doc = parseTextToDocument(text);
+const runText = (label, text, opts) => {
+  const doc = parseTextToDocument(text, opts);
   if (process.env.DUMP) {
     console.log(`\n===== ${label} (inline) =====`);
     console.log(JSON.stringify(doc, null, 2));
@@ -888,6 +888,131 @@ const runText = (label, text) => {
   ].join("\n"));
   check(f, "salutation skipped as name", d.contact.name === "Noor Testwell", d.contact.name);
   check(f, "salutation skipped as headline", d.contact.headline === "Facilities Manager", d.contact.headline);
+}
+
+/* ── D9 (session 6): skill lists wrapped across two PDF lines ─────────────
+   The PDF adapter passes { softWrapped: true }; the widest line stands in for
+   the text column. "Budget" / "Control" is one skill the renderer wrapped. */
+const D9_HEAD = [
+  "Noor Testwell",
+  "noor.testwell@example.com",
+  "SUMMARY",
+  // 115 chars: the widest line, i.e. the column width for the wrap test.
+  "Facilities operations manager with eleven years across mixed-use towers, a 210-bed hospital and a university campus.",
+  "SKILLS",
+];
+const D9_WRAPPED = [
+  "CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · SLA Reporting · Budget",
+  "Control · Civil Defence Compliance · Energy Management · Contract Negotiation · Team Leadership",
+];
+{
+  const f = "d9-wrapped-skill-list (inline, PDF)";
+  const d = runText(f, [...D9_HEAD, ...D9_WRAPPED].join("\n"), { softWrapped: true });
+  check(f, "\"Budget Control\" is one skill", d.skills.includes("Budget Control"), d.skills);
+  check(f, "no \"Budget\" / \"Control\" halves", !d.skills.includes("Budget") && !d.skills.includes("Control"), d.skills);
+  check(f, "10 skills", d.skills.length === 10, d.skills);
+}
+{
+  // Same lines from a DOCX (no soft wraps): left alone — a Word paragraph
+  // break is the author's.
+  const f = "d9-not-soft-wrapped (inline, DOCX)";
+  const d = runText(f, [...D9_HEAD, ...D9_WRAPPED].join("\n"));
+  check(f, "no join without softWrapped", d.skills.includes("Budget") && d.skills.includes("Control"), d.skills);
+}
+{
+  // Guard: an author-broken list stops short of the margin — two real skills.
+  const f = "d9-guard-short-line (inline, PDF)";
+  const d = runText(f, [...D9_HEAD, "Python · SQL · Excel · Oracle Fusion", "Power BI · Tableau · SAP Ariba"].join("\n"), { softWrapped: true });
+  check(f, "\"Oracle Fusion\" and \"Power BI\" stay apart", d.skills.includes("Oracle Fusion") && d.skills.includes("Power BI"), d.skills);
+}
+{
+  // Guard: the next line opens with a "Label:" — a new list, not a wrap.
+  const f = "d9-guard-label (inline, PDF)";
+  const d = runText(f, [...D9_HEAD,
+    "Technical: CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · BMS Controls",
+    "Soft skills: Team Leadership · Negotiation",
+  ].join("\n"), { softWrapped: true });
+  check(f, "\"BMS Controls\" not joined to the next label", d.skills.some((s) => /BMS Controls$/.test(s)) && !d.skills.some((s) => /Controls Soft/.test(s)), d.skills);
+}
+{
+  // Guard: the join would make a run-on, not an item (> 4 words).
+  const f = "d9-guard-item-size (inline, PDF)";
+  const d = runText(f, [...D9_HEAD,
+    "CAFM (Maximo) · Planned Preventive Maintenance · HVAC · Vendor Management · Preventive Maintenance Planning",
+    "Civil Defence Compliance · Energy Management",
+  ].join("\n"), { softWrapped: true });
+  check(f, "no 5-word joined item", d.skills.includes("Preventive Maintenance Planning") && d.skills.includes("Civil Defence Compliance"), d.skills);
+}
+
+/* ── Session 6: unmarked PDF paragraphs wrapped across lines ──────────────
+   A role whose header fills role, company and location; the unmarked lines
+   under it are bullets. In a PDF (softWrapped) a paragraph that wraps used to
+   come back as one bullet per physical line. */
+const P_HEAD = [...D9_HEAD.slice(0, 4), "EXPERIENCE", "Facilities Manager | Oasis Healthcare Estates | Abu Dhabi | Jan 2017 - Feb 2021"];
+const P_WRAPPED = [
+  "Ran facilities for a 210-bed hospital and two outpatient clinics under DoH and JCI requirements, with a team",
+  "of 60 technicians across three shifts, and delivered a AED 4.2M HVAC retrofit on schedule with no break to the",
+  "Clinical services wing. Introduced a critical-spares register that cut emergency procurement by 44%.",
+];
+{
+  const f = "s6-paragraph-wrap (inline, PDF)";
+  const d = runText(f, [...P_HEAD, ...P_WRAPPED].join("\n"), { softWrapped: true });
+  const b = d.experience[0]?.bullets ?? [];
+  check(f, "three physical lines are one bullet (lower-case start, then a dangling \"the\")", b.length === 1 && b[0].startsWith("Ran facilities") && b[0].endsWith("by 44%."), b);
+}
+{
+  // DOCX: mammoth gives one paragraph per line and drops list markers, so
+  // unmarked lower-case bullets must stay separate.
+  const f = "s6-paragraph-not-soft-wrapped (inline, DOCX)";
+  const d = runText(f, [...P_HEAD, ...P_WRAPPED].join("\n"));
+  check(f, "no join without softWrapped", (d.experience[0]?.bullets ?? []).length === 3, d.experience[0]?.bullets);
+}
+{
+  // Guard: short lower-case bullets do not reach the margin — the author
+  // broke them, the renderer did not.
+  const f = "s6-paragraph-guard-short (inline, PDF)";
+  const d = runText(f, [...P_HEAD, "managed vendor contracts", "reduced costs by 10%", "trained 60 staff"].join("\n"), { softWrapped: true });
+  check(f, "short lower-case lines stay separate bullets", (d.experience[0]?.bullets ?? []).length === 3, d.experience[0]?.bullets);
+}
+{
+  // Guard: a margin-length line ending on "and" never swallows the next
+  // (dated, separated) role header.
+  const f = "s6-paragraph-guard-next-role (inline, PDF)";
+  const d = runText(f, [...P_HEAD,
+    "Coordinated planned shutdowns with academic timetabling across a 12-building university campus, security and",
+    "Assistant Facilities Manager | Gulf Campus Services | Sharjah | Jun 2014 - Dec 2016",
+    "Supervised 35 technicians across a 12-building university campus.",
+  ].join("\n"), { softWrapped: true });
+  check(f, "2 roles; the second header is not appended to a bullet", d.experience.length === 2 && d.experience[1]?.role === "Assistant Facilities Manager", d.experience.map((e) => e.role));
+}
+
+/* ── Session 6: Arabic repeat of a role in an English CV (rtl-mixed.docx) ── */
+const AR_REPEAT = "أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى الآن)";
+{
+  const f = "s6-arabic-repeat-in-english-block (inline)";
+  const d = runText(f, [
+    "Layla Haddad", "layla@example.com", "Experience",
+    "Senior Procurement Specialist - Falcon Facilities Management", "Abu Dhabi | Mar 2021 - Present",
+    "Ran 60+ tenders a year for MEP and soft-services contracts worth AED 40M.",
+    "Procurement Officer - Oasis Build Contracting", "Dubai | Jun 2017 - Feb 2021",
+    "Sourced materials for 12 residential projects on schedule and within budget.",
+    AR_REPEAT,
+  ].join("\n"));
+  check(f, "2 roles, no Arabic third card", d.experience.length === 2, d.experience.map((e) => e.role));
+  check(f, "the Arabic line is unplaced, not dropped", (d.unplaced ?? []).includes(AR_REPEAT), d.unplaced);
+}
+{
+  // Guard: in an Arabic-majority Experience block an Arabic role line is a role.
+  const f = "s6-arabic-block-keeps-roles (inline)";
+  const d = runText(f, [
+    "Reem Al Hashimi", "reem@example.com", "Experience",
+    "محلل سلسلة التوريد | شركة الخليج للخدمات اللوجستية | Jan 2023 - Present",
+    "• قاد فريقاً من 8 محللين لتحسين دقة التنبؤ بالطلب",
+    "• خفّض المخزون الاحتياطي بنسبة 12%",
+    "منسق مشتريات | شركة الواحة للمقاولات | Jun 2019 - Dec 2022",
+    "• أدار عقود الموردين",
+  ].join("\n"));
+  check(f, "both Arabic roles kept", d.experience.length === 2 && d.experience[1]?.role === "منسق مشتريات", d.experience.map((e) => e.role));
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

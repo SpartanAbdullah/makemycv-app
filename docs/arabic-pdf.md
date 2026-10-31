@@ -24,11 +24,12 @@ fidelity composites) and the "Session 4 — Arabic" section of
 
 | Question | Answer | Where |
 |---|---|---|
-| Does it reorder bidi? | Yes — bidi-js per paragraph, segments reversed per laid-out line, so wrapping and pagination stay correct. The paragraph base direction is resolved from the first strong character whatever the `direction` style says (`dir=auto` behaviour); explicit `direction: "rtl"` inverts the order, so it is never set. | `textkit/lib/textkit.js:1657` (`bidiEngine`), `:859` (`reorderLine`) |
+| Does it reorder bidi? | Yes — bidi-js per paragraph, segments reversed per laid-out line, so wrapping and pagination stay correct. The paragraph base direction is the `direction` style, which `@react-pdf/layout` defaults to `"ltr"` (`layout/lib/index.js:1375`; session 4 read it as first-strong, session 5 showed it is not). Since session 6 `ArabicText` sets `"rtl"` on Arabic-first runs (see "Paragraph direction"). | `textkit/lib/textkit.js:1657` (`bidiEngine`), `:859` (`reorderLine`) |
 | Does it shape Arabic? | Yes — fontkit's OpenType layout applies the font's init/medi/fina/rlig/liga lookups. | `textkit.js:977` (`layoutRun` → `font.layout(..., 'ltr')`) |
 | Can a Latin + Arabic font stack be used? | **No.** `fontFamily: [Inter, Arabic]` is accepted (`layout/lib/index.js:1376`, per-code-point pick at `textkit.js:2804`), but `reorderLine` pulls glyphs across run boundaries by string index: a Latin run draws Arabic glyph ids and the bogus ids poison pdfkit's subset / ToUnicode tables for the whole document (probe 1 / probe 3 rows A). | `textkit.js:874-897` |
 | Ligatures? | `reorderLine` dedupes ligature glyphs by `glyph.id` per line, so the second lam-alef on a line vanishes ("لا" dropped from "الإدارة لا تعرف الآن إلا الله", probe 3 row B3); pdf.js also reads a multi-code-point ligature back reversed ("سالم"). | `textkit.js:883-890` |
 | Decomposed dots? | `resolve()` maps string indices to glyph indices by `codePoints.length`; a glyph with no code points (Noto Sans / Naskh Arabic build dotted letters as base + dot mark via `ccmp`) gets no index, the map drifts, dots land on the wrong letters and the last glyphs of a run vanish ("أول" lost, "مالي" → "مالى", probe 2). | `textkit.js:940` |
+| Why do long Arabic lines extract with words missing? (session 6) | `bidiEngine` splits runs at every bidi-level change; `reorderLine` keeps each run's logical length and refills it with visual-order glyphs, so each run's `TJ` is cut at an arbitrary point inside a word. Patched — approach 6. | `textkit.js:1658` (`bidiEngine`), `:874` (`reorderLine`) |
 | Glyph cache? | fontkit caches one Glyph object per id with the code points of its FIRST creation; pdfkit's subsetter resolves composite components with `getGlyph(id)` (no code points). After a document embeds ض (composite over ص) the ص glyph is `[]` for the rest of the process → the next line with ص drops glyphs or throws `reading 'id'`. Same state across two downloads in one browser tab. | `fontkit` `getGlyph`, `pdfkit` `TTFSubset.encode` |
 
 ### The approach
@@ -63,8 +64,31 @@ fidelity composites) and the "Session 4 — Arabic" section of
    after a face loads, every code point it maps is laid out once, so every
    cmap glyph exists with its code points before any subset runs. Called by
    `downloadCV` (Arabic face only when the CV has Arabic) and the Node
-   renderers.
-5. **Preview**: `app/globals.css` declares `'Vazirmatn CV'` from the same two
+   renderers. It also installs a repair on the face's `getGlyph`: a glyph
+   reachable only through GSUB (Vazirmatn's contextual alternates, e.g. the
+   medial ی after چ) can still be created first by an earlier document's
+   subsetter with no code points; when layout later asks for it with code
+   points, the cached glyph takes them (session 6 — an Urdu CV rendered after
+   an Arabic one in the same process threw `reading 'id'` without it).
+6. **textkit reorder patch** (`scripts/patch-react-pdf-textkit.mjs`, run on
+   `postinstall`, session 6, E8.1). textkit splits a paragraph into runs at
+   every bidi-level change (an Arabic line with "8", "94%" or "SAP IBP" in it
+   is 3–7 runs), and `reorderLine` kept each run's LOGICAL length while
+   refilling it with VISUAL-order glyphs — so the run that held the
+   one-character "8" drew one letter from the middle of some Arabic word, and
+   each run became its own `BT … TJ … ET`. pdf.js and pypdf reverse each text
+   item on its own and lost the cut words (session 5: persona A b1 3 of 14
+   words, b2 1 of 7); PyMuPDF scrambled them. The patch rebuilds the line's
+   runs in visual order (each glyph keeps its own run's font / size / colour /
+   link; adjacent runs that draw alike merge; a multi-character glyph is
+   drawn once per occurrence, keyed by run + glyph index rather than glyph
+   id). A one-face Arabic line is now ONE text-show operator; rasters are
+   pixel-identical to the unpatched output (checked on 8 pages); lines that
+   need no reordering (every Latin-only line) return before the patched code.
+   `npm run test:textkit-patch` (in `npm test`, so CI) fails if the installed
+   textkit is not patched — on a textkit upgrade the script warns, leaves the
+   file alone, and that test fails until the patch is ported.
+7. **Preview**: `app/globals.css` declares `'Vazirmatn CV'` from the same two
    files with `unicode-range` limited to the Arabic blocks, placed FIRST in
    the three `--cv-font-*` stacks (it must precede the next/font families,
    whose metric-adjusted Arial fallback carries Arabic glyphs of its own).
@@ -80,39 +104,107 @@ fidelity composites) and the "Session 4 — Arabic" section of
   NFKC-normalises every extracted PDF line (`lib/importers/pdfAdapter.ts`,
   2026-10-31), so re-importing an exported Arabic CV keeps the name, headline
   and role in base letters (`__fixtures__/import/arabic-export-classic.pdf`).
-  Long Arabic lines split across `TJ` operators can still lose words.
-- **One run per line.** Inside a `<Text>` that contains Arabic, a nested bold
-  label loses its weight, a `<Link>` loses its hyperlink (text stays), Latin
-  words are set in Vazirmatn's Latin instead of Inter / Bricolage / Instrument
-  Serif, and letter-spacing is dropped. Lines without Arabic are unaffected.
-- **Paragraph direction.** The PDF resolves each paragraph's base direction
-  from its first strong character (RTL for an Arabic-first line); the live
-  templates set no `dir`, so the browser lays the same line out with an LTR
-  base. Pure-Arabic and English-first lines look the same in both; an
-  Arabic-first line that also contains Latin (e.g. "مدير مالي — Senior
-  Manager | company") orders its segments differently in the preview. The
-  PDF's order is the one an Arabic reader expects. Follow-up for the live
-  templates: `unicode-bidi: plaintext` on `.cv-print` text plus an alignment
-  decision — a template-rendering change, so an owner call.
+  Since the textkit patch (approach 6) a long Arabic line is one text-show
+  operator and pdf.js / pypdf no longer lose words from it; how a tool ORDERS
+  a mixed line still depends on the tool (see the session-6 matrix in
+  `docs/ai-mission/ARABIC_PRODUCTION_2026-10-31.md` in the parent folder), and
+  pdfminer-based parsers still read Arabic in visual (reversed) order.
+  Two pdf.js behaviours the PDF cannot change: brackets in a right-to-left
+  line are drawn as the mirrored glyph (textkit's bidi mirroring, as every
+  RTL renderer does) and pdf.js does not un-mirror them, so "(IFRS)" reads
+  ")IFRS(" — a glyph has one ToUnicode entry, shared with the real ")"; and
+  pdf.js reads a line with fewer than 30 % right-to-left characters as
+  left-to-right, so an Arabic-first line that is mostly Latin ("مدير مالي
+  أول | Senior Finance Manager (CPA)") comes back with its segments in
+  visual order (Latin first). Every word is still there.
+- **One face per Arabic-bearing line.** Since session 6 (E8.5) nested
+  `<Text>` / `<Link>` children of an Arabic-bearing `<Text>` stay their own
+  runs — Classic's bold role next to a regular company keeps both weights, a
+  nested link keeps its hyperlink — because the textkit patch keeps every
+  glyph in its own run. All runs of such a line are shaped together
+  (`shapeArabicSegments`, letters join across a run boundary) and are all
+  set in Vazirmatn: Latin words on an Arabic-bearing line use Vazirmatn's
+  Latin instead of Inter / Bricolage / Instrument Serif, and letter-spacing is
+  dropped. A child of any other element type falls back to one flattened
+  run. Lines without Arabic are unaffected.
+- **Arabic names in Gulf Standard and Corporate** (E8.6) use a 1.35 line
+  height instead of 1.15 (`ARABIC_NAME_LINE_HEIGHT`, preview and PDF), so the
+  dots under a final ي clear the headline.
+- **Paragraph direction (session 6, E8.2 — owner decision taken: first
+  strong, per paragraph, in both renderers).** Session 5 measured that
+  BOTH renderers used an LTR base (`@react-pdf/layout` defaults `direction`
+  to `"ltr"`, so the old "first strong" sentence here was wrong): a mid-line
+  "(Power BI)" reversed the clauses around it, trailing Latin and "%" sat at
+  the wrong end, continuation lines were flush left. Now:
+  - **PDF**: `ArabicText` gives an Arabic-first run (`firstStrongDirection`,
+    `lib/pdf/arabicText.ts`) `direction: "rtl"` and — unless the layout set
+    `textAlign` — an explicit `textAlign: "right"` (layout's measure step
+    only compensates an explicit alignment in a shrink-wrapped box; with the
+    implicit one a contact item's text was drawn outside its box). Role
+    titles that share a row with dates get a content-sized box when
+    Arabic-first (`roleBox` / `withRoleBox` in `CVDocument.tsx`), as the
+    live templates size them, so they stay at the row start.
+  - **Preview**: every template root carries `.cv-bidi`; `app/globals.css`
+    sets `unicode-bidi: plaintext` on it and its descendants (each block's
+    direction from its first strong character; Chrome then aligns the
+    default `text-align: start` right for Arabic-first blocks), keeps inline
+    phrasing elements (`span`, `a`, `b`, …) at `normal` so a line built from
+    spans is ONE paragraph like the PDF's flattened run, and gives flex /
+    grid children `plaintext` back (they are block containers).
+  - Latin-first and letterless paragraphs resolve LTR exactly as before:
+    the Latin fidelity gate passes unchanged (31 ok / 11 check), and Latin
+    PDF content streams are byte-identical. Explicit `center` / `right`
+    alignment is kept. An Arabic-first bullet's marker sits on the RIGHT,
+    right before its text, in both renderers: the PDF bullet row is
+    `row-reverse` with the list's left padding mirrored onto the right
+    (`bulletRowDir` / `bulletDotDir` in `CVDocument.tsx`, all five bullet
+    renderers), the live `<li>` gets `dir="rtl"` and the same mirrored
+    margins (`bulletLiProps` in `lib/templates/utils.ts`, every bullet list
+    in the 13 template files). Latin bullets get no extra props or styles.
 - **Fonts not registered** (registration failed, or Node without
   `registerPdfFontsFromDir`): the wrapper leaves text alone and Helvetica
   prints the session-3 junk. `pdfArabicFamily()` is the switch.
-- **Urdu is not covered.** Vazirmatn lacks U+FBA6 (isolated ہ); probe 7
-  (`_cowork/pdf-fidelity-s4-scratch/probe7.mjs`) shows an isolated ہ printing
-  nothing and a letter after a joined ہ dropping. Arabic and Persian letters
-  are what the suite verifies.
+- **Urdu (session 6, E8.4).** Vazirmatn has every presentation form the
+  shaper emits except U+FBA6, the isolated heh goal ہ (session 5 saw it fall
+  back to Helvetica-Bold and print "¦"). The shaper now emits the base letter
+  U+06C1 for that position — Vazirmatn maps it to its isolated outline, which
+  in this face is drawn like the Arabic isolated ه — so "طاہرہ" prints in
+  Vazirmatn and the text layer keeps the Urdu letter. ٹ ڈ ڑ ک گ ں ھ ہ ی ے ۓ
+  are rendered and checked (`scripts/arabic-glyphs.test.mjs` asserts every
+  emitted form is in both cuts; `smoke:arabic` renders the `urdu-name`
+  persona in all 14 templates with no fallback font). ۂ is
+  decomposed to ہ + hamza above so it joins. Still **not** shaped: Arabic-
+  script letters without presentation forms in the table (ۃ U+06C3, ۀ U+06C0,
+  Sindhi / Pashto / Kurdish letters) print in their isolated shape mid-word;
+  the Review note names any such letter the CV contains
+  (`unjoinedArabicLetters`). The isolated ہ uses Vazirmatn's naskh-style
+  design, not the Nastaliq shape an Urdu reader may expect.
 
 ## Checks
 
 - `npm run test:unit` — `lib/pdf/arabicText.test.ts` (forms, lam-alef,
-  marks, tatweel / ZWNJ, Persian letters, Latin ligatures, NFKC round-trip).
-- `npm run smoke:arabic` — renders 14 templates × `arabic-only`,
-  `arabic-first`, `arabic-name`, `arabic-dense` (`lib/data/preview-profiles.ts`),
-  checks every Arabic word of each persona in the pdf.js text layer after
-  NFKC, no U+FFFD, no junk characters, page counts (dense ≥ 2 pages with
-  Arabic on page 2), and writes page-1 (and page-2) rasters to
-  `.arabic-smoke/`.
+  marks, tatweel / ZWNJ, Persian and Urdu letters, Latin ligatures, NFKC
+  round-trip, multi-run shaping, first-strong direction).
+- `npm run test:arabic-glyphs` — every form the shaper emits, plus Arabic /
+  Urdu digits and punctuation, exists in both Vazirmatn cuts.
+- `npm run test:textkit-patch` — the installed textkit is patched, and a real
+  render keeps every Arabic word of mixed lines whole in one pdf.js item.
+- `npm run smoke:arabic` — renders 14 templates × 7 personas: `arabic-only`,
+  `arabic-first`, `arabic-name`, `arabic-dense`, and since session 6
+  `arabic-dense2` (six roles, two Arabic education entries, mixed
+  Arabic/Latin skills, ≥ 2 pages), `arabic-midline` (Arabic-first bullets
+  with "(Power BI)", "SAP IBP", "12%"), `urdu-name` ("طاہرہ ملک", Urdu
+  headline / roles / bullets) — `lib/data/preview-profiles.ts`. Checks every
+  Arabic word in the pdf.js text layer after NFKC; every Arabic-first line
+  (name, headline, roles, companies, bullets, schools, degrees) WHOLE and in
+  reading order in the content-ordered pdf.js items after NFKC (spacing
+  ignored; brackets compared as one class; lines pdf.js reads as LTR — under
+  30 % right-to-left characters — held to the word check); no standard-14
+  fallback font embedded; no U+FFFD or junk; page counts (dense personas ≥ 2
+  pages with Arabic on page 2). Writes page-1 (and page-2) rasters to
+  `.arabic-smoke/`. On the unpatched textkit the word check passes and the
+  line check fails 84 of 98 files.
 - `node scripts/pdf-fidelity.mjs --persona=<id>` — preview next to PDF for
-  any of the five personas; `npm run fidelity:pdf` is the Latin gate and must
+  any of the eight personas; `npm run fidelity:pdf` is the Latin gate and must
   stay byte-identical.
 - `/preview/<template>?persona=arabic-only` etc. for a human look.

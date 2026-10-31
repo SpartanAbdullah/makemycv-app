@@ -13,7 +13,7 @@ import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
 
 /**
@@ -287,7 +287,7 @@ export const ChronicleTemplate = ({ data }: { data: CvData; plan?: PlanTier }) =
     return (
       <ul className="marker:text-slate-400" style={bulletListStyle}>
         {items.map((bullet, index) => (
-          <li key={index} style={{ ...bodyStyle, marginBottom: "2px" }}>
+          <li key={index} {...bulletLiProps(bullet, bulletListStyle.paddingLeft, { ...bodyStyle, marginBottom: "2px" })}>
             {bullet}
           </li>
         ))}
@@ -442,7 +442,7 @@ export const ChronicleTemplate = ({ data }: { data: CvData; plan?: PlanTier }) =
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${36 * m}px ${32 * m}px`,

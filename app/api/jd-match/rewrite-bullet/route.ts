@@ -15,6 +15,9 @@ import {
   getClientIp,
   makeLimiter,
 } from "@/lib/server/rateLimit";
+import { logAiFailure } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/jd-match/rewrite-bullet";
 
 /**
  * JD Match Phase B — truthful single-bullet rewrite (Pro apply-fix).
@@ -236,6 +239,7 @@ export async function POST(request: Request) {
     // a graceful "no rewrite available" so the user just gets no suggestion.
     let variants: string[] | null = null;
     let apiFailed = false;
+    let lastErr: unknown;
     for (let attempt = 0; attempt < 2 && variants === null; attempt++) {
       let raw: string;
       try {
@@ -244,9 +248,11 @@ export async function POST(request: Request) {
       } catch (err) {
         // A timeout is not retried — the user has already waited 25 s.
         if (isTimeoutError(err)) {
+          logAiFailure(ROUTE, "timeout");
           return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
         }
         apiFailed = true;
+        lastErr = err;
         continue; // upstream/network error — retry the call
       }
       try {
@@ -260,6 +266,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ variants });
     }
     if (apiFailed) {
+      logAiFailure(ROUTE, "upstream", lastErr);
       return NextResponse.json(
         { error: "Couldn't reach the rewrite service. Please try again." },
         { status: 502 },
@@ -267,7 +274,8 @@ export async function POST(request: Request) {
     }
     // Reached the model but never got a parseable array — treat as no rewrite.
     return NextResponse.json({ variants: [] });
-  } catch {
+  } catch (err) {
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

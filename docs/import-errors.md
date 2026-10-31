@@ -60,10 +60,10 @@ analytics.
 | `too_large` | Gate: `size > MAX_IMPORT_BYTES` (15 MB). | "This file is larger than 15 MB. Export a lighter PDF — without a high-resolution photo — and try again." |
 | `encrypted_pdf` | pdf.js `PasswordException`. | "This PDF is password-protected, so it cannot be read. Open it, remove the password (Print → Save as PDF also works) and import the new file." |
 | `no_text_layer` | PDF opened, text < 200 chars. | "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again." |
-| `corrupt_pdf` | pdf.js `InvalidPDFException` / `FormatError` / `UnknownErrorException` etc. — including a .docx renamed to .pdf. | "This PDF could not be opened — it may be damaged, or not really a PDF. Re-export it from the original document and try again." |
+| `corrupt_pdf` | pdf.js `InvalidPDFException` / `FormatError` / `UnknownErrorException` etc. Since session 6 (D11) the bytes are sniffed first: a Word .docx zip or an old .doc under a .pdf name gets its own copy, same reason. | "This PDF could not be opened — it may be damaged, or not really a PDF. Re-export it from the original document and try again." · .docx bytes: "This file is actually a Word document with a .pdf name. Rename it to end in .docx, or pick the original Word file, and import it again." · .doc bytes: "This file is actually an older Word .doc file with a .pdf name. Open it in Word, choose Save As → Word Document (.docx), and import that file." |
 | `worker_load_failed` | pdf.js worker (self-hosted, then CDN) could not load; also the `pdfjs-dist` / `mammoth` chunk itself failing to import. | "The PDF reader could not load in this browser (a network or ad blocker often causes this). Reload the page and try again, or import a Word (.docx) version instead." |
-| `timeout` | Extraction exceeded `PDF_TIMEOUT_MS` (45 s); the loading task is destroyed. | "Reading this PDF took too long. Try a smaller or simpler export, or import a Word (.docx) version instead." |
-| `corrupt_docx` | Bytes are not a zip, or mammoth cannot find the document part. | "This Word file could not be opened — it may be damaged, or not really a .docx. Open it in Word and save it again as .docx." |
+| `timeout` | The PDF read exceeded `PDF_TIMEOUT_MS` (45 s) counted from the pick: since session 6 (D10) the budget also covers loading the adapter chunk, the `pdfjs-dist` import and the worker probe (`withDeadline`); the loading task is destroyed. After 8 s (`SLOW_READ_HINT_MS`) the "Reading your PDF" overlay adds "Still reading your file…". | "Reading this PDF took too long. Try a smaller or simpler export, or import a Word (.docx) version instead." |
+| `corrupt_docx` | Bytes are not a zip, or mammoth cannot find the document part. PDF bytes under a .docx name (D11, session 6) get their own copy, same reason. | "This Word file could not be opened — it may be damaged, or not really a .docx. Open it in Word and save it again as .docx." · PDF bytes: "This file is actually a PDF with a .docx name. Rename it to end in .pdf, or pick the original PDF, and import it again." |
 | `empty_text` | DOCX opened, text < 200 chars (picture-only document). | "This Word file has almost no readable text. If the CV is a picture inside the document, export a text-based version and try again." |
 | `parse_exception` | The text parser or mapper threw; anything unclassified. The original message is never carried (it could quote document text). | "Something went wrong while reading this file. Try again — or fill in your details below." |
 | `mapping_empty` | Parsed, but `hasUsableContent()` is false: no email/phone/summary/LinkedIn and no experience, education, skills, languages, certifications or projects. A name alone does not count — the parser lifts the first line of _any_ document as a name. | "The file was read, but no CV sections (name, experience, education, skills) could be found in it. Check that it is a CV written in English. You can also try the free AI Resume Checker, which handles more layouts." |
@@ -86,7 +86,10 @@ text layer too, so it is not offered for scans.
      disables real workers and memoises a failed fake-worker import after the
      first failure, so a retry _after_ a failure can never work; that is what
      the previous catch-and-retry did). Then `getDocument` under a 45 s
-     deadline, first 30 pages read.
+     deadline, first 30 pages read. A longer file still imports, and the
+     review says so in one line ("We read the first 30 of 31 pages. Anything
+     after page 30 is not in this review…", `ParsedDocument.pagesSkipped`,
+     session 6 D7a). Nothing about it goes to analytics.
    - DOCX: byte sniff (OLE → `.doc`, not zip → corrupt), mammoth for the body,
      then `docxParts.ts` reads `word/header*.xml` (prepended) and the contact
      lines of `word/footer*.xml` (appended). mammoth ignores headers, and Word
@@ -147,7 +150,10 @@ for a cross-origin worker was refused.
   has no dates and no bullets yet is merged into that role
   (`mergeDatedTail` in `textParser.ts`). text-cv.pdf and two-column-table.docx
   now give 2 roles; `test:import` and `smoke:import` assert the exact count.
-  rtl-mixed.docx still adds a third card for its Arabic role line.
+  rtl-mixed.docx's Arabic repeat of role 1 no longer adds a third card
+  (session 6): in a Latin-majority Experience block, a mostly-Arabic line
+  that would start a new role after a Latin role goes to "We couldn't place
+  this". Arabic bullets inside a role and Arabic-majority CVs are unchanged.
 - **Scans need OCR**; none is offered, and the copy does not promise one.
 - **DOCX produced by Google Docs / LibreOffice / Canva** could not be generated
   here; mammoth is known to read Google Docs and LibreOffice output, and the

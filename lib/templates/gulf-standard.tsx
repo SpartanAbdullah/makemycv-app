@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CvData, CvEducation, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
@@ -9,6 +9,7 @@ import { educationTitle, meaningfulEducation } from "../utils/education";
 import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { ARABIC_NAME_LINE_HEIGHT, containsArabic } from "../pdf/arabicText";
 
 /**
  * "Gulf Standard" — the traditional UAE/Gulf expat CV (template audit
@@ -289,7 +290,7 @@ export const GulfStandardTemplate = ({
     return (
       <ul className="marker:text-slate-500" style={bulletListStyle}>
         {items.map((bullet, index) => (
-          <li key={index} style={bulletStyle}>
+          <li key={index} {...bulletLiProps(bullet, bulletListStyle.paddingLeft, bulletStyle)}>
             {bullet}
           </li>
         ))}
@@ -310,7 +311,7 @@ export const GulfStandardTemplate = ({
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${36 * m}px ${32 * m}px`,
@@ -348,7 +349,7 @@ export const GulfStandardTemplate = ({
               style={{
                 margin: 0,
                 fontSize: `${27 * fs}px`,
-                lineHeight: 1.15 * ls,
+                lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * ls,
                 fontWeight: 700,
                 color: SLATE_900,
                 overflowWrap: "anywhere",

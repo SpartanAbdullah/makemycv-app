@@ -44,14 +44,20 @@
 
 /**
  * Arabic letters, marks and presentation forms (what `containsArabic` tests).
- * Base direction is deliberately NOT decided here: the live templates set no
- * `dir`, so the browser lays every paragraph out with an LTR base and the PDF
- * does the same (textkit's default) — same line order, same bullet side,
- * same alignment in both renderers.
+ * Paragraph direction is decided by `firstStrongDirection` below (session 6,
+ * E8.2): Arabic-first paragraphs are RTL in the PDF (components/pdf/
+ * ArabicText.tsx) and in the preview (`unicode-bidi: plaintext`, globals.css).
  */
 const ARABIC_RE = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
 
 export const containsArabic = (text: string): boolean => ARABIC_RE.test(text);
+
+/**
+ * Line-height ratio for a large name that contains Arabic (session 6, E8.6).
+ * Gulf Standard and Corporate set the name at 1.15; Vazirmatn's dots under
+ * a final ي then nearly touch the headline. Latin names keep 1.15.
+ */
+export const ARABIC_NAME_LINE_HEIGHT = 1.35;
 
 /* ── Joining table ──────────────────────────────────────────────────────── */
 
@@ -111,7 +117,16 @@ const FORMS: Record<number, Forms> = {
   0x06af: [0xfb92, 0xfb93, 0xfb94, 0xfb95], // گ
   0x06ba: [0xfb9e, 0xfb9f], // ں
   0x06be: [0xfbaa, 0xfbab, 0xfbac, 0xfbad], // ھ
-  0x06c1: [0xfba6, 0xfba7, 0xfba8, 0xfba9], // ہ
+  // ہ (heh goal). Vazirmatn has no glyph for the isolated presentation form
+  // U+FBA6, and a code point the face lacks is handed to textkit's font
+  // substitution, which prints Helvetica-Bold "¦" and adds a second font run
+  // to the line (session 5, ARABIC_PRODUCTION §1 test 7). The base letter
+  // U+06C1 maps to Vazirmatn's isolated outline (the face draws it like
+  // U+FEE9), it is one code point → one glyph like every other form, and it
+  // keeps the Urdu letter itself in the text layer (U+FEE9 would read back
+  // as the Arabic ه after NFKC). `scripts/arabic-glyphs.test.mjs` fails if
+  // any form below is missing from either Vazirmatn cut.
+  0x06c1: [0x06c1, 0xfba7, 0xfba8, 0xfba9], // ہ
   0x06cc: [0xfbfc, 0xfbfd, 0xfbfe, 0xfbff], // ی
   0x06d2: [0xfbae, 0xfbaf], // ے
   0x06d3: [0xfbb0, 0xfbb1], // ۓ
@@ -188,25 +203,80 @@ const LATIN_LIGATURES: ReadonlyArray<readonly [RegExp, string]> = [
  * the result per line.
  */
 export function shapeArabic(text: string): string {
-  if (!containsArabic(text)) return text;
-  return shapeArabicLetters(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text));
+  return shapeArabicSegments([text])[0];
 }
 
-function shapeArabicLetters(text: string): string {
-  const cps = Array.from(text, (ch) => ch.codePointAt(0) as number);
-  const out: number[] = [];
+/**
+ * Letters that have no presentation forms of their own but are a letter we
+ * do shape plus a combining hamza: ۂ (U+06C2, Urdu heh goal + hamza) is
+ * canonically ہ + U+0654. Passed through whole, it would reach fontkit as a
+ * base letter between non-joining presentation forms and print isolated in
+ * the middle of a word; decomposed, ہ joins and the hamza mark rides on it.
+ * NFC / NFKC compose the pair back, so the text layer still reads ۂ.
+ */
+const decomposeUnmapped = (text: string): string => text.replace(/\u06C2/g, "\u06C1\u0654");
+
+/**
+ * Base direction of a paragraph by its first strong character (Unicode bidi
+ * rules P2/P3 — what the preview's `unicode-bidi: plaintext` does): "rtl"
+ * when the first letter is Hebrew / Arabic script (including presentation
+ * forms), "ltr" for any other letter, null when the text has no letter at all
+ * (digits, punctuation, dates). Session 6 (E8.2): an Arabic-first paragraph is
+ * laid out with an RTL base in BOTH renderers, so "… (Power BI) …" and
+ * "بنسبة 12%" read in order and continuation lines align right.
+ */
+export function firstStrongDirection(text: string): "rtl" | "ltr" | null {
+  for (const ch of text) {
+    if (!/\p{L}/u.test(ch)) continue; // digits, marks, spaces, punctuation are weak / neutral
+    return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(ch) ? "rtl" : "ltr";
+  }
+  return null;
+}
+
+/**
+ * Arabic-script letters in `text` that `shapeArabic` has no forms for, so the
+ * PDF prints them in their isolated shape even mid-word (e.g. ۃ U+06C3, ۀ
+ * U+06C0, Sindhi / Pashto / Kurdish letters). Hamza (ء, never joins) and ۂ
+ * (decomposed above) are not reported. The Review step names these to the
+ * user instead of claiming support it has not verified; the Arabic, Persian
+ * and Urdu letters in FORMS are rendered and checked in `npm run smoke:arabic`.
+ */
+export function unjoinedArabicLetters(text: string): string[] {
+  const out = new Set<string>();
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) as number;
+    if (cp >= 0xfb50) continue; // already a presentation form
+    if (!ARABIC_RE.test(ch) || !/\p{L}/u.test(ch)) continue; // marks, digits, punctuation
+    if (FORMS[cp] || cp === 0x0621 || cp === 0x06c2 || cp === TATWEEL) continue;
+    out.add(ch);
+  }
+  return [...out];
+}
+
+/** Every code point `shapeArabic` can emit for a letter (forms + lam-alef). For the glyph-coverage test. */
+export const shapedLetterCodePoints = (): number[] => [
+  ...new Set([...Object.values(FORMS).flat(), ...Object.values(LAM_ALEF).flat()]),
+];
+
+/**
+ * The joining pass over code points. Each output code point is tagged with
+ * the index of the input code point it came from, so a caller can split the
+ * shaped text back into the runs it was given (`shapeArabicSegments`).
+ */
+function shapeCodePoints(cps: number[]): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
   // Whether the previous visible letter joins forward into the current one.
   let prevJoins = false;
   for (let i = 0; i < cps.length; i += 1) {
     const cp = cps[i];
     if (isTransparent(cp)) {
-      out.push(cp);
+      out.push([cp, i]);
       continue; // marks do not change the joining state
     }
     const forms = FORMS[cp];
     if (!forms) {
       // Tatweel and ZWJ keep the joining chain alive; everything else breaks it.
-      out.push(cp);
+      out.push([cp, i]);
       prevJoins = cp === TATWEEL || cp === ZWJ;
       continue;
     }
@@ -214,8 +284,8 @@ function shapeArabicLetters(text: string): string {
     // Lam + alef → one ligature code point (the alef is consumed).
     if (cp === LAM && n < cps.length && LAM_ALEF[cps[n]]) {
       const [isol, fina] = LAM_ALEF[cps[n]];
-      out.push(prevJoins ? fina : isol);
-      for (let k = i + 1; k < n; k += 1) out.push(cps[k]); // marks between lam and alef
+      out.push([prevJoins ? fina : isol, i]);
+      for (let k = i + 1; k < n; k += 1) out.push([cps[k], k]); // marks between lam and alef
       i = n;
       prevJoins = false; // alef never joins forward
       continue;
@@ -227,10 +297,35 @@ function shapeArabicLetters(text: string): string {
     else if (prevJoins) form = forms[1]; // final
     else if (canForward) form = forms[2] as number; // initial
     else form = forms[0]; // isolated
-    out.push(form);
+    out.push([form, i]);
     prevJoins = canForward;
   }
-  return String.fromCodePoint(...out);
+  return out;
+}
+
+const prepare = (text: string): string =>
+  decomposeUnmapped(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text));
+
+/**
+ * Shape several runs that sit on ONE line (session 6, E8.5 — e.g. a bold role
+ * and a regular company) as one text: joining looks across run boundaries,
+ * and the result is split back so each run keeps its own style. A lam-alef
+ * ligature that straddles two runs goes to the run of the lam. Runs are
+ * returned unchanged when the line holds no Arabic.
+ */
+export function shapeArabicSegments(segments: readonly string[]): string[] {
+  if (!containsArabic(segments.join(""))) return [...segments];
+  const cps: number[] = [];
+  const owner: number[] = [];
+  segments.forEach((seg, si) => {
+    for (const ch of prepare(seg)) {
+      cps.push(ch.codePointAt(0) as number);
+      owner.push(si);
+    }
+  });
+  const parts: number[][] = segments.map(() => []);
+  for (const [cp, src] of shapeCodePoints(cps)) parts[owner[src]].push(cp);
+  return parts.map((part) => String.fromCodePoint(...part));
 }
 
 /**

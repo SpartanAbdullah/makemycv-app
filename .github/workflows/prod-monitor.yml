@@ -1,0 +1,244 @@
+# Production monitor for app.makemycv.ae (2026-10-31, session 6 ops).
+#
+# What it does, once a day and on demand: hits /api/health and the public
+# pages, then runs the three browser smokes (builder, import, checker) against
+# PRODUCTION, with screenshots and logs uploaded as artifacts. A check counts
+# as failed only when it fails twice in a row (one retry), so a single network
+# blip does not page anyone.
+#
+# Alert path: a failed run fails the job (GitHub emails the repo owner about
+# failed scheduled runs) AND opens — or comments on — one open issue labelled
+# `prod-monitor`. A green run closes that issue with a "recovered" comment.
+# Alert drill: `gh workflow run prod-monitor.yml --ref <branch> -f simulate_failure=true`
+# adds one fake failing row so the issue + failed-job path can be tested; the
+# next normal run closes the issue again.
+#
+# Guardrails:
+#   - No AI content is generated. The builder smoke never calls an AI route;
+#     the checker smoke answers POST /api/resume-checker/parse itself
+#     (page.route), so no Anthropic call and no spend-guard units; the import
+#     smoke is client-side. Cover letter / LinkedIn are only screenshotted.
+#   - GA4 stays clean: SMOKE_BLOCK_ANALYTICS=1 aborts googletagmanager /
+#     google-analytics / doubleclick / Vercel Speed Insights requests in the
+#     builder and checker smokes (the import smoke always does). The dataLayer
+#     assertions still run — pushes land in window.dataLayer without GTM.
+#
+# Scheduling caveat: GitHub runs `schedule:` only from the DEFAULT branch
+# (main). On stagingmmc this file is runnable by hand
+# (`gh workflow run prod-monitor.yml --ref stagingmmc`) and by the push trigger
+# below; the daily run starts once the file reaches main in a release.
+# Scheduled workflows are also auto-disabled after 60 days without repository
+# activity — re-enable in the Actions tab if that ever happens.
+
+name: Production monitor
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC = 08:00 UAE
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Alert drill - add a failing check so the issue path runs
+        type: boolean
+        default: false
+  # Validate the monitor itself whenever this file changes on the working
+  # branch (also registers the workflow so it can be dispatched by hand).
+  push:
+    branches: [stagingmmc]
+    paths: [".github/workflows/prod-monitor.yml"]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: prod-monitor
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash # bash -eo pipefail, so `cmd | tee log` fails when cmd fails
+
+env:
+  APP_BASE: https://app.makemycv.ae
+  ART: monitor-artifacts
+
+jobs:
+  monitor:
+    name: app.makemycv.ae health + smokes
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The smokes try the runner's Google Chrome first and fall back to
+      # Playwright's Chromium; installing it keeps the fallback available.
+      - run: npx playwright install --with-deps chromium
+
+      - run: mkdir -p "$ART"
+
+      - name: Health endpoint
+        id: health
+        continue-on-error: true
+        run: |
+          for attempt in 1 2; do
+            code=$(curl -s -o "$ART/health.json" -w '%{http_code}' --max-time 20 "$APP_BASE/api/health" || echo 000)
+            echo "attempt $attempt: HTTP $code $(cat "$ART/health.json" 2>/dev/null)" | tee -a "$ART/health.log"
+            if [ "$code" = 200 ] && grep -q '"status":"ok"' "$ART/health.json"; then exit 0; fi
+            sleep 20
+          done
+          exit 1
+
+      - name: Public pages answer 200
+        id: pages
+        continue-on-error: true
+        run: |
+          fails=0
+          for p in /builder /resume-checker /jd-match /cover-letter /linkedin-message /api/resume-checker/checklist; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 2 --retry-all-errors --max-time 30 "$APP_BASE$p" || echo 000)
+            echo "$code  $p" | tee -a "$ART/pages.log"
+            [ "$code" = 200 ] || fails=$((fails + 1))
+          done
+          exit $fails
+
+      - name: smoke:builder (production)
+        id: builder
+        continue-on-error: true
+        env:
+          SMOKE_BASE: ${{ env.APP_BASE }}
+          SMOKE_BLOCK_ANALYTICS: "1"
+        run: |
+          npm run smoke:builder 2>&1 | tee "$ART/smoke-builder.log" && exit 0
+          echo "--- retry ---" | tee -a "$ART/smoke-builder.log"
+          npm run smoke:builder 2>&1 | tee -a "$ART/smoke-builder.log"
+
+      - name: smoke:import (production)
+        id: import
+        continue-on-error: true
+        env:
+          SMOKE_BASE: ${{ env.APP_BASE }}
+        run: |
+          npm run smoke:import 2>&1 | tee "$ART/smoke-import.log" && exit 0
+          echo "--- retry ---" | tee -a "$ART/smoke-import.log"
+          npm run smoke:import 2>&1 | tee -a "$ART/smoke-import.log"
+
+      - name: smoke:checker (production, parse stubbed)
+        id: checker
+        continue-on-error: true
+        env:
+          SMOKE_BASE: ${{ env.APP_BASE }}
+          SMOKE_BLOCK_ANALYTICS: "1"
+          SMOKE_PDF: __fixtures__/import/text-cv.pdf
+        run: |
+          npm run smoke:checker 2>&1 | tee "$ART/smoke-checker.log" && exit 0
+          echo "--- retry ---" | tee -a "$ART/smoke-checker.log"
+          npm run smoke:checker 2>&1 | tee -a "$ART/smoke-checker.log"
+
+      - name: Screenshots
+        if: always()
+        continue-on-error: true
+        env:
+          SMOKE_BASE: ${{ env.APP_BASE }}
+          SHOT_DIR: ${{ env.ART }}/shots
+        run: node scripts/monitor-screenshots.mjs 2>&1 | tee "$ART/screenshots.log"
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-monitor-${{ github.run_id }}
+          path: ${{ env.ART }}
+          retention-days: 14
+
+      - name: Report (summary, issue, job status)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          R_DRILL: ${{ inputs.simulate_failure }}
+          R_HEALTH: ${{ steps.health.outcome }}
+          R_PAGES: ${{ steps.pages.outcome }}
+          R_BUILDER: ${{ steps.builder.outcome }}
+          R_IMPORT: ${{ steps.import.outcome }}
+          R_CHECKER: ${{ steps.checker.outcome }}
+        run: |
+          rows=(
+            "health endpoint|$R_HEALTH|health.log"
+            "public pages|$R_PAGES|pages.log"
+            "smoke:builder|$R_BUILDER|smoke-builder.log"
+            "smoke:import|$R_IMPORT|smoke-import.log"
+            "smoke:checker|$R_CHECKER|smoke-checker.log"
+          )
+          if [ "$R_DRILL" = true ]; then
+            echo "simulate_failure=true: this run only tests the alert path; nothing is wrong." > "$ART/drill.log"
+            rows+=("alert drill (simulated, not a real fault)|failure|drill.log")
+          fi
+          failed=()
+          {
+            echo "## app.makemycv.ae production monitor"
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+            for r in "${rows[@]}"; do
+              IFS='|' read -r name outcome _ <<< "$r"
+              echo "| $name | ${outcome:-not run} |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          for r in "${rows[@]}"; do
+            IFS='|' read -r name outcome log <<< "$r"
+            [ "$outcome" = success ] || failed+=("$name|${outcome:-not run}|$log")
+          done
+
+          gh label create prod-monitor --color B60205 \
+            --description "Opened by the scheduled production monitor" 2>/dev/null || true
+          open=$(gh issue list --label prod-monitor --state open --json number --jq '.[0].number // empty')
+
+          if [ ${#failed[@]} -eq 0 ]; then
+            echo "All checks passed." >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$open" ]; then
+              gh issue comment "$open" --body "Recovered: all checks passed in $RUN_URL"
+              gh issue close "$open"
+            fi
+            exit 0
+          fi
+
+          {
+            echo "Production monitor failed on \`${GITHUB_REF_NAME}\` at $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            echo "Run: $RUN_URL (screenshots and full logs in the run artifacts)"
+            echo
+            for f in "${failed[@]}"; do
+              IFS='|' read -r name outcome log <<< "$f"
+              echo "### $name: $outcome"
+              echo
+              echo '```'
+              if [ -f "$ART/$log" ]; then
+                grep -E '^(FAIL|  FAIL)|failure|Error|error' "$ART/$log" | head -n 20 || true
+                echo "..."
+                tail -n 15 "$ART/$log"
+              else
+                echo "(no log: the step did not run)"
+              fi
+              echo '```'
+              echo
+            done
+            echo "Runbook: OPERATIONS_RUNBOOK.md (workspace docs/ai-mission), section 3 Production regression testing."
+          } > issue-body.md
+
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file issue-body.md
+          else
+            gh issue create --title "Production monitor failing: app.makemycv.ae" \
+              --label prod-monitor --body-file issue-body.md
+          fi
+          echo "Failing: ${#failed[@]} check(s)" >> "$GITHUB_STEP_SUMMARY"
+          exit 1

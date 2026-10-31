@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CvData, PlanTier } from "../types/cv";
 import { formatLanguageLevel } from "../language";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
@@ -222,6 +222,7 @@ export const ATSCleanTemplate = ({
 
   return (
     <div
+      className="cv-bidi"
       style={{
         width: "794px",
         minHeight: "1123px",
@@ -449,11 +450,11 @@ export const ATSCleanTemplate = ({
                       .map((bullet, i) => (
                         <li
                           key={i}
-                          style={{
+                          {...bulletLiProps(bullet, "16px", {
                             fontSize: `${11 * theme.fontScale}px`,
                             color: "#374151",
                             lineHeight: 1.55 * theme.lineScale,
-                          }}
+                          })}
                         >
                           {bullet}
                         </li>
@@ -677,11 +678,11 @@ export const ATSCleanTemplate = ({
                       {bullets.map((bullet, i) => (
                         <li
                           key={i}
-                          style={{
+                          {...bulletLiProps(bullet, "16px", {
                             fontSize: `${11 * theme.fontScale}px`,
                             color: "#374151",
                             lineHeight: 1.55 * theme.lineScale,
-                          }}
+                          })}
                         >
                           {bullet}
                         </li>

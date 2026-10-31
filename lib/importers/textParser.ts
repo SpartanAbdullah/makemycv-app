@@ -472,6 +472,51 @@ function isBulletContinuation(line: string): boolean {
   return /[.!?]["')\]]?$/.test(line);
 }
 
+/** Words a wrapped line can end on but a finished sentence or a header cannot. */
+const DANGLING_END_RE =
+  /(?:[,&/–-]|\b(?:a|an|the|of|in|on|at|to|for|with|and|or|by|from|into|across|over|under|per|via|as|its|their|our|his|her|my|this|that|these|those))$/i;
+
+/**
+ * Session 6 (E11 "remaining"): is `line` the next physical line of the
+ * unmarked paragraph whose last physical line was `prev`? Only for PDF text
+ * (`wrapWidth` > 0), and only when `prev` ran to the right margin (so the
+ * renderer broke it) without closing punctuation. Then the line continues it
+ * when it starts lower case, or when `prev` stopped on a word no sentence
+ * ends on ("…archived in the" / "CAFM system. …") and the line carries no
+ * dates and no header separator (a new role is never swallowed).
+ */
+function isParagraphContinuation(prev: string, line: string, wrapWidth: number): boolean {
+  if (!reachesMargin(prev, wrapWidth)) return false;
+  if (/[.!?:;]["')\]]?$/.test(prev)) return false;
+  if (isBulletLine(line) || detectSection(line)) return false;
+  if (/^[a-z]/.test(line)) return true;
+  if (!DANGLING_END_RE.test(prev)) return false;
+  const hasDates = extractDates(line).length > 0 || PRESENT_RE.test(line);
+  return !hasDates && splitHeaderParts(line).length < 2;
+}
+
+const ARABIC_SCRIPT_GLOBAL_RE = /[؀-ۿݐ-ݿ]/g;
+const LATIN_LETTER_GLOBAL_RE = /[A-Za-zÀ-ɏ]/g;
+
+/** Mostly Arabic-script letters (Arabic, Urdu, Persian), Latin at most a third. */
+function isMostlyArabicScript(line: string): boolean {
+  const ar = line.match(ARABIC_SCRIPT_GLOBAL_RE)?.length ?? 0;
+  const lat = line.match(LATIN_LETTER_GLOBAL_RE)?.length ?? 0;
+  return ar >= 3 && ar >= 0.7 * (ar + lat);
+}
+
+/** Lines that are mostly Latin vs mostly Arabic script: a Latin block has at
+ *  least twice as many (and at least two) Latin lines. */
+function isLatinMajorityBlock(lines: string[]): boolean {
+  let latin = 0;
+  let arabic = 0;
+  for (const l of lines) {
+    if (isMostlyArabicScript(l)) arabic++;
+    else if ((l.match(LATIN_LETTER_GLOBAL_RE)?.length ?? 0) >= 3) latin++;
+  }
+  return latin >= 2 && latin >= 2 * arabic;
+}
+
 // ── Experience block parser ──────────────────────────────────────────────────
 
 /**
@@ -494,7 +539,20 @@ function isBulletContinuation(line: string): boolean {
  *        "Jan 2024 - Present · Dubai, UAE"
  *        "Built ops team from scratch"
  */
-function parseExperienceBlock(lines: string[]): ParsedExperience[] {
+function parseExperienceBlock(
+  lines: string[],
+  wrapWidth = 0,
+  /** Lines kept out of the entries; the caller shows them as unplaced. */
+  leftovers: string[] = [],
+): ParsedExperience[] {
+  // Session 6 (rtl-mixed.docx): bilingual English CVs repeat a role in Arabic
+  // ("أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى
+  // الآن)"). The bare year made it a dated header, so it became a third card
+  // with Company "…أبوظبي (مارس" (the Arabic month and "until now" are not
+  // date tokens). In a Latin-majority block, an Arabic line that would START
+  // a role after a Latin role goes to "We couldn't place this" instead.
+  // Arabic bullets inside a role, and Arabic-majority CVs, are untouched.
+  const latinBlock = isLatinMajorityBlock(lines);
   const entries: ParsedExperience[] = [];
   let current: ParsedExperience | null = null;
   let pendingDates: string[] | null = null;
@@ -502,6 +560,9 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
   // True while the last line handled was a marked bullet (or a wrapped line
   // appended to one). See isBulletContinuation.
   let bulletOpen = false;
+  // The physical line last stored as (or appended to) an UNMARKED bullet,
+  // while that paragraph may still continue. See isParagraphContinuation.
+  let paragraphTail: string | null = null;
 
   const pushCurrent = () => {
     if (!current) return;
@@ -593,6 +654,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       current.bullets = current.bullets ?? [];
       current.bullets.push(stripBulletPrefix(line));
       bulletOpen = true;
+      paragraphTail = null;
       continue;
     }
 
@@ -611,6 +673,24 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       const last = current.bullets.length - 1;
       current.bullets[last] = `${current.bullets[last]} ${line}`;
       bulletOpen = true;
+      continue;
+    }
+
+    // Session 6: an UNMARKED paragraph in a PDF wraps too, and arrived as one
+    // bullet per physical line ("…with weekly" / "steering reviews, …" /
+    // "CAFM system. Lessons learned…"). PDF text only (wrapWidth > 0): in a
+    // DOCX every line is a paragraph of its own, and mammoth drops list
+    // markers, so lower-case bullets there would wrongly merge.
+    const tail = paragraphTail;
+    paragraphTail = null;
+    if (
+      tail !== null &&
+      current?.bullets?.length &&
+      isParagraphContinuation(tail, line, wrapWidth)
+    ) {
+      const last = current.bullets.length - 1;
+      current.bullets[last] = `${current.bullets[last]} ${line}`;
+      paragraphTail = line;
       continue;
     }
 
@@ -663,6 +743,18 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
       continue;
     }
 
+    if (
+      looksLikeNewHeader &&
+      latinBlock &&
+      current &&
+      (current.role || current.company) &&
+      !isMostlyArabicScript(`${current.role ?? ""} ${current.company ?? ""}`) &&
+      isMostlyArabicScript(line)
+    ) {
+      leftovers.push(line);
+      continue;
+    }
+
     if (looksLikeNewHeader) {
       pushCurrent();
       current = startEntryFromLine(line);
@@ -683,6 +775,7 @@ function parseExperienceBlock(lines: string[]): ParsedExperience[] {
         // structural position (after role/company/location).
         current.bullets = current.bullets ?? [];
         current.bullets.push(line);
+        paragraphTail = line;
       }
     }
   }
@@ -930,6 +1023,78 @@ function parseCertificationsBlock(lines: string[]): ParsedCertification[] {
 }
 
 // ── Skills / Languages block parsing ─────────────────────────────────────────
+
+const LIST_SEP_RE = /[,;|·•]/;
+const LIST_SEP_GLOBAL_RE = /[,;|·•]/g;
+
+/** Options for text that comes from a PDF text layer. */
+export type ParseTextOptions = {
+  /**
+   * The text was laid out by a renderer that wraps lines at the right margin
+   * (a PDF). Only then can two physical lines be halves of one item; DOCX
+   * text (mammoth) has one paragraph per line and never wraps.
+   */
+  softWrapped?: boolean;
+};
+
+/** A physical line at least this share of the widest line ran to the margin. */
+const WRAP_FILL_RATIO = 0.75;
+
+/**
+ * Widest line in the document, in characters: the stand-in for the text
+ * column when the source is soft-wrapped; 0 (= never treat a line as
+ * wrapped) otherwise. A single over-long line only makes the test stricter.
+ */
+function wrapWidthOf(lines: string[], opts: ParseTextOptions): number {
+  if (!opts.softWrapped) return 0;
+  return lines.reduce((m, l) => Math.max(m, l.length), 0);
+}
+
+/** Did this physical line run to the right margin (so the renderer wrapped it)? */
+function reachesMargin(line: string, wrapWidth: number): boolean {
+  return wrapWidth > 0 && line.length >= wrapWidth * WRAP_FILL_RATIO;
+}
+
+/**
+ * D9 (session 5): a separator list that wraps in a PDF splits the item at the
+ * wrap ("… · SLA Reporting · Budget" / "Control · Civil Defence …" gave the
+ * skills "Budget" and "Control"). Join a line to the next when ALL hold:
+ *  - the line is a list (≥2 separators) and does not end with a separator;
+ *  - it ran to the right margin (so the break is the renderer's, not the
+ *    author's: an author-broken list stops short of the margin);
+ *  - the next line does not start with a separator, a bullet, or a "Label:";
+ *  - the item the join produces is still item-sized (≤4 words, ≤40 chars).
+ * Two real skills on either side of an author's line break fail the margin
+ * test; a run-on fails the size test. No-op unless `wrapWidth` > 0.
+ */
+function joinWrappedListLines(lines: string[], wrapWidth: number): string[] {
+  if (wrapWidth <= 0) return lines;
+  const out: string[] = [];
+  let prevPhysical: string | undefined;
+  for (const line of lines) {
+    if (prevPhysical !== undefined && isWrappedListPair(prevPhysical, line, wrapWidth)) {
+      out[out.length - 1] = `${out[out.length - 1]} ${line}`;
+    } else {
+      out.push(line);
+    }
+    prevPhysical = line;
+  }
+  return out;
+}
+
+/** `prev` and `next` are consecutive PHYSICAL lines of one list block. */
+function isWrappedListPair(prev: string, next: string, wrapWidth: number): boolean {
+  if ((prev.match(LIST_SEP_GLOBAL_RE)?.length ?? 0) < 2) return false;
+  if (/[,;|·•]\s*$/.test(prev)) return false;
+  if (!reachesMargin(prev, wrapWidth)) return false;
+  if (/^\s*[,;|·•]/.test(next) || isBulletLine(next)) return false;
+  const head = next.split(LIST_SEP_RE)[0].trim();
+  if (!head || head.includes(":")) return false;
+  const tail = prev.split(LIST_SEP_RE).pop()?.trim() ?? "";
+  if (!tail) return false;
+  const joined = `${tail} ${head}`;
+  return joined.length <= 40 && joined.split(/\s+/).length <= 4;
+}
 
 function flattenList(lines: string[]): string[] {
   return lines
@@ -1571,7 +1736,10 @@ function harvestContact(lines: string[]): {
 
 // ── Public entry point ───────────────────────────────────────────────────────
 
-export function parseTextToDocument(text: string): ParsedDocument {
+export function parseTextToDocument(
+  text: string,
+  opts: ParseTextOptions = {},
+): ParsedDocument {
   // Normalise: split, trim, drop empty. We keep an index-aligned array so the
   // contact harvester can mark lines as consumed.
   const rawLines = text.split(/\r?\n/);
@@ -1666,20 +1834,34 @@ export function parseTextToDocument(text: string): ParsedDocument {
     result.unplaced = [...unplaced, ...buffers.personal];
   }
 
+  // PDF text column width in characters (0 for DOCX / pasted text), used to
+  // tell a renderer's line wrap from an author's line break.
+  const wrapWidth = wrapWidthOf(lines, opts);
+
   result.summary = buffers.summary.join(" ").replace(/\s{2,}/g, " ").trim();
-  result.experience = parseExperienceBlock(buffers.experience);
+  const experienceLeftovers: string[] = [];
+  result.experience = parseExperienceBlock(
+    buffers.experience,
+    wrapWidth,
+    experienceLeftovers,
+  );
+  if (experienceLeftovers.length > 0) {
+    result.unplaced = [...(result.unplaced ?? []), ...experienceLeftovers];
+  }
   result.education = parseEducationBlock(buffers.education);
   result.certifications = parseCertificationsBlock(buffers.certifications);
   // A detected Projects section used to be buffered and then silently
   // dropped — nothing the parser detects gets discarded any more.
   result.projects = parseProjectsBlock(buffers.projects);
 
-  result.skills = flattenList(buffers.skills);
+  // D9: rejoin list items the PDF renderer wrapped across two lines (PDF only,
+  // see joinWrappedListLines for the guards).
+  result.skills = flattenList(joinWrappedListLines(buffers.skills, wrapWidth));
 
   // Languages: `languages` stays the plain name list (its consumers all read
   // names), and `languageDetails` carries the same entries with the stated
   // proficiency mapped to CvLanguage.level. The two are index-aligned.
-  const parsedLanguages = flattenList(buffers.languages)
+  const parsedLanguages = flattenList(joinWrappedListLines(buffers.languages, wrapWidth))
     .map(parseLanguageEntry)
     .filter((l) => l.name);
   result.languages = parsedLanguages.map((l) => l.name);

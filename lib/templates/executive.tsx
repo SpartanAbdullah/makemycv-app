@@ -11,6 +11,7 @@ import {
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { bulletLiProps } from "./utils";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -169,6 +170,7 @@ export const ExecutiveTemplate = ({
 
   return (
     <div
+      className="cv-bidi"
       style={{
         display: "flex",
         flexDirection: "row",
@@ -507,11 +509,11 @@ export const ExecutiveTemplate = ({
                         .map((bullet, i) => (
                           <li
                             key={i}
-                            style={{
+                            {...bulletLiProps(bullet, "12px", {
                               fontSize: `${11 * fs}px`,
                               color: "#374151",
                               lineHeight: 1.55 * ls,
-                            }}
+                            })}
                           >
                             {bullet}
                           </li>
@@ -671,11 +673,11 @@ export const ExecutiveTemplate = ({
                         {bullets.map((bullet, i) => (
                           <li
                             key={i}
-                            style={{
+                            {...bulletLiProps(bullet, "12px", {
                               fontSize: `${11 * fs}px`,
                               color: "#374151",
                               lineHeight: 1.55 * ls,
-                            }}
+                            })}
                           >
                             {bullet}
                           </li>

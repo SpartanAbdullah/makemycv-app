@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { containsArabic, shapeArabic, toLogicalArabic } from "./arabicText";
+import {
+  containsArabic,
+  firstStrongDirection,
+  shapeArabic,
+  shapeArabicSegments,
+  toLogicalArabic,
+  unjoinedArabicLetters,
+} from "./arabicText";
 
 const cps = (s: string) => Array.from(s, (c) => c.codePointAt(0)!.toString(16).toUpperCase());
 
@@ -51,6 +58,89 @@ describe("shapeArabic joining forms", () => {
     assert.deepEqual(cps(shapeArabic("پ")), ["FB56"]);
     assert.deepEqual(cps(shapeArabic("گچ")), ["FB94", "FB7B"]);
     assert.deepEqual(cps(shapeArabic("ے")), ["FBAE"]);
+  });
+
+  it("sets an isolated Urdu heh goal as the base letter the PDF face has (E8.4)", () => {
+    // طاہرہ: ط(init) ا(final) | ہ(init) ر(final) | ہ isolated → U+06C1, never U+FBA6
+    assert.deepEqual(cps(shapeArabic("طاہرہ")), ["FEC3", "FE8E", "FBA8", "FEAE", "6C1"]);
+    // joined heh goal keeps its presentation forms: تجزیہ ends in final ہ, مہینے has a medial one
+    assert.deepEqual(cps(shapeArabic("یہ")), ["FBFE", "FBA7"]);
+    assert.deepEqual(cps(shapeArabic("مہینے")), ["FEE3", "FBA9", "FBFF", "FEE8", "FBAF"]);
+    assert.equal(shapeArabic("طاہرہ ملک").includes("ﮦ"), false);
+  });
+
+  it("shapes the other Urdu letters UAE job seekers type", () => {
+    // ٹرک ڈرائیور گودام میں بناۓ بڑھایا: ٹ ڈ ڑ ک گ ں ھ ے ۓ all take a presentation form
+    const out = shapeArabic("ٹرک ڈرائیور گودام میں نئے بناۓ بڑھایا");
+    for (const ch of out) {
+      const cp = ch.codePointAt(0)!;
+      assert.equal([0x0679, 0x0688, 0x0691, 0x06a9, 0x06af, 0x06ba, 0x06be, 0x06d2, 0x06d3].includes(cp), false, `unshaped U+${cp.toString(16)}`);
+    }
+    assert.equal(toLogicalArabic(out), "ٹرک ڈرائیور گودام میں نئے بناۓ بڑھایا".normalize("NFKC"));
+  });
+
+  it("decomposes ۂ (heh goal + hamza) so it joins, and NFKC composes it back", () => {
+    // کۂ → ک(init) ہ(final) + hamza above
+    assert.deepEqual(cps(shapeArabic("کۂ")), ["FB90", "FBA7", "654"]);
+    assert.equal(toLogicalArabic(shapeArabic("کۂ")), "کۂ");
+  });
+});
+
+describe("shapeArabicSegments (E8.5 — several runs on one line)", () => {
+  it("shapes the runs as one text and splits the result back per run", () => {
+    const runs = ["محلل سلسلة التوريد", " | شركة الخليج للخدمات اللوجستية"];
+    const parts = shapeArabicSegments(runs);
+    assert.equal(parts.length, 2);
+    assert.equal(parts.join(""), shapeArabic(runs.join("")));
+    assert.deepEqual(parts.map(toLogicalArabic), runs.map((r) => r.normalize("NFKC")));
+  });
+
+  it("joins letters across a run boundary", () => {
+    // محمد split mid-word: م(init) ح(medial) | م(medial) د(final)
+    assert.deepEqual(shapeArabicSegments(["مح", "مد"]).map(cps), [["FEE3", "FEA4"], ["FEE4", "FEAA"]]);
+  });
+
+  it("gives a lam-alef that straddles two runs to the run of the lam", () => {
+    assert.deepEqual(shapeArabicSegments(["ل", "ا"]).map(cps), [["FEFB"], []]);
+  });
+
+  it("returns Latin-only runs unchanged (no ligature pre-composition)", () => {
+    assert.deepEqual(shapeArabicSegments(["Office", " | Profit"]), ["Office", " | Profit"]);
+  });
+});
+
+describe("firstStrongDirection", () => {
+  it("is rtl for an Arabic-first paragraph, whatever follows", () => {
+    assert.equal(firstStrongDirection("صمّم لوحات متابعة (Power BI) لمستوى الخدمة"), "rtl");
+    assert.equal(firstStrongDirection("خفّض المخزون بنسبة 12% بعد تطبيق نظام SAP IBP"), "rtl");
+    assert.equal(firstStrongDirection("12% — خفّض المخزون"), "rtl"); // digits are weak
+    assert.equal(firstStrongDirection(shapeArabic("مدير مالي — Senior Manager")), "rtl"); // presentation forms
+    assert.equal(firstStrongDirection("طاہرہ ملک"), "rtl");
+  });
+
+  it("is ltr for a Latin-first paragraph, even with Arabic later", () => {
+    assert.equal(firstStrongDirection("Senior محلل Supply Chain"), "ltr");
+    assert.equal(firstStrongDirection("(CPA) محاسب قانوني"), "ltr");
+    assert.equal(firstStrongDirection("Cut freight spend by AED 1.2M"), "ltr");
+  });
+
+  it("is null when there is no letter", () => {
+    assert.equal(firstStrongDirection("2023 – 2025"), null);
+    assert.equal(firstStrongDirection("+971 50 123 4567"), null);
+    assert.equal(firstStrongDirection(""), null);
+  });
+});
+
+describe("unjoinedArabicLetters", () => {
+  it("reports nothing for Arabic, Persian and the Urdu letters the shaper covers", () => {
+    assert.deepEqual(unjoinedArabicLetters("أحمد الراشد — مدير مالي أول، ٢٠٢٦"), []);
+    assert.deepEqual(unjoinedArabicLetters("پژوهشگر چاپ"), []);
+    assert.deepEqual(unjoinedArabicLetters("طاہرہ ملک — ٹرک ڈرائیور گودام میں بناۓ بڑھایا کۂ ۔"), []);
+    assert.deepEqual(unjoinedArabicLetters("Senior Finance Manager"), []);
+  });
+
+  it("names letters without presentation forms (they print unjoined)", () => {
+    assert.deepEqual(unjoinedArabicLetters("صلوۃ ۀ ۀ"), ["ۃ", "ۀ"]);
   });
 });
 

@@ -23,6 +23,9 @@ import {
   type LinkedinModelOutcome,
 } from "@/lib/linkedinMessage/prompt";
 import { trimToWordLimit } from "@/lib/linkedinMessage/length";
+import { logAiFailure } from "@/lib/server/logRouteError";
+
+const ROUTE = "api/linkedin-message";
 
 /**
  * LinkedIn recruiter message (2026-10-31 — product #3 in CLAUDE.md).
@@ -124,6 +127,7 @@ export async function POST(request: Request) {
 
     let outcome: LinkedinModelOutcome | null = null;
     let apiFailed = false;
+    let lastErr: unknown;
     for (let attempt = 0; attempt < 2 && outcome === null; attempt++) {
       try {
         const raw = await callHaiku(apiKey, req);
@@ -132,12 +136,15 @@ export async function POST(request: Request) {
       } catch (err) {
         // A timeout is not retried — the user has already waited 25 s.
         if (isTimeoutError(err)) {
+          logAiFailure(ROUTE, "timeout");
           return NextResponse.json(UPSTREAM_TIMEOUT_BODY, { status: UPSTREAM_TIMEOUT_STATUS });
         }
         apiFailed = true;
+        lastErr = err;
       }
     }
     if (outcome === null) {
+      logAiFailure(ROUTE, apiFailed ? "upstream" : "unparseable", apiFailed ? lastErr : undefined);
       return NextResponse.json(
         {
           error: apiFailed
@@ -175,7 +182,8 @@ export async function POST(request: Request) {
       if (cut.trimmed) lengthOutcome = "trimmed";
     }
     return NextResponse.json({ message: text, variant: req.variant, outcome: lengthOutcome });
-  } catch {
+  } catch (err) {
+    logAiFailure(ROUTE, "internal", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -25,6 +25,304 @@ Format:
 
 ---
 
+## [2026-11-01 02:50] Arabic bullets: Banner / Chronicle / Harvard mirror the live list padding (session 6, follow-up)
+
+**Goal:** after the RTL-marker fix the Harvard dense Arabic cells dropped from ok to check in the fidelity harness
+(block diff 3.5 % → 9.7 %): Banner, Chronicle and Harvard draw the PDF dot INSIDE the list padding, so mirroring
+the PDF's own padding ended the Arabic text ~9pt further from the right edge than the live list.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — those three renderers pass `pt(live padding) − dot width` to
+  `bulletRowDir`, so the RTL text ends where the live list puts it (text width unchanged).
+**Notes / risks / follow-up:** Harvard dense back to ok (block diff 3.0 %); Banner / Chronicle cells unchanged; Latin
+bullets untouched (the helper returns {} for them).
+**Suggested commit:** fix(pdf): RTL bullet mirror in Banner / Chronicle / Harvard matches the live list padding
+
+## [2026-11-01 02:30] Arabic-first bullets: the marker moves to the right, next to its text (session 6, E8.2 follow-up)
+
+**Goal:** release blocker found in review of E8.2 (`_cowork/session6/arabic/compare-A-classic.png`): Arabic-first
+bullets aligned right but kept their marker at the far left, a column-width away from the text.
+**Files:**
+- edited: `components/pdf/CVDocument.tsx` — `bulletRowDir` / `bulletDotDir`: an Arabic-first bullet row is
+  `row-reverse` with the list's left padding mirrored to the right (margin -pad / +pad), the dot right-aligned in its
+  box; applied in the shared `BulletList` and the four layout-local bullet renderers (Modern helper, Banner,
+  Chronicle, Harvard).
+- edited: `lib/templates/utils.ts` — `bulletLiProps(text, pad, style)`: `dir="rtl"` + the same mirrored margins for
+  an Arabic-first `<li>`; Latin items get their original style back.
+- edited: 13 `lib/templates/*.tsx` — every bullet `<li>` (28) goes through `bulletLiProps` with its list's padding.
+- edited: `docs/arabic-pdf.md` — "Paragraph direction".
+**Notes / risks / follow-up:** checked the other prefixes beside Arabic-first text — " • " / " · " skill and
+language separators are inside one run (bidi orders them), role titles keep their place at the row start opposite
+the dates (same as LTR), contact icons sit next to content-sized items: none detached. Browser print enlarges the
+`.cv-print` list padding to 1.25rem, so in print the right gutter of an Arabic bullet is the template's own pad.
+Evidence `_cowork/session6/arabic/compare-*-bullets.png`.
+**Suggested commit:** fix(pdf,preview): Arabic-first bullets keep their marker beside the text, on the right
+
+## [2026-11-01 01:40] smoke:arabic: Dense-2, mid-line Latin, Urdu name, whole-line reading-order check (session 6, E8.7)
+
+**Goal:** E8.7 — make the staging smoke cover what session-5 production verification found: the Dense-2 shape (page 2
+with Arabic education and mixed skills), Arabic-first bullets with Latin mid-line, an Urdu name, and lines that keep
+every word but lose their order (the old word check could not see that).
+**Files:**
+- edited: `lib/data/preview-profiles.ts` — personas `arabic-dense2`, `arabic-midline`, `urdu-name` (synthetic).
+- edited: `scripts/arabic-smoke.tsx` — whole Arabic-first lines per persona in the manifest; Dense-2 must reach page 2;
+  Harvard (no headline, live and PDF) is not expected to print one.
+- edited: `scripts/arabic-smoke-check.mjs` — every Arabic-first line whole and in reading order in the content-ordered
+  pdf.js items after NFKC (spacing ignored; brackets one class; lines pdf.js reads as LTR held to the word check);
+  no standard-14 fallback font embedded.
+- edited: `scripts/pdf-fidelity.mjs`, `app/preview/[templateId]/page.tsx` — accept the three new persona ids.
+- edited: `scripts/patch-react-pdf-textkit.mjs` — entry check via `fileURLToPath`.
+- edited: `docs/arabic-pdf.md` — Checks; the two pdf.js extraction limits (mirrored brackets, Latin-majority lines).
+**Notes / risks / follow-up:** 98/98 files pass. With the unpatched textkit the word check still passes every file and
+the new line check fails 84 of 98 — it guards E8.1.
+**Suggested commit:** test(pdf): smoke:arabic covers Dense-2, mid-line Latin, Urdu and whole-line order (E8.7)
+
+## [2026-11-01 01:10] Arabic PDF: role stays bold and company regular on one line; room under Arabic names (session 6, E8.5 + E8.6)
+
+**Goal:** E8.5 — Classic's "role | company" line printed entirely bold when it contained Arabic (the session-4 one-run
+rule), and a link inside an Arabic line lost its hyperlink. E8.6 — in Gulf Standard and Corporate the dots under a
+bold Arabic name's final ي nearly touched the headline.
+**Files:**
+- edited: `lib/pdf/arabicText.ts` (+ tests) — `shapeArabicSegments()`: the runs of one line are shaped together
+  (joining across a run boundary) and split back per run; `shapeArabic` is its one-run case. `ARABIC_NAME_LINE_HEIGHT`.
+- edited: `components/pdf/ArabicText.tsx` — nested `<Text>` / `<Link>` children stay runs (own weight, colour, link),
+  all in Vazirmatn; any other child type falls back to the flattened run. Safe only with the textkit patch (E8.1),
+  which keeps each glyph in its own run.
+- edited: `components/pdf/CVDocument.tsx`, `lib/templates/gulf-standard.tsx`, `lib/templates/corp-sidebar.tsx` — name
+  line height 1.35 when the name contains Arabic (1.15 otherwise, unchanged).
+- edited: `docs/arabic-pdf.md` — the one-run limit rewritten.
+**Notes / risks / follow-up:** persona A on Classic: Vazirmatn-Bold for the role, Vazirmatn-Regular for the company,
+both words whole in pdf.js; the email link annotation is kept. Latin text never reaches this code.
+**Suggested commit:** fix(pdf): keep run weights and links inside Arabic lines; room under Arabic names (E8.5, E8.6)
+
+## [2026-11-01 00:40] Arabic-first paragraphs are right-to-left in the preview AND the PDF (session 6, E8.2)
+
+**Goal:** E8.2 (ARABIC_PRODUCTION_2026-10-31.md §3), owner decision taken: first-strong, per-paragraph direction in
+both renderers. Before, both used an LTR base: "صمّم لوحات متابعة (Power BI) لمستوى …" read its clauses in reverse,
+"… نظام SAP IBP" put SAP IBP at the right end, a trailing "%" sat apart from its number, continuation lines were
+flush left.
+**Files:**
+- edited: `lib/pdf/arabicText.ts` (+ test) — `firstStrongDirection()`.
+- edited: `components/pdf/ArabicText.tsx` — Arabic-first runs get `direction: "rtl"` and, unless the layout set one,
+  an explicit `textAlign: "right"` (the implicit alignment drew a shrink-wrapped contact item outside its box).
+- edited: `components/pdf/CVDocument.tsx` — `roleBox` / `withRoleBox`: an Arabic-first role title next to its dates
+  gets a content-sized box (Classic, Professional, Modern, Gulf Standard, ExperienceEntry layouts), as live.
+- edited: `app/globals.css` — `.cv-bidi` scope: `unicode-bidi: plaintext` on blocks, `normal` on inline phrasing
+  elements, `plaintext` again on flex / grid children.
+- edited: all 14 `lib/templates/*.tsx` roots — `cv-bidi` class (only 6 carry `.cv-print`; CLAUDE.md says all do).
+- edited: `docs/arabic-pdf.md` — "Paragraph direction" rewritten; the probe-table bidi row corrected.
+**Notes / risks / follow-up:** Latin gate `fidelity:pdf` passed (31 ok / 11 check / 0 mismatch); Latin role rows keep
+`flex: 1` (identical style objects). Arabic personas vs session 4: arabic-first 9/4/1 (was 8/5/1), arabic-only 10/4/0
+(9/5/0), arabic-name 11/3/0 (9/5/0); text parity 98–100 % (was 99.8 % mean). pdf.js now reads every persona-A /
+dense / Urdu cell in logical order. List markers stay left of a right-aligned Arabic bullet in both renderers
+(mirroring the marker is a separate design call). The CLAUDE.md sentence "every template root carries .cv-print" is
+inaccurate (6 of 14) — not changed here.
+**Suggested commit:** feat(pdf,preview): first-strong paragraph direction for Arabic-first text (E8.2)
+
+## [2026-10-31 23:55] Arabic PDF: one text-show operator per Arabic line, no words lost in pdf.js / pypdf (session 6, E8.1)
+
+**Goal:** E8.1 (ARABIC_PRODUCTION_2026-10-31.md §2): long Arabic lines were written as 3–7 `TJ` operators split
+inside words; pdf.js and pypdf (and so our own importer) lost the cut words — persona A b1 3/14, b2 1/7.
+**Root cause:** `@react-pdf/textkit` 6.1.0 splits a paragraph into runs at every bidi-level change (digits, "%",
+Latin inside Arabic), and `reorderLine` keeps each run's LOGICAL length while refilling it with VISUAL-order glyphs, so
+every run's text-show operator starts and ends at an arbitrary glyph inside a word (the 1-character run "8" drew the
+single letter "د" of "مستودعات"). Not justification, not GPOS offsets.
+**Files:**
+- created: `scripts/patch-react-pdf-textkit.mjs` + `"postinstall"` — rewrites that block of `reorderLine` to rebuild
+  runs in visual order (each glyph keeps its own run; adjacent runs that draw alike merge; multi-character glyphs drawn
+  once per occurrence). Idempotent; warns and leaves the file alone if the anchor is gone.
+- created: `scripts/textkit-patch.test.mjs` + `test:textkit-patch` (in `npm test` → CI) — installed textkit is patched;
+  a real render of three mixed Arabic lines keeps every Arabic word whole in one pdf.js item; Latin line one item.
+  Fails on unpatched textkit with exactly the session-5 symptom.
+- edited: `lib/pdf/fonts.ts` — `repairGlyphCache`: a GSUB-only glyph (Vazirmatn contextual alternate) cached with no
+  code points by an earlier subset takes the code points layout supplies (an Urdu CV rendered after an Arabic one in
+  one process threw `reading 'id'`, before and after the patch).
+- edited: `docs/arabic-pdf.md` — approach 6, the probe table row, the text-layer limit.
+**Notes / risks / follow-up:** rasters of 8 Arabic pages are pixel-identical before/after; 6 Latin templates have
+byte-identical content streams. Lines that need no bidi reorder never reach the patched code. The patch lives in
+`node_modules`: any environment that installs with `--ignore-scripts` ships the old behaviour (test:textkit-patch
+catches it in CI). Before/after matrix: `_cowork/session6/arabic/`.
+**Suggested commit:** fix(pdf): one text-show operator per Arabic line (textkit reorder patch, E8.1)
+
+## [2026-10-31 23:30] Arabic PDF: Urdu heh goal prints in Vazirmatn, no Helvetica "¦" (session 6, E8.4)
+
+**Goal:** E8.4 (ARABIC_PRODUCTION_2026-10-31.md §1 test 7): an isolated ہ (U+FBA6, absent from Vazirmatn) fell back
+to Helvetica-Bold and printed "¦", added a second font run to the line, and lost the word from every text layer
+(the session-6 Node render of the same Urdu persona crashed in textkit's reorder instead).
+**Files:**
+- edited: `lib/pdf/arabicText.ts` — isolated ہ → base U+06C1 (Vazirmatn's isolated outline; text layer keeps the Urdu
+  letter); ۂ decomposed to ہ + U+0654 so it joins; `unjoinedArabicLetters()` reports letters without forms;
+  `shapedLetterCodePoints()` for the coverage test.
+- edited: `lib/pdf/arabicText.test.ts` — Urdu heh goal forms, Urdu letters, ۂ, `unjoinedArabicLetters`.
+- created: `scripts/arabic-glyphs.test.mjs` + `test:arabic-glyphs` — every emitted form + Urdu/Arabic digits and
+  punctuation exist in both Vazirmatn cuts (fontkit).
+- edited: `components/builder/steps/ReviewStep.tsx` — the Arabic note names any letter that prints unjoined.
+- edited: `docs/arabic-pdf.md` — the Urdu limit rewritten.
+**Notes / risks / follow-up:** verified by rendering "طاہرہ ملک" on Classic and Gulf Standard
+(`_cowork/session6/arabic/`): fonts = Vazirmatn + Inter only, name extracts in logical order in pdf.js / pypdf /
+PyMuPDF / pdftotext. ۃ / ۀ and other letters without forms still print isolated (named to the user).
+**Suggested commit:** fix(pdf): Urdu isolated heh goal prints in Vazirmatn (E8.4)
+
+## [2026-11-01 00:30] Import: a cover letter picked by mistake gets a pointer to /cover-letter (D8 follow-up)
+
+**Goal:** the optional D8 follow-up (IMPORT_MONITORING.md §8.3, backlog E11.D8): a cover letter with a contact header
+imported as a CV with only contact details and no word that it is a letter. In-flow discovery of product #2, peer
+tone, never a block.
+**Files:**
+- edited: `lib/importers/fieldMapper.ts`: `looksLikeCoverLetter(parsed)`: no role, no degree, and a "Dear …" / "To whom
+  it may concern" line among the unplaced lines.
+- edited: `components/import/MappingReview.tsx`: one line under the header, "This file reads like a cover letter rather
+  than a CV. To write one for a specific role, try the cover letter tool." (link to `/cover-letter`,
+  `data-testid="import-cover-letter-hint"`). The import itself is unchanged.
+- edited: `scripts/import-fixtures.test.mjs` (true for s5-cover-letter-contact.pdf, false for text-cv.pdf),
+  `scripts/import-smoke.mjs` (hint shown with the link for the letter, absent for text-cv.pdf).
+**Notes / risks / follow-up:** a letter with no contact line still ends in `mapping_empty` with the generic copy
+(case 10b); a letter-specific failure message would need a copy variant, not done. No analytics.
+**Suggested commit:** feat(import): point a cover letter picked by mistake at /cover-letter
+
+## [2026-11-01 00:20] Import: an Arabic repeat of a role in an English CV is not a third card (rtl-mixed.docx)
+
+**Goal:** session-5 remaining item: `rtl-mixed.docx` (English CV with Arabic lines) imported a third experience card
+for "أخصائية مشتريات أولى — فالكون لإدارة المرافق، أبوظبي (مارس 2021 - حتى الآن)", the Arabic translation of role 1. The
+bare year made it a dated header; the Arabic month and "حتى الآن" (until now) are not date tokens, so the card's
+Company was "فالكون لإدارة المرافق، أبوظبي (مارس" and its start "2021".
+**Files:**
+- edited: `lib/importers/textParser.ts`: `isMostlyArabicScript`, `isLatinMajorityBlock`; in a Latin-majority
+  Experience block, a mostly-Arabic line that would start a new role after a Latin role is returned as a leftover and
+  shown in "We couldn't place this" (copyable, not dropped).
+- edited: `scripts/import-fixtures.test.mjs` (rtl-mixed.docx: exactly 2 roles, the Arabic line unplaced; was ≥2),
+  `scripts/parser-fixtures.test.cjs` (the repeat is unplaced; an Arabic-majority block keeps its Arabic roles),
+  `scripts/import-smoke.mjs` (rtl-mixed.docx review shows 2 cards), `docs/import-errors.md`.
+**Notes / risks / follow-up:** a genuinely separate Arabic-only role in an otherwise English CV now lands in "We
+couldn't place this" instead of a card with bracket debris. Arabic bullets inside a role (02-mixed-lang.pdf) and
+Arabic-majority CVs (arabic-export-classic.pdf) are unchanged. Arabic date tokens are not parsed (an Arabic parser is a
+feature, backlog E8).
+**Suggested commit:** fix(import): keep an Arabic repeat of a role out of the experience cards
+
+## [2026-11-01 00:10] Import: an unmarked PDF paragraph comes back as one bullet, not one per line (session 5 remaining)
+
+**Goal:** session-5 remaining item (IMPORT_MONITORING.md §8.5, backlog E11.D2 note): an unmarked paragraph under a role
+in a PDF ("Detailed … narrative: …") arrived as one bullet per physical line, cut mid-sentence.
+**Files:**
+- edited: `lib/importers/textParser.ts`: `parseExperienceBlock(lines, wrapWidth)` appends a line to the unmarked bullet
+  above it when `isParagraphContinuation` holds: PDF text only (`wrapWidth` > 0), the previous physical line ran to
+  the right margin without closing punctuation, and the line starts lower case, or the previous line stopped on a
+  word no sentence ends on ("the", "and", "with", a comma…) and the line has no dates and no header separator.
+- edited: `scripts/parser-fixtures.test.cjs` (joined in PDF; not in DOCX; short lower-case bullets kept apart; a dated
+  role header after a line ending "and" is still a new role), `scripts/import-fixtures.test.mjs` (s5-long-wrapped.pdf:
+  exactly 5 bullets per role, the narrative whole).
+**Notes / risks / follow-up:** DOCX untouched on purpose: mammoth drops list markers, so lower-case Word bullets would
+merge.
+**Suggested commit:** fix(import): join wrapped lines of unmarked PDF paragraphs
+
+## [2026-11-01 00:00] Import: a renamed PDF / Word file is named for what it is (session 5 D11)
+
+**Goal:** Minor copy defect D11 (IMPORT_MONITORING.md §8.3): a .docx renamed .pdf got "may be damaged, re-export",
+and a PDF renamed .docx got "open it in Word and save it again as .docx" (wrong for a PDF), although the byte sniff
+already knew the real type.
+**Files:**
+- edited: `lib/importers/importErrors.ts`: `MISMATCH_COPY` (pdfNamedDocx / docxNamedPdf / docNamedPdf) and
+  `zipLooksLikeDocx` (a `word/` entry name in the first 64 KB).
+- edited: `lib/importers/docxAdapter.ts`: PDF bytes → `corrupt_docx` with "This file is actually a PDF with a .docx
+  name. Rename it to end in .pdf, or pick the original PDF, and import it again."
+- edited: `lib/importers/pdfAdapter.ts`: sniff before `getDocument`; a Word .docx zip → `corrupt_pdf` with "This file
+  is actually a Word document with a .pdf name…", an OLE .doc → `corrupt_pdf` with the Save-As advice. Other zips and
+  junk still reach pdf.js and keep the generic copy.
+- created: `__fixtures__/import/s5-docx-bytes.pdf`, `__fixtures__/import/s5-pdf-bytes.docx` (matrix cases 9a / 9b).
+- edited: `lib/importers/importErrors.test.ts`, `scripts/import-fixtures.test.mjs` (both fixtures, a renamed .doc, a
+  non-Word zip keeps the generic copy), `scripts/import-smoke.mjs` (both fixtures through the picker, copy checked),
+  `docs/import-errors.md`.
+**Notes / risks / follow-up:** `error_reason` values unchanged (corrupt_pdf / corrupt_docx), so GA4 series stay
+comparable.
+**Suggested commit:** fix(import): name the real type when a file's extension and bytes disagree (D11)
+
+## [2026-10-31 23:50] Import: the 45 s PDF budget starts at the pick, and a slow read says so (session 5 D10)
+
+**Goal:** Minor defect D10 (IMPORT_MONITORING.md §8.3): on a 10 KiB/s link the user waited 57 s on "Reading your PDF"
+with no message, and the 45 s timeout never fired, because the adapter chunk, the `pdfjs-dist` import and the worker
+HEAD probe ran before the budget started (and had no bound at all).
+**Files:**
+- edited: `lib/importers/importErrors.ts`: `withDeadline(work, deadlineAt, onExpire)` (rejects with `timeout`),
+  `SLOW_READ_HINT_MS` = 8 s.
+- edited: `lib/importers/pdfAdapter.ts`: `extractPdfText` takes `deadlineAt` (absolute; wins over `timeoutMs`) and
+  does not open the PDF when it is already spent; `loadPdfjs` puts the pdf.js import and the worker probe under the
+  same deadline (a probe that times out is forgotten so the next pick probes again); `pdfAdapter.parse(file,
+  { deadlineAt })`; the checker's `extractPdfTextInBrowserDetailed` gets one budget from its own start.
+- edited: `lib/importers/adapter.ts`: optional `{ deadlineAt }` on `ImportAdapter.parse`.
+- edited: `components/builder/BuilderShell.tsx`: the deadline is fixed when the pick starts and covers the adapter
+  chunk import; the parsing overlay shows "Still reading your file… A slow connection can make this take longer…"
+  after 8 s (`role="status"`, `data-testid="import-slow-hint"`).
+- edited: `lib/importers/importErrors.test.ts` (withDeadline), `scripts/import-fixtures.test.mjs` (spent deadline does
+  not open the PDF; deadlineAt beats timeoutMs), `scripts/import-smoke.mjs` (worker GET held 12 s → hint at ~8 s then
+  the review; worker HEAD held 60 s → `cv_import_failed(timeout)` at ~45 s), `docs/import-errors.md`.
+**Notes / risks / follow-up:** `error_reason` values unchanged. DOCX has no deadline (unchanged); the hint shows for
+both formats.
+**Suggested commit:** fix(import): start the PDF deadline at the pick and show a slow-read hint (D10)
+
+## [2026-10-31 23:40] Import: a skill list wrapped across two PDF lines keeps its items whole (session 5 D9)
+
+**Goal:** Minor defect D9 (IMPORT_MONITORING.md §8.3): "… · SLA Reporting · Budget" / "Control · Civil Defence …"
+imported as the two skills "Budget" and "Control".
+**Files:**
+- edited: `lib/importers/textParser.ts`: `parseTextToDocument(text, { softWrapped })`; `joinWrappedListLines` runs on
+  the Skills and Languages buffers before `flattenList`. A line joins the next only when it is a list (≥2 separators)
+  not ending in a separator, ran to the right margin (≥75% of the widest line in the document), the next line does not
+  open with a separator, bullet or "Label:", and the joined item stays item-sized (≤4 words, ≤40 chars).
+- edited: `lib/importers/pdfAdapter.ts`: passes `{ softWrapped: true }` (DOCX and the resume-checker path do not:
+  a Word paragraph break is the author's).
+- edited: `scripts/parser-fixtures.test.cjs` (wrapped list joined; DOCX not joined; guards for a short author-broken
+  line, a "Label:" line and a run-on), `scripts/import-fixtures.test.mjs` (s5-long-wrapped.pdf: "Budget Control", 10
+  skills).
+**Notes / risks / follow-up:** the margin test is character-count based; a PDF whose widest line is an outlier (merged
+two-column line) just disables the join, the safe direction.
+**Suggested commit:** fix(import): join skill lists wrapped across PDF lines (D9)
+
+## [2026-10-31 23:30] Import: the review says when pages past 30 were not read (session 5 D7a)
+
+**Goal:** Minor defect D7(a) (IMPORT_MONITORING.md §8.3): a PDF longer than `MAX_PDF_PAGES` (30) imported with the
+extra pages silently dropped (the 31-page fixture lost its skills and education with no message).
+**Files:**
+- edited: `lib/importers/pdfAdapter.ts`: `extractPdfText` returns `pagesRead` and `truncated` beside `pages`;
+  `parsePdfBytes` sets `ParsedDocument.pagesSkipped = { read, total }` when truncated.
+- edited: `lib/importers/adapter.ts`: optional `pagesSkipped` on `ParsedDocument` (counts only).
+- edited: `components/import/MappingReview.tsx`: one line under the header, "We read the first 30 of 31 pages.
+  Anything after page 30 is not in this review; add it in the builder after importing."
+  (`data-testid="import-pages-skipped"`).
+- edited: `scripts/import-fixtures.test.mjs` (30 of 31 reported, 6-page file reports nothing, 1-page cap not
+  truncated), `scripts/import-smoke.mjs` (s5-31-pages.pdf case; line present for it, absent for text-cv.pdf),
+  `docs/import-errors.md`.
+**Notes / risks / follow-up:** no analytics change: no existing `cv_import` param fits and a new one is not needed to
+act on this. The cap itself is unchanged.
+**Suggested commit:** fix(import): say when a PDF's pages past 30 were not read (D7a)
+
+## [2026-10-31 15:15] Ops: daily production monitor + AI-route failures now reach Vercel's error clusters (session 6)
+
+**Goal:** production stability review (docs/ai-mission/PRODUCTION_STABILITY_2026-10-31.md). Vercel is on Hobby:
+runtime logs last 1 hour and only `console.error` lines survive 7 days (as error clusters). The AI routes answered
+502/503/504 without logging anything, so a revoked key, an exhausted Anthropic balance or a spent daily cap left no
+trace at all. And nothing exercised production after a release except a person running the smokes.
+**Files:**
+- edited: `lib/server/logRouteError.ts` - new `logAiFailure(route, kind, err?)`: one `console.error` line
+  `[route] ai_<timeout|upstream|unparseable|spend_cap|internal>`; prints Anthropic's own error body (status + JSON,
+  ≤300 chars) and reduces every other error to its name, because model output and payloads can hold CV text.
+- created: `lib/server/logRouteError.test.ts` - 4 tests incl. "a non-Anthropic message is never printed".
+- edited: `app/api/{ai-improve,cover-letter,linkedin-message,jd-match,jd-match/rewrite-bullet,resume-checker/parse}/route.ts`
+  - call it on timeout / upstream failure / unusable output / 500; parse also logs a failed `saveReport`.
+  `lib/server/spendGuard.ts` - `spendCapResponse` logs `ai_spend_cap` (covers every AI route).
+  `ai-improve` no longer returns Anthropic's raw error text to the browser (now the same sentence as the other routes).
+- created: `.github/workflows/prod-monitor.yml` - daily 04:00 UTC + dispatch + push-on-change: `/api/health`, 6
+  public URLs, `smoke:builder`, `smoke:import`, `smoke:checker` against https://app.makemycv.ae (one retry each),
+  screenshots + logs as artifacts, one open `prod-monitor` issue on failure (closed on recovery), job fails.
+  Dispatch input `simulate_failure=true` is an alert drill (one fake failing row; the next normal run closes the issue).
+- created: `scripts/monitor-screenshots.mjs` - full-page PNGs of the 5 public pages, analytics blocked.
+- edited: `scripts/builder-smoke.mjs`, `scripts/checker-smoke.mjs` - `SMOKE_BLOCK_ANALYTICS=1` aborts GTM / GA /
+  doubleclick / Speed Insights requests (default unchanged); dataLayer assertions unaffected.
+**Notes / risks / follow-up:** `schedule:` only fires from `main`; until the next release the monitor runs by hand
+(`gh workflow run prod-monitor.yml --ref stagingmmc`). Runs from stagingmmc use stagingmmc's smoke scripts, which
+can be ahead of production (a new import expectation fails there until it ships). No AI call is made: the checker
+smoke stubs `/api/resume-checker/parse`. Verification: tsc, lint 11/11, `npm test` 3 suites, the three smokes against
+production with `SMOKE_BLOCK_ANALYTICS=1` all passed locally.
+**Suggested commit:** feat(ops): daily production monitor + log AI-route failures
+
 ## [2026-10-31 22:50] Import: "Page N of M" footers no longer become roles (session 5 D7b)
 
 **Goal:** Minor defect D7(b) (IMPORT_MONITORING.md §8.3): page-number footer lines were not stripped, so a CV whose

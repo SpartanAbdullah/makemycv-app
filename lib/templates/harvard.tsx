@@ -15,7 +15,7 @@ import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
-import { getFullName } from "./utils";
+import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
 
 /**
@@ -301,7 +301,7 @@ export const HarvardTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
     return (
       <ul className="marker:text-black" style={bulletListStyle}>
         {items.map((bullet, index) => (
-          <li key={index} style={{ ...bodyStyle, marginBottom: "1px" }}>
+          <li key={index} {...bulletLiProps(bullet, bulletListStyle.paddingLeft, { ...bodyStyle, marginBottom: "1px" })}>
             {bullet}
           </li>
         ))}
@@ -314,7 +314,7 @@ export const HarvardTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
 
   return (
     <div
-      className="cv-print relative overflow-hidden bg-white"
+      className="cv-print cv-bidi relative overflow-hidden bg-white"
       style={{
         fontFamily: theme.fontFamily,
         padding: `${px(HARVARD_PAGE_PADDING_PT.vertical) * m}px ${

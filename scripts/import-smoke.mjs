@@ -66,7 +66,32 @@ const CASES = [
   ["s5-header-table.docx", "import"],
   ["s5-arabic-majority.pdf", "import"],
   ["arabic-export-classic.pdf", "import"],
+  // Session 6 (D7a): 31 pages, one past MAX_PDF_PAGES.
+  ["s5-31-pages.pdf", "import"],
+  // Session 6: a cover letter with a contact header (matrix case 10a).
+  ["s5-cover-letter-contact.pdf", "import"],
+  // Session 6 (D11): extension / bytes mismatch (matrix cases 9a / 9b).
+  ["s5-docx-bytes.pdf", "corrupt_pdf"],
+  ["s5-pdf-bytes.docx", "corrupt_docx"],
 ];
+
+// D11 (session 6): the error bar names the real type for a renamed file.
+const EXPECT_MESSAGE = {
+  "s5-docx-bytes.pdf": /actually a Word document with a \.pdf name/,
+  "s5-pdf-bytes.docx": /actually a PDF with a \.docx name/,
+};
+
+// D7a (session 6): the review names the pages it read when the PDF is longer
+// than MAX_PDF_PAGES, and says nothing for a normal file.
+const EXPECT_PAGES_SKIPPED = {
+  "s5-31-pages.pdf": /We read the first 30 of 31 pages/,
+  "text-cv.pdf": null,
+};
+// Session 6: a letter gets a pointer to /cover-letter; a CV does not.
+const EXPECT_COVER_HINT = {
+  "s5-cover-letter-contact.pdf": true,
+  "text-cv.pdf": false,
+};
 
 // Experience cards the review must show (D1, 2026-10-31). Both files hold two
 // roles whose dates sit on the line under the title; until the fix the review
@@ -75,6 +100,8 @@ const CASES = [
 const EXPECT_ROLES = {
   "text-cv.pdf": 2,
   "two-column-table.docx": 2,
+  // Session 6: its Arabic repeat of role 1 is unplaced, not a third card.
+  "rtl-mixed.docx": 2,
   "s5-long-wrapped.pdf": 3,
   "s5-header-table.docx": 3,
 };
@@ -138,6 +165,20 @@ async function runCase(name, file, expected) {
           if (roles === EXPECT_ROLES[name]) ok(`${name}: review shows ${roles} experience cards`);
           else fail(`${name}: review shows ${EXPECT_ROLES[name]} experience cards`, `got ${roles}`);
         }
+        if (name in EXPECT_PAGES_SKIPPED) {
+          const want = EXPECT_PAGES_SKIPPED[name];
+          const line = review.getByTestId("import-pages-skipped");
+          const shown = (await line.isVisible().catch(() => false)) ? ((await line.textContent()) ?? "").trim() : null;
+          if (want ? shown && want.test(shown) : shown === null) ok(`${name}: pages-skipped line ${want ? `"${shown}"` : "absent"} (D7a)`);
+          else fail(`${name}: pages-skipped line (D7a)`, `expected ${want ?? "none"}, got ${JSON.stringify(shown)}`);
+        }
+        if (name in EXPECT_COVER_HINT) {
+          const hint = review.getByTestId("import-cover-letter-hint");
+          const shown = await hint.isVisible().catch(() => false);
+          const href = shown ? await hint.getByRole("link").getAttribute("href").catch(() => null) : null;
+          if (EXPECT_COVER_HINT[name] ? shown && href === "/cover-letter" : !shown) ok(`${name}: cover-letter hint ${shown ? `shown → ${href}` : "absent"}`);
+          else fail(`${name}: cover-letter hint`, `expected ${EXPECT_COVER_HINT[name] ? "shown" : "absent"}, shown=${shown} href=${href}`);
+        }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }
@@ -174,6 +215,10 @@ async function runCase(name, file, expected) {
     }
   } else if (pushes[0].event === "cv_import_failed" && pushes[0].error_reason === expected && REASONS.has(expected)) {
     ok(`${label} — "${message.slice(0, 90)}"`);
+    if (EXPECT_MESSAGE[name]) {
+      if (EXPECT_MESSAGE[name].test(message)) ok(`${name}: copy names the real type (D11)`);
+      else fail(`${name}: copy names the real type (D11)`, `"${message}"`);
+    }
   } else {
     fail(label, `outcome=${outcome}; ${summary}; message="${message.slice(0, 90)}"`);
   }
@@ -427,7 +472,92 @@ async function checkFirstImportToast() {
   }
 }
 
+// ── Slow reads (session 6 D10) ─────────────────────────────────────────────
+// Production 2026-10-31 (matrix case 12a): on a slow link the user waited 57 s
+// on "Reading your PDF" with no word, and the 45 s budget never fired because
+// loading pdf.js and probing the worker ran before it started.
+/** Fresh context; `routeWorker(route)` handles every pdf.worker.min.mjs request. */
+async function withWorkerRoute(routeWorker, fn) {
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  await c.route("**/pdf.worker.min.mjs", routeWorker);
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByRole("button", { name: /Import existing CV/ }).waitFor({ timeout: 30000 });
+    await pg.evaluate(() => { window.dataLayer = []; });
+    return await fn(pg);
+  } finally {
+    await c.close();
+  }
+}
+const importPushes = (pg) =>
+  pg.evaluate(() => (window.dataLayer ?? []).filter((e) => e && typeof e.event === "string" && e.event.startsWith("cv_import")).map((e) => `${e.event}${e.error_reason ? `(${e.error_reason})` : ""}`));
+const hold = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 1. The worker script itself takes 12 s (the HEAD probe answers at once): the
+//    "still reading" line appears after ~8 s and the import then completes.
+async function checkSlowReadHint() {
+  const label = "slow read (D10): \"Still reading your file…\" after ~8 s, then the review";
+  await withWorkerRoute(
+    async (route) => {
+      if (route.request().method() === "GET") await hold(12000);
+      await route.continue().catch(() => {});
+    },
+    async (pg) => {
+      if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened");
+      const t0 = Date.now();
+      const hint = pg.getByTestId("import-slow-hint");
+      const review = pg.getByRole("dialog", { name: /Import from/ });
+      let hintAt = null;
+      while (Date.now() - t0 < 60000) {
+        if (hintAt === null && /Still reading your file/.test((await hint.textContent().catch(() => "")) ?? "")) hintAt = Date.now() - t0;
+        if (await review.isVisible().catch(() => false)) break;
+        await pg.waitForTimeout(200);
+      }
+      const reviewAt = Date.now() - t0;
+      const opened = await review.isVisible().catch(() => false);
+      if (opened && hintAt !== null && hintAt >= 7500 && hintAt < 11000) ok(`${label} — hint at ${(hintAt / 1000).toFixed(1)} s, review at ${(reviewAt / 1000).toFixed(1)} s`);
+      else fail(label, `hint at ${hintAt === null ? "never" : `${hintAt} ms`}, review ${opened ? `at ${reviewAt} ms` : "never opened"}`);
+    },
+  );
+}
+
+// 2. The worker HEAD probe never answers within the budget: before session 6
+//    this sat outside the 45 s clock (the read started afresh after it). Now
+//    the pick ends in cv_import_failed(timeout) about 45 s after it started.
+async function checkProbeUnderDeadline() {
+  const label = "worker probe held 60 s (D10): timeout at ~45 s from the pick";
+  await withWorkerRoute(
+    async (route) => {
+      if (route.request().method() === "HEAD") await hold(60000);
+      await route.continue().catch(() => {});
+    },
+    async (pg) => {
+      if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return fail(label, "file chooser never opened");
+      const t0 = Date.now();
+      const errorBar = pg.getByTestId("import-error");
+      const review = pg.getByRole("dialog", { name: /Import from/ });
+      let outcome = "nothing";
+      while (Date.now() - t0 < 75000) {
+        if (await errorBar.isVisible().catch(() => false)) { outcome = "error"; break; }
+        if (await review.isVisible().catch(() => false)) { outcome = "review"; break; }
+        await pg.waitForTimeout(250);
+      }
+      const took = Date.now() - t0;
+      const pushes = await importPushes(pg);
+      if (outcome === "error" && pushes.length === 1 && pushes[0] === "cv_import_failed(timeout)" && took >= 43000 && took < 50000) {
+        ok(`${label} — ${pushes[0]} after ${(took / 1000).toFixed(1)} s`);
+      } else {
+        fail(label, `outcome=${outcome} after ${took} ms; pushes=${JSON.stringify(pushes)}`);
+      }
+    },
+  );
+}
+
 for (const [w, h] of CONSENT_VIEWPORTS) await checkConsentOverlap(w, h);
+await checkSlowReadHint();
+await checkProbeUnderDeadline();
 await checkImportAfterTyping();
 await checkErrorClearedByNextPick();
 await checkFirstImportToast();

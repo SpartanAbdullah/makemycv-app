@@ -11,6 +11,7 @@ import {
 // ONE run (session 4, 2026-10-31 — see ArabicText.tsx and
 // lib/pdf/arabicText.ts); Latin-only runs are returned untouched.
 import { Link, Text } from "./ArabicText";
+import { ARABIC_NAME_LINE_HEIGHT, containsArabic, firstStrongDirection } from "../../lib/pdf/arabicText";
 import type { Style } from "@react-pdf/types";
 import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";
@@ -118,6 +119,46 @@ const GREEN_700 = "#15803D";
 
 /** The live templates are written in CSS px (96 DPI); react-pdf is pt (72). */
 const pt = (px: number) => px * 0.75;
+
+/**
+ * Box of a role title that shares a row with its dates (E8.2, session 6).
+ * The live templates size that element to its content (justify-between pushes
+ * the dates right); the PDF stretches it with `flex: 1` so a long title wraps.
+ * For left-aligned Latin the two are indistinguishable and `flex: 1` stays.
+ * An Arabic-first title aligns right (its paragraph direction), so in a
+ * stretched box it would sit against the dates while the preview keeps it at
+ * the start of the row: such a title gets a content-sized, shrinkable box,
+ * which still wraps at the row width.
+ */
+const roleBox = (text: string): Style =>
+  firstStrongDirection(text) === "rtl" ? { flexGrow: 0, flexShrink: 1 } : { flex: 1 };
+/**
+ * Bullet row of an Arabic-first bullet (session 6, E8.2 follow-up). The text
+ * aligns right (its paragraph direction), so the marker moves to the right
+ * too, right before the text in reading order: the row is reversed and the
+ * list's left padding is mirrored onto the right (margin -pad / +pad), so the
+ * marker sits as far from the right edge, and as close to its text, as an
+ * LTR marker does on the left; the text box keeps its width. The live lists
+ * do the same with `dir="rtl"` + mirrored margins (lib/templates/utils.ts
+ * `bulletLiProps`). Latin bullets get {} — identical styles. Banner,
+ * Chronicle and Harvard draw their dot INSIDE the list padding (their LTR
+ * text sits pad + dot in), so they pass the live padding minus the dot width:
+ * the RTL text then ends exactly where the live list puts it.
+ */
+const bulletRowDir = (text: string, listPadLeft: number): Style =>
+  firstStrongDirection(text) === "rtl"
+    ? { flexDirection: "row-reverse", marginLeft: -listPadLeft, marginRight: listPadLeft }
+    : {};
+/** The marker glyph sits at the outer edge of its box, mirrored with the row. */
+const bulletDotDir = (text: string): Style => (firstStrongDirection(text) === "rtl" ? { textAlign: "right" } : {});
+
+/** `base` with its `flex` shorthand swapped for roleBox (Gulf Standard's entry title carries `flex: 1`). */
+const withRoleBox = (base: Style, text: string): Style => {
+  if (firstStrongDirection(text) !== "rtl") return base;
+  const { flex: _flex, ...rest } = base;
+  void _flex;
+  return { ...rest, ...roleBox(text) };
+};
 /**
  * The line box of every live run that sets no line-height of its own:
  * headings, side labels, chips and entry rows inherit `line-height: 1.5`
@@ -398,11 +439,12 @@ const BulletList = ({
 }) => {
   const items = bullets.map((b) => b.trim()).filter(Boolean);
   if (items.length === 0) return null;
+  const listPad = Number(styles?.list?.paddingLeft ?? s.bulletList?.paddingLeft ?? 0) || 0;
   return (
     <View style={{ ...s.bulletList, ...styles?.list }}>
       {items.map((bullet, bi) => (
-        <View key={bi} style={{ ...s.bulletItem, ...styles?.item, ...(styles?.gap && bi > 0 ? { marginTop: styles.gap } : {}) }}>
-          <Text style={{ ...s.bulletDot, ...styles?.dot }}>•</Text>
+        <View key={bi} style={{ ...s.bulletItem, ...styles?.item, ...(styles?.gap && bi > 0 ? { marginTop: styles.gap } : {}), ...bulletRowDir(bullet, listPad) }}>
+          <Text style={{ ...s.bulletDot, ...styles?.dot, ...bulletDotDir(bullet) }}>•</Text>
           <Text style={{ ...s.bulletText, ...styles?.text }}>{bullet}</Text>
         </View>
       ))}
@@ -467,7 +509,7 @@ const ExperienceEntry = ({
           gap: 6,
         }}
       >
-        <Text style={{ ...v.roleStyle, flex: 1 }}>{role.role?.trim() || "Role"}</Text>
+        <Text style={{ ...v.roleStyle, ...roleBox(role.role ?? "") }}>{role.role?.trim() || "Role"}</Text>
         <Text style={{ ...v.dateStyle, flexShrink: 0, textAlign: "right" }}>
           {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
         </Text>
@@ -1120,7 +1162,7 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
                     gap: pt(12),
                   }}
                 >
-                  <Text style={{ ...entryTitle, lineHeight: 1.35 * ls, flex: 1 }}>
+                  <Text style={{ ...entryTitle, lineHeight: 1.35 * ls, ...roleBox(`${role.role ?? ""} ${role.company ?? ""}`) }}>
                     {role.role?.trim() || "Role"}
                     {role.company ? (
                       <Text style={{ ...regular, color: SLATE_700 }}>
@@ -2133,8 +2175,8 @@ const ModernBullets = ({
   return (
     <View style={{ marginTop, paddingLeft: 6 }}>
       {bullets.map((bullet, i) => (
-        <View key={i} style={{ flexDirection: "row" }}>
-          <Text style={{ ...style, width: 9 }}>•</Text>
+        <View key={i} style={{ flexDirection: "row", ...bulletRowDir(bullet, 6) }}>
+          <Text style={{ ...style, width: 9, ...bulletDotDir(bullet) }}>•</Text>
           <Text style={{ ...style, flex: 1 }}>{bullet}</Text>
         </View>
       ))}
@@ -2433,7 +2475,7 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
                           gap: 6,
                         }}
                       >
-                        <Text style={{ ...bodyStrong, flex: 1 }}>
+                        <Text style={{ ...bodyStrong, ...roleBox(role.role ?? "") }}>
                           {role.role?.trim() || "Role"}
                         </Text>
                         {/* the date span inherits the row's font-semibold */}
@@ -3146,7 +3188,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
               fontSize: 20 * theme.fontScale,
               fontFamily: fonts.bold, fontWeight: 700,
               color: "#0F172A",
-              lineHeight: 1.15 * theme.lineScale,
+              lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * theme.lineScale,
             }}
           >
             {name}
@@ -3657,7 +3699,7 @@ const ProfessionalPDFLayout = ({
             // title row, the location line and the bullet list.
             <View key={role.id} style={{ marginTop: i > 0 ? pt(12) : 0 }} minPresenceAhead={48}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: pt(12) }}>
-                <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: 1.35 * ls, color: SLATE_800, flex: 1 }}>
+                <Text style={{ ...bold, fontSize: pt(12) * fs, lineHeight: 1.35 * ls, color: SLATE_800, ...roleBox(`${role.role ?? ""} ${role.company ?? ""}`) }}>
                   {role.role?.trim() || "Role"}
                   {role.company ? (
                     <Text style={{ ...regular, color: SLATE_600 }}>{` | ${role.company.trim()}`}</Text>
@@ -4569,8 +4611,8 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 3, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 2 }}>
-            <Text style={{ ...bodyText, width: 10, color: SLATE_400 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 2, ...bulletRowDir(bullet, Math.max(0, pt(16) - 10)) }}>
+            <Text style={{ ...bodyText, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...bodyText, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
@@ -5057,7 +5099,7 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
             minHeight: showPhoto ? photoHeight : undefined,
           }}
         >
-          <Text style={{ fontSize: 20 * fs, lineHeight: 1.15 * ls, ...bold, color: SLATE_900 }}>
+          <Text style={{ fontSize: 20 * fs, lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * ls, ...bold, color: SLATE_900 }}>
             {name}
           </Text>
           {headline ? (
@@ -5169,7 +5211,7 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
                 minPresenceAhead={48}
               >
                 <View style={entryRow}>
-                  <Text style={entryTitle}>{role.role?.trim() || "Role"}</Text>
+                  <Text style={withRoleBox(entryTitle, role.role ?? "")}>{role.role?.trim() || "Role"}</Text>
                   <Text style={dateStyle}>
                     {formatDateRange(role.startDate, role.endDate, role.isCurrent)}
                   </Text>
@@ -5414,8 +5456,8 @@ const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 2, paddingLeft: 10 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5 }}>
-            <Text style={{ ...body, width: 10, color: SLATE_400 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 1.5, ...bulletRowDir(bullet, Math.max(0, pt(14) * fs - 10)) }}>
+            <Text style={{ ...body, width: 10, color: SLATE_400, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
@@ -5814,8 +5856,8 @@ const HarvardPDFLayout = ({ data }: { data: CvData }) => {
     return (
       <View style={{ marginTop: 1.5, paddingLeft: 12 }}>
         {list.map((bullet, i) => (
-          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75 }}>
-            <Text style={{ ...body, width: 9 }}>•</Text>
+          <View key={i} style={{ flexDirection: "row", marginBottom: 0.75, ...bulletRowDir(bullet, Math.max(0, pt(16) * fs - 9)) }}>
+            <Text style={{ ...body, width: 9, ...bulletDotDir(bullet) }}>•</Text>
             <Text style={{ ...body, flex: 1 }}>{bullet}</Text>
           </View>
         ))}
