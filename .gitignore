@@ -55,3 +55,6 @@ next-env.d.ts
 # pdf-fidelity harness output (scripts/pdf-fidelity.mjs)
 .fidelity-pdfs/
 .pdf-fidelity-build/
+
+# perf measurements (scripts/perf-measure.mjs)
+/.perf-results

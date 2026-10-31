@@ -16,6 +16,80 @@ Format:
 
 ---
 
+## [2026-10-31 17:10] smoke:checker: allow the pdf.js worker HEAD probe in the privacy assertion
+
+**Goal:** `npm run smoke:checker` has been red since `45ade82` (this morning's import commit): the new
+`resolveWorkerSrc` HEAD-probes `/pdf.worker.min.mjs` once per page, and the smoke counted every same-origin
+non-GET request as a payload leaving the browser, so it reported
+`["/pdf.worker.min.mjs","/api/resume-checker/parse"]`. Found while running the gates for the performance review.
+**Files:**
+- edited: `scripts/checker-smoke.mjs` — the request recorder ignores `HEAD /pdf.worker.min.mjs` (no body, nothing
+  of the CV travels with it); every other non-GET request is still counted and the body-key check is unchanged.
+**Notes / risks / follow-up:** The assertion still fails on any additional POST/PUT or on a changed parse body.
+**Suggested commit:** test(checker-smoke): ignore the body-less pdf.js worker HEAD probe
+
+## [2026-10-31 16:30] Reliability: bounded wait on every Claude call (504 + sentence instead of a dead spinner)
+
+**Goal:** Performance/reliability review (session 4, priority 9). None of the six Anthropic `fetch()` calls
+(`ai-improve`, `jd-match`, `jd-match/rewrite-bullet`, `cover-letter`, `linkedin-message`,
+`lib/resumeChecker/parse.ts`) passed a `signal`, and none of the client hooks has a timeout either, so a stalled
+upstream held the spinner until the platform killed the function — 60 s on the parse route (`maxDuration`), the
+platform default (minutes) elsewhere — and the user then saw "Something went wrong" from a body-less 504.
+**Files:**
+- edited: `lib/server/anthropic.ts` — `ANTHROPIC_TIMEOUT_MS` (25 s, small prompts ≤ 2048 tokens; observed latency is
+  single-digit seconds), `ANTHROPIC_PARSE_TIMEOUT_MS` (45 s; the route's maxDuration is 60 and scoring + KV write
+  follow), `anthropicSignal()` (`AbortSignal.timeout`), `isTimeoutError()` (TimeoutError / AbortError by name),
+  `UPSTREAM_TIMEOUT_BODY` + `UPSTREAM_TIMEOUT_STATUS` (504; `error` is the field every AI hook renders).
+- edited: the five `app/api/**/route.ts` above — `signal: anthropicSignal()` on the fetch; a timeout returns the 504
+  immediately and is NOT retried (the 2-attempt loops would otherwise double a 25 s wait behind the same spinner).
+- edited: `lib/resumeChecker/parse.ts` — 45 s signal; `ParseError` gains `{ kind: "claude-timeout" }`;
+  `app/api/resume-checker/parse/route.ts` maps it to the 504 body (with `requestId`).
+- edited: `lib/server/anthropic.test.ts` — a local `http.createServer` that never answers: fetch with the signal
+  rejects as a timeout at the cap (120 ms cap → rejected in 160 ms); `isTimeoutError` ignores ordinary failures.
+**Notes / risks / follow-up:** Before: unbounded (platform-killed). After: ≤ 25 s / ≤ 45 s, then a sentence and a
+retry. The hooks (`useAIImprove`, `useJdMatch`, `useCoverLetter`, `useLinkedinMessage`, `useBulletRewrite`) and
+`UploadDropzone` already render `data.error` for non-429 failures, so no client change was needed. The client
+still has no timeout of its own — if the function itself is unreachable the browser waits for the platform's
+answer; left as is (one more layer for a case the 504 now covers). Measured figures and the deferred list are in
+`docs/performance-2026-10-31.md`.
+**Suggested commit:** fix(api): bound every Anthropic call with AbortSignal.timeout, answer 504 with a message
+
+## [2026-10-31 16:20] Reliability: side-record localStorage writes cannot throw out of a store action
+
+**Goal:** Same review. `setIsPro`, `setHasUsedFreeDownload`, `setParseSignals` and `captureScoreBaseline` in
+`lib/store/cvStore.ts` wrote with a bare `localStorage.setItem` BEFORE their `set()`. A `QuotaExceededError` or a
+private-mode refusal threw out of the action, so a checker import (which calls the last two) could crash half-way
+as a React event-handler error instead of degrading to the TopBar's "could not save" chip. The CV itself was never
+at risk — `saveCvToStorage` already returns `false` and flips `saveError` — but a crash mid-import reads as a lost
+import.
+**Files:**
+- edited: `lib/store/cvStore.ts` — exported `writeStorage(key, value): boolean` (try/catch, console.warn, never
+  throws); the four actions use it. Photo note: `resizeAndCropToSquare` already caps a 5 MB upload at 200×200 JPEG
+  q0.85 (≈ 10–15 KB base64), so the photo cannot fill the 5 MB origin quota on its own — no compression change.
+- edited: `lib/store/scoreBaseline.test.ts` — `writeStorage` returns false (not throws) on a refused write, stores
+  on success, no-op without `window`.
+**Notes / risks / follow-up:** Behaviour on the happy path is identical. `setJdTarget` already had its own
+try/catch and is untouched.
+**Suggested commit:** fix(store): never throw out of a store action on a refused localStorage write
+
+## [2026-10-31 16:00] Perf harness: scripts/perf-measure.mjs
+
+**Goal:** Reproducible numbers for the performance review — nothing in the repo measured load, typing, preview,
+export or import time.
+**Files:**
+- created: `scripts/perf-measure.mjs` — Playwright + installed Chrome against a production build: `/builder` cold
+  load (TTFB, FCP, LCP, hydration = React props on the first input, JS transferred/decoded, first Continue),
+  per-keystroke React work (capture→bubble on `input`) and input→paint for 50 characters in First name and Summary,
+  input → first `.cv-print` mutation (preview), Download click → PDF blob (`URL.createObjectURL` hook; dense persona
+  = classic profile with experience tripled, from the `smoke:pdf` build), import of `text-cv.pdf` /
+  `header-contact.docx` / a 25 MB PDF, checker file → `POST /parse` sent (route answered locally), and Pixel 7 +
+  4× CPU for cold load and typing. Medians over `RUNS` (default 3); JSON in `.perf-results/`.
+- edited: `.gitignore` — `/.perf-results`.
+**Notes / risks / follow-up:** Not a `test:*` script (needs a server + Chrome, and it reports numbers rather than
+pass/fail). Usage in the file header. Event Timing API was not used for typing because Chrome clamps
+`durationThreshold` to 16 ms, which hides exactly the keystrokes we care about.
+**Suggested commit:** chore(perf): add scripts/perf-measure.mjs runtime measurement harness
+
 ## [2026-10-31 13:40] CV import: failure taxonomy, pre-parse gate, encrypted/scan/.doc detection, header text, empty-mapping guard
 
 **Goal:** GA4 (Oct 3–30) shows `cv_import` 296 / 234 users and `cv_import_failed` 41 / 19 users. Establish
