@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { containsArabic, firstStrongDirection, shapeArabic, toLogicalArabic, unjoinedArabicLetters } from "./arabicText";
+import {
+  containsArabic,
+  firstStrongDirection,
+  shapeArabic,
+  shapeArabicSegments,
+  toLogicalArabic,
+  unjoinedArabicLetters,
+} from "./arabicText";
 
 const cps = (s: string) => Array.from(s, (c) => c.codePointAt(0)!.toString(16).toUpperCase());
 
@@ -76,6 +83,29 @@ describe("shapeArabic joining forms", () => {
     // کۂ → ک(init) ہ(final) + hamza above
     assert.deepEqual(cps(shapeArabic("کۂ")), ["FB90", "FBA7", "654"]);
     assert.equal(toLogicalArabic(shapeArabic("کۂ")), "کۂ");
+  });
+});
+
+describe("shapeArabicSegments (E8.5 — several runs on one line)", () => {
+  it("shapes the runs as one text and splits the result back per run", () => {
+    const runs = ["محلل سلسلة التوريد", " | شركة الخليج للخدمات اللوجستية"];
+    const parts = shapeArabicSegments(runs);
+    assert.equal(parts.length, 2);
+    assert.equal(parts.join(""), shapeArabic(runs.join("")));
+    assert.deepEqual(parts.map(toLogicalArabic), runs.map((r) => r.normalize("NFKC")));
+  });
+
+  it("joins letters across a run boundary", () => {
+    // محمد split mid-word: م(init) ح(medial) | م(medial) د(final)
+    assert.deepEqual(shapeArabicSegments(["مح", "مد"]).map(cps), [["FEE3", "FEA4"], ["FEE4", "FEAA"]]);
+  });
+
+  it("gives a lam-alef that straddles two runs to the run of the lam", () => {
+    assert.deepEqual(shapeArabicSegments(["ل", "ا"]).map(cps), [["FEFB"], []]);
+  });
+
+  it("returns Latin-only runs unchanged (no ligature pre-composition)", () => {
+    assert.deepEqual(shapeArabicSegments(["Office", " | Profit"]), ["Office", " | Profit"]);
   });
 });
 

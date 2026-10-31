@@ -9,6 +9,7 @@ import { educationTitle, meaningfulEducation } from "../utils/education";
 import { splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { ARABIC_NAME_LINE_HEIGHT, containsArabic } from "../pdf/arabicText";
 
 /**
  * "Gulf Standard" — the traditional UAE/Gulf expat CV (template audit
@@ -348,7 +349,7 @@ export const GulfStandardTemplate = ({
               style={{
                 margin: 0,
                 fontSize: `${27 * fs}px`,
-                lineHeight: 1.15 * ls,
+                lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * ls,
                 fontWeight: 700,
                 color: SLATE_900,
                 overflowWrap: "anywhere",

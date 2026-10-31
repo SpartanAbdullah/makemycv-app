@@ -109,10 +109,19 @@ fidelity composites) and the "Session 4 — Arabic" section of
   a mixed line still depends on the tool (see the session-6 matrix in
   `docs/ai-mission/ARABIC_PRODUCTION_2026-10-31.md` in the parent folder), and
   pdfminer-based parsers still read Arabic in visual (reversed) order.
-- **One run per line.** Inside a `<Text>` that contains Arabic, a nested bold
-  label loses its weight, a `<Link>` loses its hyperlink (text stays), Latin
-  words are set in Vazirmatn's Latin instead of Inter / Bricolage / Instrument
-  Serif, and letter-spacing is dropped. Lines without Arabic are unaffected.
+- **One face per Arabic-bearing line.** Since session 6 (E8.5) nested
+  `<Text>` / `<Link>` children of an Arabic-bearing `<Text>` stay their own
+  runs — Classic's bold role next to a regular company keeps both weights, a
+  nested link keeps its hyperlink — because the textkit patch keeps every
+  glyph in its own run. All runs of such a line are shaped together
+  (`shapeArabicSegments`, letters join across a run boundary) and are all
+  set in Vazirmatn: Latin words on an Arabic-bearing line use Vazirmatn's
+  Latin instead of Inter / Bricolage / Instrument Serif, and letter-spacing is
+  dropped. A child of any other element type falls back to one flattened
+  run. Lines without Arabic are unaffected.
+- **Arabic names in Gulf Standard and Corporate** (E8.6) use a 1.35 line
+  height instead of 1.15 (`ARABIC_NAME_LINE_HEIGHT`, preview and PDF), so the
+  dots under a final ي clear the headline.
 - **Paragraph direction (session 6, E8.2 — owner decision taken: first
   strong, per paragraph, in both renderers).** Session 5 measured that
   BOTH renderers used an LTR base (`@react-pdf/layout` defaults `direction`

@@ -25,6 +25,24 @@ Format:
 
 ---
 
+## [2026-11-01 01:10] Arabic PDF: role stays bold and company regular on one line; room under Arabic names (session 6, E8.5 + E8.6)
+
+**Goal:** E8.5 — Classic's "role | company" line printed entirely bold when it contained Arabic (the session-4 one-run
+rule), and a link inside an Arabic line lost its hyperlink. E8.6 — in Gulf Standard and Corporate the dots under a
+bold Arabic name's final ي nearly touched the headline.
+**Files:**
+- edited: `lib/pdf/arabicText.ts` (+ tests) — `shapeArabicSegments()`: the runs of one line are shaped together
+  (joining across a run boundary) and split back per run; `shapeArabic` is its one-run case. `ARABIC_NAME_LINE_HEIGHT`.
+- edited: `components/pdf/ArabicText.tsx` — nested `<Text>` / `<Link>` children stay runs (own weight, colour, link),
+  all in Vazirmatn; any other child type falls back to the flattened run. Safe only with the textkit patch (E8.1),
+  which keeps each glyph in its own run.
+- edited: `components/pdf/CVDocument.tsx`, `lib/templates/gulf-standard.tsx`, `lib/templates/corp-sidebar.tsx` — name
+  line height 1.35 when the name contains Arabic (1.15 otherwise, unchanged).
+- edited: `docs/arabic-pdf.md` — the one-run limit rewritten.
+**Notes / risks / follow-up:** persona A on Classic: Vazirmatn-Bold for the role, Vazirmatn-Regular for the company,
+both words whole in pdf.js; the email link annotation is kept. Latin text never reaches this code.
+**Suggested commit:** fix(pdf): keep run weights and links inside Arabic lines; room under Arabic names (E8.5, E8.6)
+
 ## [2026-11-01 00:40] Arabic-first paragraphs are right-to-left in the preview AND the PDF (session 6, E8.2)
 
 **Goal:** E8.2 (ARABIC_PRODUCTION_2026-10-31.md §3), owner decision taken: first-strong, per-paragraph direction in

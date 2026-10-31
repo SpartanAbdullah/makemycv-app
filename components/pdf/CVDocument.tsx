@@ -11,7 +11,7 @@ import {
 // ONE run (session 4, 2026-10-31 — see ArabicText.tsx and
 // lib/pdf/arabicText.ts); Latin-only runs are returned untouched.
 import { Link, Text } from "./ArabicText";
-import { firstStrongDirection } from "../../lib/pdf/arabicText";
+import { ARABIC_NAME_LINE_HEIGHT, containsArabic, firstStrongDirection } from "../../lib/pdf/arabicText";
 import type { Style } from "@react-pdf/types";
 import type { ReactNode } from "react";
 import type { CvData, PlanTier } from "../../lib/types/cv";
@@ -3167,7 +3167,7 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
               fontSize: 20 * theme.fontScale,
               fontFamily: fonts.bold, fontWeight: 700,
               color: "#0F172A",
-              lineHeight: 1.15 * theme.lineScale,
+              lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * theme.lineScale,
             }}
           >
             {name}
@@ -5078,7 +5078,7 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
             minHeight: showPhoto ? photoHeight : undefined,
           }}
         >
-          <Text style={{ fontSize: 20 * fs, lineHeight: 1.15 * ls, ...bold, color: SLATE_900 }}>
+          <Text style={{ fontSize: 20 * fs, lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * ls, ...bold, color: SLATE_900 }}>
             {name}
           </Text>
           {headline ? (

@@ -52,6 +52,13 @@ const ARABIC_RE = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
 
 export const containsArabic = (text: string): boolean => ARABIC_RE.test(text);
 
+/**
+ * Line-height ratio for a large name that contains Arabic (session 6, E8.6).
+ * Gulf Standard and Corporate set the name at 1.15; Vazirmatn's dots under
+ * a final ي then nearly touch the headline. Latin names keep 1.15.
+ */
+export const ARABIC_NAME_LINE_HEIGHT = 1.35;
+
 /* ── Joining table ──────────────────────────────────────────────────────── */
 
 /** [isolated, final, initial, medial]; a right-joining letter has 2 entries. */
@@ -196,10 +203,7 @@ const LATIN_LIGATURES: ReadonlyArray<readonly [RegExp, string]> = [
  * the result per line.
  */
 export function shapeArabic(text: string): string {
-  if (!containsArabic(text)) return text;
-  return shapeArabicLetters(
-    decomposeUnmapped(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text)),
-  );
+  return shapeArabicSegments([text])[0];
 }
 
 /**
@@ -254,21 +258,25 @@ export const shapedLetterCodePoints = (): number[] => [
   ...new Set([...Object.values(FORMS).flat(), ...Object.values(LAM_ALEF).flat()]),
 ];
 
-function shapeArabicLetters(text: string): string {
-  const cps = Array.from(text, (ch) => ch.codePointAt(0) as number);
-  const out: number[] = [];
+/**
+ * The joining pass over code points. Each output code point is tagged with
+ * the index of the input code point it came from, so a caller can split the
+ * shaped text back into the runs it was given (`shapeArabicSegments`).
+ */
+function shapeCodePoints(cps: number[]): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
   // Whether the previous visible letter joins forward into the current one.
   let prevJoins = false;
   for (let i = 0; i < cps.length; i += 1) {
     const cp = cps[i];
     if (isTransparent(cp)) {
-      out.push(cp);
+      out.push([cp, i]);
       continue; // marks do not change the joining state
     }
     const forms = FORMS[cp];
     if (!forms) {
       // Tatweel and ZWJ keep the joining chain alive; everything else breaks it.
-      out.push(cp);
+      out.push([cp, i]);
       prevJoins = cp === TATWEEL || cp === ZWJ;
       continue;
     }
@@ -276,8 +284,8 @@ function shapeArabicLetters(text: string): string {
     // Lam + alef → one ligature code point (the alef is consumed).
     if (cp === LAM && n < cps.length && LAM_ALEF[cps[n]]) {
       const [isol, fina] = LAM_ALEF[cps[n]];
-      out.push(prevJoins ? fina : isol);
-      for (let k = i + 1; k < n; k += 1) out.push(cps[k]); // marks between lam and alef
+      out.push([prevJoins ? fina : isol, i]);
+      for (let k = i + 1; k < n; k += 1) out.push([cps[k], k]); // marks between lam and alef
       i = n;
       prevJoins = false; // alef never joins forward
       continue;
@@ -289,10 +297,35 @@ function shapeArabicLetters(text: string): string {
     else if (prevJoins) form = forms[1]; // final
     else if (canForward) form = forms[2] as number; // initial
     else form = forms[0]; // isolated
-    out.push(form);
+    out.push([form, i]);
     prevJoins = canForward;
   }
-  return String.fromCodePoint(...out);
+  return out;
+}
+
+const prepare = (text: string): string =>
+  decomposeUnmapped(LATIN_LIGATURES.reduce((s, [re, lig]) => s.replace(re, lig), text));
+
+/**
+ * Shape several runs that sit on ONE line (session 6, E8.5 — e.g. a bold role
+ * and a regular company) as one text: joining looks across run boundaries,
+ * and the result is split back so each run keeps its own style. A lam-alef
+ * ligature that straddles two runs goes to the run of the lam. Runs are
+ * returned unchanged when the line holds no Arabic.
+ */
+export function shapeArabicSegments(segments: readonly string[]): string[] {
+  if (!containsArabic(segments.join(""))) return [...segments];
+  const cps: number[] = [];
+  const owner: number[] = [];
+  segments.forEach((seg, si) => {
+    for (const ch of prepare(seg)) {
+      cps.push(ch.codePointAt(0) as number);
+      owner.push(si);
+    }
+  });
+  const parts: number[][] = segments.map(() => []);
+  for (const [cp, src] of shapeCodePoints(cps)) parts[owner[src]].push(cp);
+  return parts.map((part) => String.fromCodePoint(...part));
 }
 
 /**

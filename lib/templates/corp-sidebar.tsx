@@ -11,6 +11,7 @@ import {
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { ARABIC_NAME_LINE_HEIGHT, containsArabic } from "../pdf/arabicText";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -187,7 +188,7 @@ export const CorpSidebarTemplate = ({
               fontWeight: 700,
               color: "#0F172A",
               letterSpacing: "-0.3px",
-              lineHeight: 1.15 * theme.lineScale,
+              lineHeight: (containsArabic(name) ? ARABIC_NAME_LINE_HEIGHT : 1.15) * theme.lineScale,
             }}
           >
             {name}
