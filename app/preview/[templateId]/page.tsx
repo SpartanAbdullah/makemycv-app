@@ -10,8 +10,8 @@ import { getTemplateById } from "@/lib/templates";
  * classic template via getTemplateById, and get the classic profile
  * re-pointed at the resolved template.
  *
- * The app is globally noindexed; this reiterates it locally and the route
- * is additionally disallowed in app/robots.ts.
+ * The app is globally noindexed; this reiterates it locally. The route is
+ * deliberately NOT disallowed in app/robots.ts, so Google can read the noindex.
  */
 export const metadata: Metadata = {
   title: "Template Preview",
