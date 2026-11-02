@@ -25,6 +25,16 @@ Format:
 
 ---
 
+## [2026-11-02 22:30] Consent banner painted with the server HTML (byte-identical with the site)
+
+**Goal:** PageSpeed mobile picked the consent banner's paragraph as the Largest Contentful Paint. The banner rendered nothing until hydration and then appeared, so the page's LCP waited on the JS bundle. Same component in both repos, so the app copy changes too.
+**Files:**
+- edited: `components/consent/ConsentBanner.tsx` - copied byte-for-byte from makemycv-site; see the site's COWORK_CHANGELOG entry of the same time for the design and the checks.
+**Notes / risks / follow-up:** Verified here: tsc, eslint on the file, `npm run test:unit`. The browser checks ran on the site build.
+**Suggested commit:** perf(consent): paint the banner with the server HTML
+
+---
+
 ## [2026-11-02 19:55] robots.txt: stop disallowing /preview so its noindex can be read
 
 **Goal:** technical SEO audit 2026-11-02, findings A6/C3. `/preview/*` was both disallowed in robots.txt and `noindex`; Google never sees a noindex on a URL it may not crawl, so an externally linked preview could show as "Indexed, though blocked by robots.txt".
