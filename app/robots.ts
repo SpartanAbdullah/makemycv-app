@@ -6,7 +6,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/_next/", "/preview", "/preview/"],
+        // /preview is NOT disallowed: its pages carry noindex, and Google
+        // can only see a noindex on a URL it is allowed to crawl.
+        disallow: ["/api/", "/_next/"],
       },
     ],
     sitemap: "https://app.makemycv.ae/sitemap.xml",

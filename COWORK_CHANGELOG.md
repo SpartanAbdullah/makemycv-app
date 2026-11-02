@@ -25,6 +25,17 @@ Format:
 
 ---
 
+## [2026-11-02 19:55] robots.txt: stop disallowing /preview so its noindex can be read
+
+**Goal:** technical SEO audit 2026-11-02, findings A6/C3. `/preview/*` was both disallowed in robots.txt and `noindex`; Google never sees a noindex on a URL it may not crawl, so an externally linked preview could show as "Indexed, though blocked by robots.txt".
+**Files:**
+- edited: `app/robots.ts` - `disallow` is now `/api/`, `/_next/` only, with a comment explaining why `/preview` is absent.
+- edited: `app/preview/[templateId]/page.tsx` - docblock updated to match (noindex stays).
+**Notes / risks / follow-up:** no behaviour change for users; the app stays globally noindexed. Verified: tsc, eslint on both files.
+**Suggested commit:** fix(seo): let crawlers read the /preview noindex
+
+---
+
 ## [2026-10-31 21:00] Classic: a right-to-left name / headline reaches the right margin (session 7, E8.8)
 
 **Goal:** backlog E8.8. Classic's header column reserves a right gutter for its corner photo (live `pr-24`, PDF 72pt).
