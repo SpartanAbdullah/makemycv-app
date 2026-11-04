@@ -845,3 +845,40 @@ describe("grade thresholds map to the ScoreChip tiers", () => {
     }
   });
 });
+
+// --- Missing fields (Sentry MAKEMYCV-APP-J/K, 2026-10) -----------------------
+// A CV restored from an older backup or import can lack fields the rules call
+// .trim() on. The engine must score it as blank, not throw: a throw here takes
+// the whole builder to its error screen.
+
+describe("missing fields never throw", () => {
+  const holey = {
+    ...blankCv(),
+    personal: { email: "a@b.co" },
+    experience: [{ id: "e1", company: "DIFC Bank" }, { id: "e2", bullets: [undefined, "Did a thing"] }],
+    education: [{ id: "d1" }],
+  } as unknown as CvData;
+
+  test("computeScore scores a CV with missing personal, experience and education fields", () => {
+    const r = computeScore(holey);
+    assert.equal(typeof r.total, "number");
+    assert.ok(Number.isFinite(r.total));
+  });
+
+  test("checker mode and derived stats survive the same CV", () => {
+    assert.doesNotThrow(() => computeScore(holey, { mode: "checker" }));
+    assert.doesNotThrow(() => computeDerivedStats(holey));
+  });
+
+  test("filling the gaps does not change the score of a complete CV", () => {
+    for (const [name, cv] of Object.entries(FIXTURES)) {
+      assert.equal(computeScore(clone(cv)).total, GOLDEN[name].total, name);
+    }
+  });
+
+  test("the caller's CV is not modified", () => {
+    const before = JSON.stringify(holey);
+    computeScore(holey);
+    assert.equal(JSON.stringify(holey), before);
+  });
+});

@@ -25,6 +25,19 @@ Format:
 
 ---
 
+## [2026-11-04 18:30] Builder no longer crashes on missing CV fields or blocked storage
+
+**Goal:** the two live crashes found in the Sentry review of 2026-11-04. Both are caught by the builder's error boundary, so the user lands on the error screen instead of their CV.
+**Files:**
+- edited: `lib/scoreEngine.ts` - new `withScoringDefaults()`: `computeScore` and `computeDerivedStats` now score a read-side copy whose personal / experience / education string fields and arrays default to "" / []. MAKEMYCV-APP-J/K (37 events, Android Chrome) were `p.firstName.trim()` / `p.headline.trim()` on a CV that lacked the field (an older backup or import shape). Fixed at the entry point rather than at the 36 `.trim()` call sites.
+- edited: `lib/utils/localStorage.ts` - `readStorage()` / `removeStorage()` that cannot throw; `loadCvFromStorage` and `clearCvStorage` use them. MAKEMYCV-APP-B (7 events, last 2026-11-03): with site storage blocked, the bare `getItem` in the first hydration threw a SecurityError.
+- edited: `lib/store/cvStore.ts` - `loadAccessState`, `clearCoupon`, `reset` and `setParseSignals` read/remove through the same helpers. Every other storage call in lib/components was already inside a try.
+- edited: `lib/scoreEngine.test.ts`, `lib/utils/localStorage.test.ts` - a holey CV scores without throwing in builder and checker mode, the goldens are unchanged, the input is not mutated; with `window.localStorage` throwing, load returns null, save returns false, removes are no-ops.
+**Notes / risks / follow-up:** tsc, lint 11/11, `npm test` (5 suites, 563 unit tests). No scoring change for complete CVs (goldens pinned). With storage blocked the builder works for the session but cannot remember the CV; the TopBar's existing "could not save" chip already says so. Where the field-less CVs come from is not proven; the guard makes the source irrelevant to the crash. Resolve MAKEMYCV-APP-J, K, B, 18 and 19 in Sentry once this reaches production.
+**Suggested commit:** fix(builder): survive missing CV fields and blocked storage
+
+---
+
 ## [2026-11-04 16:30] Proxy runs only on a visitor's first page view
 
 **Goal:** Vercel warned the free team was at its limits: Fluid Active CPU ≈ 3h59m of 4h over the last 30 days (this app 1h5m of it, climbing since the consent proxy landed on 2026-10-24) and CDN requests 755K of 1M. In Next 16 `proxy.ts` is a function, and it ran on every page view, prefetch, icon and manifest request to stamp a cookie most requests already had.

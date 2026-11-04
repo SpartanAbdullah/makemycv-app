@@ -3,9 +3,35 @@ import { CURRENT_VERSION, migrate } from "../store/migrate";
 
 const STORAGE_KEY = "makemycv:data";
 
+/**
+ * localStorage read / remove that cannot throw (2026-11-04). When the browser
+ * blocks site storage (Chrome "block third-party cookies and site data", some
+ * in-app browsers, Safari lockdown), touching `window.localStorage` at all
+ * throws a SecurityError. A bare read in the builder's first hydration took
+ * the whole page to its error screen (Sentry MAKEMYCV-APP-B). With storage
+ * blocked the builder still works for the session; it just cannot remember.
+ */
+export const readStorage = (key: string): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+export const removeStorage = (key: string): void => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* storage blocked: nothing to remove */
+  }
+};
+
 export const loadCvFromStorage = (): CvData | null => {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw = readStorage(STORAGE_KEY);
   if (!raw) return null;
   let parsed: unknown;
   try {
@@ -64,10 +90,7 @@ export const saveCvToStorage = (data: CvData): boolean => {
   }
 };
 
-export const clearCvStorage = () => {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
-};
+export const clearCvStorage = () => removeStorage(STORAGE_KEY);
 
 /**
  * Serialise a CV for the user to keep as a backup file.

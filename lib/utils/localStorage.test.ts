@@ -9,7 +9,15 @@
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { exportCvJson, readCvBackup } from "./localStorage";
+import {
+  clearCvStorage,
+  exportCvJson,
+  loadCvFromStorage,
+  readCvBackup,
+  readStorage,
+  removeStorage,
+  saveCvToStorage,
+} from "./localStorage";
 import { CURRENT_VERSION } from "../store/migrate";
 import type { CvData } from "../types/cv";
 
@@ -107,6 +115,32 @@ describe("backup round-trip", () => {
     ]) {
       const r = readCvBackup(notACv);
       assert.equal(r.ok, false, `expected rejection for ${notACv}`);
+    }
+  });
+});
+
+// Blocked storage (Sentry MAKEMYCV-APP-B, 2026-11). With site storage blocked,
+// merely reading `window.localStorage` throws a SecurityError. The builder must
+// load with an empty CV instead of crashing on its first hydration.
+describe("blocked storage", () => {
+  const g = globalThis as { window?: unknown };
+  const blocked = {
+    get localStorage(): Storage {
+      throw new Error("SecurityError: Access is denied for this document.");
+    },
+  };
+
+  test("reads return nothing and removes are no-ops instead of throwing", () => {
+    const prev = g.window;
+    g.window = blocked;
+    try {
+      assert.equal(loadCvFromStorage(), null);
+      assert.equal(readStorage("makemycv:data"), null);
+      assert.doesNotThrow(() => removeStorage("makemycv:data"));
+      assert.doesNotThrow(() => clearCvStorage());
+      assert.equal(saveCvToStorage(sample), false);
+    } finally {
+      g.window = prev;
     }
   });
 });
