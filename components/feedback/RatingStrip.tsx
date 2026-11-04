@@ -49,6 +49,14 @@ type Props = {
   source: SubscribeSource;
   /** Inline on a tinted strip (builder header) or standalone card (report page). */
   variant?: "strip" | "card";
+  /**
+   * Starting value for the email field, e.g. the address on the user's own CV
+   * (2026-11-03). It is only a convenience: nothing leaves the browser until
+   * the person presses "Send me tips", and editing or clearing the field wins.
+   * Never pass it on a page another person can open (the shared checker
+   * report), or the owner's address is shown to whoever has the link.
+   */
+  prefillEmail?: string;
 };
 
 const btnBase: React.CSSProperties = {
@@ -74,7 +82,7 @@ const input: React.CSSProperties = {
   minWidth: 0,
 };
 
-export const RatingStrip = ({ surface, source, variant = "strip" }: Props) => {
+export const RatingStrip = ({ surface, source, variant = "strip", prefillEmail = "" }: Props) => {
   // Browser-only reads, false on the server and the first paint.
   const showStars = useClientValue(() => FEEDBACK_ON && !recent(RATED_KEY, RATE_AGAIN_DAYS), false);
   const showEmail = useClientValue(() => EMAIL_ON && !recent(SUBSCRIBED_KEY, 3650), false);
@@ -86,7 +94,10 @@ export const RatingStrip = ({ surface, source, variant = "strip" }: Props) => {
   const [consent, setConsent] = useState(false);
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [email, setEmail] = useState("");
+  // null until the person types: until then the field follows the prefill,
+  // so a CV edited after the strip opened still shows the current address.
+  const [typedEmail, setEmail] = useState<string | null>(null);
+  const email = typedEmail ?? prefillEmail.trim();
   const [emailPhase, setEmailPhase] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   // Once a block has been answered its client value flips to false (so the

@@ -21,6 +21,19 @@ export default function proxy(request: NextRequest) {
   return res;
 }
 
+/*
+ * Matcher (narrowed 2026-11-04). In Next 16 the proxy runs as a Vercel
+ * function, so every match spends Fluid Active CPU — and the old pattern ran
+ * on every page view, prefetch, icon and manifest request, with the free team
+ * at its 4-hour CPU limit. Now: page paths only (no dot in the path), and
+ * only while the region cookie is missing, i.e. once per visitor per 30 days.
+ */
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|fonts|logos).*)"],
+  matcher: [
+    {
+      source: "/((?!api|_next/static|_next/image|.*\\..*).*)",
+      // = GEO_COOKIE; Next reads `config` statically, so it must be a literal.
+      missing: [{ type: "cookie", key: "mmcv_geo" }],
+    },
+  ],
 };

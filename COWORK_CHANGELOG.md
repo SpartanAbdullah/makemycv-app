@@ -25,6 +25,27 @@ Format:
 
 ---
 
+## [2026-11-04 16:30] Proxy runs only on a visitor's first page view
+
+**Goal:** Vercel warned the free team was at its limits: Fluid Active CPU ≈ 3h59m of 4h over the last 30 days (this app 1h5m of it, climbing since the consent proxy landed on 2026-10-24) and CDN requests 755K of 1M. In Next 16 `proxy.ts` is a function, and it ran on every page view, prefetch, icon and manifest request to stamp a cookie most requests already had.
+**Files:**
+- edited: `proxy.ts` - matcher only: page paths without a dot, and only while `mmcv_geo` is missing (`missing` cookie condition). Body unchanged.
+**Notes / risks / follow-up:** Verified with `next start` + curl: `/builder` sets the cookie without one and is untouched with one; `/favicon.svg`, `/site.webmanifest`, `/logos/*`, `/api/health` skip the proxy. tsc, lint 11/11, `npm run build`. The site's proxy got the same change. Separate request saving, not in code: the Sentry uptime monitor hits `/` about every 30 s (~3K requests a day); set its interval to 5 min in Sentry.
+**Suggested commit:** perf(proxy): run only on first page views
+
+---
+
+## [2026-11-03 12:00] Tips sign-up after a download starts with the CV's own email
+
+**Goal:** grow the opt-in tips list without collecting anything silently. After a download the "Send me tips" field was empty, so the person had to type the address they had just typed into their CV. It now starts with that address; signing up is one tap and still an explicit, recorded opt-in.
+**Files:**
+- edited: `components/feedback/RatingStrip.tsx` - optional `prefillEmail` prop. The field follows it until the person types (`typedEmail` is null until then), so clearing or editing the field wins.
+- edited: `components/builder/DownloadSupportCard.tsx` - passes `data.personal.email` from the CV store; also a small decorative karak-cup SVG after "buy me a karak" (palette of the www/support cups, `aria-hidden`). Re-measured per the copy-length comment: the line stays two lines (38.5px) at 320, 360 and 375px.
+**Notes / risks / follow-up:** Nothing leaves the browser until "Send me tips" is pressed; the CV-stays-local promise is unchanged. Deliberately NOT applied to the resume-checker report: that page is shareable, so a prefill would show the owner's address to anyone with the link. The field only appears with `NEXT_PUBLIC_EMAIL_SIGNUP=1`, which is still off in production until Supabase + Resend are configured.
+**Suggested commit:** feat(feedback): prefill the tips email from the CV after a download
+
+---
+
 ## [2026-11-02 22:30] Consent banner painted with the server HTML (byte-identical with the site)
 
 **Goal:** PageSpeed mobile picked the consent banner's paragraph as the Largest Contentful Paint. The banner rendered nothing until hydration and then appeared, so the page's LCP waited on the JS bundle. Same component in both repos, so the app copy changes too.

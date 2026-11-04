@@ -2,6 +2,7 @@
 
 import { SUPPORT_URL } from "../../lib/config/support";
 import { track } from "../../lib/analytics";
+import { useCvStore } from "../../lib/store/cvStore";
 import { RatingStrip } from "../feedback/RatingStrip";
 
 /**
@@ -41,7 +42,29 @@ type Props = {
   onDismiss: () => void;
 };
 
+/* A small karak cup after the link text (2026-11-03). Same palette as the
+   CSS cups on www/support (KarakPicker: gold body, foam top, gold handle);
+   the steam takes the link colour. Decorative, so aria-hidden. */
+const KarakCup = () => (
+  <svg
+    aria-hidden="true"
+    width="16"
+    height="16"
+    viewBox="0 0 20 20"
+    className="ml-1 inline-block align-[-3px]"
+  >
+    <path d="M7 2.5c-1 1 1 2 0 3.5M11 2.5c-1 1 1 2 0 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.5" />
+    <path d="M14 9.5h1.5a2.25 2.25 0 0 1 0 4.5H14" fill="none" stroke="#C49A48" strokeWidth="1.6" />
+    <path d="M3.5 8h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" fill="#D4A95A" />
+    <path d="M3.5 8h11v1.6h-11z" fill="#F6EFE0" />
+  </svg>
+);
+
 export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
+  // The address on the CV just downloaded, offered as the tips field's
+  // starting value. It stays in the browser unless the person presses
+  // "Send me tips" (see RatingStrip's prefillEmail).
+  const cvEmail = useCvStore((s) => s.data.personal.email);
   if (!open) return null;
 
   return (
@@ -67,6 +90,7 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
           onClick={() => track("support_click", { surface: "post_export" })}
         >
           buy me a karak
+          <KarakCup />
         </a>
         <span aria-hidden="true"> →</span>
       </p>
@@ -85,7 +109,7 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
           on most exports this renders nothing and the strip stays one line.
           The 64px budget above applies to the karak line only; this block
           pushes content down in-flow, it never covers anything. */}
-      <RatingStrip surface="post_export" source="post_export" />
+      <RatingStrip surface="post_export" source="post_export" prefillEmail={cvEmail} />
     </div>
   );
 };
