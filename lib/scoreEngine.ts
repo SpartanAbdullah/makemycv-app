@@ -96,7 +96,55 @@ export type ScoreDerivedStats = {
   expectedPages: 1 | 2;
 };
 
-export function computeDerivedStats(cv: CvData): ScoreDerivedStats {
+/**
+ * The rules below call `.trim()` on these fields directly, and the engine runs
+ * on whatever the store holds: a payload from an older build, or an import
+ * that left a field out. One missing `personal.firstName` was enough to throw
+ * and take the builder to its error screen (Sentry MAKEMYCV-APP-J/K,
+ * 2026-10). Fill the string fields and arrays the rules read with "" / [];
+ * this is a read-side copy, nothing is written back to the CV.
+ */
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const list = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+export function withScoringDefaults(cv: CvData): CvData {
+  const p = cv.personal ?? ({} as CvData["personal"]);
+  return {
+    ...cv,
+    personal: {
+      ...p,
+      firstName: str(p.firstName),
+      lastName: str(p.lastName),
+      headline: str(p.headline),
+      summary: str(p.summary),
+      email: str(p.email),
+      phone: str(p.phone),
+      location: str(p.location),
+      linkedin: str(p.linkedin),
+      website: str(p.website),
+    },
+    experience: list<CvData["experience"][number]>(cv.experience).map((e) => ({
+      ...e,
+      company: str(e?.company),
+      role: str(e?.role),
+      location: str(e?.location),
+      startDate: str(e?.startDate),
+      endDate: str(e?.endDate),
+      bullets: list<unknown>(e?.bullets).map(str),
+    })),
+    education: list<CvData["education"][number]>(cv.education).map((e) => ({
+      ...e,
+      school: str(e?.school),
+      degree: str(e?.degree),
+      field: str(e?.field),
+      startDate: str(e?.startDate),
+      endDate: str(e?.endDate),
+    })),
+  };
+}
+
+export function computeDerivedStats(input: CvData): ScoreDerivedStats {
+  const cv = withScoringDefaults(input);
   const bullets = cv.experience.flatMap((e) =>
     e.bullets.map((b) => b.trim()).filter(Boolean),
   );
@@ -1465,9 +1513,10 @@ function clamp(n: number): number {
  * are provided, keeping the 0–100 total comparable across modes.
  */
 export function computeScore(
-  cv: CvData,
+  input: CvData,
   options: ScoreOptions = {},
 ): ScoreReport {
+  const cv = withScoringDefaults(input);
   const mode = options.mode ?? "builder";
   const signals = options.parseSignals;
 

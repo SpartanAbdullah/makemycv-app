@@ -16,6 +16,8 @@ import {
   clearCvStorage,
   debounce,
   loadCvFromStorage,
+  readStorage,
+  removeStorage,
   saveCvToStorage,
   STORAGE_KEY,
 } from "../utils/localStorage";
@@ -373,7 +375,7 @@ const loadAccessState = (): AccessState => {
   }
 
   const storedCouponCode = getNormalizedCouponCode(
-    window.localStorage.getItem(COUPON_STORAGE_KEY) ?? "",
+    readStorage(COUPON_STORAGE_KEY) ?? "",
   );
   const hasValidCouponInStorage =
     storedCouponCode.length > 0 && isValidProCoupon(storedCouponCode);
@@ -381,7 +383,7 @@ const loadAccessState = (): AccessState => {
   return {
     isPro: true,
     hasUsedFreeDownload:
-      window.localStorage.getItem(FREE_DL_STORAGE_KEY) === "true",
+      readStorage(FREE_DL_STORAGE_KEY) === "true",
     appliedCouponCode: hasValidCouponInStorage ? storedCouponCode : "",
     proAccessSource: "free",
   };
@@ -423,26 +425,18 @@ export const useCvStore = create<CvStore>((set, get) => ({
     message: "MakeMyCV is now free — no promo code needed.",
   }),
   clearCoupon: () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(COUPON_STORAGE_KEY);
-    }
+    removeStorage(COUPON_STORAGE_KEY);
     set({ appliedCouponCode: "" });
   },
   reset: () => {
     clearCvStorage();
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
-    }
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(SCORE_BASELINE_STORAGE_KEY);
-    }
+    removeStorage(PARSE_SIGNALS_STORAGE_KEY);
+    removeStorage(SCORE_BASELINE_STORAGE_KEY);
     // Skills the user set aside are remembered outside the document (see
     // lib/skills/setAside.ts). "Start over" has to clear them too, or the next
     // CV inherits a park list belonging to a CV that no longer exists.
     clearSetAside();
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(JD_TARGET_STORAGE_KEY);
-    }
+    removeStorage(JD_TARGET_STORAGE_KEY);
     set({
       data: defaultCvData,
       parseSignals: null,
@@ -454,8 +448,8 @@ export const useCvStore = create<CvStore>((set, get) => ({
   setParseSignals: (signals) => {
     if (signals) {
       writeStorage(PARSE_SIGNALS_STORAGE_KEY, JSON.stringify(signals));
-    } else if (typeof window !== "undefined") {
-      window.localStorage.removeItem(PARSE_SIGNALS_STORAGE_KEY);
+    } else {
+      removeStorage(PARSE_SIGNALS_STORAGE_KEY);
     }
     set({ parseSignals: signals });
   },
