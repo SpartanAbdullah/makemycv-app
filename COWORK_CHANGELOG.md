@@ -25,6 +25,14 @@ Format:
 
 ---
 
+## [2026-11-05 14:30] Remove false claims from the checker page
+
+**Goal:** the 2026-11-05 viability audit found the checker page denying an email list and tracking that exist, and implying equivalence with real ATS software that has never been tested.
+**Files:**
+- edited: `app/resume-checker/page.tsx` - FAQ no longer says "no email list, no tracking pixels"; meta description no longer says "We test the same things an ATS does".
+**Notes / risks / follow-up:** copy only. Companion site PR removes the same class of claims on www. Whether checker report URLs reach GA4 in the page path is still unchecked (report ids are bearer links for 24 h).
+**Suggested commit:** fix(copy): stop denying analytics and the email list on the checker page
+
 ## [2026-11-04 18:30] Builder no longer crashes on missing CV fields or blocked storage
 
 **Goal:** the two live crashes found in the Sentry review of 2026-11-04. Both are caught by the builder's error boundary, so the user lands on the error screen instead of their CV.
