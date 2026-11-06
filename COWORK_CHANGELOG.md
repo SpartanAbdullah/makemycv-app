@@ -25,6 +25,16 @@ Format:
 
 ---
 
+## [2026-11-06 12:15] Bound the input to /api/ai-improve
+
+**Goal:** the 2026-11-05 viability audit found this route had no input limit, so the daily spend guard limited calls but not tokens. A stubbed run forwarded a 40-million-character prompt for 1 spend unit.
+**Files:**
+- created: `lib/ai/improveInput.ts` - clips each field and list, gives role bullets one shared 12,000-character budget, drops values of the wrong type. Pure, so it is unit tested.
+- created: `lib/ai/improveInput.test.ts` - normal CV unchanged, every limit, bounded worst case, wrong types.
+- edited: `app/api/ai-improve/route.ts` - clips before spend is charged, and only an own-property `domain` selects a specialist clause.
+**Notes / risks / follow-up:** clips rather than rejects, like the other AI routes; caps sit well above a normal CV. On an unusually long CV the first roles use the bullet budget, and the user is not told. Verified with the real handler and a stubbed Anthropic fetch: largest prompt in the test cases about 24,000 characters. Not a live AI call. Malformed JSON still answers 500, and the body is still read before clipping (the platform caps its size). Other AI routes already clip their inputs; origin checks are a separate item.
+**Suggested commit:** fix(ai-improve): bound request input so the spend guard limits tokens
+
 ## [2026-11-05 14:30] Remove false claims from the checker page
 
 **Goal:** the 2026-11-05 viability audit found the checker page denying an email list and tracking that exist, and implying equivalence with real ATS software that has never been tested.
