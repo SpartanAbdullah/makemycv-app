@@ -16,6 +16,7 @@ import {
   makeLimiter,
 } from "@/lib/server/rateLimit";
 import type { RoleFamily } from "@/lib/data/roleFamily";
+import { clipImproveInput } from "@/lib/ai/improveInput";
 import { normalizePlaceholders } from "@/lib/ai/placeholders";
 import { logAiFailure } from "@/lib/server/logRouteError";
 
@@ -111,7 +112,12 @@ function rateLimitedResponse(retryAfterSeconds: number) {
 // system prompt, so the model writes domain-native wording.
 function buildPrompt(body: RequestBody): { system: string; user: string } {
   const base = buildBasePrompt(body);
-  const clause = body.domain ? DOMAIN_CLAUSE[body.domain] : undefined;
+  // own-property check: `domain` comes from the request, and "constructor" would
+  // otherwise resolve to a function on the object's prototype.
+  const clause =
+    typeof body.domain === "string" && Object.hasOwn(DOMAIN_CLAUSE, body.domain)
+      ? DOMAIN_CLAUSE[body.domain]
+      : undefined;
   if (!clause) return base;
   return { system: `${clause}\n\n${base.system}`, user: base.user };
 }
@@ -256,13 +262,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Bounded before spend is charged: the 1 unit below only limits tokens if
+    // the prompt really is small. See lib/ai/improveInput.ts.
+    const input = { type: body.type, domain: body.domain, ...clipImproveInput(body) };
+
     // Global daily spend cap — checked AFTER the per-IP windows (so hammering
     // users still see the friendlier 429) and after validation (so malformed
     // requests never burn budget). 1 unit: small prompt, max_tokens 2048.
     const spend = await takeSpendUnits(1);
     if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
-    const { system, user } = buildPrompt(body);
+    const { system, user } = buildPrompt(input);
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
