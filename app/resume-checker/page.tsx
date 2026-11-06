@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   // including it twice produced "… | MakeMyCV | MakeMyCV" (audit ENG-19).
   title: "Free ATS Resume Checker for UAE Jobs",
   description:
-    "ATS-check your CV in about a minute. Free, no sign-up. We test the same things an ATS does: raw text extraction, section detection, and parse-blocking formatting.",
+    "ATS-check your CV in about a minute. Free, no sign-up. We check what commonly trips up ATS software: text extraction, section detection, and parse-blocking formatting.",
   alternates: { canonical: "https://app.makemycv.ae/resume-checker" },
   // No robots override: the app subdomain inherits the layout's noindex —
   // www.makemycv.ae/resume-checker is the indexable SEO surface (see
@@ -130,7 +130,7 @@ const FAQS: Array<{ q: string; a: string; aJsx?: React.ReactNode }> = [
   },
   {
     q: "What happens to my CV?",
-    a: "Your PDF never uploads — your browser extracts the text and sends only that. We use an AI service (Anthropic) to parse it into a report, store the report for 24 hours so you can revisit the URL, then it auto-deletes. No accounts, no email list, no tracking pixels.",
+    a: "Your PDF never uploads — your browser extracts the text and sends only that. We use an AI service (Anthropic) to parse it into a report, store the report for 24 hours so you can revisit the URL, then it auto-deletes. You don't need an account. The site uses analytics, and our email list is optional; the privacy policy has the details.",
   },
   {
     q: "Is it really free?",
