@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { askForExport, parseExportCount, serializeExportCount } from "./exportAsks";
+import { askForExport, parseExportCount, sentenceForExport, serializeExportCount } from "./exportAsks";
 
 test("the first export asks for a follow, then the asks rotate", () => {
   assert.deepEqual(
@@ -12,6 +12,18 @@ test("the first export asks for a follow, then the asks rotate", () => {
 test("an out-of-range count falls back to the first ask", () => {
   assert.equal(askForExport(0), "follow");
   assert.equal(askForExport(-3), "follow");
+});
+
+test("with the service off, the sentence is always the karak line", () => {
+  assert.deepEqual([1, 2, 3].map((n) => sentenceForExport(n, false)), ["karak", "karak", "karak"]);
+});
+
+test("with the service on, odd exports mention it, starting with the first", () => {
+  assert.deepEqual(
+    [1, 2, 3, 4, 5].map((n) => sentenceForExport(n, true)),
+    ["service", "karak", "service", "karak", "service"],
+  );
+  assert.equal(sentenceForExport(0, true), "service");
 });
 
 test("the count round-trips through storage", () => {

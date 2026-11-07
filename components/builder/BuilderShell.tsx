@@ -68,7 +68,8 @@ import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadSupportCard } from "./DownloadSupportCard";
 import { canAskAfterExport } from "../feedback/RatingStrip";
-import { nextExportAsk, type ExportAsk } from "../../lib/exportAsks";
+import { HUMAN_REVIEW_ON } from "../../lib/config/humanReview";
+import { askForExport, nextExportNumber, sentenceForExport, type ExportAsk, type ExportSentence } from "../../lib/exportAsks";
 import { CookieSettingsLink } from "../consent/CookieSettingsLink";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
@@ -800,6 +801,7 @@ export const BuilderShell = ({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [supportCardOpen, setSupportCardOpen] = useState(false);
   const [supportAsk, setSupportAsk] = useState<ExportAsk>("follow");
+  const [supportSentence, setSupportSentence] = useState<ExportSentence>("karak");
   const [downloadGuardOpen, setDownloadGuardOpen] = useState(false);
 
   // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
@@ -1102,7 +1104,9 @@ export const BuilderShell = ({
         // Decided once, here, so answering a star mid-card can't swap the row
         // out from under the thanks line. A row with nothing to ask (already
         // answered, or switched off) falls back to follow.
-        const ask = nextExportAsk();
+        const exportNumber = nextExportNumber();
+        const ask = askForExport(exportNumber);
+        setSupportSentence(sentenceForExport(exportNumber, HUMAN_REVIEW_ON));
         setSupportAsk(ask === "follow" || canAskAfterExport(ask) ? ask : "follow");
         setSupportCardOpen(true);
       }
@@ -1432,6 +1436,7 @@ export const BuilderShell = ({
         <DownloadSupportCard
           open={supportCardOpen}
           ask={supportAsk}
+          sentence={supportSentence}
           onDismiss={() => setSupportCardOpen(false)}
         />
 

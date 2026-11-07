@@ -5,6 +5,7 @@ import ScoreSidebar from "@/components/resume-checker/ScoreSidebar";
 import CategoryCard from "@/components/resume-checker/CategoryCard";
 import ShareButton from "@/components/resume-checker/ShareButton";
 import FixInBuilderButton from "@/components/resume-checker/FixInBuilderButton";
+import HumanReviewLine from "@/components/resume-checker/HumanReviewLine";
 import PostReportTipJar from "@/components/resume-checker/PostReportTipJar";
 import ReportAtsTextPreview from "@/components/resume-checker/ReportAtsTextPreview";
 import { RatingStrip } from "@/components/feedback/RatingStrip";
@@ -145,6 +146,8 @@ export default async function ReportPage({
           </div>
         </div>
       </section>
+
+      <HumanReviewLine />
 
       {/* One-tap rating + optional email, after the report has been read
           (2026-10-24). Renders nothing when switched off or already answered. */}
