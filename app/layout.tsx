@@ -9,7 +9,6 @@ import {
   outfit,
 } from "./fonts/app";
 import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME } from "@/lib/seo/schema";
 import { CONSENT_DEFAULT_SCRIPT } from "@/lib/consent";
 import { ConsentBanner } from "@/components/consent/ConsentBanner";
@@ -153,17 +152,18 @@ export default function RootLayout({
             CV export could be attributed to the traffic that produced it and
             the entire SEO/link-building spend was unmeasurable.
 
-            These two give RUM and Web Vitals for THIS host only — Vercel
+            This gives RUM for THIS host only — Vercel
             Analytics is per-project and does NOT follow a session across the
             www -> app domain hop. Cross-domain attribution needs the GA4
             cross-domain config, which lands separately; do not assume this
-            covers it. The app's CSP already allowed vitals.vercel-insights.com
-            from an install that never happened, so no header change was needed.
+            covers it.
 
-            Neither library sends CV content: they report route, referrer and
-            timing only. */}
+            Speed Insights was removed on 2026-11-07: the team was at its 10,000
+            event limit, and GA4 and PageSpeed cover what it reported.
+
+            Vercel Analytics sends no CV content: it reports route and referrer
+            only. */}
         <Analytics />
-        <SpeedInsights />
         {/* Google Tag Manager (2026-08-10, GA4 audit). This host appeared in ZERO
             hostname rows across 28 days of GA4 data — the actual product was
             entirely unmeasured while the marketing site was fully tagged.

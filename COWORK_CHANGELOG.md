@@ -25,6 +25,16 @@ Format:
 
 ---
 
+## [2026-11-07 15:15] Stop named crawlers running the proxy; remove Speed Insights
+
+**Goal:** the free Vercel team is at 3h 57m of its 4h CPU limit, with a safe daily rate of only about 420 s until about 24 Nov. Crawlers keep no cookies, so each of their page requests ran the proxy for nothing.
+**Files:**
+- edited: `proxy.ts` - the page entry of the matcher now also skips a named list of crawlers by user agent.
+- edited: `app/layout.tsx` - removed `<SpeedInsights />` (the team is at the 10,000 event limit; GA4 and PageSpeed cover it).
+- edited: `package.json`, `package-lock.json` - removed `@vercel/speed-insights`.
+**Notes / risks / follow-up:** the list names crawlers on purpose: a missing `mmcv_geo` cookie reads as non-EU, so a loose "bot" match could turn analytics on by default for a real EU visitor (Cubot phones have "bot" in their user agent). A crawler based in the EU now reads as non-EU, which affects bots only. Crawlers using browser-like user agents are not caught, so measure the saving on the usage chart a few days after release. `vitals.vercel-insights.com` stays in the CSP; it is unused but harmless.
+**Suggested commit:** perf(proxy): skip named crawlers and remove Speed Insights
+
 ## [2026-11-05 14:30] Remove false claims from the checker page
 
 **Goal:** the 2026-11-05 viability audit found the checker page denying an email list and tracking that exist, and implying equivalence with real ATS software that has never been tested.
