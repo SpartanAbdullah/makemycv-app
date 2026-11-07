@@ -40,12 +40,12 @@ export function confirmEmail(confirmUrl: string): { subject: string; text: strin
   const text =
     "One tap to confirm you want UAE job-search tips from MakeMyCV, about twice a month:\n\n" +
     `${confirmUrl}\n\n` +
-    "If you didn't ask for this, ignore this email — nothing is stored unless you confirm.\n\n— Abdullah, MakeMyCV";
+    "If you didn't ask for this, ignore this email — nothing is stored unless you confirm.\n\n— The MakeMyCV team";
   const html =
     `<div style="font-family:Inter,Arial,sans-serif;font-size:16px;line-height:1.5;color:#0B0F0C;max-width:520px">` +
     `<p>One tap to confirm you want UAE job-search tips from MakeMyCV, about twice a month.</p>` +
     `<p style="margin:24px 0"><a href="${escape(confirmUrl)}" style="background:#0E7C4A;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;display:inline-block">Yes, send me the tips</a></p>` +
     `<p style="color:#6B7368;font-size:14px">If you didn't ask for this, ignore this email — nothing is stored unless you confirm.</p>` +
-    `<p style="color:#6B7368;font-size:14px">— Abdullah, MakeMyCV</p></div>`;
+    `<p style="color:#6B7368;font-size:14px">— The MakeMyCV team</p></div>`;
   return { subject, text, html };
 }

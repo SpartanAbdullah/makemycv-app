@@ -101,7 +101,7 @@ export const TipJar = ({
       </div>
 
       <p className="mt-2 text-sm text-brand-muted">
-        MakeMyCV is free for everyone — including people who can&apos;t pay
+        The builder is free for everyone — including people who can&apos;t pay
         right now. A small tip keeps it that way.
       </p>
 
@@ -130,8 +130,8 @@ export const TipJar = ({
 
       {/* Reassurance microcopy */}
       <p className="mt-5 text-sm leading-relaxed text-slate-500">
-        Built by Abdullah, a solo developer in Dubai. Ko-fi accepts cards
-        without a PayPal account; tips go directly to him.
+        Built by a solo developer in Dubai who cares. Ko-fi accepts cards
+        without a PayPal account; tips go directly to us.
       </p>
     </div>
   );

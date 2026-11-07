@@ -25,6 +25,26 @@ Format:
 
 ---
 
+## [2026-11-07 21:35] Track A: owner name removed, one post-export ask per export, follow row
+
+**Goal:** owner decisions in docs/human-review-launch-2026-11/PLAN.md: no personal name in the app and a follow ask after export, without stacking every ask on one card.
+**Files:**
+- edited: components/TipJar.tsx, components/builder/BuilderShell.tsx, app/resume-checker/report/[reportId]/page.tsx, lib/server/email.ts, components/builder/DownloadSupportCard.tsx: name and first person removed.
+- created: lib/exportAsks.ts, lib/exportAsks.test.ts: per-browser export count choosing follow, stars or email. lib/config/social.ts: LinkedIn and Instagram.
+- edited: components/builder/DownloadSupportCard.tsx: follow row and one row per export. components/feedback/RatingStrip.tsx: only prop and canAskAfterExport. components/builder/BuilderShell.tsx: picks the ask once per export.
+- edited: lib/analytics.ts: cta_id added to PARAM_KEYS, so app cta_click events carry the id.
+**Notes/risks:** a person who exports once is asked to follow, not to rate, which will slow the ratings RatingsProof needs. Checked with NEXT_PUBLIC_FEEDBACK and NEXT_PUBLIC_EMAIL_SIGNUP on: follow, stars, email, follow at 320px and 1440px; smoke:builder and axe pass. paypal.me/Abdullah2431 remains until the owner sets a new handle.
+**Suggested commit:** feat: remove owner name and show one post-export ask per export
+
+## [2026-11-06 12:15] Bound the input to /api/ai-improve
+
+**Goal:** the 2026-11-05 viability audit found this route had no input limit, so the daily spend guard limited calls but not tokens. A stubbed run forwarded a 40-million-character prompt for 1 spend unit.
+**Files:**
+- created: `lib/ai/improveInput.ts` - clips each field and list, gives role bullets one shared 12,000-character budget, drops values of the wrong type. Pure, so it is unit tested.
+- created: `lib/ai/improveInput.test.ts` - normal CV unchanged, every limit, bounded worst case, wrong types.
+- edited: `app/api/ai-improve/route.ts` - clips before spend is charged, and only an own-property `domain` selects a specialist clause.
+**Notes / risks / follow-up:** clips rather than rejects, like the other AI routes; caps sit well above a normal CV. On an unusually long CV the first roles use the bullet budget, and the user is not told. Verified with the real handler and a stubbed Anthropic fetch: largest prompt in the test cases about 24,000 characters. Not a live AI call. Malformed JSON still answers 500, and the body is still read before clipping (the platform caps its size). Other AI routes already clip their inputs; origin checks are a separate item.
+**Suggested commit:** fix(ai-improve): bound request input so the spend guard limits tokens
 ## [2026-11-07 15:15] Stop named crawlers running the proxy; remove Speed Insights
 
 **Goal:** the free Vercel team is at 3h 57m of its 4h CPU limit, with a safe daily rate of only about 420 s until about 24 Nov. Crawlers keep no cookies, so each of their page requests ran the proxy for nothing.

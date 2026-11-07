@@ -67,6 +67,8 @@ import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadSupportCard } from "./DownloadSupportCard";
+import { canAskAfterExport } from "../feedback/RatingStrip";
+import { nextExportAsk, type ExportAsk } from "../../lib/exportAsks";
 import { CookieSettingsLink } from "../consent/CookieSettingsLink";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
@@ -797,6 +799,7 @@ export const BuilderShell = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [supportCardOpen, setSupportCardOpen] = useState(false);
+  const [supportAsk, setSupportAsk] = useState<ExportAsk>("follow");
   const [downloadGuardOpen, setDownloadGuardOpen] = useState(false);
 
   // Mobile-only Edit | Preview view switch. Defaults to "edit" on every load,
@@ -1096,6 +1099,11 @@ export const BuilderShell = ({
       // also never cleared, which leaked if the shell unmounted inside the
       // window.
       if (kind !== "json") {
+        // Decided once, here, so answering a star mid-card can't swap the row
+        // out from under the thanks line. A row with nothing to ask (already
+        // answered, or switched off) falls back to follow.
+        const ask = nextExportAsk();
+        setSupportAsk(ask === "follow" || canAskAfterExport(ask) ? ask : "follow");
         setSupportCardOpen(true);
       }
     } catch {
@@ -1423,6 +1431,7 @@ export const BuilderShell = ({
             covering anything — the Download button is in the TopBar above. */}
         <DownloadSupportCard
           open={supportCardOpen}
+          ask={supportAsk}
           onDismiss={() => setSupportCardOpen(false)}
         />
 
@@ -1514,7 +1523,7 @@ export const BuilderShell = ({
                     textUnderlineOffset: 3,
                   }}
                 >
-                  Built by Abdullah
+                  Built by the MakeMyCV team
                 </a>
                 <span aria-hidden="true"> · </span>
                 <CookieSettingsLink style={{ color: "var(--ff-muted)" }} />
