@@ -7,7 +7,9 @@ import { CONSENT_TEXT, type SubscribeSource } from "../../lib/feedback/subscribe
 import { notifyClientValues, useClientValue } from "../consent/useClientValue";
 
 /**
- * RatingStrip (2026-10-24) — the one thing we ask for after a success moment.
+ * RatingStrip (2026-10-24) — the star and email asks after a success moment.
+ * The post-export card shows one of them per export (`only`, lib/exportAsks.ts);
+ * the checker report shows both.
  *
  * Tap a star (that's the whole ask). Then, optionally, add a line and tick
  * "you may quote me". Then, optionally, leave an email for tips. Each step is
@@ -36,6 +38,10 @@ const recent = (key: string, days: number) => {
     return false;
   }
 };
+/** Whether a row has anything to show right now. Browser only: call it after a click. */
+export const canAskAfterExport = (ask: "stars" | "email"): boolean =>
+  ask === "stars" ? FEEDBACK_ON && !recent(RATED_KEY, RATE_AGAIN_DAYS) : EMAIL_ON && !recent(SUBSCRIBED_KEY, 3650);
+
 const mark = (key: string) => {
   try {
     window.localStorage.setItem(key, new Date().toISOString());
@@ -57,6 +63,8 @@ type Props = {
    * report), or the owner's address is shown to whoever has the link.
    */
   prefillEmail?: string;
+  /** Show just this block. Omit to show both. */
+  only?: "stars" | "email";
 };
 
 const btnBase: React.CSSProperties = {
@@ -82,7 +90,7 @@ const input: React.CSSProperties = {
   minWidth: 0,
 };
 
-export const RatingStrip = ({ surface, source, variant = "strip", prefillEmail = "" }: Props) => {
+export const RatingStrip = ({ surface, source, variant = "strip", prefillEmail = "", only }: Props) => {
   // Browser-only reads, false on the server and the first paint.
   const showStars = useClientValue(() => FEEDBACK_ON && !recent(RATED_KEY, RATE_AGAIN_DAYS), false);
   const showEmail = useClientValue(() => EMAIL_ON && !recent(SUBSCRIBED_KEY, 3650), false);
@@ -102,8 +110,8 @@ export const RatingStrip = ({ surface, source, variant = "strip", prefillEmail =
 
   // Once a block has been answered its client value flips to false (so the
   // NEXT visit stays quiet); keep it mounted now so the thanks line shows.
-  const starsVisible = showStars || phase !== "idle";
-  const emailVisible = showEmail || emailPhase !== "idle";
+  const starsVisible = only !== "email" && (showStars || phase !== "idle");
+  const emailVisible = only !== "stars" && (showEmail || emailPhase !== "idle");
   if (!starsVisible && !emailVisible) return null;
 
   const rate = async (n: number) => {

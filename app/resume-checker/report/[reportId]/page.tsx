@@ -160,7 +160,7 @@ export default async function ReportPage({
           rel="noopener noreferrer"
           className="underline underline-offset-2 hover:text-slate-700"
         >
-          Built by Abdullah
+          Built by the MakeMyCV team
         </a>
       </footer>
 

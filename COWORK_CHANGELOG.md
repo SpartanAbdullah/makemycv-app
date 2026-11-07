@@ -25,6 +25,17 @@ Format:
 
 ---
 
+## [2026-11-07 21:35] Track A: owner name removed, one post-export ask per export, follow row
+
+**Goal:** owner decisions in docs/human-review-launch-2026-11/PLAN.md: no personal name in the app and a follow ask after export, without stacking every ask on one card.
+**Files:**
+- edited: components/TipJar.tsx, components/builder/BuilderShell.tsx, app/resume-checker/report/[reportId]/page.tsx, lib/server/email.ts, components/builder/DownloadSupportCard.tsx: name and first person removed.
+- created: lib/exportAsks.ts, lib/exportAsks.test.ts: per-browser export count choosing follow, stars or email. lib/config/social.ts: LinkedIn and Instagram.
+- edited: components/builder/DownloadSupportCard.tsx: follow row and one row per export. components/feedback/RatingStrip.tsx: only prop and canAskAfterExport. components/builder/BuilderShell.tsx: picks the ask once per export.
+- edited: lib/analytics.ts: cta_id added to PARAM_KEYS, so app cta_click events carry the id.
+**Notes/risks:** a person who exports once is asked to follow, not to rate, which will slow the ratings RatingsProof needs. Checked with NEXT_PUBLIC_FEEDBACK and NEXT_PUBLIC_EMAIL_SIGNUP on: follow, stars, email, follow at 320px and 1440px; smoke:builder and axe pass. paypal.me/Abdullah2431 remains until the owner sets a new handle.
+**Suggested commit:** feat: remove owner name and show one post-export ask per export
+
 ## [2026-11-06 12:15] Bound the input to /api/ai-improve
 
 **Goal:** the 2026-11-05 viability audit found this route had no input limit, so the daily spend guard limited calls but not tokens. A stubbed run forwarded a 40-million-character prompt for 1 spend unit.

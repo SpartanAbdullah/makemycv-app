@@ -60,7 +60,7 @@ const PARAM_KEYS = [
   // every other key either surface pushes (2026-10-31 audit) — reset too, so a
   // value from one event can never ride along on the next
   "step_number", "step_id", "file_type", "error_reason", "merge_mode", "sections_filled",
-  "outcome", "with_job_text", "placeholders", "cta_location", "template_id", "cups",
+  "outcome", "with_job_text", "placeholders", "cta_id", "cta_location", "template_id", "cups",
   // linkedin_message_requested / linkedin_message_copied (2026-10-31):
   // variant = "message" | "connection_note"; over_cap = note longer than 200.
   "variant", "over_cap",

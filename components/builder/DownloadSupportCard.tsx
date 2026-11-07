@@ -2,6 +2,8 @@
 
 import { SUPPORT_URL } from "../../lib/config/support";
 import { track } from "../../lib/analytics";
+import { FOLLOW_PROFILES } from "../../lib/config/social";
+import type { ExportAsk } from "../../lib/exportAsks";
 import { useCvStore } from "../../lib/store/cvStore";
 import { RatingStrip } from "../feedback/RatingStrip";
 
@@ -17,6 +19,10 @@ import { RatingStrip } from "../feedback/RatingStrip";
  * Deliberately NOT bottom-anchored: the bottom band below `xl` is already
  * owned by the fixed Edit|Preview pill (bottom:20) and the Toaster
  * (bottom:96). A card there would collide with both.
+ *
+ * One sentence and one row per export (2026-11-07). The parent picks the row
+ * through `ask` (lib/exportAsks.ts), so a person is never handed the karak
+ * line, a follow row, stars and an email form all at once.
  *
  * Frequency is the PARENT's business — this component has no localStorage,
  * no timers and no suppression. BuilderShell re-opens it on every
@@ -39,8 +45,45 @@ import { RatingStrip } from "../feedback/RatingStrip";
 
 type Props = {
   open: boolean;
+  ask: ExportAsk;
   onDismiss: () => void;
 };
+
+/* Same paths as the site's components/SocialIcons.tsx. Decorative: the link
+   carries the aria-label. */
+const GLYPHS: Record<(typeof FOLLOW_PROFILES)[number]["id"], React.ReactNode> = {
+  linkedin: (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.12 20.45H3.56V9h3.56v11.45Z" />
+    </svg>
+  ),
+  instagram: (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+};
+
+const FollowRow = () => (
+  <div data-follow-row className="flex items-center gap-1">
+    <span className="mr-1 font-medium">Follow us for UAE job tips</span>
+    {FOLLOW_PROFILES.map(({ id, label, url }) => (
+      <a
+        key={id}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`MakeMyCV on ${label}`}
+        onClick={() => track("cta_click", { cta_id: `social_${id}`, cta_location: "post_export" })}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5"
+      >
+        {GLYPHS[id]}
+      </a>
+    ))}
+  </div>
+);
 
 /* A small karak cup after the link text (2026-11-03). Same palette as the
    CSS cups on www/support (KarakPicker: gold body, foam top, gold handle);
@@ -60,7 +103,7 @@ const KarakCup = () => (
   </svg>
 );
 
-export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
+export const DownloadSupportCard = ({ open, ask, onDismiss }: Props) => {
   // The address on the CV just downloaded, offered as the tips field's
   // starting value. It stays in the browser unless the person presses
   // "Send me tips" (see RatingStrip's prefillEmail).
@@ -81,7 +124,7 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
           widths. Re-measure before lengthening it. The success toast already
           confirms the download, so the prefix was redundant anyway. */}
       <p className="min-w-0">
-        MakeMyCV is free and always will be — if it helped,{" "}
+        The builder stays free — if it helped,{" "}
         <a
           href={SUPPORT_URL}
           target="_blank"
@@ -89,7 +132,7 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
           className="font-semibold underline underline-offset-2 hover:opacity-80"
           onClick={() => track("support_click", { surface: "post_export" })}
         >
-          buy me a karak
+          buy us a karak
           <KarakCup />
         </a>
         <span aria-hidden="true"> →</span>
@@ -104,12 +147,14 @@ export const DownloadSupportCard = ({ open, onDismiss }: Props) => {
         ✕
       </button>
       </div>
-      {/* One-tap rating + optional email (2026-10-24). Each block hides
-          itself when its server side is off or it was answered recently, so
-          on most exports this renders nothing and the strip stays one line.
-          The 64px budget above applies to the karak line only; this block
-          pushes content down in-flow, it never covers anything. */}
-      <RatingStrip surface="post_export" source="post_export" prefillEmail={cvEmail} />
+      {/* The one row for this export. The 64px budget above applies to the
+          karak line only; this row pushes content down in-flow, it never
+          covers anything. */}
+      {ask === "follow" ? (
+        <FollowRow />
+      ) : (
+        <RatingStrip surface="post_export" source="post_export" prefillEmail={cvEmail} only={ask} />
+      )}
     </div>
   );
 };
