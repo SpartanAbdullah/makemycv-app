@@ -105,6 +105,10 @@ export type ParsedDocument = {
    *  (MAX_PDF_PAGES); MappingReview tells the user which pages were read.
    *  Counts only, never document content. */
   pagesSkipped?: { read: number; total: number };
+  /** Set by the PDF adapter when the file had no text layer and the text was
+   *  read from the page images by OCR (lib/importers/ocr.ts). MappingReview
+   *  asks the person to check the result; analytics get `import_path: "ocr"`. */
+  viaOcr?: boolean;
 };
 
 /** Why a parse failed. Since 2026-10-31 the kinds are the closed taxonomy in
@@ -122,9 +126,14 @@ export interface ImportAdapter {
   name: string;
   /** Parse a File object (PDF/DOCX) or raw string (LinkedIn paste).
    *  `deadlineAt` (epoch ms) is the caller's budget for the whole read; the
-   *  PDF (session 6 D10) and DOCX (session 7) adapters honour it. */
+   *  PDF (session 6 D10) and DOCX (session 7) adapters honour it.
+   *  `onOcr` is called by the PDF adapter when the file is a scan and the OCR
+   *  fallback starts (no page yet), then before each page it reads. */
   parse(
     input: File | string,
-    opts?: { deadlineAt?: number },
+    opts?: {
+      deadlineAt?: number;
+      onOcr?: (progress: { page: number; pages: number } | null) => void;
+    },
   ): Promise<ParsedDocument>;
 }

@@ -76,6 +76,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Self-hosted OCR assets (scanned-PDF import, 2026-11-21). Both
+        // folders carry their version in the path (tesseract-7.0.0,
+        // lang/4.0.0_fast), so a browser that has them never asks again:
+        // about 3.3 MB per device once, not per import. Without this, files
+        // under public/ are revalidated on every use.
+        source: "/ocr/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
     ];
   },
 };

@@ -29,6 +29,7 @@ const { parseDocxBytes, extractDocxText } = build("docxAdapter.js");
 const { mapParsedToCv, countSectionsFilled, hasUsableContent, looksLikeCoverLetter, mappingEmptyMessage } = build("fieldMapper.js");
 const { gateImportFile, importFileType, importErrorMessage, IMPORT_ERROR_REASONS, ImportParseError } =
   build("importErrors.js");
+const { OcrError } = build("ocr.js");
 
 const pdfjs = await import(
   pathToFileURL(path.join(root, "node_modules/pdfjs-dist/legacy/build/pdf.mjs")).href
@@ -417,6 +418,117 @@ await expectReason("empty.docx", "empty_file", new ArrayBuffer(0));
   const r = await extractPdfText(data, { pdfjs, workerSrc, maxPages: 1 });
   check("page-cap", "page count reported", r.pages === 1, r.pages);
   check("page-cap", "a 1-page file under a 1-page cap is not truncated", r.pagesRead === 1 && r.truncated === false, [r.pagesRead, r.truncated]);
+}
+
+/* ── scanned PDF: OCR fallback (2026-11-21, lib/importers/ocr.ts) ───────── */
+
+// Flag off = no `ocr` option = today's behaviour. `expectReason("scanned-cv.pdf",
+// "no_text_layer")` above is that case; these pin the rest of it.
+{
+  // A PDF WITH a text layer must never reach OCR, flag on or off, and must
+  // parse to exactly the same document.
+  let calls = 0;
+  const neverCalled = {
+    recognise: async () => { calls++; throw new Error("OCR must not run"); },
+    onStart: () => { calls++; },
+  };
+  for (const name of ["text-cv.pdf", "plain-helvetica-cv.pdf", "s5-31-pages.pdf", "arabic-only.pdf"]) {
+    const off = await parsePdfBytes(bytesOf(name), { pdfjs, workerSrc });
+    const on = await parsePdfBytes(bytesOf(name), { pdfjs, workerSrc, ocr: neverCalled });
+    check(name, "same parse with and without the OCR fallback", JSON.stringify(on) === JSON.stringify(off));
+    check(name, "viaOcr is not set", on.viaOcr === undefined && off.viaOcr === undefined, [on.viaOcr, off.viaOcr]);
+  }
+  check("ocr", "the recogniser was never called for a text PDF", calls === 0, calls);
+}
+{
+  // Flag off: the error is the plain one, with the old copy and no OCR mark.
+  let err;
+  try { await parsePdfBytes(bytesOf("scanned-cv.pdf"), { pdfjs, workerSrc }); } catch (e) { err = e; }
+  check("scanned-cv.pdf", "flag off: no_text_layer with the original copy", err?.kind === "no_text_layer" && err?.message === importErrorMessage("no_text_layer"), [err?.kind, err?.message]);
+  check("scanned-cv.pdf", "flag off: no ocrOutcome on the error", err?.ocrOutcome === undefined, err?.ocrOutcome);
+}
+{
+  // Flag on, OCR fails: same reason as before, marked for analytics.
+  let err;
+  try {
+    await parsePdfBytes(bytesOf("scanned-cv.pdf"), {
+      pdfjs,
+      workerSrc,
+      ocr: { recognise: async () => { throw new OcrError("load_failed"); } },
+    });
+  } catch (e) { err = e; }
+  check("scanned-cv.pdf", "OCR fails → no_text_layer, ocrOutcome load_failed", err?.kind === "no_text_layer" && err?.ocrOutcome === "load_failed", [err?.kind, err?.ocrOutcome]);
+  check("scanned-cv.pdf", "OCR-failed copy is user copy", /scanned image/.test(err?.message ?? "") && !/exception|error:/i.test(err?.message ?? ""), err?.message);
+}
+{
+  // Flag on, real OCR. The browser renders the page with pdf.js and a canvas
+  // (scripts/import-smoke.mjs with SMOKE_OCR=1 covers that); Node has no
+  // canvas, so this recogniser lifts the page's JPEG straight out of the
+  // fixture (it is one DCTDecode image) and reads it with the same
+  // tesseract.js version and the same committed language data the browser
+  // gets from /ocr/lang/.
+  const { createWorker } = require("tesseract.js");
+  const recognise = async (data) => {
+    const bytes = Buffer.from(data);
+    const jpeg = bytes.subarray(
+      bytes.indexOf(Buffer.from([0xff, 0xd8, 0xff])),
+      bytes.lastIndexOf(Buffer.from([0xff, 0xd9])) + 2,
+    );
+    const worker = await createWorker("eng", 1, {
+      langPath: path.join(root, "public", "ocr", "lang", "4.0.0_fast"),
+      cacheMethod: "none",
+      gzip: true,
+    });
+    try {
+      const { data: read } = await worker.recognize(jpeg);
+      return { text: read.text, confidence: read.confidence, pages: 1, pagesRead: 1 };
+    } finally {
+      await worker.terminate();
+    }
+  };
+  let started = 0;
+  let parsed, failure;
+  try {
+    parsed = await parsePdfBytes(bytesOf("scanned-cv.pdf"), { pdfjs, workerSrc, ocr: { recognise, onStart: () => started++ } });
+  } catch (e) { failure = e; }
+  const f = "scanned-cv.pdf (OCR)";
+  check(f, "imports instead of failing", !!parsed, failure?.ocrOutcome ?? failure?.message);
+  if (parsed) {
+    const partial = mapParsedToCv(parsed);
+    const exp = partial.experience ?? [];
+    if (process.env.DUMP) console.log(JSON.stringify(partial, null, 1));
+    check(f, "onStart fired once", started === 1, started);
+    check(f, "marked viaOcr", parsed.viaOcr === true, parsed.viaOcr);
+    check(f, "no pagesSkipped for a 1-page scan", parsed.pagesSkipped === undefined, parsed.pagesSkipped);
+    check(f, "has usable content, ≥5 sections", hasUsableContent(partial) && countSectionsFilled(partial) >= 5, countSectionsFilled(partial));
+    check(f, "name", partial.personal?.firstName === "Layla" && partial.personal?.lastName === "Haddad", [partial.personal?.firstName, partial.personal?.lastName]);
+    check(f, "phone", /971\s?55\s?987\s?6543/.test(partial.personal?.phone ?? ""), partial.personal?.phone);
+    check(f, "an email was read (the review asks the person to check it)", /@example\.com$/.test(partial.personal?.email ?? ""), partial.personal?.email);
+    check(f, "exactly 2 roles", exp.length === 2, exp.map((e) => e.role));
+    check(f, "role 1 title / company", exp[0]?.role === "Senior Procurement Specialist" && exp[0]?.company === "Falcon Facilities Management", exp[0]);
+    check(f, "every role has a start date and bullets", exp.every((e) => e.startDate && e.bullets.length > 0), exp.map((e) => [e.startDate, e.bullets.length]));
+    check(f, "bullets carry no OCR bullet mark", exp.every((e) => e.bullets.every((b) => !/^[+«»*•]/.test(b))), exp.flatMap((e) => e.bullets));
+    check(f, "education", /Supply Chain/.test(partial.education?.[0]?.degree ?? ""), partial.education?.[0]);
+    // The same CV through its text layer (text-cv.pdf is the page this scan
+    // is a picture of). Apart from ids, the OCR import must be the same
+    // document, with three known differences: the email (the scan loses a
+    // dot), the LinkedIn URL (the text layer wraps it; the scan reads it
+    // whole) and the language levels ("English - Fluent · Arabic - Native"
+    // reads as all dashes, so the levels are dropped, never guessed).
+    const strip = (cv) => JSON.parse(JSON.stringify(cv, (k, v) => (k === "id" ? undefined : v)));
+    const fromText = strip(mapParsedToCv(await parsePdfBytes(bytesOf("text-cv.pdf"), { pdfjs, workerSrc })));
+    const fromScan = strip(partial);
+    const emailRead = fromScan.personal.email;
+    const langsRead = fromScan.languages;
+    check(f, "LinkedIn URL read whole", fromScan.personal.linkedin === "https://linkedin.com/in/laylahaddad-example", fromScan.personal.linkedin);
+    check(f, "both languages, and no level the page did not state for them", JSON.stringify(langsRead.map((l) => l.name)) === JSON.stringify(fromText.languages.map((l) => l.name)) && langsRead.every((l, i) => l.level === undefined || l.level === fromText.languages[i].level), langsRead);
+    fromScan.personal.email = fromText.personal.email;
+    fromScan.personal.linkedin = fromText.personal.linkedin;
+    fromScan.languages = fromText.languages;
+    const differing = Object.keys(fromText).filter((k) => JSON.stringify(fromText[k]) !== JSON.stringify(fromScan[k]));
+    check(f, "otherwise the same CV as the text-layer import of the same page", differing.length === 0, differing.map((k) => [k, fromScan[k]]));
+    check(f, "email is what was read, never repaired by guessing", emailRead === "layla.haddad@example.com" || emailRead === "haddad@example.com", emailRead);
+  }
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

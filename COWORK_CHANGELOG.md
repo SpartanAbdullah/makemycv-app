@@ -6,6 +6,34 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 18:40] Scanned-PDF import by in-browser OCR, behind NEXT_PUBLIC_OCR_IMPORT (off)
+
+**Goal:** tracker item 15 (docs/growth-roadmap-2026-11/TRACKER.md). `no_text_layer` (a scanned or image-only PDF) was 20 of 31 import failures in the week of 9 Nov. With `NEXT_PUBLIC_OCR_IMPORT=1` such a PDF is read by OCR in the browser and goes through the normal review. **The flag is off by default and is not set in Vercel; nothing changes in production until it is.**
+**Download size (the Vercel free-plan question):** one first OCR import downloads about **3.3 MB**, under the 5 MB mark: worker 30 KB + wasm core 1.27 MB (brotli; 3.9 MB raw) + English data 1.96 MB (already gzipped) + about 10 KB of tesseract.js in a lazy chunk. tesseract.js 7.0.0's default English data is 2.95 MB (4.3 MB total); the smaller `tessdata_fast` model read the fixture identically, so it is the one used. Both folders are served `immutable`, and tesseract.js keeps the language data in IndexedDB, so a second scan on the same device downloads nothing. A person who never picks a scan downloads none of it (checked: a text PDF makes no `/ocr/` request).
+**CSP:** no change. Worker, core and language data are same-origin (`worker-src 'self'`, `connect-src 'self'`), and the wasm compiles under the `'unsafe-eval'` already in `script-src`. Nothing is fetched from jsDelivr (tesseract.js's default) or any other host; the smoke asserts no off-origin request while a scan is read.
+**Files:**
+- created: `lib/importers/ocr.ts` (+ `ocr.test.ts`, 19 cases) - the flag, budgets (`OCR_MAX_PAGES` 3, `OCR_TIMEOUT_MS` 90 s counted from when the scan is detected, minimum confidence 45), asset paths, `cleanOcrText` and `runOcrFallback`. Pure; no browser API.
+- created: `lib/importers/ocrBrowser.ts` - pdf.js renders each page to a canvas (long edge 2340 px), tesseract.js reads it. Loaded only when a scan is picked with the flag on.
+- edited: `lib/importers/pdfAdapter.ts` - `parsePdfBytes` takes an optional `ocr` fallback; without it (flag off) a scan throws `no_text_layer` as before. The text goes through `parseTextToDocument` like any import. `PDF_TIMEOUT_MS` / `withDeadline` untouched.
+- edited: `lib/importers/importErrors.ts` (`ImportParseError.ocrOutcome`), `lib/importers/adapter.ts` (`ParsedDocument.viaOcr`, `onOcr` on `parse`).
+- edited: `components/builder/BuilderShell.tsx` - the import overlay says "Reading your scanned PDF", that it takes longer, and which page is being read. `components/import/MappingReview.tsx` - a line asking the person to check every field, email and phone first.
+- edited: `lib/analytics.ts`, `docs/import-errors.md` - `cv_import` / `cv_import_failed` carry `import_path: "ocr"` when OCR ran, and a failed read adds `ocr_outcome` (`load_failed` / `timeout` / `low_text` / `error`). Enums only. With the flag off neither param is sent.
+- created: `scripts/copy-ocr-assets.mjs`, run on `postinstall` - copies the worker and the three LSTM core builds from `node_modules` to `public/ocr/tesseract-7.0.0/` (git-ignored, 11.3 MB raw; the browser fetches one build). Fails the install if `TESSERACT_VERSION` in `ocr.ts` and the installed version disagree.
+- created: `public/ocr/lang/4.0.0_fast/eng.traineddata.gz` (committed, 1.96 MB: it is not on npm), `public/ocr/README.md`.
+- edited: `next.config.ts` (`/ocr/*` cache header only), `package.json` (`tesseract.js` 7.0.0 exact, postinstall), `.gitignore`, `.env.example`, `CLAUDE.md`.
+- edited: `scripts/import-fixtures.test.mjs` - real OCR over the existing `scanned-cv.pdf` fixture (the result must equal the text-layer import of the same page), text PDFs never reach OCR and parse identically with and without the fallback, flag-off error unchanged. `scripts/import-smoke.mjs` - `SMOKE_OCR=1`, `SMOKE_VIEWPORT`, `SMOKE_ONLY`.
+**Notes / risks / follow-up:**
+- A failed or timed-out OCR ends in the same `no_text_layer` reason as before, with copy that says the scan could not be read clearly.
+- OCR misreads small marks. On the fixture the email came out without its dot in one of three runs (`haddad@example.com` for `layla.haddad@…`). Nothing is repaired by guessing; the review tells the person to check. Language levels on a line like "English - Fluent · Arabic - Native" are dropped (names kept), because the separators all read as dashes.
+- English model only. An Arabic-only scan fails as `no_text_layer` / `low_text`, as today.
+- Only the first 3 pages are read; the review says so for longer files (existing "We read the first N of M pages" line).
+- Timing here: about 5 s for the one-page fixture on a desktop Chrome, at 1440 px and at 375 px. NOT measured on a real phone or a slow connection; do that before the flag goes on.
+- The fixture is a clean render (a JPEG of a browser page), not a skewed phone photo. Real scans will read worse.
+- Before turning the flag on: add `import_path` and `ocr_outcome` as Data Layer Variables and GA4 event parameters in GTM, or the split will not reach GA4.
+- The /resume-checker upload does not use OCR (out of scope).
+- Built and smoke-tested on Next.js 16.4.3 (where `npm run build` stopped twice on the security-advisory notice and passed on retry). `stagingmmc` moved to 16.4.6 while this was in progress (entry below); after merging, tsc, lint, `npm test`, the build and the flag-on OCR smoke were run again on 16.4.6.
+**Verification:** tsc; lint 11/11; `npm test` 5 suites (import fixtures 160 checks); flag-off production build: `smoke:builder` pass, `smoke:import` all cases pass, scan fails with the original copy, no `/ocr/` request, no OCR param; flag-on production build: `SMOKE_OCR=1 smoke:import` pass at 1440x900 and 375x812 (review opens with 6 sections and 2 roles, Import button inside the viewport, `cv_import` with `import_path: "ocr"`, no off-origin request); with `/ocr/*` blocked the import ends in `no_text_layer` + `ocr_outcome: load_failed`.
+**Suggested commit:** feat(import): read scanned PDFs with in-browser OCR behind NEXT_PUBLIC_OCR_IMPORT
 ## [2026-11-21 18:35] Next.js 16.4.3 to 16.4.6 (security advisories)
 
 **Goal:** clear the Next.js advisories `npm audit` reports for 16.0.0-16.4.4 (seven GHSA entries: cache leaks with `use cache`, SVG rejection bypass in image optimisation, HttpOnly cookie exposure on Edge routes, among others). `next build` was stopping about every other run with a SecurityFatalError.

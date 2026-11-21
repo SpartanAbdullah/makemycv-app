@@ -125,7 +125,14 @@ export const useGuardedDownload = () => useContext(DownloadContext);
 
 type ImportState =
   | { phase: "idle" }
-  | { phase: "parsing"; source: string; startedAt: number }
+  | {
+      phase: "parsing";
+      source: string;
+      startedAt: number;
+      /** The PDF has no text layer and is being read by OCR (flag
+       *  NEXT_PUBLIC_OCR_IMPORT). `page` is set once a page is being read. */
+      scan?: { page?: number; pages?: number };
+    }
   | { phase: "review"; source: string; parsed: ParsedDocument };
 
 /* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
@@ -1174,9 +1181,21 @@ export const BuilderShell = ({
       // The one place a failed file import is recorded. Every failure path
       // below ends here exactly once, with a reason from the closed set in
       // lib/importers/importErrors.ts and nothing else about the file.
-      const failImport = (reason: ImportErrorReason, message: string) => {
+      // `ocr` is passed only when the OCR fallback ran for this pick (flag
+      // NEXT_PUBLIC_OCR_IMPORT), so without the flag the event is unchanged.
+      // Enums only: `import_path: "ocr"`, and how the read ended when it failed.
+      const failImport = (
+        reason: ImportErrorReason,
+        message: string,
+        ocr?: { outcome?: string },
+      ) => {
         setImportState({ phase: "idle" });
-        track("cv_import_failed", { file_type: fileType, error_reason: reason });
+        track("cv_import_failed", {
+          file_type: fileType,
+          error_reason: reason,
+          ...(ocr ? { import_path: "ocr" } : {}),
+          ...(ocr?.outcome ? { ocr_outcome: ocr.outcome } : {}),
+        });
         setErrorMsg(message);
       };
 
@@ -1213,7 +1232,14 @@ export const BuilderShell = ({
                   deadlineAt,
                 )
               ).pdfAdapter;
-        const parsed = await adapter.parse(file, { deadlineAt });
+        const parsed = await adapter.parse(file, {
+          deadlineAt,
+          // The file is a scan: say so, and that it takes longer.
+          onOcr: (progress) =>
+            setImportState((s) =>
+              s.phase === "parsing" ? { ...s, scan: progress ?? {} } : s,
+            ),
+        });
         // Partial-import guard: a parse with nothing usable used to open
         // MappingReview in its "No fields could be extracted" state with the
         // Import button disabled (or, worse, with a "1 section" that was only
@@ -1222,7 +1248,11 @@ export const BuilderShell = ({
         if (!hasUsableContent(mapParsedToCv(parsed))) {
           // Session 7: a cover letter (matrix case 10b) gets its own copy
           // and a link; the reason stays mapping_empty.
-          failImport("mapping_empty", mappingEmptyMessage(parsed));
+          failImport(
+            "mapping_empty",
+            mappingEmptyMessage(parsed),
+            parsed.viaOcr ? {} : undefined,
+          );
           return;
         }
         setImportState({ phase: "review", source, parsed });
@@ -1230,7 +1260,11 @@ export const BuilderShell = ({
         // Typed failures route to specific guidance (audit UX-18); the file
         // is untouched and the user stays in the builder — never a dead end.
         const e = toImportParseError(err);
-        failImport(e.kind, e.message);
+        failImport(
+          e.kind,
+          e.message,
+          e.ocrOutcome ? { outcome: e.ocrOutcome } : undefined,
+        );
       }
     });
   };
@@ -1256,6 +1290,7 @@ export const BuilderShell = ({
         file_type: importState.source.toLowerCase(),
         merge_mode: mode,
         sections_filled: n,
+        ...(importState.parsed.viaOcr ? { import_path: "ocr" } : {}),
       });
     }
     pushToast(
@@ -1619,16 +1654,60 @@ export const BuilderShell = ({
                   marginBottom: 14,
                 }}
               >
-                Reading your {importState.source}
+                {importState.scan
+                  ? "Reading your scanned PDF"
+                  : `Reading your ${importState.source}`}
               </div>
-              <ProcessSteps
-                steps={[
-                  "Reading the file",
-                  "Extracting the text",
-                  "Detecting sections",
-                  "Mapping to your CV",
-                ]}
-              />
+              {importState.scan ? (
+                // OCR fallback: real progress (the page being read), not the
+                // timed checklist, because this can run for a minute.
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="import-ocr-notice"
+                  style={{ fontSize: 14, color: "var(--ff-ink)", lineHeight: 1.5 }}
+                >
+                  <p style={{ margin: 0 }}>
+                    This PDF is a scan, so the text is being read from the page
+                    images. That takes longer: up to a minute, and a little
+                    more the first time.
+                  </p>
+                  <p
+                    style={{
+                      margin: "12px 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 15,
+                        height: 15,
+                        flexShrink: 0,
+                        border: "2px solid var(--ff-line)",
+                        borderTopColor: "var(--ff-accent)",
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                    {importState.scan.page
+                      ? `Reading page ${importState.scan.page} of ${importState.scan.pages}…`
+                      : "Getting the text reader ready…"}
+                  </p>
+                </div>
+              ) : (
+                <ProcessSteps
+                  steps={[
+                    "Reading the file",
+                    "Extracting the text",
+                    "Detecting sections",
+                    "Mapping to your CV",
+                  ]}
+                />
+              )}
               <p
                 role="status"
                 data-testid="import-slow-hint"
@@ -1636,10 +1715,10 @@ export const BuilderShell = ({
                   fontSize: 13,
                   color: "var(--ff-ink)",
                   lineHeight: 1.5,
-                  margin: slowRead ? "14px 0 0" : 0,
+                  margin: slowRead && !importState.scan ? "14px 0 0" : 0,
                 }}
               >
-                {slowRead
+                {slowRead && !importState.scan
                   ? "Still reading your file… A slow connection can make this take longer. You'll see the result, or what to try instead, as soon as it's done."
                   : null}
               </p>
