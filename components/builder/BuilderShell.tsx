@@ -294,24 +294,25 @@ const TopBar = ({
       {/* Right — score chip + JD match + templates + download */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <ScoreChip report={scoreReport} delta={scoreDelta} />
-        {/* Free CV-vs-job diagnosis. Hidden below lg so the bar stays
-            uncluttered on smaller screens; the Review step carries the same
-            entry point for everyone else. */}
+        {/* Free CV-vs-job diagnosis. Icon-only on phones from 400px
+            (2026-11-21): it used to be hidden below lg, so a phone user met
+            it only on the last step. Below 400px there is no room beside the
+            score chip and Download, and the Review step still carries it. */}
         <Link
           href="/jd-match"
           aria-label="Match to a job"
-          className="hidden lg:inline-flex cv-top-btn cv-top-btn-secondary"
+          className="hidden min-[400px]:inline-flex cv-top-btn cv-top-btn-secondary"
         >
           <Icon name="lightbulb" size={13} />
           {/* Label spans collapse to icon-only when the left column is
               narrow (see the @container rule in the shell's style block). */}
-          <span className="cv-top-btn-label">Match to a job</span>
+          <span className="cv-top-btn-label hidden lg:inline">Match to a job</span>
         </Link>
         <button
           type="button"
           onClick={onTemplates}
           aria-label="All templates"
-          className="hidden sm:inline-flex cv-top-btn cv-top-btn-secondary"
+          className="hidden min-[360px]:inline-flex cv-top-btn cv-top-btn-secondary"
         >
           <svg
             width="13"
@@ -329,7 +330,7 @@ const TopBar = ({
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
           </svg>
-          <span className="cv-top-btn-label">All templates</span>
+          <span className="cv-top-btn-label hidden sm:inline">All templates</span>
         </button>
         <button
           type="button"

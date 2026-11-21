@@ -276,13 +276,23 @@ export const ReviewStep = ({
               tabIndex={-1}
               style={{ outline: "none" }}
             >
-              {score.total >= 40 ? "Looking good," : "Let's build this out,"}
+              {/* "Looking good" above an amber "Missing sections" box read as
+                  two verdicts at once (2026-11-21). The score and its
+                  thresholds are unchanged; only this greeting defers to the
+                  required-section check. */}
+              {missingRequired.length > 0
+                ? "Nearly there,"
+                : score.total >= 40
+                  ? "Looking good,"
+                  : "Let's build this out,"}
               <br />
               <span className="accent">{firstName}.</span>
             </h1>
             <p className="cv-step-subtitle" style={{ maxWidth: 380 }}>
-              Your CV scores {score.total}/100 on our UAE hiring rubric. Take a
-              final look, pick a template, and download.
+              Your CV scores {score.total}/100 on our UAE hiring rubric.{" "}
+              {missingRequired.length > 0
+                ? `${missingRequired.length === 1 ? "One section recruiters expect is" : `${missingRequired.length} sections recruiters expect are`} still empty. Fill ${missingRequired.length === 1 ? "it" : "them"} in before you download.`
+                : "Take a final look, pick a template, and download."}
             </p>
           </div>
 

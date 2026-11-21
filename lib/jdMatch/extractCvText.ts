@@ -3,6 +3,7 @@
  * Runs client-side only — the CV never leaves the browser (PDPL, see spec).
  */
 import type { CvData } from "../types/cv";
+import { uaeFieldPhrases } from "./uaeFields";
 
 /**
  * Marks a hard phrase boundary the source text actually had — a clause
@@ -69,7 +70,11 @@ export function extractCvCorpus(cv: CvData): string {
 
   const p = cv.personal;
   parts.push(p.headline, p.summary, p.nationality ?? "", p.visaStatus ?? "");
-  if (p.drivingLicense) parts.push("driving licence", p.drivingLicense);
+  if (p.drivingLicense) parts.push(p.drivingLicense);
+  if (p.availability) parts.push(p.availability);
+  // What the filled-in UAE Essentials fields already answer ("valid UAE
+  // driving licence", "immediate joiner"). Each phrase is its own part.
+  parts.push(...uaeFieldPhrases(p));
 
   for (const role of cv.experience) {
     parts.push(role.role, role.company, role.location);

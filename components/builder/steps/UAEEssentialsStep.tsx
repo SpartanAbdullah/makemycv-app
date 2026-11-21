@@ -65,6 +65,20 @@ const pickOwned = (source: Record<string, unknown>) => {
   return out;
 };
 
+/**
+ * A saved value that is not in the option list (CVs saved before the lists
+ * were fixed, e.g. "Residence visa, transferable"). Without an <option> for
+ * it the select rendered blank while the value still printed on the CV, so
+ * the person could not see what the field held (2026-11-21). The value is
+ * kept as written; picking a listed option replaces it.
+ */
+const legacyOption = (value: string | undefined, options: readonly string[]) =>
+  value && !options.includes(value) ? (
+    <option key={value} value={value}>
+      {value}
+    </option>
+  ) : null;
+
 const serializeOwned = (source: Record<string, unknown>) =>
   JSON.stringify(OWNED_FIELDS.map((key) => source[key] ?? ""));
 export const UAEEssentialsStep = ({
@@ -252,6 +266,7 @@ export const UAEEssentialsStep = ({
                 always one this select can show (audit F24). */}
             <select className="cv-select" {...register("visaStatus")}>
               <option value="">Select status…</option>
+              {legacyOption(personal.visaStatus, VISA_STATUS_OPTIONS)}
               {VISA_STATUS_OPTIONS.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -262,6 +277,7 @@ export const UAEEssentialsStep = ({
           <Field label="Availability / notice period">
             <select className="cv-select" {...register("availability")}>
               <option value="">Select availability…</option>
+              {legacyOption(personal.availability, AVAILABILITY_OPTIONS)}
               {AVAILABILITY_OPTIONS.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -272,6 +288,7 @@ export const UAEEssentialsStep = ({
           <Field label="UAE driving licence">
             <select className="cv-select" {...register("drivingLicense")}>
               <option value="">Select…</option>
+              {legacyOption(personal.drivingLicense, DRIVING_LICENCE_OPTIONS)}
               {DRIVING_LICENCE_OPTIONS.map((o) => (
                 <option key={o} value={o}>
                   {o}
