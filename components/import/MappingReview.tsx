@@ -328,6 +328,21 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
                 ? "No fields could be extracted. Try a different file."
                 : "Fix anything that looks wrong, then confirm to import. Common mis-mappings: role ↔ company, school ↔ degree."}
             </p>
+            {/* Scanned PDF read by OCR (2026-11-21): a read off an image can
+                miss a dot or a digit, and a wrong email or phone number costs
+                the person replies. Say what to check; never "fix" it for them. */}
+            {parsed.viaOcr && (
+              <p
+                className="mt-2 text-sm text-slate-600"
+                data-testid="import-ocr-review-note"
+              >
+                <strong style={{ color: "var(--ff-ink)" }}>
+                  This PDF was a scan, so the text was read from the page images.
+                </strong>{" "}
+                Check every field against your CV, especially your email
+                address and phone number: a dot or a digit can be misread.
+              </p>
+            )}
             {/* D7a (session 6): the PDF adapter reads MAX_PDF_PAGES pages; say
                 so instead of dropping the rest silently. */}
             {parsed.pagesSkipped && (

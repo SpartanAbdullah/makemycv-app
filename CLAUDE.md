@@ -260,6 +260,14 @@ npm run build
   `RESEND_API_KEY` for email). Locally they stay off; the end-to-end check
   uses a mock PostgREST/Resend (`_cowork/audit-2026-10/scripts/mock-backend.mjs`).
   Every analytics event name also needs a trigger + tag published in GTM.
+- **Scanned-PDF import (2026-11-21)**: `NEXT_PUBLIC_OCR_IMPORT=1` makes the
+  builder import read a PDF with no text layer by OCR in the browser
+  (`lib/importers/ocr.ts`, `ocrBrowser.ts`); off, a scan fails with
+  `no_text_layer` as before. Every OCR asset is same-origin under `/ocr/`:
+  the worker and wasm core are copied from `node_modules` on `postinstall`
+  (`scripts/copy-ocr-assets.mjs`, git-ignored) and the English data is
+  committed. Never point tesseract.js at a CDN. To check it in a browser:
+  build with the flag, `next start`, then `SMOKE_OCR=1 npm run smoke:import`.
 - CI (`.github/workflows/ci.yml`, pushes to `main`/`stagingmmc` and PRs) runs
   typecheck → lint → test on Node 22. It does **not** run `next build`; Vercel
   does that on deploy.

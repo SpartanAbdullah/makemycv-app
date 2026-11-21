@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "postinstall": "node scripts/patch-react-pdf-textkit.mjs",
+    "postinstall": "node scripts/patch-react-pdf-textkit.mjs && node scripts/copy-ocr-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=11",
@@ -39,6 +39,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
+    "tesseract.js": "7.0.0",
     "zod": "^3.25.76",
     "zustand": "^5.0.3"
   },

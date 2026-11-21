@@ -63,3 +63,7 @@ next-env.d.ts
 .arabic-smoke-build/
 # ad-hoc react-pdf probes
 .lh-probe/
+
+# tesseract.js worker + wasm core, copied from node_modules on postinstall
+# (scripts/copy-ocr-assets.mjs). The language data next to it IS committed.
+/public/ocr/tesseract-*/

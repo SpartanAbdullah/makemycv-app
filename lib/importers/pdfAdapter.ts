@@ -20,6 +20,12 @@ import {
   withDeadline,
   zipLooksLikeDocx,
 } from "./importErrors";
+import {
+  OcrError,
+  ocrImportEnabled,
+  runOcrFallback,
+  type OcrFallback,
+} from "./ocr";
 import { parseTextToDocument } from "./textParser";
 
 type PdfTextItemLike = {
@@ -441,18 +447,32 @@ export async function extractPdfTextInBrowserDetailed(
 }
 
 /** Bytes → ParsedDocument, shared by the browser adapter and the Node fixture
- *  suite. Throws ImportParseError only. */
+ *  suite. Throws ImportParseError only.
+ *
+ *  `opts.ocr` (2026-11-21) is the scanned-PDF fallback: when the text layer is
+ *  under MIN_TEXT_LENGTH and a recogniser was passed, the first OCR_MAX_PAGES
+ *  pages are read by OCR and that text is parsed instead. Without it (the
+ *  flag is off, or a caller that never passes one) a scan throws
+ *  `no_text_layer` exactly as before, and a failed OCR throws the same reason. */
 export async function parsePdfBytes(
   data: ArrayBuffer,
-  opts: ExtractPdfOptions,
+  opts: ExtractPdfOptions & { ocr?: OcrFallback },
 ): Promise<ParsedDocument> {
-  const { text, pages, pagesRead, truncated } = await extractPdfText(data, opts);
+  const extracted = await extractPdfText(data, opts);
+  let { text, pagesRead } = extracted;
+  const { pages, truncated } = extracted;
+  let viaOcr = false;
   if (text.trim().length < MIN_TEXT_LENGTH) {
-    throw new ImportParseError("no_text_layer");
+    if (!opts.ocr) throw new ImportParseError("no_text_layer");
+    const read = await runOcrFallback(data, opts.ocr);
+    text = read.text;
+    pagesRead = read.pagesRead;
+    viaOcr = true;
   }
   let parsed: ParsedDocument;
   try {
-    // A PDF text layer is soft-wrapped at the right margin (D9, session 6).
+    // A PDF text layer is soft-wrapped at the right margin (D9, session 6);
+    // so are the lines OCR reads off the page.
     parsed = parseTextToDocument(text, { softWrapped: true });
   } catch (err) {
     throw toImportParseError(err);
@@ -460,14 +480,48 @@ export async function parsePdfBytes(
   // D7a (session 6): pages past MAX_PDF_PAGES used to vanish without a word
   // (a 31-page file lost its last page, skills and education, silently). The
   // review now says how many pages were read. Counts only, no analytics.
-  if (truncated) parsed.pagesSkipped = { read: pagesRead, total: pages };
+  if (viaOcr) {
+    parsed.viaOcr = true;
+    if (pages > pagesRead) parsed.pagesSkipped = { read: pagesRead, total: pages };
+  } else if (truncated) {
+    parsed.pagesSkipped = { read: pagesRead, total: pages };
+  }
   return parsed;
+}
+
+/** The browser OCR fallback, or undefined when NEXT_PUBLIC_OCR_IMPORT is not
+ *  "1". ocrBrowser.ts (and tesseract.js behind it) is only fetched when a scan
+ *  is actually picked. */
+function browserOcrFallback(
+  pdfjs: PdfjsModule,
+  onOcr?: (progress: { page: number; pages: number } | null) => void,
+): OcrFallback | undefined {
+  if (!ocrImportEnabled()) return undefined;
+  return {
+    onStart: () => onOcr?.(null),
+    onProgress: (p) => onOcr?.(p),
+    recognise: async (data, ctx) => {
+      let mod: typeof import("./ocrBrowser");
+      try {
+        mod = await import("./ocrBrowser");
+      } catch {
+        throw new OcrError("load_failed");
+      }
+      return mod.recognisePdfPages(pdfjs as unknown as Parameters<typeof mod.recognisePdfPages>[0], data, ctx);
+    },
+  };
 }
 
 export const pdfAdapter: ImportAdapter = {
   name: "PDF",
 
-  async parse(input: File, opts?: { deadlineAt?: number }): Promise<ParsedDocument> {
+  async parse(
+    input: File,
+    opts?: {
+      deadlineAt?: number;
+      onOcr?: (progress: { page: number; pages: number } | null) => void;
+    },
+  ): Promise<ParsedDocument> {
     // Failures THROW typed errors instead of resolving `{}` (audit UX-18) —
     // the old swallow-to-empty behavior made every failure mode (corrupt
     // file, scanned image, odd layout) land on the same dead-end "No fields
@@ -481,6 +535,11 @@ export const pdfAdapter: ImportAdapter = {
     const deadlineAt = opts?.deadlineAt ?? Date.now() + PDF_TIMEOUT_MS;
     const { pdfjs, workerSrc } = await loadPdfjs(deadlineAt);
     const data = await input.arrayBuffer();
-    return parsePdfBytes(data, { pdfjs, workerSrc, deadlineAt });
+    return parsePdfBytes(data, {
+      pdfjs,
+      workerSrc,
+      deadlineAt,
+      ocr: browserOcrFallback(pdfjs, opts?.onOcr),
+    });
   },
 };
