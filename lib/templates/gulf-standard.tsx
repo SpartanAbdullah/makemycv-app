@@ -81,18 +81,18 @@ export type GulfDetailRow = { label: string; value: string };
  */
 export const gulfDetailRows = (data: CvData): GulfDetailRow[] => {
   const chips = new Map(
-    getEssentialChips(data.personal).map((chip) => [chip.label, chip.value]),
+    getEssentialChips(data.personal).map((chip) => [chip.key, chip.value]),
   );
   const rows: GulfDetailRow[] = [];
-  const nationality = chips.get("Nationality");
+  const nationality = chips.get("nationality");
   if (nationality) rows.push({ label: "Nationality", value: nationality });
   const dob = data.personal.dateOfBirth?.trim();
   if (dob) rows.push({ label: "Date of birth", value: dob });
-  const visa = chips.get("Visa");
+  const visa = chips.get("visa");
   if (visa) rows.push({ label: "Visa status", value: visa });
-  const availability = chips.get("Available");
+  const availability = chips.get("availability");
   if (availability) rows.push({ label: "Availability", value: availability });
-  const licence = chips.get("DL");
+  const licence = chips.get("licence");
   if (licence) rows.push({ label: "Driving licence", value: licence });
   const languages = data.languages
     .map((lang) => {

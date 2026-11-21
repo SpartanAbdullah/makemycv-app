@@ -48,7 +48,8 @@ export type ScoreMode = "builder" | "checker";
  * The characterization tests in scoreEngine.test.ts pin the signal set and the
  * golden totals, so a rubric change that forgets to bump this fails there.
  */
-export const SCORING_RUBRIC_VERSION = 3;
+// 4 (2026-11): A14 no longer applies when the driving licence is "None".
+export const SCORING_RUBRIC_VERSION = 4;
 
 export type ScoreOptions = {
   mode?: ScoreMode;
@@ -1271,19 +1272,37 @@ function evaluateAts(
   // awarded a point for something that appears nowhere on the document. The
   // signal is "does the printed CV answer this", so it has to agree with what
   // getEssentialChips actually renders.
+  //
+  // Rubric 4 (2026-11, product audit A5, owner-approved): an explicit "None"
+  // takes this signal OUT of the score instead of failing it. The point was
+  // unearnable for anyone without a licence, so a complete CV from someone
+  // who does not drive could never reach the total a driver's could — the
+  // score was marking the person, not the document. "None" still earns
+  // nothing: it is not counted as stated, it is not counted at all. A blank
+  // field is unchanged (the CV has not answered the question).
   {
     const value = p.drivingLicense?.trim() ?? "";
-    const pass = Boolean(value) && !/^(?:none|n\/?a|no)$/i.test(value);
+    const saysNone = /^(?:none|n\/?a|no)$/i.test(value);
+    const pass = Boolean(value) && !saysNone;
     out.push(
-      sig("A14", "atsEssentials", 1, pass, pass ? "good" : "review", {
-        title: pass
-          ? "Driving licence stated"
-          : "No UAE driving licence indicated",
-        description: pass
-          ? ""
-          : "Sales, logistics and site roles in the UAE filter on this outright, so a licence shown on the CV is worth listing.",
-        actionable: pass ? "" : "Add your licence if you hold one (e.g. 'UAE Light Vehicle').",
-      }),
+      sig(
+        "A14",
+        "atsEssentials",
+        1,
+        pass,
+        pass ? "good" : "review",
+        {
+          title: pass
+            ? "Driving licence stated"
+            : "No UAE driving licence indicated",
+          description: pass
+            ? ""
+            : "Sales, logistics and site roles in the UAE filter on this outright, so a licence shown on the CV is worth listing.",
+          actionable: pass ? "" : "Add your licence if you hold one (e.g. 'UAE Light Vehicle').",
+        },
+        false,
+        !saysNone,
+      ),
     );
   }
 

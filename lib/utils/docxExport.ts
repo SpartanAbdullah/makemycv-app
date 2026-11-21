@@ -10,6 +10,7 @@ import { meaningfulProjects } from "./projects";
 import { meaningfulExperience } from "./experience";
 import { meaningfulEducation } from "./education";
 import { getEssentialChips } from "./essentials";
+import { buildCvFilename, triggerBlobDownload } from "./download";
 
 export async function exportToDocx(data: CvData): Promise<void> {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, ExternalHyperlink } =
@@ -231,10 +232,5 @@ export async function exportToDocx(data: CvData): Promise<void> {
   });
 
   const blob = await Packer.toBlob(doc);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${fullName.replace(/\s+/g, "-")}-CV.docx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(blob, buildCvFilename(data, "docx"));
 }

@@ -1,20 +1,5 @@
 import type { CvData, PlanTier } from "../lib/types/cv";
-
-function sanitizeName(value: string): string {
-  return value
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-zA-Z0-9_-]/g, "");
-}
-
-function buildFilename(data: CvData): string {
-  const first = sanitizeName(data.personal.firstName ?? "");
-  const last = sanitizeName(data.personal.lastName ?? "");
-  if (first || last) {
-    return `CV_${[first, last].filter(Boolean).join("_")}.pdf`;
-  }
-  return "CV_MakeMyCV.pdf";
-}
+import { buildCvFilename, triggerBlobDownload } from "../lib/utils/download";
 
 // Default plan is "pro": there is no paid tier any more (paywall removed
 // 2026-05-31), so no PDF should ever carry the "Free Plan" watermark. The
@@ -44,14 +29,7 @@ export async function downloadCV(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blob = await pdf(doc as any).toBlob();
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = buildFilename(data);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, buildCvFilename(data, "pdf"));
   } catch (err) {
     console.error("PDF download failed:", err);
     throw err;

@@ -149,7 +149,11 @@ export const CoverLetterPanel = () => {
     }
   };
 
+  // Every field of the excerpt that is actually sent, first name included —
+  // it goes to the server for the sign-off and was missing from this list
+  // until 2026-11 (product audit P2).
   const excerptSummary = [
+    excerpt.firstName && "your first name",
     excerpt.headline && "your headline",
     excerpt.summary && "your summary",
     excerpt.latestRole && `your latest role (${excerpt.latestRole.title || "untitled"}${excerpt.latestRole.bullets.length ? `, ${excerpt.latestRole.bullets.length} bullet${excerpt.latestRole.bullets.length === 1 ? "" : "s"}` : ""})`,
@@ -280,8 +284,8 @@ export const CoverLetterPanel = () => {
           >
             <strong style={{ color: "var(--ff-ink)" }}>What leaves your browser:</strong>{" "}
             {excerptSummary.length ? excerptSummary.join(", ") : "an excerpt of your CV"} and the job details above are sent to our server
-            and on to Anthropic (Claude) to write the letter, then discarded. Your contact details, photo and the rest of your CV
-            stay on this device.
+            and on to Anthropic (Claude) to write the letter, then discarded. Your surname, contact details, photo and the rest of
+            your CV stay on this device.
           </div>
 
           {error && (

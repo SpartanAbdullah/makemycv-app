@@ -31,6 +31,16 @@ import { UAE_FIELD_LABELS, uaeFieldFor } from "../../lib/jdMatch/uaeFields";
 import { buildTailoredCv } from "../../lib/jdMatch/tailorCv";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { exportToDocx } from "../../lib/utils/docxExport";
+import { recordCvExport, recordCvExportStarted } from "../../lib/exportRecord";
+import type { ExportAsk, ExportSentence } from "../../lib/exportAsks";
+import {
+  getFirstIncompleteSection,
+  getMissingItems,
+  getUnfilledBlanks,
+} from "../../lib/validation/cvRequirements";
+import { ExportGateDialog } from "../builder/ExportGateDialog";
+import { DownloadSupportCard } from "../builder/DownloadSupportCard";
+import { canAskAfterExport } from "../feedback/RatingStrip";
 import { JdCvPreview, type JdChange } from "./JdCvPreview";
 import { JdHeatmap } from "./JdHeatmap";
 import { JdCoach } from "./JdCoach";
@@ -324,20 +334,48 @@ export const JdMatchPanel = () => {
   // Download the per-job copy (focused when the toggle is on) — NEVER mutates the
   // store, so the master CV keeps every skill. Pure data → exporter, like the
   // builder's own fallback export.
-  const downloadTailored = async (kind: "pdf" | "docx") => {
+  //
+  // The same three things the builder's download does (product audit 2026-11,
+  // E5 — this button used to do none of them): it counts as an export
+  // (lib/exportRecord.ts), it stops at the completeness gate first, and it
+  // shows the post-download card afterwards.
+  const [exportGateKind, setExportGateKind] = useState<"pdf" | "docx" | null>(null);
+  const [supportCard, setSupportCard] = useState<{
+    ask: ExportAsk;
+    sentence: ExportSentence;
+  } | null>(null);
+  // Where "Go back and fix" (or the back button) lands in the builder.
+  const [leaveHref, setLeaveHref] = useState("/builder");
+
+  const runTailoredDownload = async (kind: "pdf" | "docx") => {
     const data = previewCv; // export exactly what the preview shows
+    const templateId = data.settings.templateId ?? "classic";
     setTailorError(null);
     setTailorDone(false);
     setTailorDownloading(true);
+    setSupportCard(null);
+    recordCvExportStarted(kind, templateId);
     try {
       if (kind === "docx") await exportToDocx(data);
-      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      else await downloadCV(data, "pro", templateId);
       setTailorDone(true);
+      setSupportCard(recordCvExport(kind, templateId, canAskAfterExport));
     } catch {
       setTailorError("Download failed — please try again.");
     } finally {
       setTailorDownloading(false);
     }
+  };
+
+  const downloadTailored = async (kind: "pdf" | "docx") => {
+    // This file is about to go to an employer: missing required content and
+    // unfilled blanks ("__", "[your industry]") are named before it exists,
+    // exactly as in the builder. Never a hard block — "Export anyway" stays.
+    if (getMissingItems(previewCv).length > 0 || getUnfilledBlanks(previewCv).length > 0) {
+      setExportGateKind(kind);
+      return;
+    }
+    await runTailoredDownload(kind);
   };
 
   // Jump to the download panel and turn focus on (Coach hand-off / done-state).
@@ -401,10 +439,12 @@ export const JdMatchPanel = () => {
     setSavedCount(null);
   };
 
-  const goBack = () => {
+  const leaveTo = (href: string) => {
+    setLeaveHref(href);
     if (hasPending) setBackPrompt(true);
-    else router.push("/builder");
+    else router.push(href);
   };
+  const goBack = () => leaveTo("/builder");
 
   return (
     <div
@@ -992,6 +1032,46 @@ export const JdMatchPanel = () => {
                         done={tailorDone}
                         error={tailorError}
                       />
+                      {/* Post-download card, in-flow under the buttons that
+                          produced the file. Same component and the same row
+                          rule as the builder; the "next step" row offers the
+                          letter and the message, since this IS the job match. */}
+                      {supportCard && (
+                        <div
+                          style={{
+                            marginTop: 12,
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            border: "1px solid var(--ff-accent-ring)",
+                          }}
+                        >
+                          <DownloadSupportCard
+                            open
+                            ask={supportCard.ask}
+                            sentence={supportCard.sentence}
+                            onDismiss={() => setSupportCard(null)}
+                            nextLabel="Next for this job:"
+                            nextLinks={[
+                              {
+                                id: "post_export_cover_letter",
+                                href: "/cover-letter",
+                                label: "Write the cover letter",
+                                onClick: () =>
+                                  stashCoverLetterSeed({
+                                    jobTitle: result?.jobTitle ?? undefined,
+                                    jobText: analyzedText,
+                                  }),
+                              },
+                              {
+                                id: "post_export_linkedin_message",
+                                href: "/linkedin-message",
+                                label: "Message the recruiter",
+                                onClick: () => stashLinkedinMessageSeed({ jobText: analyzedText }),
+                              },
+                            ]}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1028,15 +1108,38 @@ export const JdMatchPanel = () => {
           onCancel={() => setBackPrompt(false)}
           onDiscard={() => {
             setPendingChanges([]);
-            router.push("/builder");
+            router.push(leaveHref);
           }}
           onAccept={() => {
             setData(workingCv);
             setPendingChanges([]);
-            router.push("/builder");
+            router.push(leaveHref);
           }}
         />
       )}
+
+      <ExportGateDialog
+        open={exportGateKind !== null}
+        missing={exportGateKind ? getMissingItems(previewCv) : []}
+        blanks={exportGateKind ? getUnfilledBlanks(previewCv) : []}
+        onClose={() => setExportGateKind(null)}
+        onGoFix={() => {
+          setExportGateKind(null);
+          // Missing required content first; with none, the first line that
+          // still has a blank. Staged job-match changes get the usual
+          // keep / discard question before the page changes.
+          const target =
+            getFirstIncompleteSection(previewCv) ??
+            getUnfilledBlanks(previewCv)[0]?.sectionId ??
+            null;
+          leaveTo(target ? `/builder?step=${target}` : "/builder");
+        }}
+        onExportAnyway={async () => {
+          const kind = exportGateKind;
+          setExportGateKind(null);
+          if (kind) await runTailoredDownload(kind);
+        }}
+      />
 
       {pendingCredential && (
         <CredentialConfirmDialog

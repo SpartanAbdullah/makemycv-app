@@ -15,28 +15,25 @@
 // JSON backup would have made it three conventions and three bugs, so the
 // plumbing lives here now.
 
+//
+// (2026-11) The plumbing moved here in August but the PDF and Word exports
+// kept their own copies, so the three conventions survived. They are gone
+// now: every export calls triggerBlobDownload() with a name from
+// lib/utils/fileName.ts, which also keeps accented and non-Latin names
+// (product audit E4) — fileName.test.ts fails if an export sets
+// `a.download` itself again.
+
 import type { CvData } from "../types/cv";
 import { exportCvJson } from "./localStorage";
-
-/** Filename-safe fragment: collapse whitespace to _, drop everything else. */
-export function sanitizeFilenamePart(value: string): string {
-  return value
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-zA-Z0-9_-]/g, "");
-}
+import { cvFileName } from "./fileName";
 
 /**
- * `CV_First_Last.<ext>`, falling back to `CV_MakeMyCV.<ext>` when the CV has no
- * name yet (which is normal for a backup taken early, and must not produce a
- * file called `CV_..json`).
+ * `CV_First_Last.<ext>` for every CV export. With no name yet (normal for a
+ * backup taken early) the file is `CV.<ext>` — or `CV_backup.json`, so a
+ * backup is still recognisable in a Downloads folder.
  */
 export function buildCvFilename(data: CvData, extension: string): string {
-  const first = sanitizeFilenamePart(data.personal.firstName ?? "");
-  const last = sanitizeFilenamePart(data.personal.lastName ?? "");
-  const stem =
-    first || last ? `CV_${[first, last].filter(Boolean).join("_")}` : "CV_MakeMyCV";
-  return `${stem}.${extension}`;
+  return cvFileName(data.personal, extension, extension === "json" ? "CV_backup" : "CV");
 }
 
 /**

@@ -90,6 +90,24 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
   const updateSection = useCvStore((state) => state.updateSection);
   const settings = useCvStore((state) => state.data.settings);
   const { handleImport } = useImport();
+  // "Upload your CV" arrival from www (`/builder?import=1`, 2026-11). A file
+  // picker cannot be opened without the user's own click, so the page does the
+  // next best thing: the import control takes focus and is drawn as the
+  // obvious first action. Read once at mount; the parameter is then removed so
+  // a reload or a later visit to this step is not "invited" again.
+  const [importInvited] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("import") === "1",
+  );
+  const importButtonRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!importInvited) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("import");
+    window.history.replaceState(null, "", url.toString());
+    importButtonRef.current?.focus();
+  }, [importInvited]);
   const lastSerializedRef = useRef<string>(
     serializeOwned(personal as unknown as Record<string, unknown>),
   );
@@ -232,8 +250,14 @@ export const PersonalStep = ({ onNext }: { onNext: () => void }) => {
       <div>
         <ImportButton
           icon="upload"
-          label="Import existing CV (PDF / DOCX)"
+          label={
+            importInvited
+              ? "Choose your CV file to import (PDF / DOCX)"
+              : "Import existing CV (PDF / DOCX)"
+          }
           onClick={() => handleImport()}
+          invited={importInvited}
+          buttonRef={importButtonRef}
         />
         <p
           style={{
@@ -550,21 +574,29 @@ const ImportButton = ({
   icon,
   label,
   onClick,
+  invited = false,
+  buttonRef,
 }: {
   icon: "upload" | "linkedin";
   label: string;
   onClick: () => void;
+  /** The visitor arrived asking to upload a CV: draw this as the first action. */
+  invited?: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
 }) => (
   <button
+    ref={buttonRef}
     type="button"
     onClick={onClick}
     style={{
       width: "100%",
       fontFamily: "var(--font-body)",
       fontSize: 13,
-      color: "var(--ff-ink)",
-      background: "var(--ff-card)",
-      border: "1px dashed var(--ff-line-strong)",
+      color: invited ? "var(--ff-accent-dark)" : "var(--ff-ink)",
+      background: invited ? "var(--ff-accent-soft)" : "var(--ff-card)",
+      border: invited
+        ? "1px solid var(--ff-accent)"
+        : "1px dashed var(--ff-line-strong)",
       // Canonical single-line dashed-CTA metrics (matches .cv-btn-ghost).
       padding: "11px 16px",
       borderRadius: 10,
@@ -581,8 +613,10 @@ const ImportButton = ({
       e.currentTarget.style.color = "var(--ff-accent-dark)";
     }}
     onMouseLeave={(e) => {
-      e.currentTarget.style.borderColor = "var(--ff-line-strong)";
-      e.currentTarget.style.color = "var(--ff-ink)";
+      e.currentTarget.style.borderColor = invited
+        ? "var(--ff-accent)"
+        : "var(--ff-line-strong)";
+      e.currentTarget.style.color = invited ? "var(--ff-accent-dark)" : "var(--ff-ink)";
     }}
   >
     <Icon name={icon} size={14} />

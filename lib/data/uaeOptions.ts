@@ -17,17 +17,27 @@
  * CV did not say so. Nationality stays free text.
  */
 
+// 2026-11 (product audit A5/A13, owner-approved): two answers the list could
+// not give.
+//   "Residence visa" — the plain wording many CVs use ("UAE Residence"); the
+//     parser recognised the label and then had nowhere to put the value.
+//   "Outside UAE, available to relocate" — 30–38% of applications for UAE
+//     jobs in 2026 came from abroad (LinkedIn UAE Workforce Readiness Report).
+//     Those applicants had to leave the field blank, and lose the visa
+//     points, or pick a status that was not true.
 export const VISA_STATUS_OPTIONS = [
   "UAE National",
   "GCC National",
   "Family sponsorship",
   "Employment visa",
+  "Residence visa",
   "Golden Visa",
   "Green Visa",
   "Freelance permit",
   "Investor visa",
   "Visit visa",
   "Cancelled / transferable",
+  "Outside UAE, available to relocate",
 ] as const;
 
 export const AVAILABILITY_OPTIONS = [
@@ -72,11 +82,18 @@ export function normalizeVisaStatus(raw: string): VisaStatusOption | null {
   if (/\bfreelanc/.test(v)) return "Freelance permit";
   if (/\b(investor|partner)\b/.test(v)) return "Investor visa";
   if (/\b(visit|tourist)\b/.test(v)) return "Visit visa";
+  // Only a plain statement of being abroad. "Willing to relocate" on its own
+  // is not one: people already in the UAE write it about moving emirate.
+  if (/\b(outside (?:the )?(?:uae|u\.a\.e\.?|emirates)|overseas|abroad)\b/.test(v)) {
+    return "Outside UAE, available to relocate";
+  }
   // "Cancelled" wins outright; "transferable" alone only when no live visa
   // type is named — "Employment visa (transferable)" is still an employment
-  // visa (the word-export fixture).
+  // visa (the word-export fixture), and "Residence visa – transferable" is
+  // still a residence visa (it used to be stored as "Cancelled").
   if (/\b(cancel\w*|nol)\b/.test(v)) return "Cancelled / transferable";
   if (/\b(employment|work|company)\b/.test(v)) return "Employment visa";
+  if (/\bresiden(?:ce|cy|t)\b/.test(v)) return "Residence visa";
   if (/\b(transferable|transferrable)\b/.test(v)) return "Cancelled / transferable";
   return null;
 }

@@ -70,8 +70,8 @@ import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadSupportCard } from "./DownloadSupportCard";
 import { canAskAfterExport } from "../feedback/RatingStrip";
-import { HUMAN_REVIEW_ON } from "../../lib/config/humanReview";
-import { askForExport, nextExportNumber, sentenceForExport, type ExportAsk, type ExportSentence } from "../../lib/exportAsks";
+import type { ExportAsk, ExportSentence } from "../../lib/exportAsks";
+import { recordCvExport, recordCvExportStarted } from "../../lib/exportRecord";
 import { CookieSettingsLink } from "../consent/CookieSettingsLink";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
@@ -810,7 +810,7 @@ export const BuilderShell = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [supportCardOpen, setSupportCardOpen] = useState(false);
-  const [supportAsk, setSupportAsk] = useState<ExportAsk>("follow");
+  const [supportAsk, setSupportAsk] = useState<ExportAsk>("next");
   const [supportSentence, setSupportSentence] = useState<ExportSentence>("karak");
   const [downloadGuardOpen, setDownloadGuardOpen] = useState(false);
 
@@ -910,6 +910,32 @@ export const BuilderShell = ({
     templateBaselineRef.current = id;
     track("template_selected", { template: id });
   }, [data.settings.templateId, hydrated]);
+
+  // Template deep link: `/builder?template=<id>`, sent by "Use This Template"
+  // on www. Until 2026-11 those links opened the bare builder, which starts on
+  // Classic, so the template the visitor had just chosen was thrown away and
+  // they had to find the gallery again on the last step (audit O1).
+  //
+  // Applied once, after the saved CV has loaded (applying it earlier would be
+  // overwritten by hydration), and then removed from the address bar: a
+  // reload must not re-apply it over a template the user picked later.
+  // Declared AFTER the template_selected effect on purpose — that effect has
+  // already taken its baseline, so this change is counted as a selection.
+  useEffect(() => {
+    if (!hydrated) return;
+    const url = new URL(window.location.href);
+    const wanted = url.searchParams.get("template");
+    if (wanted === null) return;
+    url.searchParams.delete("template");
+    window.history.replaceState(null, "", url.toString());
+    // An id this build does not know is ignored, not guessed at.
+    if (!templates.some((t) => t.id === wanted)) return;
+    const settings = useCvStore.getState().data.settings;
+    if ((settings.templateId ?? "classic") === wanted) return;
+    useCvStore
+      .getState()
+      .updateSection("settings", settingsForTemplate(settings, wanted));
+  }, [hydrated]);
 
   // cv_preview_viewed: once per session per surface — the fullscreen overlay
   // on desktop, the Preview toggle on mobile. The always-visible desktop
@@ -1074,12 +1100,7 @@ export const BuilderShell = ({
     // Attempt counter for the export funnel: cv_export_started → cv_export.
     // The gap between the two is the render-failure rate. Backups excluded
     // for the same reason as below.
-    if (kind !== "json") {
-      track("cv_export_started", {
-        format: kind,
-        template: templateId,
-      });
-    }
+    if (kind !== "json") recordCvExportStarted(kind, templateId);
     try {
       if (kind === "json") {
         downloadCvBackup(cv);
@@ -1090,41 +1111,24 @@ export const BuilderShell = ({
       }
       pushToast(EXPORT_COPY[kind].success, { tone: "success", duration: 4000 });
 
-      /* North-star metric. Fired here and nowhere else: this is the single
-         export gate for the whole builder (TopBar, ReviewStep and the template
-         preview modal all route through it), and it sits after the await, so it
-         only counts exports that actually produced a file — not clicks, and not
-         attempts that threw.
+      /* North-star metric (`cv_export`), recorded through lib/exportRecord.ts
+         — the one function every download path calls (this gate for the
+         TopBar, ReviewStep and the template preview; JD Match for its
+         per-job copy). It sits after the await, so it only counts exports
+         that actually produced a file — not clicks, and not attempts that
+         threw.
 
          `json` is excluded deliberately. A backup is housekeeping, not a
-         finished CV; the tip jar makes exactly that distinction three lines
-         below. Counting backups here would inflate the one number the product
-         gets judged on.
+         finished CV, and not a moment to ask for anything. Counting backups
+         would inflate the one number the product gets judged on.
 
-         No `plan` parameter: every call site passes "pro", so it would be a
-         constant masquerading as a dimension. Add it when a real free/pro
-         split exists. */
+         The card opens immediately rather than on a timer: it is in-flow, so
+         there is nothing to wait for it to stop covering. The row it shows is
+         decided once, in recordCvExport (lib/exportAsks.ts has the order). */
       if (kind !== "json") {
-        track("cv_export", {
-          format: kind,
-          template: templateId,
-        });
-      }
-      // A backup is housekeeping, not a finished-CV moment — don't ask for a
-      // tip for it.
-      //
-      // Opens immediately rather than on a 1500ms timer: the card is in-flow,
-      // so there is nothing to wait for it to stop covering. The old timer was
-      // also never cleared, which leaked if the shell unmounted inside the
-      // window.
-      if (kind !== "json") {
-        // Decided once, here, so answering a star mid-card can't swap the row
-        // out from under the thanks line. A row with nothing to ask (already
-        // answered, or switched off) falls back to follow.
-        const exportNumber = nextExportNumber();
-        const ask = askForExport(exportNumber);
-        setSupportSentence(sentenceForExport(exportNumber, HUMAN_REVIEW_ON));
-        setSupportAsk(ask === "follow" || canAskAfterExport(ask) ? ask : "follow");
+        const { ask, sentence } = recordCvExport(kind, templateId, canAskAfterExport);
+        setSupportSentence(sentence);
+        setSupportAsk(ask);
         setSupportCardOpen(true);
       }
     } catch {
@@ -1590,10 +1594,24 @@ export const BuilderShell = ({
                   textAlign: "center",
                 }}
               >
+                {/* Accuracy over reassurance (product audit 2026-11, P2). The
+                    old line called AI suggestions "the one exception" — but
+                    the cover letter and LinkedIn message send an excerpt, and
+                    the CV checker keeps its report for 24 hours. Each of those
+                    says so where it is used; this line must not contradict
+                    them. */}
                 <p style={{ marginBottom: 6, letterSpacing: "0.02em" }}>
-                  Your CV lives in this browser only — we never see it. AI
-                  suggestions are the one exception (sent securely, never
-                  stored).
+                  The CV you build here is saved in this browser only — there
+                  is no account. The AI tools and the CV checker send the text
+                  they need to our server, and each one says what it sends.{" "}
+                  <a
+                    href="https://www.makemycv.ae/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--ff-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
+                  >
+                    Privacy
+                  </a>
                 </p>
                 <a
                   href={SUPPORT_URL}

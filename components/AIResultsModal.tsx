@@ -5,6 +5,7 @@ import type { AIError, AIImproveType } from "../hooks/useAIImprove";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "./ui/ModalCloseButton";
 import { hasPlaceholder } from "../lib/ai/placeholders";
+import { describeRetryAfter } from "../lib/ai/improveOutcome";
 import { PlaceholderText, PLACEHOLDER_HINT } from "./ai/PlaceholderText";
 
 type Props = {
@@ -346,6 +347,17 @@ export function AIResultsModal({
             <p className="mt-2 max-w-sm text-sm text-[var(--ff-muted)]">
               {error.message}
             </p>
+            {/* When it comes back (product audit A6): the allowance is per
+                internet address, so someone on shared Wi-Fi can hit it
+                without having used it — the least we owe them is a time. */}
+            {describeRetryAfter(error.retryAfter) && (
+              <p
+                data-testid="ai-reset-time"
+                className="mt-2 max-w-sm text-sm font-medium text-[var(--ff-ink-2)]"
+              >
+                You can use AI help again {describeRetryAfter(error.retryAfter)}.
+              </p>
+            )}
             {error.supportUrl && (
               <a
                 href={error.supportUrl}
@@ -393,10 +405,49 @@ export function AIResultsModal({
           </div>
         )}
 
+        {/* Nothing to suggest — the model declined or had nothing to add.
+            An answer, not a fault: plain ink, no red (truthfulness rule:
+            "an empty result is an honest decline and must surface as one"). */}
+        {error?.code === "NOTHING_TO_SUGGEST" && (
+          <div
+            data-testid="ai-nothing-to-suggest"
+            className="flex flex-col items-center py-8 text-center"
+          >
+            {/* The message itself opens "Nothing to suggest…" (it also stands
+                alone in the Experience step), so the heading says something
+                else rather than repeating it. */}
+            <h3 className="text-base font-bold text-[var(--ff-ink)]">
+              No suggestions this time
+            </h3>
+            <p className="mt-2 max-w-sm text-sm text-[var(--ff-muted)]">
+              {error.message}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              {onRetry && (
+                <button type="button" onClick={onRetry} className="cv-btn-secondary">
+                  Try again
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-sm text-[var(--ff-muted)] underline cursor-pointer hover:text-[var(--ff-ink-2)]"
+              >
+                Continue editing
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Generic error */}
-        {error && error.code !== "RATE_LIMITED" && (
+        {error?.code === "OTHER" && (
           <div className="flex flex-col items-center py-8 text-center">
             <p className="text-sm font-medium text-red-600">{error.message}</p>
+            {describeRetryAfter(error.retryAfter) && (
+              <p className="mt-2 text-sm text-[var(--ff-muted)]">
+                It should be available again {describeRetryAfter(error.retryAfter)}.
+              </p>
+            )}
             {onRetry && (
               <button
                 type="button"
