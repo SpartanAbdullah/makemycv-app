@@ -450,6 +450,30 @@ type CvStore = {
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
+
+/**
+ * sessionStorage keys that hold something derived from the user's CV or the
+ * job they pasted. They are owned by other modules (which cannot be imported
+ * here without a cycle through components/), so the names are repeated and
+ * `startOver.test.ts` fails if one of them is renamed at its source:
+ *   - makemycv:checkerPreview        the checker's extracted CV text
+ *   - makemycv:coverLetterSeed       job text handed from JD Match
+ *   - makemycv:linkedinMessageSeed   the same, for the LinkedIn message
+ */
+export const CV_SESSION_KEYS = [
+  "makemycv:checkerPreview",
+  "makemycv:coverLetterSeed",
+  "makemycv:linkedinMessageSeed",
+] as const;
+
+const clearCvSessionKeys = (): void => {
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of CV_SESSION_KEYS) window.sessionStorage.removeItem(key);
+  } catch {
+    /* storage blocked: nothing to remove */
+  }
+};
 const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
 const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 
@@ -563,6 +587,10 @@ export const useCvStore = create<CvStore>((set, get) => ({
     // CV inherits a park list belonging to a CV that no longer exists.
     clearSetAside();
     removeStorage(JD_TARGET_STORAGE_KEY);
+    // Session-only leftovers of the CV that was just cleared (see
+    // CV_SESSION_KEYS). Without this, "Start a new CV" on a shared computer
+    // left the previous person's extracted CV text one page away.
+    clearCvSessionKeys();
     set({
       data: defaultCvData,
       parseSignals: null,

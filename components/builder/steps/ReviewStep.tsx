@@ -20,6 +20,7 @@ import { containsArabic, unjoinedArabicLetters } from "../../../lib/pdf/arabicTe
 import { readCvBackup } from "../../../lib/utils/localStorage";
 import { settingsForTemplate, templates, type TemplateBadge } from "../../../lib/templates";
 import { TemplateRibbon } from "../../templates/TemplateBadges";
+import { TemplateOmissionNote } from "../../templates/TemplateOmissionNote";
 import {
   computeScore,
   computeDerivedStats,
@@ -28,6 +29,8 @@ import {
 import { Icon } from "../Icon";
 import { useAnimatedNumber } from "../../../hooks/useAnimatedNumber";
 import { CustomizePanel } from "../CustomizePanel";
+import { StartOverDialog } from "../StartOverDialog";
+import { useUiStore } from "../../../lib/store/uiStore";
 import { TemplatePreviewModal } from "../../preview/TemplatePreviewModal";
 import { ShareScoreCard } from "../../ShareScoreCard";
 import { useSharedScoreReport, useGuardedDownload } from "../BuilderShell";
@@ -106,6 +109,8 @@ export const ReviewStep = ({
   const updateSection = useCvStore((state) => state.updateSection);
 
   const [shareCopied, setShareCopied] = useState(false);
+  const [startOverOpen, setStartOverOpen] = useState(false);
+  const pushToast = useUiStore((s) => s.pushToast);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
 
   // Reuse BuilderShell's report instead of running the engine a second
@@ -694,6 +699,42 @@ export const ReviewStep = ({
                   {restoreNotice.text}
                 </p>
               ) : null}
+
+              {/* Start over (audit 2026-11, O7). Until this, nothing could
+                  clear the CV: on a shared computer the next person opened
+                  the builder onto someone else's details. A quiet text
+                  control, well away from the downloads; the dialog offers the
+                  backup before anything is cleared. */}
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 10,
+                  borderTop: "1px solid var(--ff-line)",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: "var(--ff-muted)",
+                }}
+              >
+                Using a shared computer, or want a clean page?{" "}
+                <button
+                  type="button"
+                  onClick={() => setStartOverOpen(true)}
+                  data-testid="start-over"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    font: "inherit",
+                    fontWeight: 600,
+                    color: "var(--ff-ink)",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 2,
+                    cursor: "pointer",
+                  }}
+                >
+                  Start a new CV
+                </button>
+              </div>
             </div>
           </div>
 
@@ -728,6 +769,8 @@ export const ReviewStep = ({
               and ATS Clean are the safest picks for online applications.
             </div>
           </div>
+
+          <TemplateOmissionNote templateId={data.settings.templateId} data={data} />
 
           <div className="ff-templates-grid">
             {templates.map((tmpl) => {
@@ -775,6 +818,18 @@ export const ReviewStep = ({
 
       {/* Export gate + tip jar render once at shell level (DownloadContext);
           the local duplicates were removed when exports were unified. */}
+
+      {startOverOpen ? (
+        <StartOverDialog
+          onCancel={() => setStartOverOpen(false)}
+          onCleared={() => {
+            setStartOverOpen(false);
+            setRestoreNotice(null);
+            pushToast("Cleared. This is a new, empty CV.");
+            onJump("personal");
+          }}
+        />
+      ) : null}
 
       <TemplatePreviewModal
         templateId={previewTemplateId}

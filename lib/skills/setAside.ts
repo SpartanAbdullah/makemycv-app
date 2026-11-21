@@ -24,7 +24,7 @@
  * Parking by REMOVING the skill from cv.skills makes that impossible: it
  * cannot print because it is not in the document. The cost is that the parked
  * list is device-local, and that is already true of the CV itself — the
- * builder's own footer says "Your CV lives in this browser only." A
+ * builder's own footer says the CV "is saved in this browser only". A
  * device-local park list is consistent with the product, not a new limit.
  *
  * Worst case here is a forgotten park list. Worst case for the flag is an

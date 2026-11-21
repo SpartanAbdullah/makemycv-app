@@ -13,7 +13,7 @@ export function logRouteError(route: string, err: unknown): void {
 export type AiFailureKind =
   | "timeout" // AbortSignal.timeout fired (504 to the user)
   | "upstream" // Anthropic answered non-2xx or the fetch failed (502/422)
-  | "unparseable" // the model answered but nothing usable came back (502)
+  | "unparseable" // the model answered but nothing usable came back (502/422)
   | "spend_cap" // the shared daily budget refused the call (503)
   | "internal"; // anything else in the route (500)
 

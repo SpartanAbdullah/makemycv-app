@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { spendCapResponse, takeSpendUnits } from "@/lib/server/spendGuard";
 import {
+  ANTHROPIC_TIMEOUT_MS,
   CLAUDE_EFFORT,
   CLAUDE_MODEL,
   UPSTREAM_TIMEOUT_BODY,
   UPSTREAM_TIMEOUT_STATUS,
   anthropicSignal,
   isTimeoutError,
-  responseText,
 } from "@/lib/server/anthropic";
 import {
   checkRateLimit,
@@ -17,7 +17,8 @@ import {
 } from "@/lib/server/rateLimit";
 import type { RoleFamily } from "@/lib/data/roleFamily";
 import { clipImproveInput } from "@/lib/ai/improveInput";
-import { normalizePlaceholders } from "@/lib/ai/placeholders";
+import { askWithOneRetry, readImproveReply, type ImproveReply } from "@/lib/ai/improveReply";
+import { NOTHING_TO_SUGGEST, nothingToSuggestMessage } from "@/lib/ai/improveOutcome";
 import { logAiFailure } from "@/lib/server/logRouteError";
 
 const ROUTE = "api/ai-improve";
@@ -224,14 +225,49 @@ function buildBasePrompt(body: RequestBody): { system: string; user: string } {
   }
 }
 
-function extractJSON(text: string): string[] {
-  // Strip markdown fences if present
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
-  // Find the JSON array
-  const start = cleaned.indexOf("[");
-  const end = cleaned.lastIndexOf("]");
-  if (start === -1 || end === -1) throw new Error("No JSON array found");
-  return JSON.parse(cleaned.slice(start, end + 1));
+// A second attempt is only worth starting with this much of the 25 s budget
+// left: these prompts answer in single-digit seconds, and the user is
+// watching a spinner.
+const RETRY_MIN_BUDGET_MS = 8_000;
+
+type Attempt = ImproveReply | { kind: "upstream" };
+
+/** One Messages API call, read into what it means for the user. */
+async function askModel(
+  apiKey: string,
+  system: string,
+  user: string,
+  timeoutMs: number,
+): Promise<Attempt> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      output_config: { effort: CLAUDE_EFFORT },
+      system,
+      messages: [{ role: "user", content: user }],
+    }),
+    // Bounded: a stalled upstream answers 504 in 25 s instead of holding
+    // the user's spinner until the platform kills the function.
+    signal: anthropicSignal(timeoutMs),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown API error");
+    // The upstream body goes to the log, not to the browser: it used to be
+    // returned verbatim, which showed users Anthropic's internal error text.
+    logAiFailure(ROUTE, "upstream", new Error(`Anthropic API error: ${res.status} — ${errText}`));
+    return { kind: "upstream" };
+  }
+
+  // A body that is not JSON reads as `unusable`, like any other bad reply.
+  return readImproveReply(await res.json().catch(() => null));
 }
 
 export async function POST(request: Request) {
@@ -274,57 +310,38 @@ export async function POST(request: Request) {
 
     const { system, user } = buildPrompt(input);
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 2048,
-        output_config: { effort: CLAUDE_EFFORT },
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
-      // Bounded: a stalled upstream answers 504 in 25 s instead of holding
-      // the user's spinner until the platform kills the function.
-      signal: anthropicSignal(),
-    });
+    // One retry when the reply could not be read (cut off, prose instead of
+    // JSON). A refusal or an empty list is an answer, not a fault, and is not
+    // asked again. Both attempts share the one 25 s budget, and the second is
+    // charged to the spend guard like any other call — if the cap says no,
+    // the first reply stands. Until 2026-11 every one of these reached the
+    // user as a bare server error (product audit A9).
+    const startedAt = Date.now();
+    const remainingMs = () => ANTHROPIC_TIMEOUT_MS - (Date.now() - startedAt);
+    const attempt = await askWithOneRetry<Attempt>(
+      (n) => askModel(apiKey, system, user, n === 1 ? ANTHROPIC_TIMEOUT_MS : remainingMs()),
+      async () => remainingMs() >= RETRY_MIN_BUDGET_MS && (await takeSpendUnits(1)).allowed,
+    );
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "Unknown API error");
-      // The upstream body goes to the log, not to the browser: it used to be
-      // returned verbatim, which showed users Anthropic's internal error text.
-      logAiFailure(ROUTE, "upstream", new Error(`Anthropic API error: ${res.status} — ${errText}`));
+    if (attempt.kind === "upstream") {
       return NextResponse.json(
         { error: "Couldn't reach the writing service. Please try again." },
         { status: 502 },
       );
     }
 
-    const data = await res.json();
-    const rawText = responseText(data);
-    const parsed = extractJSON(rawText);
-    // Strings only, and every placeholder variant ([X], {{ metric }}) folded
-    // into the one token the UI explains - see lib/ai/placeholders.ts.
-    const results = Array.isArray(parsed)
-      ? parsed
-          .filter((r): r is string => typeof r === "string")
-          .map((r) => normalizePlaceholders(r.trim()))
-          .filter(Boolean)
-      : [];
-
-    if (results.length === 0) {
-      logAiFailure(ROUTE, "unparseable");
-      return NextResponse.json(
-        { error: "Failed to parse AI response" },
-        { status: 500 },
-      );
+    if (attempt.kind === "results") {
+      return NextResponse.json({ results: attempt.results, type: body.type });
     }
 
-    return NextResponse.json({ results, type: body.type });
+    // Declined, or unreadable twice: say so plainly. 422 — the request was
+    // understood and there is nothing to return for it. The hook shows the
+    // message as a neutral note with a retry, not as an error.
+    if (attempt.kind === "unusable") logAiFailure(ROUTE, "unparseable");
+    return NextResponse.json(
+      { error: NOTHING_TO_SUGGEST, message: nothingToSuggestMessage(body.type) },
+      { status: 422 },
+    );
   } catch (err) {
     if (isTimeoutError(err)) {
       logAiFailure(ROUTE, "timeout");
@@ -332,7 +349,7 @@ export async function POST(request: Request) {
     }
     logAiFailure(ROUTE, "internal", err);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Something went wrong on our side. Nothing was lost — please try again." },
       { status: 500 },
     );
   }

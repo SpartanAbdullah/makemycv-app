@@ -438,7 +438,9 @@ describe("golden scores (characterization)", () => {
 describe("scoring rubric version", () => {
   // Every non-conditional signal is applicable on a blank CV and none are
   // trimmed (a blank CV has no "good" rows), so EMPTY surfaces the full set.
-  const RUBRIC_3_SIGNALS = [
+  // Rubric 4 (2026-11) kept the set and re-pointed A14 ("None" → not
+  // applicable), which is why the version moved while this list did not.
+  const RUBRIC_4_SIGNALS = [
     "A1", "A10", "A12", "A13", "A14", "A2", "A7", "A8", "A9",
     "C1", "C11", "C2", "C3", "C5", "C6", "C7", "C8", "C9",
     "D1", "D2", "D4", "D5", "D8", "D9",
@@ -454,13 +456,13 @@ describe("scoring rubric version", () => {
       .sort();
     assert.deepEqual(
       ids,
-      RUBRIC_3_SIGNALS,
+      RUBRIC_4_SIGNALS,
       "The sub-signal set changed. That makes every stored ScoreBaseline " +
         "incomparable to a live score, so bump SCORING_RUBRIC_VERSION in " +
         "lib/scoreEngine.ts (and update this list) — otherwise returning " +
         "users see a delta pill for a CV they never touched.",
     );
-    assert.equal(SCORING_RUBRIC_VERSION, 3, "bump me with the list above");
+    assert.equal(SCORING_RUBRIC_VERSION, 4, "bump me with the list above");
   });
 });
 
@@ -727,21 +729,35 @@ describe("monotonicity invariants", () => {
     assert.equal(full - total((cv) => delete cv.personal.drivingLicense), drop(1));
   });
 
-  test("a driving licence of 'None' scores as not stated", () => {
-    // lib/utils/essentials.ts drops the licence chip for the literal "None",
-    // so that CV renders identically to a blank one. Scoring it as stated
-    // awarded a point for something printed nowhere on the document.
+  test("a driving licence of 'None' is left out of the score, not marked down", () => {
+    // Rubric 4 (2026-11). Until then "None" scored exactly like a blank field:
+    // one point lost that a person without a licence could never earn back.
+    // It is now not applicable — out of the numerator AND the denominator.
     const none = clone(UAE_COMPLETE);
     none.personal.drivingLicense = "None";
     const blank = clone(UAE_COMPLETE);
     delete blank.personal.drivingLicense;
-    assert.equal(
-      computeScore(none).total,
-      computeScore(blank).total,
-      "'None' and blank render the same CV, so they must score the same",
+
+    const noneReport = computeScore(none);
+    assert.equal(noneReport.total, 100, "a complete CV from a non-driver can reach the top");
+    assert.ok(
+      noneReport.total > computeScore(blank).total,
+      "saying 'None' must not cost what leaving the field blank costs",
     );
-    const held = computeScore(UAE_COMPLETE).total;
-    assert.ok(held > computeScore(none).total, "an actual licence still scores");
+    // It is not counted as stated either: no A14 row, good or bad.
+    const rows = noneReport.categories.flatMap((c) => c.issues).map((i) => i.signal);
+    assert.equal(rows.includes("A14"), false, "'None' must not appear as a scored licence row");
+  });
+
+  test("'None' is worth nothing by itself: it cannot lift an incomplete CV past a licence", () => {
+    const held = clone(UAE_MISSING);
+    held.personal.drivingLicense = "Light Vehicle";
+    const none = clone(UAE_MISSING);
+    none.personal.drivingLicense = "None";
+    assert.ok(
+      computeScore(none).total <= computeScore(held).total,
+      "an actual licence never scores below 'None'",
+    );
   });
 
   test("filling a UAE essential never lowers the total", () => {

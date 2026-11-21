@@ -62,15 +62,32 @@ const cookieDomain = (): string => {
   return h.endsWith("makemycv.ae") ? "; Domain=.makemycv.ae" : "";
 };
 
+/**
+ * Push a Consent Mode command the only way GTM accepts one: as a real
+ * `arguments` object. A plain Array with the same three items is NOT a
+ * command — GTM stores it as data and the consent state does not change.
+ *
+ * Until 2026-11-21 writeConsent() collected its values with a rest parameter
+ * and pushed that Array, so "Opt out" and "Accept" did nothing until the next
+ * full page load, when the inline default above read the cookie. Checked on
+ * production: after the Array push `google_tag_data.ics.entries
+ * .analytics_storage` had no `update`; after the `arguments` push it had
+ * `update: false`. Do not "tidy" this into a rest parameter or an arrow
+ * function (arrows have no `arguments`).
+ */
+function pushConsentCommand(): void {
+  window.dataLayer = window.dataLayer || [];
+  // eslint-disable-next-line prefer-rest-params
+  window.dataLayer.push(arguments as unknown as Record<string, unknown>);
+}
+
 export function writeConsent(choice: ConsentChoice): void {
   if (typeof document === "undefined") return;
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${CONSENT_COOKIE}=${choice}; Path=/; Max-Age=${365 * 86400}; SameSite=Lax${secure}${cookieDomain()}`;
-  window.dataLayer = window.dataLayer || [];
-  // Same `arguments`-object shape Consent Mode expects.
-  (function (...args: unknown[]) {
-    window.dataLayer!.push(args as unknown as Record<string, unknown>);
-  })("consent", "update", { analytics_storage: choice });
+  (pushConsentCommand as (...command: unknown[]) => void)("consent", "update", {
+    analytics_storage: choice,
+  });
   if (choice === "denied") expireGaCookies();
 }
 

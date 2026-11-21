@@ -34,8 +34,8 @@ import { resolveTheme } from "./theme";
  * italic lines use the serif because Inter has no italic cut in either
  * renderer, which keeps the preview and the download identical.
  *
- * The accent is ignored entirely (black only); the registry flags the
- * template with `ignoresAccent` so the Colours group is hidden for it.
+ * The accent is ignored entirely (black only); `capabilities.ts` lists the
+ * template under TEMPLATES_WITHOUT_ACCENT so the Design panel says so.
  * Mirrored by HarvardPDFLayout in components/pdf/CVDocument.tsx — change
  * both or neither.
  */
@@ -108,16 +108,16 @@ export const harvardEssentials = (
   personal: CvPersonal,
 ): Array<{ label: string; value: string }> => {
   const chips = new Map(
-    getEssentialChips(personal).map((chip) => [chip.label, chip.value]),
+    getEssentialChips(personal).map((chip) => [chip.key, chip.value]),
   );
   const items: Array<{ label: string; value: string }> = [];
-  const nationality = chips.get("Nationality");
+  const nationality = chips.get("nationality");
   if (nationality) items.push({ label: "Nationality", value: nationality });
-  const visa = chips.get("Visa");
+  const visa = chips.get("visa");
   if (visa) items.push({ label: "Visa", value: visa });
-  const available = chips.get("Available");
+  const available = chips.get("availability");
   if (available) items.push({ label: "Available", value: available });
-  const licence = chips.get("DL");
+  const licence = chips.get("licence");
   if (licence) items.push({ label: "Driving licence", value: licence });
   return items;
 };

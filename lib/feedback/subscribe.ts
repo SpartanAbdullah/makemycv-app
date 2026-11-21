@@ -7,10 +7,13 @@
  * not read. Bump it whenever the consent sentence on the form changes.
  */
 
-export const CONSENT_TEXT_VERSION = "2026-10-24";
+// 2026-11-21: "about twice a month" removed. Nothing sends on a schedule, and
+// a frequency nobody keeps is a promise the product was making falsely (audit
+// 2026-11 E9, owner decision). Sign-ups before this date agreed to the old text.
+export const CONSENT_TEXT_VERSION = "2026-11-21";
 
 export const CONSENT_TEXT =
-  "UAE job-search tips by email, about twice a month. Unsubscribe with one click, any time. " +
+  "Occasional UAE job-search tips by email. Unsubscribe with one click, any time. " +
   "We never share your address.";
 
 export const SUBSCRIBE_SOURCES = ["post_export", "post_checker", "blog", "thanks", "cover_letter"] as const;

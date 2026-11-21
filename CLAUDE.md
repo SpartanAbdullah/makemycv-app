@@ -76,6 +76,15 @@ This app (app.makemycv.ae): `/builder` (the CV builder, entry
 the cover letter and the LinkedIn message are the two disclosed exceptions,
 and each sends an excerpt, not the CV.
 
+**Entry links from the site (2026-11).** www sends two intents in the query
+string: `/builder?template=<id>` (its "Use this template" buttons — applied
+once after the saved CV loads, then removed from the URL so a reload cannot
+override a later choice; an unknown id is ignored) and `/builder?import=1`
+(the hero's "Already have a CV?" link — the Personal step puts the keyboard
+on the import button). The root redirect lives in `next.config.ts`, not in
+`app/page.tsx`, because the page version dropped every query string (campaign
+tags included). Keep it there, and keep it temporary.
+
 ---
 
 ## Privacy posture — the hard constraint
@@ -99,8 +108,9 @@ implementation detail.
   matching) is a **founder decision with a disclosure requirement**, not a
   refactor. See `docs/jd-match-evidence-pass.md`. The cover letter (2026-10)
   is the first such feature: it sends the excerpt defined in
-  `lib/coverLetter/payload.ts` (headline, summary, latest role + ≤4 bullets,
-  ≤12 skill names, visa/availability — never contact details or the photo),
+  `lib/coverLetter/payload.ts` (first name, headline, summary, latest role +
+  ≤4 bullets, ≤12 skill names, visa/availability — never the surname, contact
+  details or the photo),
   the page says so above the button, and the privacy policy on www names it.
   Widening that excerpt means updating all three. The LinkedIn message
   (2026-10-31) is the second, with a smaller excerpt in
@@ -121,7 +131,11 @@ implementation detail.
   everyone else granted with an opt-out, stored in `mmcv_consent` on
   `.makemycv.ae`. The consent files are byte-identical copies of the site's —
   edit both. The inline default MUST stay ahead of the GTM script in
-  `app/layout.tsx`.
+  `app/layout.tsx`. A consent command is a real `arguments` object
+  (`pushConsentCommand` in `lib/consent.ts`): GTM ignores a plain Array with
+  the same items, which is how "Opt out" did nothing until the next page load
+  for a month (2026-11 audit, checked on production). `lib/consent.test.ts`
+  pins the shape — do not turn it into a rest parameter or an arrow function.
 
 Primary market is the UAE, so PDPL — not just GDPR — is the governing regime.
 
@@ -174,6 +188,13 @@ replaces is kept in `importUndo` — memory only, cleared by `reset()` — and
 The review opens on Merge whenever `isCvEmpty()` (`lib/utils/cvContent.ts`)
 is false.
 
+**"Start a new CV" (Review step, 2026-11) calls `reset()`** behind
+`StartOverDialog`, which offers the backup file first and has no undo on
+purpose — on a shared computer the old CV must not be one tap away. Anything
+new that holds CV-derived data has to be cleared in `reset()`;
+`CV_SESSION_KEYS` lists the sessionStorage keys other modules own
+(`startOver.test.ts` fails if one is renamed at its source).
+
 **Stale-tab guard:** the debounced save checks `staleTab` before writing. A tab
 whose in-memory copy predates another tab's save must never write, or it
 replaces newer work with older. The check lives at the write, not only in the
@@ -193,6 +214,54 @@ the user explicitly excluded onto a CV they submit to an employer. This is why
 "set aside" parks a skill by **removing it from `cv.skills`** and keeping it in
 a device-local list instead — it cannot print because it is not in the document.
 Apply the same reasoning to any future per-skill visibility state.
+
+---
+
+## What each template prints (`lib/templates/capabilities.ts`)
+
+Not every template prints every field: Harvard and Professional draw no
+photo, four templates print no date of birth, and Classic, Modern and Harvard
+draw nothing in the accent colour. `capabilities.ts` is the one list. The
+Design panel reads it (swatches give way to one line where the colour has no
+effect) and `TemplateOmissionNote` reads it (one sentence in the Review step
+and the full-page preview, only when the user has that detail switched on).
+`capabilities.test.ts` reads the template sources and fails when a template
+starts or stops printing a field without the list changing — and when a
+template that draws a photo ignores the user's "Show photo on CV" switch
+(Professional Photo did until 2026-11).
+
+`getEssentialChips()` returns a stable `key` (`visa` / `availability` /
+`licence` / `nationality`) beside the printed `label`. **Look a chip up by
+`key`, never by `label`** — the label is copy ("DL" became "Driving licence")
+and a lookup by it fails silently, dropping the row from the CV.
+
+---
+
+## Exports: one gate, one record, one naming rule
+
+A CV download is three things besides the file, and every download button has
+to do all three (JD Match's "Download for this job" did none until 2026-11):
+
+- **Gate** — `getMissingItems()` / `getUnfilledBlanks()` open
+  `ExportGateDialog` first. It warns; "Export anyway" still exports.
+- **Record** — `recordCvExportStarted()` before rendering and
+  `recordCvExport()` after the file exists (`lib/exportRecord.ts`). That is
+  the only place `cv_export`, the number the product is judged on, is fired,
+  and it returns the row the post-download card shows. Never record a JSON
+  backup.
+- **Name** — `lib/utils/fileName.ts` through `triggerBlobDownload()`:
+  `CV_First_Last.<ext>`, accented Latin letters folded to their base letter,
+  other scripts kept, and `CV.<ext>` — never the product's name — when the CV
+  has no name.
+
+`exportAsks.test.ts` and `fileName.test.ts` fail when a download path fires
+the event itself or sets `a.download` itself.
+
+The post-download card shows one row per export, in this order (owner
+decision 2026-11-21): the next step (JD Match, cover letter), then email,
+then stars, then follow. A row with nothing to ask gives way to the next one
+(`resolveExportAsk`). The sentence above the row (karak / paid review) is a
+separate alternation — the exposure test depends on it; leave it alone.
 
 ---
 
@@ -233,6 +302,13 @@ These are product invariants, repeatedly re-derived; do not relax them casually.
   `lib/jdMatch/applyFix.ts`.
 - The AI rewrite endpoint is **refuse-capable** — an empty result is an honest
   decline and must surface as one, not as an error or a silent no-op.
+  `/api/ai-improve` reads each reply with `readImproveReply()`
+  (`lib/ai/improveReply.ts`): results, **declined** (a refusal or an empty
+  list — not asked again) or **unusable** (cut off, not JSON — asked once
+  more, inside the same 25 s and charged to the spend guard). Nothing usable
+  is a 422 `nothing_to_suggest`, which `useAIImprove` — like an empty 200 —
+  turns into `NOTHING_TO_SUGGEST`; screens show it in plain ink with a retry,
+  never in red.
 - **Never rank or reshape suggestions silently.** If output is being reordered
   by something invisible (a JD target, an inferred domain), say so in the UI and
   give a one-tap way off. Advice whose basis is hidden cannot be evaluated.
