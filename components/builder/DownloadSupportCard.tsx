@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { SUPPORT_URL } from "../../lib/config/support";
-import { track } from "../../lib/analytics";
+import { HUMAN_REVIEW_URL } from "../../lib/config/humanReview";
+import { track, trackOncePerSession } from "../../lib/analytics";
 import { FOLLOW_PROFILES } from "../../lib/config/social";
-import type { ExportAsk } from "../../lib/exportAsks";
+import type { ExportAsk, ExportSentence } from "../../lib/exportAsks";
 import { useCvStore } from "../../lib/store/cvStore";
 import { RatingStrip } from "../feedback/RatingStrip";
 
@@ -46,6 +48,7 @@ import { RatingStrip } from "../feedback/RatingStrip";
 type Props = {
   open: boolean;
   ask: ExportAsk;
+  sentence: ExportSentence;
   onDismiss: () => void;
 };
 
@@ -64,6 +67,29 @@ const GLYPHS: Record<(typeof FOLLOW_PROFILES)[number]["id"], React.ReactNode> = 
       <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
     </svg>
   ),
+};
+
+/* Only ever rendered once the release gate is open. Same length budget as the
+   karak line. `human_review_view` is the exposure count for the Day 30 gate. */
+const ServiceLine = () => {
+  useEffect(() => {
+    trackOncePerSession("mmcv_hr_view_pe", "human_review_view", { surface: "post_export" });
+  }, []);
+  return (
+    <p className="min-w-0">
+      Want a person to read it too?{" "}
+      <a
+        href={`${HUMAN_REVIEW_URL}?from=pe`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold underline underline-offset-2 hover:opacity-80"
+        onClick={() => track("cta_click", { cta_id: "human_review_post_export", cta_location: "post_export" })}
+      >
+        Human review from AED 79
+      </a>
+      <span aria-hidden="true"> →</span>
+    </p>
+  );
 };
 
 const FollowRow = () => (
@@ -103,7 +129,7 @@ const KarakCup = () => (
   </svg>
 );
 
-export const DownloadSupportCard = ({ open, ask, onDismiss }: Props) => {
+export const DownloadSupportCard = ({ open, ask, sentence, onDismiss }: Props) => {
   // The address on the CV just downloaded, offered as the tips field's
   // starting value. It stays in the browser unless the person presses
   // "Send me tips" (see RatingStrip's prefillEmail).
@@ -123,6 +149,9 @@ export const DownloadSupportCard = ({ open, ask, onDismiss }: Props) => {
           spilled to three lines (78.6px) at 320 and 360 — both real Android
           widths. Re-measure before lengthening it. The success toast already
           confirms the download, so the prefix was redundant anyway. */}
+      {sentence === "service" ? (
+        <ServiceLine />
+      ) : (
       <p className="min-w-0">
         The builder stays free — if it helped,{" "}
         <a
@@ -137,6 +166,7 @@ export const DownloadSupportCard = ({ open, ask, onDismiss }: Props) => {
         </a>
         <span aria-hidden="true"> →</span>
       </p>
+      )}
       {/* 32px visual + .ff-hit-target's 8px bleed = 48px touch target. */}
       <button
         type="button"

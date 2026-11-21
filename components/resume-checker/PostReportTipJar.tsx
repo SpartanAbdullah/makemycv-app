@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HUMAN_REVIEW_ON } from "../../lib/config/humanReview";
 import { TipJarModal } from "../TipJarModal";
 
 /**
@@ -43,6 +44,9 @@ export default function PostReportTipJar() {
       observer?.disconnect();
     };
   }, []);
+
+  // One ask at a time: with the review line on the report, no tip modal as well.
+  if (HUMAN_REVIEW_ON) return null;
 
   return (
     <TipJarModal

@@ -11,6 +11,7 @@
  */
 
 export type ExportAsk = "follow" | "stars" | "email";
+export type ExportSentence = "karak" | "service";
 
 const KEY = "mmcv_export_asks";
 const VERSION = 1;
@@ -20,6 +21,15 @@ const ORDER: readonly ExportAsk[] = ["follow", "stars", "email"];
 export function askForExport(n: number): ExportAsk {
   const i = Math.max(1, Math.floor(n)) - 1;
   return ORDER[i % ORDER.length];
+}
+
+/**
+ * The sentence above the row. With the paid review on, odd exports mention it,
+ * so a person who exports once still sees it and the exposure test stays whole.
+ */
+export function sentenceForExport(n: number, serviceOn: boolean): ExportSentence {
+  if (!serviceOn) return "karak";
+  return Math.max(1, Math.floor(n)) % 2 === 1 ? "service" : "karak";
 }
 
 /** Discards rather than guesses: anything that isn't this shape reads as 0. */
@@ -39,13 +49,13 @@ export function serializeExportCount(count: number): string {
   return JSON.stringify({ v: VERSION, count });
 }
 
-/** Records one export and returns its ask. Falls back to the first ask without storage. */
-export function nextExportAsk(): ExportAsk {
+/** Records one export and returns its 1-based number. Treated as the first without storage. */
+export function nextExportNumber(): number {
   try {
     const count = parseExportCount(window.localStorage.getItem(KEY)) + 1;
     window.localStorage.setItem(KEY, serializeExportCount(count));
-    return askForExport(count);
+    return count;
   } catch {
-    return askForExport(1);
+    return 1;
   }
 }

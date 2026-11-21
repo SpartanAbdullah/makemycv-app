@@ -25,6 +25,15 @@ Format:
 
 ---
 
+## [2026-11-07 21:58] Track B: human review mentions, built and switched off
+
+**Goal:** mention the paid review after export and after the checker once the gate in docs/human-review-launch-2026-11/PLAN.md opens. With NEXT_PUBLIC_HUMAN_REVIEW unset nothing changes.
+**Files:**
+- created: lib/config/humanReview.ts, components/resume-checker/HumanReviewLine.tsx.
+- edited: lib/exportAsks.ts (and test): sentence choice, odd exports mention the review. components/builder/DownloadSupportCard.tsx, components/builder/BuilderShell.tsx, components/resume-checker/PostReportTipJar.tsx (no tip modal while the flag is on), the report page, .env.example.
+**Notes/risks:** needs human_review_view in the GTM regex before turning on. The flag must match on both projects and needs a redeploy of each.
+**Suggested commit:** feat: add human review mentions behind a flag
+
 ## [2026-11-07 21:35] Track A: owner name removed, one post-export ask per export, follow row
 
 **Goal:** owner decisions in docs/human-review-launch-2026-11/PLAN.md: no personal name in the app and a follow ask after export, without stacking every ask on one card.
