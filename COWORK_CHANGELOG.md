@@ -6,6 +6,24 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 22:12] Three import data-loss fixes from the automated review of PR #45
+
+**Goal:** an automated (Codex) review of PR #45 left three comments on the import code from batch A. Each was read against the code and is real. The owner approved fixing them on 21 Nov ("Yes, fix them").
+**Files:**
+- edited: `lib/utils/cvContent.ts` (`hasUserEnteredData`, `hasTypedContent`, `sameCvContent`, `sameSectionContent`), `components/import/MappingReview.tsx`, `components/builder/BuilderShell.tsx`, `components/builder/ImportFromReportBanner.tsx` - **a nearly empty CV was replaced without asking.** The three import screens asked `isCvEmpty()`, which looks only at name, headline, summary, skills, roles, degrees, certificates and projects. A CV holding only an email, a phone number, a photo, a language or the UAE details counted as empty: the review opened on Replace with the choice hidden, and no Undo was offered afterwards. They now ask `hasUserEnteredData()`: any text the user typed, picked or uploaded, anywhere in the CV. `isCvEmpty()` is unchanged and still serves JD Match.
+- edited: `lib/store/cvStore.ts` (`applyImportedCv`) - **Merge dropped cards the user had started.** It kept an experience card only if it had a role, a company or a bullet, and an education card only if it had a school, degree or field. A card with only dates, a location or a note was removed. Merge now drops only cards with nothing typed in them.
+- edited: `lib/store/cvStore.ts` (`updateSection`, `setData`, `importJson`), `BuilderShell.tsx` - **Undo could throw away later edits.** Undo restores the whole CV from before the import, and the ATS-report banner kept offering it for as long as it stayed open. Any write that changes the CV now ends that import's Undo: the banner's link disappears, and the toast's Undo answers "Not undone: your CV has changed since that import." Two automatic writes are deliberately not counted as edits: the forms writing back what the import gave them, and the Personal step guessing the job field when the headline box loses focus.
+- created: `lib/utils/cvContent.test.ts`; edited: `lib/store/applyImportedCv.test.ts` (32 new unit tests, 706 to 738), `scripts/import-smoke.mjs` (three new browser checks), `CLAUDE.md`.
+**Notes / risks / follow-up:**
+- A builder where someone has typed only an email now gets the add / replace choice and an Undo toast after importing. That is the intended cost of the stricter test.
+- Undo is all or nothing by design. Once the user edits, the way back is gone and the edit stays; there is no partial undo.
+- A new automatic write to the store (a normaliser, a default set on mount) would end Undo the moment an import lands. `smoke:import`'s "Undo after a Replace puts the previous CV back" catches that.
+- Not checked in a browser: the ATS-report banner's "Undo import" link disappearing after an edit. It reads the same store field as the toast, which was checked. Reaching the banner needs a checker report, which needs the AI key.
+- The new smoke checks were not run against the build before the fix; the unit tests pin each rule directly.
+- The review threads on GitHub were not replied to or resolved.
+**Verification:** tsc; lint 11/11; `npm test` 5 suites (unit 738); `npm run build`; against `next start`: `smoke:import` all cases pass (six import-safety checks, three new), `smoke:builder` 44 checks pass. In Chrome, after an import: leaving the headline box (the job field was re-guessed) and walking six steps without typing both left Undo working; typing in the Summary step made Undo refuse and kept the text.
+**Suggested commit:** fix(import): count every entered field, keep started cards on merge, end Undo after an edit
+
 ## [2026-11-21 21:35] Audit batch B: entry links, fair scoring, honest templates, exports and AI errors
 
 **Goal:** batch B of the 21 Nov product audit (`docs/makemycv-uae-audit.md` in the parent folder, section 6.5: Q3, Q4, Q6, Q9, Q11–Q17), approved by the owner on 21 Nov with four decisions: a driving licence of "None" no longer costs a score point; the first export's card shows the next step and asks for nothing; the email promise drops "about twice a month"; both disputed site lines are reworded. Ships with the site entry of the same time (`makemycv-site`, branch `audit-batch-b`) — deploy the two together.

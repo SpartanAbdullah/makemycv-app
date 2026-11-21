@@ -185,8 +185,27 @@ a normaliser is added there and to its test in the same change.
 **Imports go through `applyImportedCv()`** (pure, tested). The state an import
 replaces is kept in `importUndo` — memory only, cleared by `reset()` — and
 `undoImport()` puts back the CV, parse signals and score baseline together.
-The review opens on Merge whenever `isCvEmpty()` (`lib/utils/cvContent.ts`)
-is false.
+
+Three rules the import screens depend on (`lib/utils/cvContent.ts`; each was
+a data-loss bug found by a review of PR #45, 2026-11):
+
+- **"Is there a CV to lose?" is `hasUserEnteredData()`, not `!isCvEmpty()`.**
+  Anything the user entered counts — an email, a photo, a language, a job
+  card with only its dates. It decides the review's default (Merge), whether
+  the choice is shown, and whether Undo is offered. `isCvEmpty()` answers a
+  different question (is there anything for JD Match to match?) and must not
+  be used to decide whether data may be replaced.
+- **Merge drops only untouched cards** (`hasTypedContent`). "Meaningful"
+  (`meaningfulExperience` / `meaningfulEducation`) is the test for what to
+  PRINT; using it for what to KEEP threw away cards the user had started.
+- **Any write that changes the CV ends the import's Undo** (`updateSection`,
+  `setData`, `importJson`), because Undo restores the whole pre-import CV and
+  would discard the edit. `updateSection` compares with
+  `sameSectionContent()` first: the forms write back what an import gave
+  them, and the Personal step re-guesses the job field on a headline blur,
+  and neither is an edit. A new automatic write to the store has to stay
+  invisible to that comparison, or Undo dies the moment an import lands —
+  `smoke:import` ("Undo after a Replace…") is the check.
 
 **"Start a new CV" (Review step, 2026-11) calls `reset()`** behind
 `StartOverDialog`, which offers the backup file first and has no undo on

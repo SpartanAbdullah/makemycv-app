@@ -544,10 +544,74 @@ async function checkImportKeepsExistingCv() {
     } else {
       fail(`${label}: Undo after a Replace puts the previous CV back`, `after replace ${JSON.stringify(replaced)}, after undo ${JSON.stringify(restored)}`);
     }
+
+    // 4. Undo puts back the WHOLE CV from before the import, so once the user
+    //    has edited the imported CV it must refuse rather than throw the edit
+    //    away (review of PR #45, 2026-11). The check above also proves the
+    //    other half: the forms writing back what an import gave them does not
+    //    count as an edit, or that Undo would have been dead on arrival.
+    review = await openReviewInPlace();
+    if (!review) return fail(label, "the third import review never opened");
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    await pg.getByLabel(/First name/).fill("Edited");
+    await pg.waitForTimeout(900);
+    await pg.getByRole("button", { name: "Undo", exact: true }).click({ timeout: 8000 });
+    const refused = await pg.getByText(/Not undone: your CV has changed since that import/).waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+    await pg.waitForTimeout(900);
+    const afterEdit = await storedCv();
+    if (refused && afterEdit && afterEdit.firstName === "Edited") {
+      ok(`${label}: after an edit, Undo refuses and the edit is kept`);
+    } else {
+      fail(`${label}: after an edit, Undo refuses and the edit is kept`, `refused=${refused}, stored ${JSON.stringify(afterEdit)}`);
+    }
   } catch (e) {
     fail(label, String(e).slice(0, 200));
   } finally {
     await c.close();
+  }
+
+  // 5. Anything the user entered counts as a CV worth keeping. With only an
+  //    email address typed, the review used to treat the builder as empty:
+  //    Replace by default, the choice hidden, no Undo (review of PR #45).
+  const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg2 = await c2.newPage();
+  await pg2.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg2.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg2.getByLabel(/Email/).waitFor({ timeout: 30000 });
+    await pg2.getByLabel(/Email/).fill("only.email@example.com");
+    await pg2.waitForTimeout(900);
+    const opened = await pickInPlace(pg2, path.join(FIXTURE_DIR, "text-cv.pdf"));
+    const review2 = pg2.getByRole("dialog", { name: /Import from/ });
+    if (!opened || !(await review2.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      fail(`${label}: an email-only CV still gets the add / replace choice`, "the import review never opened");
+    } else {
+      const addRadio = review2.getByRole("radio", { name: /Add to my current CV/ });
+      const shown = (await addRadio.count()) === 1;
+      const checked = shown && (await addRadio.isChecked().catch(() => false));
+      if (shown && checked) ok(`${label}: an email-only CV still gets the choice, and it opens on "Add to my current CV"`);
+      else fail(`${label}: an email-only CV still gets the add / replace choice`, `choice shown=${shown}, add is default=${checked}`);
+      await review2.getByRole("button", { name: /^Import/ }).click();
+      await review2.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+      await pg2.waitForTimeout(900);
+      const kept = await pg2.evaluate(() => {
+        try {
+          return JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null")?.personal?.email ?? "";
+        } catch {
+          return "";
+        }
+      });
+      const undoOffered = (await pg2.getByRole("button", { name: "Undo", exact: true }).count()) === 1;
+      if (kept === "only.email@example.com" && undoOffered) ok(`${label}: the typed email survives the import, and Undo is offered`);
+      else fail(`${label}: the typed email survives the import, and Undo is offered`, `email="${kept}", undo offered=${undoOffered}`);
+    }
+  } catch (e) {
+    fail(`${label}: email-only CV`, String(e).slice(0, 200));
+  } finally {
+    await c2.close();
   }
 }
 

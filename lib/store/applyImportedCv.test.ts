@@ -129,6 +129,49 @@ describe("applyImportedCv — merge", () => {
     assert.deepEqual(out.education.map((e) => e.id), ["d1"]);
   });
 
+  // Review of PR #45: "meaningful" (a role, a company or a bullet; a school,
+  // a degree or a field) was the test for what to keep, so a card the user
+  // had only started was thrown away by the option that says it keeps
+  // everything.
+  test("keeps a job card that has only dates or a location", () => {
+    const blank = defaultCvData.experience[0];
+    const current: CvData = {
+      ...typed(),
+      experience: [
+        { ...blank, id: "dates-only", startDate: "2020", endDate: "2021" },
+        { ...blank, id: "place-only", location: "Abu Dhabi" },
+        { ...blank, id: "untouched" },
+      ],
+    };
+    const out = applyImportedCv(current, imported(), "merge");
+    assert.deepEqual(out.experience.map((e) => e.id), ["dates-only", "place-only", "e2"]);
+    assert.equal(out.experience[0].startDate, "2020");
+  });
+
+  test("keeps an education card that has only dates or notes", () => {
+    const blank = defaultCvData.education[0];
+    const current: CvData = {
+      ...typed(),
+      education: [
+        { ...blank, id: "dates-only", startDate: "2014", endDate: "2018" },
+        { ...blank, id: "notes-only", notes: "Graduated with distinction" },
+        { ...blank, id: "untouched" },
+      ],
+    };
+    const out = applyImportedCv(current, imported(), "merge");
+    assert.deepEqual(out.education.map((e) => e.id), ["dates-only", "notes-only", "d1"]);
+    assert.equal(out.education[1].notes, "Graduated with distinction");
+  });
+
+  test("a ticked box alone does not make a card worth keeping", () => {
+    const current: CvData = {
+      ...typed(),
+      experience: [{ ...defaultCvData.experience[0], id: "ticked", isCurrent: true }],
+    };
+    const out = applyImportedCv(current, imported(), "merge");
+    assert.deepEqual(out.experience.map((e) => e.id), ["e2"]);
+  });
+
   test("does not add a skill, language or certification already held by name", () => {
     const out = applyImportedCv(typed(), imported(), "merge");
     assert.deepEqual(out.skills.map((s) => s.name), ["Negotiation", "CRM"]);
@@ -202,6 +245,78 @@ describe("import undo (store)", () => {
     useCvStore.getState().undoImport();
     assert.deepEqual(useCvStore.getState().scoreBaseline, baseline);
     assert.equal(useCvStore.getState().parseSignals, null);
+  });
+
+  // Review of PR #45: Undo puts back the WHOLE CV from before the import, and
+  // the ATS-report banner kept offering it while the user went on editing, so
+  // one click threw the later work away.
+  test("an edit after the import ends that import's Undo", () => {
+    useCvStore.setState({ data: typed(), parseSignals: null, scoreBaseline: null, importUndo: null });
+    useCvStore.getState().importCvVersion(imported(), "merge");
+    assert.notEqual(useCvStore.getState().importUndo, null);
+
+    const personal = useCvStore.getState().data.personal;
+    useCvStore.getState().updateSection("personal", { ...personal, headline: "Regional Sales Lead" });
+
+    assert.equal(useCvStore.getState().importUndo, null);
+    assert.equal(useCvStore.getState().undoImport(), false);
+    // The edit is still there: nothing was rolled back.
+    assert.equal(useCvStore.getState().data.personal.headline, "Regional Sales Lead");
+    assert.equal(useCvStore.getState().data.experience.length, 2);
+  });
+
+  test("a form writing back what it was given does not end the Undo", () => {
+    // After an import the builder's forms reset to the new values and write
+    // them straight back, with a different key order and "" where the store
+    // had no field. That is not an edit.
+    const before = typed();
+    useCvStore.setState({ data: before, parseSignals: null, scoreBaseline: null, importUndo: null });
+    useCvStore.getState().importCvVersion(imported(), "merge");
+
+    const { personal, experience, settings } = useCvStore.getState().data;
+    const echoed = Object.fromEntries(
+      Object.entries({ ...personal, country: "", photo: undefined }).reverse(),
+    ) as unknown as CvData["personal"];
+    useCvStore.getState().updateSection("personal", echoed);
+    useCvStore.getState().updateSection("experience", experience.map((e) => ({ ...e, bullets: [...e.bullets, ""] })));
+    useCvStore.getState().updateSection("settings", { ...settings });
+    // …and the Personal step guessing the job field when the headline box
+    // loses focus.
+    useCvStore.getState().updateSection("settings", { ...settings, domain: "sales", domainSource: "inferred" });
+
+    assert.notEqual(useCvStore.getState().importUndo, null);
+    assert.equal(useCvStore.getState().data.settings.domain, "sales");
+    assert.equal(useCvStore.getState().undoImport(), true);
+    assert.deepEqual(useCvStore.getState().data, before);
+  });
+
+  test("any other kind of write ends it too: a new template, a restored backup, JD Match's Accept all", () => {
+    const arm = () => {
+      useCvStore.setState({ data: typed(), parseSignals: null, scoreBaseline: null, importUndo: null });
+      useCvStore.getState().importCvVersion(imported(), "replace");
+      assert.notEqual(useCvStore.getState().importUndo, null);
+    };
+
+    arm();
+    const settings = useCvStore.getState().data.settings;
+    useCvStore.getState().updateSection("settings", { ...settings, templateId: "onyx" });
+    assert.equal(useCvStore.getState().importUndo, null);
+
+    arm();
+    useCvStore.getState().importJson(typed());
+    assert.equal(useCvStore.getState().importUndo, null);
+
+    arm();
+    useCvStore.getState().setData(typed());
+    assert.equal(useCvStore.getState().importUndo, null);
+  });
+
+  test("edits with no import pending behave as before", () => {
+    useCvStore.setState({ data: typed(), importUndo: null });
+    const personal = useCvStore.getState().data.personal;
+    useCvStore.getState().updateSection("personal", { ...personal, headline: "Edited" });
+    assert.equal(useCvStore.getState().data.personal.headline, "Edited");
+    assert.equal(useCvStore.getState().importUndo, null);
   });
 
   test("there is nothing to undo before any import, or after reset", () => {

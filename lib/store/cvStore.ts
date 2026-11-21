@@ -22,8 +22,7 @@ import {
   STORAGE_KEY,
 } from "../utils/localStorage";
 import { createId } from "../utils/id";
-import { meaningfulExperience } from "../utils/experience";
-import { meaningfulEducation } from "../utils/education";
+import { hasTypedContent, sameSectionContent } from "../utils/cvContent";
 
 const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
 const SCORE_BASELINE_STORAGE_KEY = "makemycv:scoreBaseline";
@@ -294,12 +293,17 @@ export function applyImportedCv(
   return {
     ...current,
     personal: { ...current.personal, ...filled },
+    // Only the untouched seeded cards are dropped. A card with anything typed
+    // into it — dates, a location, a note — stays, even though it is too thin
+    // to print yet: "meaningful" (role, company or a bullet) was the test
+    // here and it threw away in-progress entries while the review promised to
+    // keep everything (2026-11, review of PR #45).
     experience: [
-      ...meaningfulExperience(current.experience),
+      ...current.experience.filter((entry) => hasTypedContent(entry)),
       ...(partial.experience ?? []),
     ],
     education: [
-      ...meaningfulEducation(current.education),
+      ...current.education.filter((entry) => hasTypedContent(entry)),
       ...(partial.education ?? []),
     ],
     skills: appendNewByName(current.skills, partial.skills ?? []),
@@ -553,9 +557,21 @@ export const useCvStore = create<CvStore>((set, get) => ({
   jdTarget: null,
   importUndo: null,
   setHydrated: (value) => set({ hydrated: value }),
-  setData: (data) => set({ data }),
+  // An import's Undo puts back the whole CV as it was before the import. Once
+  // the CV has been edited, that would also throw the edit away — the
+  // ATS-report banner kept offering it for as long as it stayed open (2026-11,
+  // review of PR #45). So every write that changes the CV ends the Undo.
+  // updateSection compares first: after an import the builder's forms write
+  // back what they were just given, and the Personal step re-guesses the job
+  // field when the headline box loses focus. Neither is an edit
+  // (sameSectionContent). The comparison only runs while an Undo exists.
+  setData: (data) => set({ data, importUndo: null }),
   updateSection: (key, value) =>
-    set((state) => ({ data: { ...state.data, [key]: value } })),
+    set((state) => {
+      const data = { ...state.data, [key]: value };
+      if (state.importUndo === null || sameSectionContent(key, state.data[key], value)) return { data };
+      return { data, importUndo: null };
+    }),
   // KEEP — setIsPro deletion cancelled 2026-06-12 (paid tier returning).
   // Currently a no-op that always settles isPro=true; localStorage write
   // preserved so old code paths that still call it don't crash.
@@ -600,7 +616,7 @@ export const useCvStore = create<CvStore>((set, get) => ({
       importUndo: null,
     });
   },
-  importJson: (data) => set({ data }),
+  importJson: (data) => set({ data, importUndo: null }),
   setParseSignals: (signals) => {
     if (signals) {
       writeStorage(PARSE_SIGNALS_STORAGE_KEY, JSON.stringify(signals));
