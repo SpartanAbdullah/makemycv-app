@@ -63,7 +63,7 @@ import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
 import { track, trackOncePerSession } from "../../lib/analytics";
 import { downloadCvBackup } from "../../lib/utils/download";
-import { isCvEmpty } from "../../lib/utils/cvContent";
+import { hasUserEnteredData } from "../../lib/utils/cvContent";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
@@ -1299,7 +1299,7 @@ export const BuilderShell = ({
     importConfirmedAtRef.current = Date.now();
     // Was there a CV to lose? Decides whether the toast below offers Undo —
     // undoing an import into an empty builder would just empty it again.
-    const hadCv = !isCvEmpty(useCvStore.getState().data);
+    const hadCv = hasUserEnteredData(useCvStore.getState().data);
     importCvVersion(partial, mode);
     // This import's own undo record. A later import replaces it, and an
     // older toast's Undo must then do nothing instead of undoing the wrong one.
@@ -1337,6 +1337,11 @@ export const BuilderShell = ({
               const store = useCvStore.getState();
               if (store.importUndo === undoRecord && store.undoImport()) {
                 pushToast("Import undone. Your CV is back as it was.", { tone: "notice" });
+              } else {
+                // The record is gone: the CV was edited after the import (the
+                // store ends the Undo then, so the edit is not thrown away).
+                // Say so — a button that silently does nothing reads as broken.
+                pushToast("Not undone: your CV has changed since that import.", { tone: "notice" });
               }
             },
           }

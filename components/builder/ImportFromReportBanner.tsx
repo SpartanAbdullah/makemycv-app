@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useCvStore, type ImportUndo } from "@/lib/store/cvStore";
-import { isCvEmpty } from "@/lib/utils/cvContent";
+import { hasUserEnteredData } from "@/lib/utils/cvContent";
 import {
   countSectionsFilled,
   mapCvToParsed,
@@ -167,7 +167,7 @@ export default function ImportFromReportBanner() {
         parsed={parsedForReview}
         onConfirm={(partial, mode) => {
           // Was there a CV to lose? Only then is Undo worth offering.
-          const hadCv = !isCvEmpty(useCvStore.getState().data);
+          const hadCv = hasUserEnteredData(useCvStore.getState().data);
           importCvVersion(partial, mode);
           // This import's own undo record (see BuilderShell.handleImportConfirm).
           const undoRecord = hadCv ? useCvStore.getState().importUndo : null;

@@ -16,7 +16,7 @@ import {
   mapParsedToCv,
 } from "../../lib/importers/fieldMapper";
 import { getDir } from "../../lib/utils/rtl";
-import { isCvEmpty } from "../../lib/utils/cvContent";
+import { hasUserEnteredData } from "../../lib/utils/cvContent";
 import { useCvStore } from "../../lib/store/cvStore";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "../ui/ModalCloseButton";
@@ -57,7 +57,10 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
   ].filter((x): x is string => Boolean(x));
   // Does the builder already hold something the user would miss? Read once, at
   // open: it decides the default below and must not flip while they review.
-  const [hasExistingCv] = useState(() => !isCvEmpty(useCvStore.getState().data));
+  // ANYTHING they entered counts — an email, a photo, a language, a job card
+  // with only its dates. The looser "is the CV empty" test let those be
+  // replaced by default with the choice hidden (2026-11, review of PR #45).
+  const [hasExistingCv] = useState(() => hasUserEnteredData(useCvStore.getState().data));
   // An empty builder is simply filled ("replace"). A CV with content is kept
   // and added to ("merge") unless the user chooses otherwise: "replace" used
   // to be the default for everyone, so a returning user who imported a second
