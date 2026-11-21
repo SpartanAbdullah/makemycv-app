@@ -6,6 +6,15 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 18:35] Next.js 16.4.3 to 16.4.6 (security advisories)
+
+**Goal:** clear the Next.js advisories `npm audit` reports for 16.0.0-16.4.4 (seven GHSA entries: cache leaks with `use cache`, SVG rejection bypass in image optimisation, HttpOnly cookie exposure on Edge routes, among others). `next build` was stopping about every other run with a SecurityFatalError.
+**Files:**
+- edited: `package.json`, `package-lock.json` - `next` pinned to 16.4.6. Nothing else bumped.
+**Notes / risks / follow-up:** patch release in the same minor line; no code change was needed. Still open in `npm audit`: `zod` < 4.6.6 (high, memory exhaustion on oversized collections); its fix is a semver-major bump and was not done here. `eslint-config-next` stays at 16.1.6.
+**Verification:** tsc, lint 11/11, `npm test` (5 suites), `npm run build` twice with no advisory stop, smoke:builder and smoke:pdf all pass.
+**Suggested commit:** chore(deps): next 16.4.6 for security advisories
+
 ## [2026-11-21 18:10] Phone top bar, legacy dropdown values, JD Match UAE fields, score wording
 
 **Goal:** tracker items 11-14 (docs/growth-roadmap-2026-11/TRACKER.md), from the 21 Nov live walk-through.
