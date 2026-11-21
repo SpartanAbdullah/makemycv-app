@@ -6,6 +6,16 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 15:05] Post-export karak link goes straight to Ko-fi
+
+**Goal:** tracker item 2 (docs/growth-roadmap-2026-11/TRACKER.md). 7 tip clicks from 375 exporters in 1-12 Nov; the ask opened /support first, a second click before the tip page.
+**Files:**
+- edited: `lib/config/support.ts` - new `KOFI_URL` (same `NEXT_PUBLIC_KOFI_USERNAME` override as TipJar).
+- edited: `components/builder/DownloadSupportCard.tsx` - the karak link opens Ko-fi directly and fires `tip_click { rail: "kofi", context: "post_export" }` instead of `support_click`. Copy and length unchanged, so the 320/360/375px measurements still hold.
+**Notes / risks / follow-up:** Ko-fi cannot be pre-filled with an amount, so no preset amounts were added. `support_click { surface: "post_export" }` stops; read `tip_click` with context `post_export` from 21 Nov. `mmcv_tipped_at` is still not written here.
+**Verification:** tsc, lint 11/11.
+**Suggested commit:** feat(support): link the post-export karak ask straight to Ko-fi
+
 ## [2026-10-31 15:10] QA follow-ups: LinkedIn minimum-length hint, consistent 503 when the AI key is missing
 
 **Goal:** close three minor findings from the independent release QA (docs/ai-mission/QA_INDEPENDENT_2026-10-31.md D3, D5).

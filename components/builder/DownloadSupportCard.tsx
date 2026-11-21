@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { SUPPORT_URL } from "../../lib/config/support";
+import { KOFI_URL } from "../../lib/config/support";
 import { HUMAN_REVIEW_URL } from "../../lib/config/humanReview";
 import { track, trackOncePerSession } from "../../lib/analytics";
 import { FOLLOW_PROFILES } from "../../lib/config/social";
@@ -31,10 +31,10 @@ import { RatingStrip } from "../feedback/RatingStrip";
  * successful non-JSON export by design (2026-09-18 decision; supersedes
  * the 90-day + once-per-session suppression the modal carried).
  *
- * One link, not two. The old modal fired Ko-fi and PayPal directly; this
- * sends people to www.makemycv.ae/support, which presents both properly
- * via <TipJar variant="full">. That also keeps the mobile row to one
- * line and one control.
+ * One link, not two, and it goes straight to Ko-fi (2026-11-21). It used to
+ * open www.makemycv.ae/support first; that page was a second click between
+ * the ask and the tip. Ko-fi cannot be pre-filled with an amount, so the
+ * copy names none.
  *
  * It does NOT write `mmcv_tipped_at`. Clicking through to /support is not
  * proof of a tip, and that key also suppresses TipJarModal on the
@@ -155,11 +155,11 @@ export const DownloadSupportCard = ({ open, ask, sentence, onDismiss }: Props) =
       <p className="min-w-0">
         The builder stays free — if it helped,{" "}
         <a
-          href={SUPPORT_URL}
+          href={KOFI_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold underline underline-offset-2 hover:opacity-80"
-          onClick={() => track("support_click", { surface: "post_export" })}
+          onClick={() => track("tip_click", { rail: "kofi", context: "post_export" })}
         >
           buy us a karak
           <KarakCup />
