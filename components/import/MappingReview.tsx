@@ -16,6 +16,8 @@ import {
   mapParsedToCv,
 } from "../../lib/importers/fieldMapper";
 import { getDir } from "../../lib/utils/rtl";
+import { isCvEmpty } from "../../lib/utils/cvContent";
+import { useCvStore } from "../../lib/store/cvStore";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { ModalCloseButton } from "../ui/ModalCloseButton";
 
@@ -53,7 +55,14 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
     edited.personal?.drivingLicense && `Licence: ${edited.personal.drivingLicense}`,
     edited.personal?.nationality && `Nationality: ${edited.personal.nationality}`,
   ].filter((x): x is string => Boolean(x));
-  const [mode, setMode] = useState<MergeMode>("replace");
+  // Does the builder already hold something the user would miss? Read once, at
+  // open: it decides the default below and must not flip while they review.
+  const [hasExistingCv] = useState(() => !isCvEmpty(useCvStore.getState().data));
+  // An empty builder is simply filled ("replace"). A CV with content is kept
+  // and added to ("merge") unless the user chooses otherwise: "replace" used
+  // to be the default for everyone, so a returning user who imported a second
+  // file lost the CV they had built, in one click (audit 2026-11 O3).
+  const [mode, setMode] = useState<MergeMode>(hasExistingCv ? "merge" : "replace");
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -624,30 +633,44 @@ export const MappingReview = ({ source, parsed, onConfirm, onCancel }: Props) =>
 
         {/* Footer */}
         <div className="border-t border-slate-100 px-6 py-4">
-          <div className="mb-4 flex flex-wrap gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="mergeMode"
-                value="replace"
-                checked={mode === "replace"}
-                onChange={() => setMode("replace")}
-                className="accent-slate-900"
-              />
-              <span className="text-slate-700 font-medium">Replace current CV</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="mergeMode"
-                value="merge"
-                checked={mode === "merge"}
-                onChange={() => setMode("merge")}
-                className="accent-slate-900"
-              />
-              <span className="text-slate-700 font-medium">Merge into current CV</span>
-            </label>
-          </div>
+          {/* The choice only exists when there is a CV to keep or lose. On an
+              empty builder both options did the same thing and the question
+              was noise. Merge is listed first because it is the safe one. */}
+          {hasExistingCv && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="mergeMode"
+                    value="merge"
+                    checked={mode === "merge"}
+                    onChange={() => setMode("merge")}
+                    className="accent-slate-900"
+                  />
+                  <span className="text-slate-700 font-medium">Add to my current CV</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="mergeMode"
+                    value="replace"
+                    checked={mode === "replace"}
+                    onChange={() => setMode("replace")}
+                    className="accent-slate-900"
+                  />
+                  <span className="text-slate-700 font-medium">Replace my current CV</span>
+                </label>
+              </div>
+              {/* Fixed two-line slot so switching option never moves the
+                  Import button under the pointer. */}
+              <p className="mt-2 min-h-[2.5rem] text-xs text-slate-500">
+                {mode === "merge"
+                  ? "Keeps everything you have. Fills details you left empty and adds the imported roles, education and skills after yours."
+                  : "Removes everything in your current CV, including your photo, and uses this file instead. You can undo straight after importing."}
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-wrap justify-end gap-3">
             <button

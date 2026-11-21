@@ -12,6 +12,7 @@ import { StepHeader } from "../StepHeader";
 import { LANGUAGE_LEVELS } from "../../../lib/language";
 import { sanitizeLanguageName, sanitizeLanguageNameLive } from "../../../lib/sanitize";
 import { Icon } from "../Icon";
+import { createId } from "../../../lib/utils/id";
 import type { CvLanguage, LanguageLevel } from "../../../lib/types/cv";
 
 type LanguagesForm = { languages: CvLanguage[] };
@@ -307,26 +308,31 @@ export const LanguagesStep = ({
       <section className="cv-step-card">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Suggested languages — common in the UAE labour market */}
+          {/* A new language is added with NO level. Both adds used to preset
+              "conversational", so one tap on "Arabic" printed "Arabic —
+              Conversational (B1–B2)" on the CV: a proficiency the user never
+              chose (audit 2026-11 D2; lib/store/migrate.ts holds the same
+              line — never invent a level). Every template, the PDF and the
+              DOCX print the name alone until a level is picked. */}
           <SuggestionChips
             current={fields.map((f) => f.name)}
-            onAdd={(name) =>
-              append({
-                id: crypto.randomUUID(),
-                name,
-                level: "conversational",
-              })
-            }
+            onAdd={(name) => append({ id: createId(), name })}
           />
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: 12.5,
+              color: "var(--ff-muted)",
+              margin: 0,
+            }}
+          >
+            Choose a level for each language. Until you do, only the language
+            name is printed on your CV.
+          </p>
 
           <button
             type="button"
-            onClick={() =>
-              append({
-                id: crypto.randomUUID(),
-                name: "",
-                level: "conversational",
-              })
-            }
+            onClick={() => append({ id: createId(), name: "" })}
             className="cv-btn-ghost"
           >
             <Icon name="plus" size={14} />

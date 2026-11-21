@@ -29,6 +29,7 @@ import {
 } from "../schemas/cvSchemas";
 import type { BuilderStep } from "../utils/steps";
 import { builderSteps } from "../utils/steps";
+import { countUnfilled } from "../ai/placeholders";
 
 export type SectionId = BuilderStep["id"];
 
@@ -167,6 +168,51 @@ export function getMissingItems(data: CvData): MissingItem[] {
   }
 
   return missing;
+}
+
+/**
+ * Lines that still carry an unfilled blank or placeholder ("__", "[your
+ * industry]", "{{number}}"), in builder-step order. Empty array ⇔ none.
+ *
+ * Deliberately NOT part of getMissingItems. That list answers "is required
+ * content present" and drives the step beads and section completeness; a
+ * summary with a blank in it is present, it is just not finished. This list
+ * exists for one reader — the export dialog — because an unfilled blank is
+ * printed on the CV exactly as it stands (audit 2026-11 A1).
+ *
+ * This does not break the rule at the head of this file ("only required
+ * things may warn"). That rule is about emptiness: an optional section left
+ * empty is a choice and prints nothing. A blank inside text the user kept is
+ * not a choice — it prints as "__" on a document sent to an employer.
+ *
+ * Same shape as MissingItem so the dialog and "Go back and fix" can treat
+ * both alike.
+ */
+export function getUnfilledBlanks(data: CvData): MissingItem[] {
+  const out: MissingItem[] = [];
+  const blanks = (n: number) => `${n} blank${n === 1 ? "" : "s"} to fill`;
+
+  const inHeadline = countUnfilled(data.personal.headline);
+  if (inHeadline > 0) out.push(item("personal", `${blanks(inHeadline)} in your headline`));
+
+  const inSummary = countUnfilled(data.personal.summary);
+  if (inSummary > 0) out.push(item("summary", `${blanks(inSummary)} in your summary`));
+
+  for (const role of data.experience) {
+    const n = (role.bullets ?? []).reduce((sum, b) => sum + countUnfilled(b), 0);
+    if (n === 0) continue;
+    const name = role.role?.trim() || role.company?.trim() || "a role";
+    out.push(item("experience", `${blanks(n)} in the bullets for ${name}`));
+  }
+
+  for (const project of data.projects ?? []) {
+    const n = (project.bullets ?? []).reduce((sum, b) => sum + countUnfilled(b), 0);
+    if (n === 0) continue;
+    const name = project.name?.trim() || "a project";
+    out.push(item("projects", `${blanks(n)} in the bullets for ${name}`));
+  }
+
+  return out;
 }
 
 export function getSectionMissing(

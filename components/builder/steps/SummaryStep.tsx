@@ -9,6 +9,7 @@ import { Field } from "../../forms/Field";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { FieldError } from "../../FieldError";
+import { countUnfilled } from "../../../lib/ai/placeholders";
 import { sanitizePlainText, validateSummaryLength } from "../../../lib/sanitize";
 import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
@@ -183,6 +184,11 @@ export const SummaryStep = ({
                   : wordCount > 120
                     ? "var(--ff-warn)"
                     : "var(--ff-accent-dark)";
+            // A starter leaves "__" and "[your industry]" where the user's own
+            // detail goes. Counted on this always-present line so nothing
+            // moves when the count changes; the export dialog repeats it
+            // (audit 2026-11 A1).
+            const blanks = countUnfilled(currentSummary);
             return (
               <p
                 style={{
@@ -193,6 +199,12 @@ export const SummaryStep = ({
                 }}
               >
                 {wordCount} words {"\u00B7"} Recommended: 30{"\u2013"}120
+                {blanks > 0 && (
+                  <span style={{ color: "var(--ff-warn)" }}>
+                    {" \u00B7 "}
+                    {blanks} blank{blanks === 1 ? "" : "s"} (__ or [ ]) to fill
+                  </span>
+                )}
               </p>
             );
           })()}

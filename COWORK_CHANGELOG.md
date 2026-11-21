@@ -6,6 +6,35 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 19:45] Audit batch A: six fixes for wrong output and lost work
+
+**Goal:** batch A of the 21 Nov product audit (`docs/makemycv-uae-audit.md` in the parent folder, section 6.5), approved by the owner on 21 Nov ("Batch A fixes"). Each item stops something wrong reaching an employer, or stops a user losing work. Audit ids in brackets.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx`, `components/builder/steps/ReviewStep.tsx` - **[Q1 / E1]** the download reads the CV from the store when it runs, not from the render it was created in. "Download PDF" in the template preview changes the template and downloads in the same tick, so it exported the PREVIOUSLY selected template while the screen showed the new one. The export gate reads the same way.
+- edited: `lib/ai/placeholders.ts` (`BLANK_RE`, `countUnfilled`), `lib/validation/cvRequirements.ts` (`getUnfilledBlanks`), `components/builder/ExportGateDialog.tsx`, `BuilderShell.tsx`, `steps/SummaryStep.tsx`, `steps/ExperienceStep.tsx` - **[Q2 / A1]** the ready-made idea bullets and summary starters leave `__` and `[your industry]` for the user; nothing checked they were filled, so they could be exported as written. The export dialog now lists each line with blanks ("2 blanks to fill in the bullets for Sales Executive") and says a blank is printed as it is; "Go back and fix" opens that step; the summary's word-count line and each role's "n of 8" line show the count. `PLACEHOLDER_RE` (the AI contract) is unchanged; inserting a ready-made line is not blocked.
+- edited: `lib/store/cvStore.ts` (`applyImportedCv`, `importUndo`, `undoImport`), `components/import/MappingReview.tsx`, `BuilderShell.tsx`, `components/builder/ImportFromReportBanner.tsx`, `lib/store/uiStore.ts`; created: `lib/utils/cvContent.ts` (`isCvEmpty`, moved from `JdMatchPanel.tsx`) - **[Q5 / O3, O4, O10]** import no longer costs a user their CV:
+  - the review opens on "Add to my current CV" when the builder already holds content, and on replace only when it is empty (where the choice is now hidden). One line under the options says what each does;
+  - Merge fills a personal detail when the CV's value is missing OR blank. It tested for exactly `""`, and the UAE details are `undefined` until the UAE step is opened, so Merge discarded every imported visa status, notice period, licence, nationality and date of birth the review had just shown as found;
+  - Merge drops the seeded blank experience / education cards, and does not add a skill, language or certification already on the CV by name (merging one file twice no longer doubles them);
+  - the CV, parse signals and score baseline from before an import are kept in memory; the import toast offers Undo for 15 s and the ATS-report banner offers "Undo import" until dismissed;
+  - the ATS-report banner said "Kept your existing CV. Nothing imported." after a successful Merge, and "Reports can't carry visa status…" when they can. Both corrected;
+  - toasts take an optional `key`: a newer toast in the same slot replaces the older one, so two imports in a row leave one Undo, not two.
+- edited: `components/builder/steps/LanguagesStep.tsx` - **[Q7 / D2]** a language is added with no level. Both add paths preset "conversational", so one tap printed "Arabic — Conversational (B1–B2)". Every template, the PDF and the DOCX already print the name alone when no level is set (checked in all 14 + 11 PDF call sites).
+- created: `lib/jdMatch/credentialGuard.ts`; edited: `lib/data/domainSkills.ts` (`isCredentialTerm`), `components/jdmatch/JdMatchPanel.tsx`, `steps/SkillsStep.tsx` - **[Q8 / A2]** a licence or certification is added only after "I hold it", wherever it comes from. JD Match staged one in a single tap (chips, coach and heat map all go through `handleAdd`, which now asks); AI skill suggestions that name a credential are held back and offered through the existing confirm chips. Same words as the Skills step.
+- edited: `lib/store/cvStore.ts` (`ensureSkillIds`) - **[Q10 / D1]** the load-time skills normaliser rebuilt each skill without `category`, so every reload turned a technical skill back into a general one and the "Technical Skills" heading vanished from six templates.
+- created: `lib/ai/blanks.test.ts`, `lib/store/applyImportedCv.test.ts`, `lib/store/ensureSkillIds.test.ts`, `lib/store/uiStore.test.ts`, `lib/jdMatch/credentialGuard.test.ts` (36 new unit tests, 602 to 638; the blanks suite runs against the real idea and starter banks).
+- edited: `scripts/builder-smoke.mjs` (preview "Download PDF" exports the previewed template), `scripts/import-smoke.mjs` (three import-safety checks; the P1 check now picks "Replace my current CV"), `CLAUDE.md`.
+**Notes / risks / follow-up:**
+- `cv_import`'s `merge_mode` mix will move toward `merge` from the release date; read GA4 import numbers with that in mind. No new event names, so no GTM work.
+- Undo is in memory only: a reload ends it. It is a safety net for the minutes after an import, not a second saved CV.
+- The blanks check warns; "Export anyway" still exports. JD Match's "Download for this job" still skips the export dialog altogether (audit E5, not in this batch).
+- `isCredentialTerm` matches a bank name or alias, so "Food Safety" (an alias of HACCP) also asks for confirmation — the same behaviour the paste path already had.
+- JD Match still adds a certification with a blank issuer, by design; the Certifications step asks for it.
+- Not changed: scoring, templates, PDF layouts, AI prompts. Nothing new leaves the browser.
+- Not checked: phone widths for the two new dialogs, and real devices.
+**Verification:** tsc; lint 11/11; `npm test` 5 suites (unit 638); `npm run build`; against `next start`: `smoke:builder` all pass and `smoke:import` all cases pass. The new preview-download check FAILS on the unfixed build (150e255: "previewed ats-clean, exported modern") and passes here. JD Match guard driven in Chrome with a mocked `/api/jd-match` (skill staged in one tap; certification and a PMP filed as a hard skill both ask; Cancel stages nothing). Export dialog, both counters and the Languages step looked at in a browser.
+**Suggested commit:** fix: audit batch A (preview download, unfilled blanks, safe import, language level, licence guard, skill grouping)
+
 ## [2026-11-21 18:40] Scanned-PDF import by in-browser OCR, behind NEXT_PUBLIC_OCR_IMPORT (off)
 
 **Goal:** tracker item 15 (docs/growth-roadmap-2026-11/TRACKER.md). `no_text_layer` (a scanned or image-only PDF) was 20 of 31 import failures in the week of 9 Nov. With `NEXT_PUBLIC_OCR_IMPORT=1` such a PDF is read by OCR in the browser and goes through the normal review. **The flag is off by default and is not set in Vercel; nothing changes in production until it is.**

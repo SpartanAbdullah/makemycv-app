@@ -13,7 +13,7 @@ import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
-import { hasPlaceholder } from "../../../lib/ai/placeholders";
+import { countUnfilled, hasPlaceholder } from "../../../lib/ai/placeholders";
 import { PlaceholderText, PLACEHOLDER_HINT } from "../../ai/PlaceholderText";
 import { BulletRow } from "../BulletRow";
 import { CardIconBtn } from "./shared";
@@ -367,6 +367,10 @@ export const ExperienceStep = ({
           const canMoveDown = index < fields.length - 1;
           const bullets = watch(`experience.${index}.bullets`) || [""];
           const filledBullets = bullets.filter(Boolean).length;
+          const blanksInBullets = bullets.reduce(
+            (sum: number, b: string | undefined) => sum + countUnfilled(b),
+            0,
+          );
           const roleSuggestions = suggestions[index] ?? [];
           // The card no longer auto-folds when its compulsory fields are
           // filled and focus leaves (audit F02: folding moved the Continue
@@ -605,6 +609,16 @@ export const ExperienceStep = ({
                       }}
                     >
                       {filledBullets} of {MAX_BULLETS}
+                      {/* A ready-made idea leaves "__" where the user's own
+                          figure goes. Counted here, on a line that is always
+                          present, so nothing moves when the count changes;
+                          the export dialog repeats it (audit 2026-11 A1). */}
+                      {blanksInBullets > 0 && (
+                        <span style={{ color: "var(--ff-warn)" }}>
+                          {" · "}
+                          {blanksInBullets} blank{blanksInBullets === 1 ? "" : "s"} (__) to fill
+                        </span>
+                      )}
                     </div>
                   </div>
 

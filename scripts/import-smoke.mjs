@@ -436,7 +436,9 @@ async function checkImportAfterTyping() {
       fail(label, "the import review never opened");
       return;
     }
-    await review.getByRole("radio", { name: /Replace current CV/ }).check().catch(() => {});
+    // "Placeholder" makes this a CV with content, so the review opens on
+    // "Add to my current CV" (audit 2026-11 O3). This check is about Replace.
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
     await review.getByRole("button", { name: /^Import/ }).click();
     await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
 
@@ -477,6 +479,78 @@ async function checkImportAfterTyping() {
 }
 
 /** Pick `file` on the CURRENT page (no navigation) through the Import button. */
+// ── An import must not cost the user the CV they had (audit 2026-11 O3/O4) ──
+// Until 2026-11 the review opened on "Replace" for everyone and an import was
+// final. Three things are checked on a builder that already holds a name:
+//   1. the review opens on "Add to my current CV";
+//   2. adding keeps the typed name and brings the file's roles in;
+//   3. after a Replace, "Undo" on the toast puts the previous CV back.
+async function checkImportKeepsExistingCv() {
+  const label = "import safety (O3)";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  const storedCv = () =>
+    pg.evaluate(() => {
+      try {
+        const raw = JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null");
+        return {
+          firstName: raw?.personal?.firstName ?? "",
+          roles: (raw?.experience ?? []).filter((e) => (e.role ?? "").trim() || (e.company ?? "").trim()).length,
+        };
+      } catch {
+        return null;
+      }
+    });
+  const openReviewInPlace = async () => {
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return null;
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    return (await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false)) ? review : null;
+  };
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByLabel(/First name/).waitFor({ timeout: 30000 });
+    await pg.getByLabel(/First name/).fill("Existing");
+    await pg.waitForTimeout(900); // form debounce (250 ms) + storage debounce (500 ms)
+
+    let review = await openReviewInPlace();
+    if (!review) return fail(label, "the import review never opened");
+    const mergeDefault = await review.getByRole("radio", { name: /Add to my current CV/ }).isChecked().catch(() => false);
+    if (mergeDefault) ok(`${label}: a CV with content opens the review on "Add to my current CV"`);
+    else fail(`${label}: a CV with content opens the review on "Add to my current CV"`, "the add option is not the default");
+
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const merged = await storedCv();
+    if (merged && merged.firstName === "Existing" && merged.roles >= 1) {
+      ok(`${label}: adding keeps the typed name and brings in ${merged.roles} role(s)`);
+    } else {
+      fail(`${label}: adding keeps the typed name and brings in the file's roles`, JSON.stringify(merged));
+    }
+
+    review = await openReviewInPlace();
+    if (!review) return fail(label, "the second import review never opened");
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const replaced = await storedCv();
+    await pg.getByRole("button", { name: "Undo", exact: true }).click({ timeout: 8000 });
+    await pg.waitForTimeout(900);
+    const restored = await storedCv();
+    if (replaced && replaced.firstName === "Layla" && restored && restored.firstName === "Existing" && restored.roles === merged?.roles) {
+      ok(`${label}: Undo after a Replace puts the previous CV back`);
+    } else {
+      fail(`${label}: Undo after a Replace puts the previous CV back`, `after replace ${JSON.stringify(replaced)}, after undo ${JSON.stringify(restored)}`);
+    }
+  } catch (e) {
+    fail(label, String(e).slice(0, 200));
+  } finally {
+    await c.close();
+  }
+}
+
 async function pickInPlace(pg, file) {
   let fc = null;
   for (let attempt = 0; attempt < 6 && !fc; attempt++) {
@@ -693,6 +767,7 @@ await checkSlowReadHint();
 await checkProbeUnderDeadline();
 await checkDocxUnderDeadline();
 await checkImportAfterTyping();
+await checkImportKeepsExistingCv();
 await checkErrorClearedByNextPick();
 await checkFirstImportToast();
 

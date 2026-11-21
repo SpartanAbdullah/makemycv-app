@@ -220,6 +220,36 @@ try {
   fail("DOCX export", String(e).slice(0, 160));
 }
 
+// Audit 2026-11 E1: "Download PDF" inside the template preview must export the
+// template being PREVIEWED. It used to export the one selected before, because
+// the download read the CV from a render that predated the template change.
+// The file itself does not say which layout drew it, so the check reads the
+// template the export reported — the same value the renderer was handed.
+try {
+  const before = await page.evaluate(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem("makemycv:data") || "{}").settings?.templateId ?? "classic";
+    } catch {
+      return "classic";
+    }
+  });
+  const [wantId, wantName] = before === "ats-clean" ? ["classic", "Classic"] : ["ats-clean", "ATS Clean"];
+  await page.getByRole("button", { name: `Open ${wantName} full preview` }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 45000 }),
+    page.getByRole("button", { name: "Download PDF", exact: true }).click(),
+  ]);
+  await download.saveAs(path.join(tmp, `preview-${download.suggestedFilename()}`));
+  const exported = await page.evaluate(() => {
+    const evs = (window.dataLayer || []).filter((e) => e && e.event === "cv_export");
+    return evs.length ? evs[evs.length - 1].template : null;
+  });
+  if (exported === wantId) ok(`preview "Download PDF" exports the previewed template (${wantId}; ${before} was selected)`);
+  else fail('preview "Download PDF" exports the previewed template', `previewed ${wantId}, exported ${exported}, ${before} was selected`);
+} catch (e) {
+  fail('preview "Download PDF" exports the previewed template', String(e).slice(0, 160));
+}
+
 // Funnel events (2026-10-31): every push lands in window.dataLayer whether or
 // not GTM is present, so the events can be asserted without a container.
 // Persisted sessionStorage keys make the once-per-session events survive the
