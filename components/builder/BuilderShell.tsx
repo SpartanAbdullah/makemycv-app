@@ -20,6 +20,7 @@ import {
   getFirstIncompleteSection,
   getMissingItems,
   getSectionMissing,
+  getUnfilledBlanks,
 } from "../../lib/validation/cvRequirements";
 import { Toaster } from "../ui/Toaster";
 import { ProcessSteps } from "../ui/ProcessSteps";
@@ -62,6 +63,7 @@ import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
 import { track, trackOncePerSession } from "../../lib/analytics";
 import { downloadCvBackup } from "../../lib/utils/download";
+import { isCvEmpty } from "../../lib/utils/cvContent";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
@@ -1057,6 +1059,13 @@ export const BuilderShell = ({
   // success, the inline support card opens in the header stack below.
   // Errors do NOT open it; the existing downloadError bar handles them.
   const runDownload = async (kind: ExportKind = "pdf") => {
+    // The CV is read from the store at call time, never from this render's
+    // `data`. The template preview's "Download PDF" selects a template and
+    // asks for the download in the same tick; the render that would carry the
+    // new template has not happened yet, so the closure still named the
+    // PREVIOUS template and that is the file the user got (audit 2026-11 E1).
+    const cv = useCvStore.getState().data;
+    const templateId = cv.settings.templateId ?? "classic";
     setIsDownloading(true);
     setDownloadError(null);
     // Re-arm: a card dismissed after the last export must come back for
@@ -1068,16 +1077,16 @@ export const BuilderShell = ({
     if (kind !== "json") {
       track("cv_export_started", {
         format: kind,
-        template: data.settings.templateId ?? "classic",
+        template: templateId,
       });
     }
     try {
       if (kind === "json") {
-        downloadCvBackup(data);
+        downloadCvBackup(cv);
       } else if (kind === "docx") {
-        await exportToDocx(data);
+        await exportToDocx(cv);
       } else {
-        await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+        await downloadCV(cv, "pro", templateId);
       }
       pushToast(EXPORT_COPY[kind].success, { tone: "success", duration: 4000 });
 
@@ -1098,7 +1107,7 @@ export const BuilderShell = ({
       if (kind !== "json") {
         track("cv_export", {
           format: kind,
-          template: data.settings.templateId ?? "classic",
+          template: templateId,
         });
       }
       // A backup is housekeeping, not a finished-CV moment — don't ask for a
@@ -1137,7 +1146,16 @@ export const BuilderShell = ({
     // employer. A backup of a half-finished CV is precisely what a user wants,
     // so JSON bypasses it — gating the recovery path on completeness would
     // withhold it exactly when work is most likely to be lost.
-    if (kind !== "json" && getMissingItems(data).length > 0) {
+    // Same call-time read as runDownload: the gate must judge the CV that is
+    // about to be exported, not the one this render saw. It opens for missing
+    // required content and for unfilled blanks ("__", "[your industry]") left
+    // by a ready-made bullet or summary starter — those are printed as they
+    // stand, so the user is told before the file exists (audit 2026-11 A1).
+    const cv = useCvStore.getState().data;
+    if (
+      kind !== "json" &&
+      (getMissingItems(cv).length > 0 || getUnfilledBlanks(cv).length > 0)
+    ) {
       setPendingExportKind(kind);
       setDownloadGuardOpen(true);
       return;
@@ -1275,7 +1293,13 @@ export const BuilderShell = ({
   ) => {
     // Before the store write: the section-done effect it triggers reads this.
     importConfirmedAtRef.current = Date.now();
+    // Was there a CV to lose? Decides whether the toast below offers Undo —
+    // undoing an import into an empty builder would just empty it again.
+    const hadCv = !isCvEmpty(useCvStore.getState().data);
     importCvVersion(partial, mode);
+    // This import's own undo record. A later import replaces it, and an
+    // older toast's Undo must then do nothing instead of undoing the wrong one.
+    const undoRecord = useCvStore.getState().importUndo;
     // Snapshot the "before" for the TopBar delta. Zustand set() is synchronous,
     // so this reads the CV that importCvVersion just wrote. This path sets no
     // parseSignals, so both baseline and live score run without them — the
@@ -1295,7 +1319,24 @@ export const BuilderShell = ({
     }
     pushToast(
       `${mode === "merge" ? "Merged" : "Imported"} ${n} section${n === 1 ? "" : "s"} — review the steps below and tweak anything.`,
-      { tone: "success" },
+      hadCv
+        ? {
+            tone: "success",
+            // An import can replace a whole CV, so the way back stays on
+            // screen longer than a routine toast (audit 2026-11 O3).
+            duration: 15000,
+            // One slot: a second import's toast replaces the first, so there
+            // is only ever one Undo and it is the one that works.
+            key: "import",
+            actionLabel: "Undo",
+            onAction: () => {
+              const store = useCvStore.getState();
+              if (store.importUndo === undoRecord && store.undoImport()) {
+                pushToast("Import undone. Your CV is back as it was.", { tone: "notice" });
+              }
+            },
+          }
+        : { tone: "success", key: "import" },
     );
   };
 
@@ -1755,10 +1796,14 @@ export const BuilderShell = ({
         <ExportGateDialog
           open={downloadGuardOpen}
           missing={downloadGuardOpen ? getMissingItems(data) : []}
+          blanks={downloadGuardOpen ? getUnfilledBlanks(data) : []}
           onClose={() => setDownloadGuardOpen(false)}
           onGoFix={() => {
             setDownloadGuardOpen(false);
-            const target = getFirstIncompleteSection(data);
+            // Missing required content first; with none, the first line that
+            // still has a blank.
+            const target =
+              getFirstIncompleteSection(data) ?? getUnfilledBlanks(data)[0]?.sectionId ?? null;
             if (target) onStepChange(target);
           }}
           onExportAnyway={async () => {

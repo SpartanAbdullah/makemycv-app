@@ -8,9 +8,11 @@ import { Icon } from "./Icon";
 /**
  * Export-time confirm — THE ONLY blocking dialog in the guided-feedback
  * system (2026-06). Shown when the user triggers an export (PDF or DOCX)
- * while required content is missing. Lists exactly what's missing (from
- * the shared cvRequirements module — the same list the field badges and
- * stepper read), with two honest exits:
+ * while required content is missing, or (2026-11) while a line still carries
+ * an unfilled blank from a ready-made suggestion. Lists exactly what's
+ * missing (from the shared cvRequirements module — the same list the field
+ * badges and stepper read) and which lines have blanks, with two honest
+ * exits:
  *
  *   - "Go back and fix" → navigate to the first incomplete section
  *   - "Export anyway"   → proceed normally; never a hard block
@@ -22,12 +24,18 @@ import { Icon } from "./Icon";
 export const ExportGateDialog = ({
   open,
   missing,
+  blanks = [],
   onClose,
   onGoFix,
   onExportAnyway,
 }: {
   open: boolean;
   missing: MissingItem[];
+  /** Lines that still carry an unfilled blank ("__", "[your industry]") from
+   *  a ready-made bullet or summary starter. Unlike `missing`, these are not
+   *  left out of the export — they are printed as they stand, which is why
+   *  the dialog says so in its own words (audit 2026-11 A1). */
+  blanks?: MissingItem[];
   onClose: () => void;
   onGoFix: () => void;
   onExportAnyway: () => void;
@@ -76,15 +84,63 @@ export const ExportGateDialog = ({
   };
 
   // Group items by section, preserving builder-step order.
-  const grouped = missing.reduce<Array<{ title: string; items: MissingItem[] }>>(
-    (acc, m) => {
+  const groupBySection = (items: MissingItem[]) =>
+    items.reduce<Array<{ title: string; items: MissingItem[] }>>((acc, m) => {
       const bucket = acc.find((g) => g.title === m.sectionTitle);
       if (bucket) bucket.items.push(m);
       else acc.push({ title: m.sectionTitle, items: [m] });
       return acc;
-    },
-    [],
-  );
+    }, []);
+  const grouped = groupBySection(missing);
+  const groupedBlanks = groupBySection(blanks);
+  const onlyBlanks = missing.length === 0 && blanks.length > 0;
+
+  const renderGroups = (groups: Array<{ title: string; items: MissingItem[] }>) =>
+    groups.map((g) => (
+      <div key={g.title}>
+        <p
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--ff-warn)",
+          }}
+        >
+          {g.title}
+        </p>
+        <ul style={{ marginTop: 4 }}>
+          {g.items.map((m, i) => (
+            <li
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                padding: "3px 0",
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--ff-ink-2)",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "var(--ff-warn)",
+                  flexShrink: 0,
+                  marginTop: 7,
+                }}
+              />
+              {m.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ));
 
   return (
     <div
@@ -129,19 +185,21 @@ export const ExportGateDialog = ({
             color: "var(--ff-ink)",
           }}
         >
-          A few things are still missing
+          {onlyBlanks ? "Some blanks are still unfilled" : "A few things are still missing"}
         </h2>
-        <p
-          style={{
-            marginTop: 6,
-            fontSize: 13,
-            lineHeight: 1.55,
-            color: "var(--ff-muted)",
-          }}
-        >
-          Your CV will export without these — fill them in for the strongest
-          first impression, or export as-is.
-        </p>
+        {!onlyBlanks && (
+          <p
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              lineHeight: 1.55,
+              color: "var(--ff-muted)",
+            }}
+          >
+            Your CV will export without these — fill them in for the strongest
+            first impression, or export as-is.
+          </p>
+        )}
 
         <div
           style={{
@@ -153,51 +211,30 @@ export const ExportGateDialog = ({
             paddingRight: 4,
           }}
         >
-          {grouped.map((g) => (
-            <div key={g.title}>
+          {renderGroups(grouped)}
+
+          {groupedBlanks.length > 0 && (
+            <>
+              {/* Said separately because the consequence is the opposite of
+                  the list above: a missing section is left out of the CV, an
+                  unfilled blank is printed on it. */}
               <p
                 style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "var(--ff-warn)",
+                  marginTop: grouped.length > 0 ? 4 : 0,
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                  color: "var(--ff-muted)",
                 }}
               >
-                {g.title}
+                {grouped.length > 0 ? "Also: these" : "These"} lines came from a
+                ready-made suggestion and still have a blank (
+                <span style={{ fontFamily: "var(--font-mono)" }}>__</span> or
+                square brackets) where your own detail goes. A blank is printed
+                on your CV exactly as it is.
               </p>
-              <ul style={{ marginTop: 4 }}>
-                {g.items.map((m, i) => (
-                  <li
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 8,
-                      padding: "3px 0",
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                      color: "var(--ff-ink-2)",
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: "var(--ff-warn)",
-                        flexShrink: 0,
-                        marginTop: 7,
-                      }}
-                    />
-                    {m.label}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+              {renderGroups(groupedBlanks)}
+            </>
+          )}
         </div>
 
         <div

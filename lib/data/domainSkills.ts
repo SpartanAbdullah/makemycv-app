@@ -345,3 +345,28 @@ export function domainHardSkills(
 export function allDomainSkills(): DomainSkill[] {
   return Object.values(DOMAIN_HARD_SKILLS).flat();
 }
+
+let credentialTerms: Set<string> | null = null;
+
+/**
+ * Does this term name a licence or certification in the bank, by its name or
+ * one of its aliases?
+ *
+ * The question every "add this to my CV" path has to ask before it adds
+ * anything, wherever the term came from: a suggestion chip, a pasted list, a
+ * job advert, an AI reply. Until 2026-11 only the Skills step's own chips
+ * asked it, so JD Match and the AI skill suggestions put a DHA licence or a
+ * PMP on a CV in one tap (audit 2026-11 A2).
+ *
+ * Weak aliases are deliberately left out: they are ordinary words kept for
+ * de-duplication, and treating them as credentials would raise the guard on
+ * plain skills.
+ */
+export function isCredentialTerm(term: string): boolean {
+  credentialTerms ??= new Set(
+    allDomainSkills()
+      .filter((entry) => entry.kind === "credential")
+      .flatMap((entry) => [entry.name, ...(entry.aliases ?? [])].map(norm)),
+  );
+  return credentialTerms.has(norm(term));
+}

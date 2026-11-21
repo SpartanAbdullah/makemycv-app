@@ -140,9 +140,12 @@ export const ReviewStep = ({
   const fallbackExport = async (kind: ExportKind) => {
     setFallbackDownloading(true);
     try {
-      if (kind === "json") downloadCvBackup(data);
-      else if (kind === "docx") await exportToDocx(data);
-      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      // Call-time read, for the same reason as BuilderShell.runDownload: the
+      // preview modal changes the template and downloads in one tick.
+      const cv = useCvStore.getState().data;
+      if (kind === "json") downloadCvBackup(cv);
+      else if (kind === "docx") await exportToDocx(cv);
+      else await downloadCV(cv, "pro", cv.settings.templateId ?? "classic");
     } finally {
       setFallbackDownloading(false);
     }

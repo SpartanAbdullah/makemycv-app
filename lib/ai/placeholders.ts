@@ -54,3 +54,42 @@ export function splitPlaceholders(text: string): TextPart[] {
 export function normalizePlaceholders(text: string): string {
   return text.replace(PLACEHOLDER_RE, NUMBER_PLACEHOLDER);
 }
+
+/* ── Blanks in the builder's own ready-made text (2026-11, audit A1) ─────────
+ *
+ * The idea bullets (lib/data/ideaSuggestions.ts) and summary starters
+ * (lib/data/summaryStarters.ts) are not AI output, but they follow the same
+ * principle: where a figure or a personal detail belongs they leave a blank —
+ * "Closed __ new accounts, exceeding target by __%", "[Your role] with __
+ * years in [your industry]" — for the user to fill in.
+ *
+ * The AI path refuses to insert a line that still carries a placeholder. The
+ * ready-made path inserted its blanks in one tap and nothing looked at them
+ * again, so a CV could be exported reading "Managed a team of __ staff".
+ * These helpers let the form and the export dialog see them.
+ *
+ * Kept apart from PLACEHOLDER_RE on purpose: that one defines what an AI
+ * route may emit and what blocks an insert, and widening it would change
+ * that contract. BLANK_RE only ever counts and warns.
+ *
+ * What it matches:
+ *   __                    two or more underscores
+ *   [your industry]       a bracketed prompt starting with "your"
+ *   [domain]              the one bare prompt word the starters use
+ *   [Dubai / Abu Dhabi]   a bracketed either-or choice
+ * Ordinary bracketed text ("[Confidential]", "[1]") is deliberately not a
+ * blank.
+ */
+export const BLANK_RE =
+  /_{2,}|\[\s*(?:your\b[^\]\n]{0,40}|domain|[a-z][a-z ]{0,24}\s\/\s[a-z][a-z ]{0,24})\s*\]/gi;
+
+const UNFILLED_RE = new RegExp(`${PLACEHOLDER_RE.source}|${BLANK_RE.source}`, "gi");
+
+/**
+ * How many spots in this text still wait for the user's own words: AI
+ * placeholders and ready-made blanks together. 0 for text that is finished.
+ */
+export function countUnfilled(text: string | undefined | null): number {
+  if (!text) return 0;
+  return (text.match(UNFILLED_RE) ?? []).length;
+}

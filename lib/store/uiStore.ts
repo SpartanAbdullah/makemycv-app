@@ -28,6 +28,9 @@ export type Toast = {
   /** Optional action button (e.g. "Undo") rendered next to the text. */
   actionLabel?: string;
   onAction?: () => void;
+  /** Optional slot name. A new toast with the same key replaces the one on
+   *  screen — for an action that only ever applies to the latest event. */
+  key?: string;
 };
 
 let toastSeq = 0;
@@ -46,6 +49,7 @@ type UiState = {
       duration?: number;
       actionLabel?: string;
       onAction?: () => void;
+      key?: string;
     },
   ) => void;
   dismissToast: (id: number) => void;
@@ -74,15 +78,23 @@ export const useUiStore = create<UiState>((set) => ({
           : (opts?.duration ?? 6000),
         actionLabel: opts?.actionLabel,
         onAction: opts?.onAction,
+        key: opts?.key,
       };
+      // Same slot: the newer toast takes the older one's place. Action toasts
+      // are otherwise never displaced, which left two "Undo" buttons on screen
+      // after two imports in a row, the older of them undoing nothing
+      // (2026-11, found by smoke:import).
+      const others = next.key
+        ? s.toasts.filter((t) => t.key !== next.key)
+        : s.toasts;
       // Replace, don't stack (audit F03): four "… section done ✓" toasts
       // piled up and covered the skills chips and the drawer footer. A new
       // action-less toast replaces any visible action-less toast of the same
       // tone; action toasts (Undo) are never displaced by a plain one. The
       // queue is then capped at two visible cards, oldest plain toast first.
       let toasts = next.onAction
-        ? s.toasts
-        : s.toasts.filter((t) => t.onAction || t.tone !== next.tone);
+        ? others
+        : others.filter((t) => t.onAction || t.tone !== next.tone);
       toasts = [...toasts, next];
       while (toasts.length > 2) {
         const idx = toasts.findIndex((t) => !t.onAction && t.id !== next.id);

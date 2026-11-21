@@ -163,6 +163,17 @@ examples: `parseSignals`, `scoreBaseline`, `jdTarget`. Leaving an unreadable
 record behind is worse than dropping it — it can never be used and silently
 suppresses the feature.
 
+**Load-time normalisers must carry every field.** `ensureSkillIds()` rebuilds
+each skill on every load. It predated `CvSkill.category` and silently stripped
+it for four months (2026-11 audit). A new field on a type that passes through
+a normaliser is added there and to its test in the same change.
+
+**Imports go through `applyImportedCv()`** (pure, tested). The state an import
+replaces is kept in `importUndo` — memory only, cleared by `reset()` — and
+`undoImport()` puts back the CV, parse signals and score baseline together.
+The review opens on Merge whenever `isCvEmpty()` (`lib/utils/cvContent.ts`)
+is false.
+
 **Stale-tab guard:** the debounced save checks `staleTab` before writing. A tab
 whose in-memory copy predates another tab's save must never write, or it
 replaces newer work with older. The check lives at the write, not only in the
@@ -229,7 +240,18 @@ These are product invariants, repeatedly re-derived; do not relax them casually.
   confirmation guard before being added — UAE application forms ask about them
   as knockout questions and a wrong claim is checkable against a register.
   Government *systems* a user merely operates (Ejari, Tasheel, Amer) are not
-  guarded.
+  guarded. **Every path that adds to the CV asks first**, whatever the source:
+  `isCredentialTerm()` in `lib/data/domainSkills.ts` is the test (the Skills
+  step's chips and paste, AI skill suggestions, and JD Match through
+  `lib/jdMatch/credentialGuard.ts`). Until 2026-11 only the Skills step asked;
+  a new add path without the check repeats that bug.
+- **Ready-made text leaves a blank, never a figure**: `__` and `[your …]` in
+  `lib/data/ideaSuggestions.ts` and `summaryStarters.ts`. `countUnfilled()` in
+  `lib/ai/placeholders.ts` has to recognise whatever blank a new line uses
+  (`lib/ai/blanks.test.ts` runs against the real banks), because the export
+  dialog's "blanks still to fill" list is built from it. `PLACEHOLDER_RE` is
+  the AI contract (what a route may emit, what blocks an insert) — do not
+  widen it to cover blanks.
 
 ---
 

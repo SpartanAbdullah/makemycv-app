@@ -52,6 +52,7 @@ import { useAIImprove } from "../../../hooks/useAIImprove";
 import { AIResultsModal } from "../../AIResultsModal";
 import { sanitizeSkill, sanitizeSkillLive } from "../../../lib/sanitize";
 import { ROLE_FAMILY_LABELS } from "../../../lib/data/roleFamily";
+import { isCredentialTerm } from "../../../lib/data/domainSkills";
 import {
   arrivalSuggestions,
   categoryFor,
@@ -157,6 +158,9 @@ export const SkillsStep = ({
   const [openChipId, setOpenChipId] = useState<string | null>(null);
   const [pendingCredential, setPendingCredential] = useState<Suggestion | null>(null);
   const [pasteReport, setPasteReport] = useState<PastePlan | null>(null);
+  // Where the report above came from, so its first line names the right
+  // thing: a pasted list, or AI suggestions that included a licence.
+  const [reportSource, setReportSource] = useState<"paste" | "ai">("paste");
   const [alsoCommonOpen, setAlsoCommonOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [setAsideOpen, setSetAsideOpen] = useState(false);
@@ -275,6 +279,7 @@ export const SkillsStep = ({
     }
     setDuplicateOf(null);
     setQuery("");
+    setReportSource("paste");
     setPasteReport(plan);
   };
 
@@ -360,10 +365,26 @@ export const SkillsStep = ({
 
   const handleApplySkills = (selected: string[]) => {
     const existing = new Set(fields.map((f) => norm(f.name)));
-    const additions = selected
-      .filter((name) => !existing.has(norm(name)))
+    const fresh = selected.filter((name) => !existing.has(norm(name)));
+    // The prompt tells the model never to suggest licences, but a prompt is a
+    // request, not a guarantee. Anything the bank knows as a credential is
+    // held back and offered through the same "I hold it" guard as a typed or
+    // pasted one, instead of landing on the CV with the rest (audit 2026-11 A2).
+    const credentials = fresh.filter(isCredentialTerm);
+    const additions = fresh
+      .filter((name) => !isCredentialTerm(name))
       .map((name) => ({ id: createId(), name }));
     writeSkills([...fields.map(toCvSkill), ...additions]);
+    if (credentials.length > 0) {
+      setReportSource("ai");
+      setPasteReport({
+        add: additions.map((a) => ({ name: a.name })),
+        credentials: credentials.map((name) => ({ name })),
+        duplicates: [],
+        tooLong: [],
+        overLimit: [],
+      });
+    }
     setAiModalOpen(false);
     aiClear();
   };
@@ -534,8 +555,12 @@ export const SkillsStep = ({
               </button>
               <p style={{ margin: 0, paddingRight: 24, fontWeight: 600, color: "var(--ff-ink)" }}>
                 {pasteReport.add.length > 0
-                  ? `Added ${pasteReport.add.length} skill${pasteReport.add.length === 1 ? "" : "s"} from your paste.`
-                  : "Nothing new to add from your paste."}
+                  ? `Added ${pasteReport.add.length} skill${pasteReport.add.length === 1 ? "" : "s"} from ${
+                      reportSource === "ai" ? "the AI suggestions" : "your paste"
+                    }.`
+                  : reportSource === "ai"
+                    ? "No skills added from the AI suggestions yet."
+                    : "Nothing new to add from your paste."}
               </p>
               {pasteReport.duplicates.length > 0 && (
                 <p style={{ margin: "4px 0 0" }}>
