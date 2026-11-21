@@ -25,6 +25,7 @@ import {
 } from "../../lib/jdMatch/types";
 import type { CvData, CvExperience } from "../../lib/types/cv";
 import { buildHeatmap } from "../../lib/jdMatch/heatmap";
+import { UAE_FIELD_LABELS, uaeFieldFor } from "../../lib/jdMatch/uaeFields";
 import { buildTailoredCv } from "../../lib/jdMatch/tailorCv";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { exportToDocx } from "../../lib/utils/docxExport";
@@ -742,6 +743,11 @@ export const JdMatchPanel = () => {
                         You already cover {result.matchedCount} of {result.totalRequirements} — let&apos;s tailor the rest
                         {result.jobTitle ? ` · ${result.jobTitle}` : ""}
                       </div>
+                      {/* The builder's CV score and this one measure different
+                          things; a CV can be "Strong" there and low here. */}
+                      <div style={{ fontSize: 12, color: "var(--ff-muted)", marginTop: 4 }}>
+                        This compares your CV with this one job ad. It is separate from your CV score in the builder.
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1361,8 +1367,9 @@ const MissingFix = ({
   onAdd: (category: JdCategory, term: string) => void;
   onWeave: (category: JdCategory, term: string) => void;
 }) => {
-  const showAdd = fixable && (canAddSkill(category) || canAddCert(category));
-  const showWeave = fixable && canWeave(category);
+  const uaeField = uaeFieldFor(term);
+  const showAdd = !uaeField && fixable && (canAddSkill(category) || canAddCert(category));
+  const showWeave = !uaeField && fixable && canWeave(category);
   const addTitle = canAddCert(category)
     ? `Add “${term}” to your certifications`
     : `Add “${term}” to your skills`;
@@ -1388,6 +1395,17 @@ const MissingFix = ({
         <Icon name="lock" size={11} color="var(--ff-faint)" />
       ) : (
         <span style={{ display: "inline-flex", gap: 4 }}>
+          {uaeField && (
+            <Link
+              href="/builder?step=uaeEssentials"
+              title={`Set “${UAE_FIELD_LABELS[uaeField]}” in UAE Essentials. Accept your staged changes first.`}
+              className="ff-hit-target-v"
+              style={{ ...miniBtn, textDecoration: "none" }}
+            >
+              <Icon name="plus" size={10} />
+              Set field
+            </Link>
+          )}
           {showAdd && (
             <button type="button" title={addTitle} className="ff-hit-target-v" onClick={() => onAdd(category, term)} style={miniBtn}>
               <Icon name="plus" size={10} />

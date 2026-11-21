@@ -6,6 +6,20 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-21 18:10] Phone top bar, legacy dropdown values, JD Match UAE fields, score wording
+
+**Goal:** tracker items 11-14 (docs/growth-roadmap-2026-11/TRACKER.md), from the 21 Nov live walk-through.
+**Files:**
+- edited: `components/builder/BuilderShell.tsx` - "All templates" shows icon-only from 360px and "Match to a job" from 400px (they were hidden below `sm` and `lg`). Labels return at `sm` / `lg` as before. Measured in a production build at 320, 360 and 400px: no overlap with the logo or score chip, no horizontal overflow.
+- edited: `components/builder/steps/UAEEssentialsStep.tsx` - `legacyOption()`: a saved visa, availability or licence value that is not in the option list now renders as an option. Before, the select was blank while the value still printed on the CV.
+- created: `lib/jdMatch/uaeFields.ts` (+ test, 9 cases) - recognises licence and availability requirements; a filled field answers the requirement it states and nothing more (an international licence does not answer "UAE driving licence"; "30 days notice" does not answer "immediate joiners").
+- edited: `lib/jdMatch/extractCvText.ts` - availability and those phrases join the match corpus. Still client-side; nothing new leaves the browser.
+- edited: `components/jdmatch/JdCoach.tsx`, `JdMatchPanel.tsx` - for such a requirement the coach and the gap chip point at UAE Essentials instead of offering "Add to skills" / "Weave".
+- edited: `components/builder/steps/ReviewStep.tsx` - the greeting is "Nearly there," and the subtitle names the empty sections when a required section is missing. `JdMatchPanel.tsx` - one line under the match score saying it is separate from the CV score.
+**Notes / risks / follow-up:** the score engine and its thresholds are NOT changed (it is shared with the checker and has parity tests); a thin CV can still read "Strong" at 65+. That is a founder decision. The UAE Essentials link opens in the same tab on purpose (a second tab trips the stale-tab guard); staged JD fixes are lost if not accepted first, and the link's title says so. JdHeatmap's tap-to-fix still offers Add / Weave for these terms. Visa requirements are not handled (too varied to match safely).
+**Verification:** tsc, lint 11/11, test:unit 583 pass, `npm run build`, smoke:builder all pass.
+**Suggested commit:** feat(builder): phone top bar entries, legacy field values, UAE fields in JD Match
+
 ## [2026-11-21 15:05] Post-export karak link goes straight to Ko-fi
 
 **Goal:** tracker item 2 (docs/growth-roadmap-2026-11/TRACKER.md). 7 tip clicks from 375 exporters in 1-12 Nov; the ask opened /support first, a second click before the tip page.

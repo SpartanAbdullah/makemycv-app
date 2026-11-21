@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Icon } from "../builder/Icon";
 import { WEIGHTS } from "../../lib/jdMatch/match";
 import type { JdCategory, JdTerm } from "../../lib/jdMatch/types";
+import { UAE_FIELD_LABELS, uaeFieldFor } from "../../lib/jdMatch/uaeFields";
 
 // Mirror the per-category fix affordances used elsewhere in the panel.
 const ADD_SKILL_CATEGORIES: JdCategory[] = ["hardSkills", "tools", "softSkills", "keywords"];
@@ -19,6 +21,12 @@ const WHY: Record<JdCategory, string> = {
   softSkills: "A soft skill the job calls out.",
   keywords: "A domain term recruiters scan for.",
 };
+
+/* Same tab on purpose: a second tab would trip the store's stale-tab guard
+   and the JD Match tab could no longer save. The pasted job is restored from
+   the persisted JD target on return; staged fixes are not, hence the note. */
+const UAE_FIELDS_HREF = "/builder?step=uaeEssentials";
+const fieldLinkNote = "Opens the builder. Accept your staged changes first, or they are discarded.";
 
 const cardBase: React.CSSProperties = { borderRadius: 16, padding: 18 };
 const iconCircle: React.CSSProperties = {
@@ -134,8 +142,11 @@ export const JdCoach = ({
   }
 
   // ── Current focus ──────────────────────────────────────────────────────────
-  const showWeave = fixable && canWeave(current.category) && !weaveDisabled;
-  const showAdd = fixable && (canAddSkill(current.category) || canAddCert(current.category));
+  // A licence or availability requirement is answered by a UAE Essentials
+  // field, not by a keyword: point there instead of offering Add / Weave.
+  const uaeField = uaeFieldFor(current.term);
+  const showWeave = !uaeField && fixable && canWeave(current.category) && !weaveDisabled;
+  const showAdd = !uaeField && fixable && (canAddSkill(current.category) || canAddCert(current.category));
   const addLabel = canAddCert(current.category) ? "Add to certifications" : "Add to skills";
 
   return (
@@ -158,7 +169,9 @@ export const JdCoach = ({
         </span>
       </div>
       <p style={{ fontSize: 13, color: "var(--ff-muted)", margin: "5px 0 0", lineHeight: 1.5 }}>
-        {WHY[current.category]}
+        {uaeField
+          ? `Recruiters screen on this as a field. Your CV has one for it: ${UAE_FIELD_LABELS[uaeField]}.`
+          : WHY[current.category]}
       </p>
 
       {fixable ? (
@@ -166,6 +179,12 @@ export const JdCoach = ({
           {/* Compact tier (.cv-btn--sm, icon 13) — JdHeatmap's identical
               Weave / Add pair mirrors these exactly. Height parity across
               variants comes from the shared 1px border box math in globals. */}
+          {uaeField && (
+            <Link href={UAE_FIELDS_HREF} className="cv-btn-primary cv-btn--sm" title={fieldLinkNote}>
+              <Icon name="plus" size={13} />
+              Set it in UAE Essentials
+            </Link>
+          )}
           {showWeave && (
             <button type="button" className="cv-btn-primary cv-btn--sm" onClick={() => onWeave(current.category, current.term)}>
               <Icon name="sparkle" size={13} />
