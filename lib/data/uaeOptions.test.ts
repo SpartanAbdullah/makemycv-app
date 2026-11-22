@@ -26,6 +26,30 @@ describe("normalizeVisaStatus", () => {
     assert.equal(normalizeVisaStatus("Employment visa (transferable)"), "Employment visa");
     assert.equal(normalizeVisaStatus("Transferable"), "Cancelled / transferable");
   });
+  test("a residence visa is a residence visa (2026-11)", () => {
+    // The site's own sample CV says "Visa: UAE Residence". Neither wording had
+    // an option, so the value went to "couldn't place".
+    assert.equal(normalizeVisaStatus("Residence visa"), "Residence visa");
+    assert.equal(normalizeVisaStatus("UAE Residence"), "Residence visa");
+    assert.equal(normalizeVisaStatus("UAE resident"), "Residence visa");
+    // Was stored as "Cancelled / transferable" — the opposite of the truth.
+    assert.equal(normalizeVisaStatus("Residence visa - transferable"), "Residence visa");
+    // A more specific status still wins.
+    assert.equal(normalizeVisaStatus("Family residence visa"), "Family sponsorship");
+    assert.equal(normalizeVisaStatus("Golden residence"), "Golden Visa");
+    assert.equal(normalizeVisaStatus("Cancelled residence visa"), "Cancelled / transferable");
+    assert.equal(normalizeVisaStatus("Residence visa (employment)"), "Employment visa");
+  });
+  test("applying from abroad has an answer (2026-11)", () => {
+    const outside = "Outside UAE, available to relocate";
+    assert.equal(normalizeVisaStatus(outside), outside);
+    assert.equal(normalizeVisaStatus("Currently outside the UAE"), outside);
+    assert.equal(normalizeVisaStatus("Overseas applicant"), outside);
+    assert.equal(normalizeVisaStatus("Based abroad, can relocate"), outside);
+    // Not asserted from a relocation offer alone: people inside the UAE say it too.
+    assert.equal(normalizeVisaStatus("Willing to relocate"), null);
+    assert.equal(normalizeVisaStatus("Requires sponsorship"), null);
+  });
   test("the whole builder line is NOT a visa status", () => {
     assert.equal(
       normalizeVisaStatus("Employment visa · Available: 30 days notice · DL: Light Vehicle"),

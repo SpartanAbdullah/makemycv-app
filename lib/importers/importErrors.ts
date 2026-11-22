@@ -10,6 +10,8 @@
 // this module's callers (only its extension bucket does), and no text from
 // the document is ever part of a reason or a message. See docs/import-errors.md.
 
+import type { OcrOutcome } from "./ocr";
+
 /** Every value `cv_import_failed.error_reason` may carry. Adding one means
  *  adding its copy below and a row in docs/import-errors.md. */
 export const IMPORT_ERROR_REASONS = [
@@ -121,6 +123,9 @@ export function withDeadline<T>(
 }
 
 export class ImportParseError extends Error {
+  /** Set when the OCR fallback ran and did not produce a usable read (the
+   *  reason is then `no_text_layer`). An enum for analytics, see ocr.ts. */
+  ocrOutcome?: OcrOutcome;
   constructor(
     public kind: ImportErrorReason,
     message?: string,

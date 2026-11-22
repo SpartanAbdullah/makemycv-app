@@ -20,6 +20,7 @@ import {
   getFirstIncompleteSection,
   getMissingItems,
   getSectionMissing,
+  getUnfilledBlanks,
 } from "../../lib/validation/cvRequirements";
 import { Toaster } from "../ui/Toaster";
 import { ProcessSteps } from "../ui/ProcessSteps";
@@ -62,14 +63,15 @@ import { SegmentedViewToggle } from "../ui/SegmentedViewToggle";
 import { exportToDocx } from "../../lib/utils/docxExport";
 import { track, trackOncePerSession } from "../../lib/analytics";
 import { downloadCvBackup } from "../../lib/utils/download";
+import { hasUserEnteredData } from "../../lib/utils/cvContent";
 import { computeScore } from "../../lib/scoreEngine";
 import type { ScoreReport } from "../../lib/resumeChecker/types";
 import { ScoreChip } from "./ScoreChip";
 import { Logo } from "../Logo";
 import { DownloadSupportCard } from "./DownloadSupportCard";
 import { canAskAfterExport } from "../feedback/RatingStrip";
-import { HUMAN_REVIEW_ON } from "../../lib/config/humanReview";
-import { askForExport, nextExportNumber, sentenceForExport, type ExportAsk, type ExportSentence } from "../../lib/exportAsks";
+import type { ExportAsk, ExportSentence } from "../../lib/exportAsks";
+import { recordCvExport, recordCvExportStarted } from "../../lib/exportRecord";
 import { CookieSettingsLink } from "../consent/CookieSettingsLink";
 import { SUPPORT_URL } from "../../lib/config/support";
 type ImportContextValue = {
@@ -125,7 +127,14 @@ export const useGuardedDownload = () => useContext(DownloadContext);
 
 type ImportState =
   | { phase: "idle" }
-  | { phase: "parsing"; source: string; startedAt: number }
+  | {
+      phase: "parsing";
+      source: string;
+      startedAt: number;
+      /** The PDF has no text layer and is being read by OCR (flag
+       *  NEXT_PUBLIC_OCR_IMPORT). `page` is set once a page is being read. */
+      scan?: { page?: number; pages?: number };
+    }
   | { phase: "review"; source: string; parsed: ParsedDocument };
 
 /* ─── Fullscreen preview overlay (mobile + below xl) ───────── */
@@ -801,7 +810,7 @@ export const BuilderShell = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [supportCardOpen, setSupportCardOpen] = useState(false);
-  const [supportAsk, setSupportAsk] = useState<ExportAsk>("follow");
+  const [supportAsk, setSupportAsk] = useState<ExportAsk>("next");
   const [supportSentence, setSupportSentence] = useState<ExportSentence>("karak");
   const [downloadGuardOpen, setDownloadGuardOpen] = useState(false);
 
@@ -901,6 +910,32 @@ export const BuilderShell = ({
     templateBaselineRef.current = id;
     track("template_selected", { template: id });
   }, [data.settings.templateId, hydrated]);
+
+  // Template deep link: `/builder?template=<id>`, sent by "Use This Template"
+  // on www. Until 2026-11 those links opened the bare builder, which starts on
+  // Classic, so the template the visitor had just chosen was thrown away and
+  // they had to find the gallery again on the last step (audit O1).
+  //
+  // Applied once, after the saved CV has loaded (applying it earlier would be
+  // overwritten by hydration), and then removed from the address bar: a
+  // reload must not re-apply it over a template the user picked later.
+  // Declared AFTER the template_selected effect on purpose — that effect has
+  // already taken its baseline, so this change is counted as a selection.
+  useEffect(() => {
+    if (!hydrated) return;
+    const url = new URL(window.location.href);
+    const wanted = url.searchParams.get("template");
+    if (wanted === null) return;
+    url.searchParams.delete("template");
+    window.history.replaceState(null, "", url.toString());
+    // An id this build does not know is ignored, not guessed at.
+    if (!templates.some((t) => t.id === wanted)) return;
+    const settings = useCvStore.getState().data.settings;
+    if ((settings.templateId ?? "classic") === wanted) return;
+    useCvStore
+      .getState()
+      .updateSection("settings", settingsForTemplate(settings, wanted));
+  }, [hydrated]);
 
   // cv_preview_viewed: once per session per surface — the fullscreen overlay
   // on desktop, the Preview toggle on mobile. The always-visible desktop
@@ -1050,6 +1085,13 @@ export const BuilderShell = ({
   // success, the inline support card opens in the header stack below.
   // Errors do NOT open it; the existing downloadError bar handles them.
   const runDownload = async (kind: ExportKind = "pdf") => {
+    // The CV is read from the store at call time, never from this render's
+    // `data`. The template preview's "Download PDF" selects a template and
+    // asks for the download in the same tick; the render that would carry the
+    // new template has not happened yet, so the closure still named the
+    // PREVIOUS template and that is the file the user got (audit 2026-11 E1).
+    const cv = useCvStore.getState().data;
+    const templateId = cv.settings.templateId ?? "classic";
     setIsDownloading(true);
     setDownloadError(null);
     // Re-arm: a card dismissed after the last export must come back for
@@ -1058,57 +1100,35 @@ export const BuilderShell = ({
     // Attempt counter for the export funnel: cv_export_started → cv_export.
     // The gap between the two is the render-failure rate. Backups excluded
     // for the same reason as below.
-    if (kind !== "json") {
-      track("cv_export_started", {
-        format: kind,
-        template: data.settings.templateId ?? "classic",
-      });
-    }
+    if (kind !== "json") recordCvExportStarted(kind, templateId);
     try {
       if (kind === "json") {
-        downloadCvBackup(data);
+        downloadCvBackup(cv);
       } else if (kind === "docx") {
-        await exportToDocx(data);
+        await exportToDocx(cv);
       } else {
-        await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+        await downloadCV(cv, "pro", templateId);
       }
       pushToast(EXPORT_COPY[kind].success, { tone: "success", duration: 4000 });
 
-      /* North-star metric. Fired here and nowhere else: this is the single
-         export gate for the whole builder (TopBar, ReviewStep and the template
-         preview modal all route through it), and it sits after the await, so it
-         only counts exports that actually produced a file — not clicks, and not
-         attempts that threw.
+      /* North-star metric (`cv_export`), recorded through lib/exportRecord.ts
+         — the one function every download path calls (this gate for the
+         TopBar, ReviewStep and the template preview; JD Match for its
+         per-job copy). It sits after the await, so it only counts exports
+         that actually produced a file — not clicks, and not attempts that
+         threw.
 
          `json` is excluded deliberately. A backup is housekeeping, not a
-         finished CV; the tip jar makes exactly that distinction three lines
-         below. Counting backups here would inflate the one number the product
-         gets judged on.
+         finished CV, and not a moment to ask for anything. Counting backups
+         would inflate the one number the product gets judged on.
 
-         No `plan` parameter: every call site passes "pro", so it would be a
-         constant masquerading as a dimension. Add it when a real free/pro
-         split exists. */
+         The card opens immediately rather than on a timer: it is in-flow, so
+         there is nothing to wait for it to stop covering. The row it shows is
+         decided once, in recordCvExport (lib/exportAsks.ts has the order). */
       if (kind !== "json") {
-        track("cv_export", {
-          format: kind,
-          template: data.settings.templateId ?? "classic",
-        });
-      }
-      // A backup is housekeeping, not a finished-CV moment — don't ask for a
-      // tip for it.
-      //
-      // Opens immediately rather than on a 1500ms timer: the card is in-flow,
-      // so there is nothing to wait for it to stop covering. The old timer was
-      // also never cleared, which leaked if the shell unmounted inside the
-      // window.
-      if (kind !== "json") {
-        // Decided once, here, so answering a star mid-card can't swap the row
-        // out from under the thanks line. A row with nothing to ask (already
-        // answered, or switched off) falls back to follow.
-        const exportNumber = nextExportNumber();
-        const ask = askForExport(exportNumber);
-        setSupportSentence(sentenceForExport(exportNumber, HUMAN_REVIEW_ON));
-        setSupportAsk(ask === "follow" || canAskAfterExport(ask) ? ask : "follow");
+        const { ask, sentence } = recordCvExport(kind, templateId, canAskAfterExport);
+        setSupportSentence(sentence);
+        setSupportAsk(ask);
         setSupportCardOpen(true);
       }
     } catch {
@@ -1130,7 +1150,16 @@ export const BuilderShell = ({
     // employer. A backup of a half-finished CV is precisely what a user wants,
     // so JSON bypasses it — gating the recovery path on completeness would
     // withhold it exactly when work is most likely to be lost.
-    if (kind !== "json" && getMissingItems(data).length > 0) {
+    // Same call-time read as runDownload: the gate must judge the CV that is
+    // about to be exported, not the one this render saw. It opens for missing
+    // required content and for unfilled blanks ("__", "[your industry]") left
+    // by a ready-made bullet or summary starter — those are printed as they
+    // stand, so the user is told before the file exists (audit 2026-11 A1).
+    const cv = useCvStore.getState().data;
+    if (
+      kind !== "json" &&
+      (getMissingItems(cv).length > 0 || getUnfilledBlanks(cv).length > 0)
+    ) {
       setPendingExportKind(kind);
       setDownloadGuardOpen(true);
       return;
@@ -1174,9 +1203,21 @@ export const BuilderShell = ({
       // The one place a failed file import is recorded. Every failure path
       // below ends here exactly once, with a reason from the closed set in
       // lib/importers/importErrors.ts and nothing else about the file.
-      const failImport = (reason: ImportErrorReason, message: string) => {
+      // `ocr` is passed only when the OCR fallback ran for this pick (flag
+      // NEXT_PUBLIC_OCR_IMPORT), so without the flag the event is unchanged.
+      // Enums only: `import_path: "ocr"`, and how the read ended when it failed.
+      const failImport = (
+        reason: ImportErrorReason,
+        message: string,
+        ocr?: { outcome?: string },
+      ) => {
         setImportState({ phase: "idle" });
-        track("cv_import_failed", { file_type: fileType, error_reason: reason });
+        track("cv_import_failed", {
+          file_type: fileType,
+          error_reason: reason,
+          ...(ocr ? { import_path: "ocr" } : {}),
+          ...(ocr?.outcome ? { ocr_outcome: ocr.outcome } : {}),
+        });
         setErrorMsg(message);
       };
 
@@ -1213,7 +1254,14 @@ export const BuilderShell = ({
                   deadlineAt,
                 )
               ).pdfAdapter;
-        const parsed = await adapter.parse(file, { deadlineAt });
+        const parsed = await adapter.parse(file, {
+          deadlineAt,
+          // The file is a scan: say so, and that it takes longer.
+          onOcr: (progress) =>
+            setImportState((s) =>
+              s.phase === "parsing" ? { ...s, scan: progress ?? {} } : s,
+            ),
+        });
         // Partial-import guard: a parse with nothing usable used to open
         // MappingReview in its "No fields could be extracted" state with the
         // Import button disabled (or, worse, with a "1 section" that was only
@@ -1222,7 +1270,11 @@ export const BuilderShell = ({
         if (!hasUsableContent(mapParsedToCv(parsed))) {
           // Session 7: a cover letter (matrix case 10b) gets its own copy
           // and a link; the reason stays mapping_empty.
-          failImport("mapping_empty", mappingEmptyMessage(parsed));
+          failImport(
+            "mapping_empty",
+            mappingEmptyMessage(parsed),
+            parsed.viaOcr ? {} : undefined,
+          );
           return;
         }
         setImportState({ phase: "review", source, parsed });
@@ -1230,7 +1282,11 @@ export const BuilderShell = ({
         // Typed failures route to specific guidance (audit UX-18); the file
         // is untouched and the user stays in the builder — never a dead end.
         const e = toImportParseError(err);
-        failImport(e.kind, e.message);
+        failImport(
+          e.kind,
+          e.message,
+          e.ocrOutcome ? { outcome: e.ocrOutcome } : undefined,
+        );
       }
     });
   };
@@ -1241,7 +1297,13 @@ export const BuilderShell = ({
   ) => {
     // Before the store write: the section-done effect it triggers reads this.
     importConfirmedAtRef.current = Date.now();
+    // Was there a CV to lose? Decides whether the toast below offers Undo —
+    // undoing an import into an empty builder would just empty it again.
+    const hadCv = hasUserEnteredData(useCvStore.getState().data);
     importCvVersion(partial, mode);
+    // This import's own undo record. A later import replaces it, and an
+    // older toast's Undo must then do nothing instead of undoing the wrong one.
+    const undoRecord = useCvStore.getState().importUndo;
     // Snapshot the "before" for the TopBar delta. Zustand set() is synchronous,
     // so this reads the CV that importCvVersion just wrote. This path sets no
     // parseSignals, so both baseline and live score run without them — the
@@ -1256,11 +1318,34 @@ export const BuilderShell = ({
         file_type: importState.source.toLowerCase(),
         merge_mode: mode,
         sections_filled: n,
+        ...(importState.parsed.viaOcr ? { import_path: "ocr" } : {}),
       });
     }
     pushToast(
       `${mode === "merge" ? "Merged" : "Imported"} ${n} section${n === 1 ? "" : "s"} — review the steps below and tweak anything.`,
-      { tone: "success" },
+      hadCv
+        ? {
+            tone: "success",
+            // An import can replace a whole CV, so the way back stays on
+            // screen longer than a routine toast (audit 2026-11 O3).
+            duration: 15000,
+            // One slot: a second import's toast replaces the first, so there
+            // is only ever one Undo and it is the one that works.
+            key: "import",
+            actionLabel: "Undo",
+            onAction: () => {
+              const store = useCvStore.getState();
+              if (store.importUndo === undoRecord && store.undoImport()) {
+                pushToast("Import undone. Your CV is back as it was.", { tone: "notice" });
+              } else {
+                // The record is gone: the CV was edited after the import (the
+                // store ends the Undo then, so the edit is not thrown away).
+                // Say so — a button that silently does nothing reads as broken.
+                pushToast("Not undone: your CV has changed since that import.", { tone: "notice" });
+              }
+            },
+          }
+        : { tone: "success", key: "import" },
     );
   };
 
@@ -1514,10 +1599,24 @@ export const BuilderShell = ({
                   textAlign: "center",
                 }}
               >
+                {/* Accuracy over reassurance (product audit 2026-11, P2). The
+                    old line called AI suggestions "the one exception" — but
+                    the cover letter and LinkedIn message send an excerpt, and
+                    the CV checker keeps its report for 24 hours. Each of those
+                    says so where it is used; this line must not contradict
+                    them. */}
                 <p style={{ marginBottom: 6, letterSpacing: "0.02em" }}>
-                  Your CV lives in this browser only — we never see it. AI
-                  suggestions are the one exception (sent securely, never
-                  stored).
+                  The CV you build here is saved in this browser only — there
+                  is no account. The AI tools and the CV checker send the text
+                  they need to our server, and each one says what it sends.{" "}
+                  <a
+                    href="https://www.makemycv.ae/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--ff-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
+                  >
+                    Privacy
+                  </a>
                 </p>
                 <a
                   href={SUPPORT_URL}
@@ -1619,16 +1718,60 @@ export const BuilderShell = ({
                   marginBottom: 14,
                 }}
               >
-                Reading your {importState.source}
+                {importState.scan
+                  ? "Reading your scanned PDF"
+                  : `Reading your ${importState.source}`}
               </div>
-              <ProcessSteps
-                steps={[
-                  "Reading the file",
-                  "Extracting the text",
-                  "Detecting sections",
-                  "Mapping to your CV",
-                ]}
-              />
+              {importState.scan ? (
+                // OCR fallback: real progress (the page being read), not the
+                // timed checklist, because this can run for a minute.
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="import-ocr-notice"
+                  style={{ fontSize: 14, color: "var(--ff-ink)", lineHeight: 1.5 }}
+                >
+                  <p style={{ margin: 0 }}>
+                    This PDF is a scan, so the text is being read from the page
+                    images. That takes longer: up to a minute, and a little
+                    more the first time.
+                  </p>
+                  <p
+                    style={{
+                      margin: "12px 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 15,
+                        height: 15,
+                        flexShrink: 0,
+                        border: "2px solid var(--ff-line)",
+                        borderTopColor: "var(--ff-accent)",
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                    {importState.scan.page
+                      ? `Reading page ${importState.scan.page} of ${importState.scan.pages}…`
+                      : "Getting the text reader ready…"}
+                  </p>
+                </div>
+              ) : (
+                <ProcessSteps
+                  steps={[
+                    "Reading the file",
+                    "Extracting the text",
+                    "Detecting sections",
+                    "Mapping to your CV",
+                  ]}
+                />
+              )}
               <p
                 role="status"
                 data-testid="import-slow-hint"
@@ -1636,10 +1779,10 @@ export const BuilderShell = ({
                   fontSize: 13,
                   color: "var(--ff-ink)",
                   lineHeight: 1.5,
-                  margin: slowRead ? "14px 0 0" : 0,
+                  margin: slowRead && !importState.scan ? "14px 0 0" : 0,
                 }}
               >
-                {slowRead
+                {slowRead && !importState.scan
                   ? "Still reading your file… A slow connection can make this take longer. You'll see the result, or what to try instead, as soon as it's done."
                   : null}
               </p>
@@ -1676,10 +1819,14 @@ export const BuilderShell = ({
         <ExportGateDialog
           open={downloadGuardOpen}
           missing={downloadGuardOpen ? getMissingItems(data) : []}
+          blanks={downloadGuardOpen ? getUnfilledBlanks(data) : []}
           onClose={() => setDownloadGuardOpen(false)}
           onGoFix={() => {
             setDownloadGuardOpen(false);
-            const target = getFirstIncompleteSection(data);
+            // Missing required content first; with none, the first line that
+            // still has a blank.
+            const target =
+              getFirstIncompleteSection(data) ?? getUnfilledBlanks(data)[0]?.sectionId ?? null;
             if (target) onStepChange(target);
           }}
           onExportAnyway={async () => {

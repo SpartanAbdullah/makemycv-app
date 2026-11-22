@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useCvStore } from "@/lib/store/cvStore";
+import { useCvStore, type ImportUndo } from "@/lib/store/cvStore";
+import { hasUserEnteredData } from "@/lib/utils/cvContent";
 import {
   countSectionsFilled,
   mapCvToParsed,
@@ -31,7 +32,17 @@ type Phase =
       imported: CvData;
       importedSignals: ParseSignals | null;
     }
-  | { kind: "imported"; replaced: boolean }
+  | {
+      kind: "imported";
+      // Four outcomes, each with its own sentence. This used to be a boolean
+      // "replaced", so a successful Merge was reported as "Kept your existing
+      // CV. Nothing imported." (audit 2026-11 O10) — harmless while Replace
+      // was the default, wrong for most people now that Merge is.
+      outcome: "replaced" | "merged" | "cancelled" | "undone";
+      missingUae: boolean;
+      /** This import's undo record; null when there was no CV to restore. */
+      undoRecord: ImportUndo | null;
+    }
   | { kind: "error"; message: string };
 
 export default function ImportFromReportBanner() {
@@ -42,6 +53,8 @@ export default function ImportFromReportBanner() {
   const importCvVersion = useCvStore((s) => s.importCvVersion);
   const setParseSignals = useCvStore((s) => s.setParseSignals);
   const captureScoreBaseline = useCvStore((s) => s.captureScoreBaseline);
+  const undoImport = useCvStore((s) => s.undoImport);
+  const currentUndo = useCvStore((s) => s.importUndo);
 
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const hasRunRef = useRef(false);
@@ -153,7 +166,11 @@ export default function ImportFromReportBanner() {
         source="ATS report"
         parsed={parsedForReview}
         onConfirm={(partial, mode) => {
+          // Was there a CV to lose? Only then is Undo worth offering.
+          const hadCv = hasUserEnteredData(useCvStore.getState().data);
           importCvVersion(partial, mode);
+          // This import's own undo record (see BuilderShell.handleImportConfirm).
+          const undoRecord = hadCv ? useCvStore.getState().importUndo : null;
           setParseSignals(phase.importedSignals);
           // MUST stay after setParseSignals: the baseline has to be scored with
           // the same signals the live score uses, or the delta measures the
@@ -166,11 +183,20 @@ export default function ImportFromReportBanner() {
             merge_mode: mode,
             sections_filled: countSectionsFilled(partial),
           });
-          setPhase({ kind: "imported", replaced: mode === "replace" });
+          // Say what is true of the CV now. The report's parser does read visa
+          // status and notice period when the file states them, so the nudge
+          // is shown only when the imported CV still lacks both.
+          const personal = useCvStore.getState().data.personal;
+          setPhase({
+            kind: "imported",
+            outcome: mode === "replace" ? "replaced" : "merged",
+            missingUae: !personal.visaStatus?.trim() && !personal.availability?.trim(),
+            undoRecord,
+          });
           stripParam();
         }}
         onCancel={() => {
-          setPhase({ kind: "imported", replaced: false });
+          setPhase({ kind: "imported", outcome: "cancelled", missingUae: false, undoRecord: null });
           stripParam();
         }}
       />
@@ -178,23 +204,48 @@ export default function ImportFromReportBanner() {
   }
 
   if (phase.kind === "imported") {
+    const { outcome, undoRecord } = phase;
+    // Offered only while this import is still the latest one: a later import
+    // owns the undo slot, and undoing "the last import" from here would then
+    // undo the wrong thing.
+    const canUndo = undoRecord !== null && currentUndo === undoRecord;
     return (
       <Banner tone="success" dismissible onDismiss={() => setPhase({ kind: "idle" })}>
-        {phase.replaced ? (
-          <span>
-            Imported from your ATS report. Reports can&apos;t carry visa
-            status, notice period or nationality —{" "}
-            <button
-              type="button"
-              onClick={() => router.push("/builder?step=uaeEssentials")}
-              className="font-semibold underline underline-offset-2"
-            >
-              add them now →
-            </button>
-          </span>
-        ) : (
-          "Kept your existing CV. Nothing imported."
-        )}
+        <span>
+          {outcome === "cancelled" && "Kept your existing CV. Nothing imported."}
+          {outcome === "undone" && "Import undone. Your CV is back as it was."}
+          {outcome === "replaced" && "Imported from your ATS report."}
+          {outcome === "merged" && "Added your ATS report to your current CV."}
+          {(outcome === "replaced" || outcome === "merged") && phase.missingUae && (
+            <>
+              {" "}
+              It did not state a visa status or notice period —{" "}
+              <button
+                type="button"
+                onClick={() => router.push("/builder?step=uaeEssentials")}
+                className="font-semibold underline underline-offset-2"
+              >
+                add them now →
+              </button>
+            </>
+          )}
+          {canUndo && (
+            <>
+              {" "}
+              <button
+                type="button"
+                onClick={() => {
+                  if (undoImport()) {
+                    setPhase({ kind: "imported", outcome: "undone", missingUae: false, undoRecord: null });
+                  }
+                }}
+                className="font-semibold underline underline-offset-2"
+              >
+                Undo import
+              </button>
+            </>
+          )}
+        </span>
       </Banner>
     );
   }

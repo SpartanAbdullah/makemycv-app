@@ -659,7 +659,7 @@ const runText = (label, text, opts) => {
   const d = runText(f, [
     "Omar Khan",
     "omar.khan@example.com",
-    "Visa Status: Residence visa",
+    "Visa Status: Valid until 2027",
     "Notice Period: Negotiable",
     "Driving Licence: Valid",
     "",
@@ -669,7 +669,25 @@ const runText = (label, text, opts) => {
   check(f, "unmappable visa not stored", d.uae?.visaStatus === undefined, d.uae);
   check(f, "unmappable notice not stored", d.uae?.availability === undefined, d.uae);
   check(f, "bare 'Valid' licence not stored", d.uae?.drivingLicense === undefined, d.uae);
-  check(f, "all three surface in unplaced", ["Visa Status: Residence visa", "Notice Period: Negotiable", "Driving Licence: Valid"].every((l) => (d.unplaced ?? []).includes(l)), d.unplaced);
+  check(f, "all three surface in unplaced", ["Visa Status: Valid until 2027", "Notice Period: Negotiable", "Driving Licence: Valid"].every((l) => (d.unplaced ?? []).includes(l)), d.unplaced);
+}
+
+// (r3b) "Residence visa" was this file's example of an unmappable value until
+// 2026-11 — the list had no such option, so the commonest wording on a UAE CV
+// fell into "couldn't place" (product audit A13). It is an option now.
+{
+  const f = "uae-residence-visa (inline)";
+  for (const [line, want] of [
+    ["Visa Status: Residence visa", "Residence visa"],
+    ["Visa Status: UAE Residence", "Residence visa"],
+    ["Visa Status: Residence visa - transferable", "Residence visa"],
+    ["Visa Status: Outside UAE, available to relocate", "Outside UAE, available to relocate"],
+    ["Visa Status: Employment visa (transferable)", "Employment visa"],
+    ["Visa Status: Cancelled residence visa", "Cancelled / transferable"],
+  ]) {
+    const d = runText(f, ["Omar Khan", "omar.khan@example.com", line, "", "Summary", "Engineer with 4 years on UAE sites."].join("\n"));
+    check(f, `"${line}" → ${want}`, d.uae?.visaStatus === want, d.uae);
+  }
 }
 
 // (r4) Common phrasings map to the options.

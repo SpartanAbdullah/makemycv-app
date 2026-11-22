@@ -5,6 +5,7 @@ import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
 import { TemplateBadges } from "../templates/TemplateBadges";
+import { TemplateOmissionNote } from "../templates/TemplateOmissionNote";
 
 const A4_W = 794;
 const A4_H = 1123;
@@ -123,6 +124,9 @@ export const TemplatePreviewModal = ({
               <TemplateBadges badges={template.badges} direction="row" />
             </div>
           )}
+          <div style={{ marginTop: 10 }}>
+            <TemplateOmissionNote templateId={templateId} data={data} tone="dark" />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", rowGap: 10 }}>
           {/* Ghost buttons use the scoped ff-preview-ghost class (hover/active

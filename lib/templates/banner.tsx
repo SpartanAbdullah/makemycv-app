@@ -5,7 +5,7 @@ import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
-import { getEssentialChips } from "../utils/essentials";
+import { getEssentialChips, type EssentialKey } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
 import { getFullName, bulletLiProps } from "./utils";
@@ -59,18 +59,18 @@ const shouldShowProjectLink = (value?: string): boolean => {
  * strip for exactly those words. Order and filtering come from
  * getEssentialChips so the strip never disagrees with the other templates.
  */
-const STRIP_LABELS: Record<string, string> = {
-  Visa: "Visa status",
-  Available: "Availability",
-  DL: "Driving licence",
-  Nationality: "Nationality",
+const STRIP_LABELS: Record<EssentialKey, string> = {
+  visa: "Visa status",
+  availability: "Availability",
+  licence: "Driving licence",
+  nationality: "Nationality",
 };
 
 export const bannerEssentials = (
   personal: CvPersonal,
 ): Array<{ label: string; value: string }> =>
   getEssentialChips(personal).map((chip) => ({
-    label: STRIP_LABELS[chip.label] ?? chip.label,
+    label: STRIP_LABELS[chip.key],
     value: chip.value,
   }));
 

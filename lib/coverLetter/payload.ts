@@ -2,12 +2,14 @@
  * Cover letter — what leaves the browser (2026-10-24, WP-9, cover letter v1).
  *
  * This is the ONE place that decides which parts of the CV are sent to
- * /api/cover-letter. It is deliberately an excerpt, not the CV: headline,
- * summary, the most recent role (title, company, dates, up to 4 bullets), up
- * to 12 skill names, and the UAE essentials that a UAE cover letter normally
- * states (visa, availability). No contact details, no photo, no education,
- * no certifications, no languages. The disclosure copy on the page describes
- * exactly this list; keep the two in sync.
+ * /api/cover-letter. It is deliberately an excerpt, not the CV: first name
+ * (for the sign-off), headline, summary, the most recent role (title,
+ * company, dates, up to 4 bullets), up to 12 skill names, and the UAE
+ * essentials that a UAE cover letter normally states (visa, availability).
+ * No surname, no contact details, no photo, no education, no certifications,
+ * no languages. The disclosure copy on the page describes exactly this list
+ * and so does the privacy policy on www; keep all three in sync —
+ * payload.test.ts fails when the page's list and this type drift apart.
  *
  * Pure and dependency-free so it is unit-testable from Node.
  */

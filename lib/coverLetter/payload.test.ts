@@ -7,6 +7,8 @@
  */
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   COVER_LETTER_LIMITS,
@@ -83,5 +85,35 @@ describe("buildCoverLetterRequest / parseCoverLetterRequest", () => {
   test("ignores non-string junk in arrays", () => {
     const parsed = parseCoverLetterRequest({ company: "A", jobTitle: "B", cv: { skills: ["ok", 5, null, "also"] } });
     assert.deepEqual(parsed?.cv.skills, ["ok", "also"]);
+  });
+});
+
+// The page lists what is sent, above the button. The first name went to the
+// server from v1 and was missing from that list until 2026-11 (product audit
+// P2) — nothing connected the two. Now every field of the excerpt has to be
+// named in the on-page list, so a field added here cannot ship undisclosed.
+describe("the on-page disclosure lists every field that is sent", () => {
+  const panel = fs.readFileSync(
+    path.join(process.cwd(), "components", "coverletter", "CoverLetterPanel.tsx"),
+    "utf8",
+  );
+  const start = panel.indexOf("const excerptSummary = [");
+  const list = panel.slice(start, panel.indexOf("].filter(Boolean)", start));
+
+  test("finds the list", () => {
+    assert.ok(start > 0 && list.length > 50);
+  });
+
+  test("every excerpt field appears in it", () => {
+    for (const key of Object.keys(buildCvExcerpt(cv))) {
+      assert.ok(
+        new RegExp("excerpt[.]" + key + "(?![A-Za-z])").test(list),
+        `"${key}" is sent but not disclosed`,
+      );
+    }
+  });
+
+  test("the first name is described in words the user can read", () => {
+    assert.match(list, /your first name/);
   });
 });

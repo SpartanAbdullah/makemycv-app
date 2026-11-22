@@ -13,6 +13,17 @@ carry **no file name and no document text** — only enums and counts.
 | `cv_import` | The user **confirms** the review screen (clicks *Import*) and the CV is written to the store. One per confirmed import. A review the user cancels fires nothing. | `file_type` (`pdf` / `docx` / `ats_report`), `merge_mode` (`replace` / `merge`), `sections_filled` (0–7) |
 | `cv_import_failed` | A pick that did **not** reach the review screen — the gate, the adapter, the parser or the empty-mapping guard stopped it. Exactly one per failed pick. | `file_type` (extension bucket, see below), `error_reason` (closed set, see below) |
 
+**OCR fallback (2026-11-21, flag `NEXT_PUBLIC_OCR_IMPORT=1`, off by default).**
+When a PDF has no text layer and the flag is on, it is read by OCR in the
+browser (`lib/importers/ocr.ts`). Both events then carry `import_path: "ocr"`,
+and a `cv_import_failed` whose OCR did not produce a usable read (reason still
+`no_text_layer`) also carries `ocr_outcome`: `load_failed` (worker, core or
+language data did not load), `timeout` (90 s), `low_text` (under 200
+characters or mean confidence under 45) or `error`. Neither param is sent
+when OCR did not run, so with the flag off the events are exactly as above.
+Both need a Data Layer Variable and a GA4 event parameter in GTM before they
+show up in GA4.
+
 Call sites: `components/builder/BuilderShell.tsx` (`handleImport` →
 failure; `handleImportConfirm` → success) and
 `components/builder/ImportFromReportBanner.tsx` (the checker-report hand-off,
@@ -59,7 +70,7 @@ analytics.
 | `empty_file` | Gate: `size === 0`. | "This file is empty (0 bytes). Re-export it from the original document and try again." |
 | `too_large` | Gate: `size > MAX_IMPORT_BYTES` (15 MB). | "This file is larger than 15 MB. Export a lighter PDF — without a high-resolution photo — and try again." |
 | `encrypted_pdf` | pdf.js `PasswordException`. | "This PDF is password-protected, so it cannot be read. Open it, remove the password (Print → Save as PDF also works) and import the new file." |
-| `no_text_layer` | PDF opened, text < 200 chars. | "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again." |
+| `no_text_layer` | PDF opened, text < 200 chars. | "This PDF has no readable text — it looks like a scanned image. Export a text-based PDF from Word or Google Docs and try again."  With the OCR flag on and a failed read: "This PDF is a scanned image, and its text could not be read clearly enough to import. Export a text-based PDF from Word or Google Docs and try again, or fill in your details below." |
 | `corrupt_pdf` | pdf.js `InvalidPDFException` / `FormatError` / `UnknownErrorException` etc. Since session 6 (D11) the bytes are sniffed first: a Word .docx zip or an old .doc under a .pdf name gets its own copy, same reason. | "This PDF could not be opened — it may be damaged, or not really a PDF. Re-export it from the original document and try again." · .docx bytes: "This file is actually a Word document with a .pdf name. Rename it to end in .docx, or pick the original Word file, and import it again." · .doc bytes: "This file is actually an older Word .doc file with a .pdf name. Open it in Word, choose Save As → Word Document (.docx), and import that file." |
 | `worker_load_failed` | pdf.js worker (self-hosted, then CDN) could not load; also the `pdfjs-dist` / `mammoth` chunk itself failing to import. | "The PDF reader could not load in this browser (a network or ad blocker often causes this). Reload the page and try again, or import a Word (.docx) version instead." |
 | `timeout` | The PDF read exceeded `PDF_TIMEOUT_MS` (45 s) counted from the pick: since session 6 (D10) the budget also covers loading the adapter chunk, the `pdfjs-dist` import and the worker probe (`withDeadline`); the loading task is destroyed. After 8 s (`SLOW_READ_HINT_MS`) the "Reading your PDF" overlay adds "Still reading your file…". | "Reading this PDF took too long. Try a smaller or simpler export, or import a Word (.docx) version instead." |

@@ -31,8 +31,6 @@ export type TemplateDefinition = {
   name: string;
   description: string;
   badges?: TemplateBadge[];
-  /** The template prints black only — the Design panel hides its Colours group. */
-  ignoresAccent?: boolean;
   /**
    * Density levels the template is designed around (Harvard's one-page
    * graduate sheet: font 2 / spacing 2). settingsForTemplate applies them
@@ -466,14 +464,14 @@ export const templates: TemplateDefinition[] = [
     // Zero-colour serif single column, education first, a Career Objective
     // and label-prefixed skills lines — the fresh-graduate, one-page format
     // (template audit 2026-10, shortlist item 4). No photo, no columns, no
-    // graphics, so the ATS badge is honest. The accent is ignored entirely.
+    // graphics, so the ATS badge is honest. The accent is ignored entirely
+    // (listed in capabilities.ts, which the Design panel reads).
     description:
       "Plain serif single column, education first — the graduate one-page format.",
     badges: [
       { label: "New", tone: "new" },
       { label: "ATS-Friendly", tone: "ats" },
     ],
-    ignoresAccent: true,
     densityDefaults: HARVARD_DENSITY_DEFAULTS,
     Thumbnail: HarvardThumb,
     Render: HarvardTemplate,

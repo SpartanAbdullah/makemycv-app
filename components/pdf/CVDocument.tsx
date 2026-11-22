@@ -3562,8 +3562,9 @@ const ProfessionalPDFLayout = ({
   const hasCertifications = data.certifications.length > 0;
   const hasProjects = projects.length > 0;
   const skillsFirst = isSkillsFirst(data.settings.domain);
+  // Variant AND the user's "Show photo on CV" switch — see the live template.
   const photo =
-    withPhoto && theme.photoVisible && data.personal.photo
+    withPhoto && data.personal.showPhoto && theme.photoVisible && data.personal.photo
       ? data.personal.photo
       : null;
   const essentialChips = getEssentialChips(data.personal);

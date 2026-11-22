@@ -12,6 +12,8 @@ import { canTailorByDomain } from "../../lib/utils/entitlements";
 import { useBulletRewrite } from "../../hooks/useBulletRewrite";
 import { matchRequirementsToCv } from "../../lib/jdMatch/match";
 import { applyPendingChanges, type PendingChange } from "../../lib/jdMatch/applyFix";
+import { jdAddNeedsCredentialGuard } from "../../lib/jdMatch/credentialGuard";
+import { isCvEmpty } from "../../lib/utils/cvContent";
 import { createId } from "../../lib/utils/id";
 import { Icon } from "../builder/Icon";
 import { Logo } from "../Logo";
@@ -23,34 +25,31 @@ import {
   type JdCategory,
   type JdCategoryResult,
 } from "../../lib/jdMatch/types";
-import type { CvData, CvExperience } from "../../lib/types/cv";
+import type { CvExperience } from "../../lib/types/cv";
 import { buildHeatmap } from "../../lib/jdMatch/heatmap";
 import { UAE_FIELD_LABELS, uaeFieldFor } from "../../lib/jdMatch/uaeFields";
 import { buildTailoredCv } from "../../lib/jdMatch/tailorCv";
 import { downloadCV } from "../../hooks/useDownloadCV";
 import { exportToDocx } from "../../lib/utils/docxExport";
+import { recordCvExport, recordCvExportStarted } from "../../lib/exportRecord";
+import type { ExportAsk, ExportSentence } from "../../lib/exportAsks";
+import {
+  getFirstIncompleteSection,
+  getMissingItems,
+  getUnfilledBlanks,
+} from "../../lib/validation/cvRequirements";
+import { ExportGateDialog } from "../builder/ExportGateDialog";
+import { DownloadSupportCard } from "../builder/DownloadSupportCard";
+import { canAskAfterExport } from "../feedback/RatingStrip";
 import { JdCvPreview, type JdChange } from "./JdCvPreview";
 import { JdHeatmap } from "./JdHeatmap";
 import { JdCoach } from "./JdCoach";
 import { JdTailor } from "./JdTailor";
 import { ProcessSteps } from "../ui/ProcessSteps";
 
-/**
- * True when the CV has no real content yet — a visitor who landed on /jd-match
- * before building or importing. There's nothing to match a job against, so we
- * guide them to the builder instead of letting them "match" an empty CV.
- */
-const isCvEmpty = (cv: CvData): boolean => {
-  const p = cv.personal;
-  if (p.firstName?.trim() || p.lastName?.trim() || p.headline?.trim() || p.summary?.trim()) return false;
-  if (cv.skills.length > 0) return false;
-  if ((cv.certifications?.length ?? 0) > 0) return false;
-  if ((cv.projects?.length ?? 0) > 0) return false;
-  if (cv.experience.some((e) => e.role?.trim() || e.company?.trim() || (e.bullets ?? []).some((b) => b.trim())))
-    return false;
-  if (cv.education.some((e) => e.school?.trim() || e.degree?.trim() || e.field?.trim())) return false;
-  return true;
-};
+// isCvEmpty (lib/utils/cvContent.ts): a visitor who landed on /jd-match before
+// building or importing has nothing to match a job against, so we guide them
+// to the builder instead of letting them "match" an empty CV.
 
 const BAND_COLOR: Record<string, string> = {
   strong: "var(--ff-accent)",
@@ -118,6 +117,11 @@ export const JdMatchPanel = () => {
   const [isDesktop, setIsDesktop] = useState(false);
   const [mobileView, setMobileView] = useState<"work" | "cv">("work");
   const [backPrompt, setBackPrompt] = useState(false);
+  // A licence / certification waiting for "I hold it" before it is staged.
+  const [pendingCredential, setPendingCredential] = useState<{
+    category: JdCategory;
+    term: string;
+  } | null>(null);
 
   // Standalone page: hydrate the store ourselves (idempotent). See Phase A.
   useEffect(() => {
@@ -277,7 +281,7 @@ export const JdMatchPanel = () => {
     }
   };
 
-  const handleAdd = (category: JdCategory, term: string) => {
+  const stageAdd = (category: JdCategory, term: string) => {
     const isCert = category === "certifications";
     setSavedCount(null);
     setShowChanges(true); // a just-applied fix should always be visible
@@ -294,6 +298,18 @@ export const JdMatchPanel = () => {
         ? `Staged: added “${term}” to your Certifications`
         : `Staged: added “${term}” to your Skills`,
     });
+  };
+
+  // Every "Add" in this panel (missing chips, the coach, the heatmap) arrives
+  // here, so this is the one place the licence guard has to stand. A licence
+  // or certification is staged only after an explicit "I hold it" — the same
+  // rule, and the same words, as the Skills step (audit 2026-11 A2).
+  const handleAdd = (category: JdCategory, term: string) => {
+    if (jdAddNeedsCredentialGuard(category, term)) {
+      setPendingCredential({ category, term });
+      return;
+    }
+    stageAdd(category, term);
   };
 
   // Open the bullet weaver AND bring it into view — the guided flow should never
@@ -318,20 +334,48 @@ export const JdMatchPanel = () => {
   // Download the per-job copy (focused when the toggle is on) — NEVER mutates the
   // store, so the master CV keeps every skill. Pure data → exporter, like the
   // builder's own fallback export.
-  const downloadTailored = async (kind: "pdf" | "docx") => {
+  //
+  // The same three things the builder's download does (product audit 2026-11,
+  // E5 — this button used to do none of them): it counts as an export
+  // (lib/exportRecord.ts), it stops at the completeness gate first, and it
+  // shows the post-download card afterwards.
+  const [exportGateKind, setExportGateKind] = useState<"pdf" | "docx" | null>(null);
+  const [supportCard, setSupportCard] = useState<{
+    ask: ExportAsk;
+    sentence: ExportSentence;
+  } | null>(null);
+  // Where "Go back and fix" (or the back button) lands in the builder.
+  const [leaveHref, setLeaveHref] = useState("/builder");
+
+  const runTailoredDownload = async (kind: "pdf" | "docx") => {
     const data = previewCv; // export exactly what the preview shows
+    const templateId = data.settings.templateId ?? "classic";
     setTailorError(null);
     setTailorDone(false);
     setTailorDownloading(true);
+    setSupportCard(null);
+    recordCvExportStarted(kind, templateId);
     try {
       if (kind === "docx") await exportToDocx(data);
-      else await downloadCV(data, "pro", data.settings.templateId ?? "classic");
+      else await downloadCV(data, "pro", templateId);
       setTailorDone(true);
+      setSupportCard(recordCvExport(kind, templateId, canAskAfterExport));
     } catch {
       setTailorError("Download failed — please try again.");
     } finally {
       setTailorDownloading(false);
     }
+  };
+
+  const downloadTailored = async (kind: "pdf" | "docx") => {
+    // This file is about to go to an employer: missing required content and
+    // unfilled blanks ("__", "[your industry]") are named before it exists,
+    // exactly as in the builder. Never a hard block — "Export anyway" stays.
+    if (getMissingItems(previewCv).length > 0 || getUnfilledBlanks(previewCv).length > 0) {
+      setExportGateKind(kind);
+      return;
+    }
+    await runTailoredDownload(kind);
   };
 
   // Jump to the download panel and turn focus on (Coach hand-off / done-state).
@@ -395,10 +439,12 @@ export const JdMatchPanel = () => {
     setSavedCount(null);
   };
 
-  const goBack = () => {
+  const leaveTo = (href: string) => {
+    setLeaveHref(href);
     if (hasPending) setBackPrompt(true);
-    else router.push("/builder");
+    else router.push(href);
   };
+  const goBack = () => leaveTo("/builder");
 
   return (
     <div
@@ -986,6 +1032,46 @@ export const JdMatchPanel = () => {
                         done={tailorDone}
                         error={tailorError}
                       />
+                      {/* Post-download card, in-flow under the buttons that
+                          produced the file. Same component and the same row
+                          rule as the builder; the "next step" row offers the
+                          letter and the message, since this IS the job match. */}
+                      {supportCard && (
+                        <div
+                          style={{
+                            marginTop: 12,
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            border: "1px solid var(--ff-accent-ring)",
+                          }}
+                        >
+                          <DownloadSupportCard
+                            open
+                            ask={supportCard.ask}
+                            sentence={supportCard.sentence}
+                            onDismiss={() => setSupportCard(null)}
+                            nextLabel="Next for this job:"
+                            nextLinks={[
+                              {
+                                id: "post_export_cover_letter",
+                                href: "/cover-letter",
+                                label: "Write the cover letter",
+                                onClick: () =>
+                                  stashCoverLetterSeed({
+                                    jobTitle: result?.jobTitle ?? undefined,
+                                    jobText: analyzedText,
+                                  }),
+                              },
+                              {
+                                id: "post_export_linkedin_message",
+                                href: "/linkedin-message",
+                                label: "Message the recruiter",
+                                onClick: () => stashLinkedinMessageSeed({ jobText: analyzedText }),
+                              },
+                            ]}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1022,12 +1108,46 @@ export const JdMatchPanel = () => {
           onCancel={() => setBackPrompt(false)}
           onDiscard={() => {
             setPendingChanges([]);
-            router.push("/builder");
+            router.push(leaveHref);
           }}
           onAccept={() => {
             setData(workingCv);
             setPendingChanges([]);
-            router.push("/builder");
+            router.push(leaveHref);
+          }}
+        />
+      )}
+
+      <ExportGateDialog
+        open={exportGateKind !== null}
+        missing={exportGateKind ? getMissingItems(previewCv) : []}
+        blanks={exportGateKind ? getUnfilledBlanks(previewCv) : []}
+        onClose={() => setExportGateKind(null)}
+        onGoFix={() => {
+          setExportGateKind(null);
+          // Missing required content first; with none, the first line that
+          // still has a blank. Staged job-match changes get the usual
+          // keep / discard question before the page changes.
+          const target =
+            getFirstIncompleteSection(previewCv) ??
+            getUnfilledBlanks(previewCv)[0]?.sectionId ??
+            null;
+          leaveTo(target ? `/builder?step=${target}` : "/builder");
+        }}
+        onExportAnyway={async () => {
+          const kind = exportGateKind;
+          setExportGateKind(null);
+          if (kind) await runTailoredDownload(kind);
+        }}
+      />
+
+      {pendingCredential && (
+        <CredentialConfirmDialog
+          term={pendingCredential.term}
+          onCancel={() => setPendingCredential(null)}
+          onConfirm={() => {
+            stageAdd(pendingCredential.category, pendingCredential.term);
+            setPendingCredential(null);
           }}
         />
       )}
@@ -1196,19 +1316,14 @@ const ChangeControls = ({
   );
 };
 
-/* ─── Warn-before-leave dialog (staged changes not yet saved) ───────────── */
-const BackConfirmDialog = ({
-  count,
-  onCancel,
-  onDiscard,
-  onAccept,
-}: {
-  count: number;
-  onCancel: () => void;
-  onDiscard: () => void;
-  onAccept: () => void;
-}) => {
-  const ref = useRef<HTMLDivElement | null>(null);
+/* ─── Modal keyboard contract, shared by this panel's dialogs ──────────────
+   Focus moves into the dialog, Escape cancels, Tab is trapped inside (mirrors
+   ExportGateDialog) so focus can't reach the still-mounted background
+   controls — honours aria-modal — and focus returns to the opener on close. */
+const useModalKeys = (
+  ref: React.RefObject<HTMLDivElement | null>,
+  onCancel: () => void,
+) => {
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.focus();
@@ -1217,8 +1332,6 @@ const BackConfirmDialog = ({
         onCancel();
         return;
       }
-      // Trap Tab within the dialog (mirrors ExportGateDialog) so focus can't
-      // reach the still-mounted background controls — honours aria-modal.
       if (e.key === "Tab" && ref.current) {
         const focusables = ref.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -1241,7 +1354,91 @@ const BackConfirmDialog = ({
       document.removeEventListener("keydown", onKey);
       opener?.focus?.();
     };
-  }, [onCancel]);
+  }, [ref, onCancel]);
+};
+
+/* ─── Licence guard (a credential waits for "I hold it") ──────────────────
+   Same words as the Skills step's guard: one rule, one sentence, wherever a
+   licence is about to be put on the CV. */
+const CredentialConfirmDialog = ({
+  term,
+  onCancel,
+  onConfirm,
+}: {
+  term: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useModalKeys(ref, onCancel);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        background: "var(--surface-overlay)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Do you hold ${term}?`}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--ff-card)",
+          borderRadius: "var(--radius-2xl)",
+          border: "1px solid var(--ff-line)",
+          boxShadow: "0 18px 48px rgba(11,15,12,0.22)",
+          padding: 24,
+          maxWidth: 440,
+          width: "100%",
+          outline: "none",
+        }}
+      >
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--ff-ink)", margin: 0 }}>
+          {term}
+        </h2>
+        <p style={{ fontSize: 13.5, color: "var(--ff-muted)", lineHeight: 1.55, margin: "8px 0 20px" }}>
+          This is a licence or certification. Only add it if you hold it, or it
+          is genuinely in process — employers verify these.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button type="button" onClick={onCancel} className="cv-btn-secondary cv-btn--sm">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} className="cv-btn-primary cv-btn--sm">
+            <Icon name="check" size={13} />
+            I hold it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Warn-before-leave dialog (staged changes not yet saved) ───────────── */
+const BackConfirmDialog = ({
+  count,
+  onCancel,
+  onDiscard,
+  onAccept,
+}: {
+  count: number;
+  onCancel: () => void;
+  onDiscard: () => void;
+  onAccept: () => void;
+}) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useModalKeys(ref, onCancel);
 
   return (
     <div

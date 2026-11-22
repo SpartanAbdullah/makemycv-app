@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { RoleFamily } from "../lib/data/roleFamily";
+import { NOTHING_TO_SUGGEST, nothingToSuggestMessage } from "../lib/ai/improveOutcome";
 
 export type AIImproveType = "bullets" | "skills" | "summary";
 
@@ -18,9 +19,14 @@ export type AIImprovePayload = {
 };
 
 export type AIError = {
-  code: "RATE_LIMITED" | "OTHER";
+  /**
+   * NOTHING_TO_SUGGEST is not a fault: the model declined or had nothing to
+   * add. Screens show it as a neutral note with a retry, never in red.
+   */
+  code: "RATE_LIMITED" | "NOTHING_TO_SUGGEST" | "OTHER";
   message: string;
   supportUrl?: string;
+  /** Seconds until the limit that refused the request resets, when known. */
   retryAfter?: number;
 };
 
@@ -63,15 +69,35 @@ export function useAIImprove() {
         return;
       }
 
-      if (!res.ok) {
+      if (res.status === 422 && data?.error === NOTHING_TO_SUGGEST) {
         setError({
-          code: "OTHER",
-          message: data?.error ?? "Something went wrong",
+          code: "NOTHING_TO_SUGGEST",
+          message: data.message ?? nothingToSuggestMessage(payload.type),
         });
         return;
       }
 
-      setResults(data?.results ?? []);
+      if (!res.ok) {
+        setError({
+          code: "OTHER",
+          message: data?.error ?? "Something went wrong",
+          // The shared daily cap (503) says when it resets too.
+          retryAfter: data?.retryAfter,
+        });
+        return;
+      }
+
+      // An empty list on a 200 must never be a blank screen (it was: the
+      // modal rendered a title and nothing else).
+      const results = data?.results ?? [];
+      if (results.length === 0) {
+        setError({
+          code: "NOTHING_TO_SUGGEST",
+          message: nothingToSuggestMessage(payload.type),
+        });
+        return;
+      }
+      setResults(results);
     } catch {
       setError({ code: "OTHER", message: "Something went wrong" });
     } finally {

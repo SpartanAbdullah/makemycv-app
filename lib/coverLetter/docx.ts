@@ -6,6 +6,8 @@
  */
 
 import type { CvData } from "../types/cv";
+import { triggerBlobDownload } from "../utils/download";
+import { coverLetterFileName as buildCoverLetterFileName } from "../utils/fileName";
 
 export type CoverLetterDocxInput = {
   letter: string;
@@ -14,11 +16,9 @@ export type CoverLetterDocxInput = {
   jobTitle: string;
 };
 
-export const coverLetterFileName = (cv: CvData, company: string) => {
-  const name = [cv.personal.firstName, cv.personal.lastName].filter(Boolean).join(" ").trim() || "Cover-Letter";
-  const co = company.trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").slice(0, 40);
-  return `${name.replace(/\s+/g, "-")}-Cover-Letter${co ? `-${co}` : ""}.docx`;
-};
+/** `Cover_Letter_First_Last_Company.docx` — the shared rule in lib/utils/fileName.ts. */
+export const coverLetterFileName = (cv: CvData, company: string) =>
+  buildCoverLetterFileName(cv.personal, company);
 
 /** Split the letter into paragraphs on blank lines; single newlines stay inside a paragraph. */
 export const letterParagraphs = (letter: string): string[] =>
@@ -58,10 +58,5 @@ export async function exportCoverLetterDocx({ letter, cv, company, jobTitle }: C
   });
 
   const blob = await Packer.toBlob(doc);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = coverLetterFileName(cv, company);
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(blob, coverLetterFileName(cv, company));
 }

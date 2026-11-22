@@ -64,6 +64,10 @@ const PARAM_KEYS = [
   // linkedin_message_requested / linkedin_message_copied (2026-10-31):
   // variant = "message" | "connection_note"; over_cap = note longer than 200.
   "variant", "over_cap",
+  // cv_import / cv_import_failed when the scanned-PDF OCR fallback ran
+  // (2026-11-21): import_path = "ocr"; ocr_outcome = load_failed | timeout |
+  // low_text | error.
+  "import_path", "ocr_outcome",
 ] as const;
 const PARAM_RESET: Record<(typeof PARAM_KEYS)[number], undefined> = Object.fromEntries(
   PARAM_KEYS.map((k) => [k, undefined]),

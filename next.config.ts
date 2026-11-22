@@ -2,6 +2,20 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // The app's root is only an entrance to the builder. The redirect lives
+  // here, not in app/page.tsx: a config redirect is answered at the routing
+  // layer (no function runs) and carries the query string through. The page
+  // version was prerendered as a constant "/builder", so every campaign tag
+  // and every intent the site sent (`?template=`, `?import=1`) was dropped
+  // before the builder loaded (audit 2026-11 O2). app/page.tsx stays as the
+  // fallback for anything that reaches the page itself.
+  //
+  // Temporary (307), like the page's own redirect() was: browsers keep a
+  // permanent redirect for good, and the root may one day be a page of its
+  // own.
+  async redirects() {
+    return [{ source: "/", destination: "/builder", permanent: false }];
+  },
   async headers() {
     return [
       {
@@ -74,6 +88,17 @@ const nextConfig: NextConfig = {
               "upgrade-insecure-requests",
             ].join("; "),
           },
+        ],
+      },
+      {
+        // Self-hosted OCR assets (scanned-PDF import, 2026-11-21). Both
+        // folders carry their version in the path (tesseract-7.0.0,
+        // lang/4.0.0_fast), so a browser that has them never asks again:
+        // about 3.3 MB per device once, not per import. Without this, files
+        // under public/ are revalidated on every use.
+        source: "/ocr/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
     ];

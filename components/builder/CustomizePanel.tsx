@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useCvStore } from "../../lib/store/cvStore";
 import { getTemplateById } from "../../lib/templates";
+import { getTemplateCapabilities } from "../../lib/templates/capabilities";
 import type { CvFontFamily, PhotoShape } from "../../lib/types/cv";
 import { onColor } from "../../lib/utils/color";
 import { Icon } from "./Icon";
@@ -307,9 +308,11 @@ export const CustomizePanel = () => {
   };
 
   const accentColor = settings.accentColor ?? "#1e5b54";
-  // Harvard prints black only (template audit 2026-10): a colour picker
-  // whose choice never shows up would be a dead control, so the group hides.
-  const showColours = !getTemplateById(settings.templateId).ignoresAccent;
+  // A colour picker whose choice never shows up is a dead control. Harvard
+  // prints black only; Classic and Modern draw nothing in the accent colour
+  // (product audit 2026-11, T6 — the control did nothing on the default
+  // template). The swatches give way to one line saying so.
+  const showColours = getTemplateCapabilities(settings.templateId).usesAccent;
   const isCustomColor = !ACCENT_SWATCHES.some(
     (sw) => sw.hex.toLowerCase() === accentColor.toLowerCase(),
   );
@@ -558,7 +561,27 @@ export const CustomizePanel = () => {
         )}
       </Group>
       </>
-      ) : null}
+      ) : (
+      <>
+      <Divider />
+
+      <Group label="Colours">
+        <p
+          data-testid="colours-fixed-note"
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-body)",
+            fontSize: 12.5,
+            lineHeight: 1.45,
+            color: "var(--ff-muted)",
+          }}
+        >
+          The {getTemplateById(settings.templateId).name} template prints in
+          its own fixed colours. Pick another template to choose a colour.
+        </p>
+      </Group>
+      </>
+      )}
 
       <Divider />
 

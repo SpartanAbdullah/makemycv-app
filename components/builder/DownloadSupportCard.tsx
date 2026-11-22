@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { KOFI_URL } from "../../lib/config/support";
 import { HUMAN_REVIEW_URL } from "../../lib/config/humanReview";
 import { track, trackOncePerSession } from "../../lib/analytics";
@@ -24,7 +25,10 @@ import { RatingStrip } from "../feedback/RatingStrip";
  *
  * One sentence and one row per export (2026-11-07). The parent picks the row
  * through `ask` (lib/exportAsks.ts), so a person is never handed the karak
- * line, a follow row, stars and an email form all at once.
+ * line, a follow row, stars and an email form all at once. The first export's
+ * row is the next useful step, not an ask (2026-11-21): links to JD Match and
+ * the cover letter — or whatever `nextLinks` the surface passes (JD Match
+ * shows the card too and must not link to itself).
  *
  * Frequency is the PARENT's business — this component has no localStorage,
  * no timers and no suppression. BuilderShell re-opens it on every
@@ -45,12 +49,52 @@ import { RatingStrip } from "../feedback/RatingStrip";
  * ImportFromReportBanner.tsx: info and success share one green, not two.
  */
 
+export type NextStepLink = {
+  /** Enum for analytics (`cta_id`), never free text. */
+  id: string;
+  href: string;
+  label: string;
+  onClick?: () => void;
+};
+
 type Props = {
   open: boolean;
   ask: ExportAsk;
   sentence: ExportSentence;
   onDismiss: () => void;
+  /** The "next step" row's links. Defaults to the builder's pair. */
+  nextLinks?: NextStepLink[];
+  /** The few words before those links. */
+  nextLabel?: string;
 };
+
+const BUILDER_NEXT_LINKS: NextStepLink[] = [
+  { id: "post_export_jd_match", href: "/jd-match", label: "Match this CV to the job ad" },
+  { id: "post_export_cover_letter", href: "/cover-letter", label: "Write the cover letter" },
+];
+
+/* The first export's row: what to do with the CV next. Offered the way a
+   peer would (CLAUDE.md, "friendly in-flow discovery") — two plain links, no
+   badge, no "new". Each link is a 44px-tall target; the row wraps on a
+   phone instead of shrinking the text. */
+const NextStepRow = ({ links, label }: { links: NextStepLink[]; label: string }) => (
+  <div data-next-step-row className="flex flex-wrap items-center gap-x-4 gap-y-0">
+    <span className="font-medium">{label}</span>
+    {links.map(({ id, href, label, onClick }) => (
+      <Link
+        key={id}
+        href={href}
+        onClick={() => {
+          onClick?.();
+          track("cta_click", { cta_id: id, cta_location: "post_export" });
+        }}
+        className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2 hover:opacity-80"
+      >
+        {label}
+      </Link>
+    ))}
+  </div>
+);
 
 /* Same paths as the site's components/SocialIcons.tsx. Decorative: the link
    carries the aria-label. */
@@ -129,7 +173,14 @@ const KarakCup = () => (
   </svg>
 );
 
-export const DownloadSupportCard = ({ open, ask, sentence, onDismiss }: Props) => {
+export const DownloadSupportCard = ({
+  open,
+  ask,
+  sentence,
+  onDismiss,
+  nextLinks = BUILDER_NEXT_LINKS,
+  nextLabel = "Applying for a job with it?",
+}: Props) => {
   // The address on the CV just downloaded, offered as the tips field's
   // starting value. It stays in the browser unless the person presses
   // "Send me tips" (see RatingStrip's prefillEmail).
@@ -180,7 +231,9 @@ export const DownloadSupportCard = ({ open, ask, sentence, onDismiss }: Props) =
       {/* The one row for this export. The 64px budget above applies to the
           karak line only; this row pushes content down in-flow, it never
           covers anything. */}
-      {ask === "follow" ? (
+      {ask === "next" ? (
+        <NextStepRow links={nextLinks} label={nextLabel} />
+      ) : ask === "follow" ? (
         <FollowRow />
       ) : (
         <RatingStrip surface="post_export" source="post_export" prefillEmail={cvEmail} only={ask} />

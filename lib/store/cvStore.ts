@@ -22,6 +22,7 @@ import {
   STORAGE_KEY,
 } from "../utils/localStorage";
 import { createId } from "../utils/id";
+import { hasTypedContent, sameSectionContent } from "../utils/cvContent";
 
 const PARSE_SIGNALS_STORAGE_KEY = "makemycv:parseSignals";
 const SCORE_BASELINE_STORAGE_KEY = "makemycv:scoreBaseline";
@@ -177,7 +178,22 @@ const toSkillLevel = (value: unknown): SkillLevel | undefined => {
   return undefined;
 };
 
-const ensureSkillIds = (input: unknown): CvSkill[] => {
+const toSkillCategory = (value: unknown): CvSkill["category"] | undefined =>
+  value === "technical" || value === "general" ? value : undefined;
+
+/**
+ * Normalise the stored skills list on load: legacy string entries become
+ * objects, missing ids are minted, and unknown values are dropped.
+ *
+ * Every field of CvSkill must be carried through here. Until 2026-11 this
+ * rebuilt each skill as `{ id, name, level? }` — written before `category`
+ * existed — so the first reload after tagging a skill "technical" silently
+ * turned it back into a general one, the "Technical Skills" heading vanished
+ * from the templates that group by it, and the next save made the loss
+ * permanent (audit 2026-11 D1). Exported and pure so that cannot recur
+ * untested: adding a field to CvSkill means adding it here and to the test.
+ */
+export const ensureSkillIds = (input: unknown): CvSkill[] => {
   if (!Array.isArray(input)) return [];
 
   return input.flatMap((item) => {
@@ -200,10 +216,105 @@ const ensureSkillIds = (input: unknown): CvSkill[] => {
         ? maybeId
         : createId();
     const level = toSkillLevel((item as { level?: unknown }).level);
+    const category = toSkillCategory((item as { category?: unknown }).category);
 
-    return level ? [{ id, name, level }] : [{ id, name }];
+    const skill: CvSkill = { id, name };
+    if (level) skill.level = level;
+    if (category) skill.category = category;
+    return [skill];
   });
 };
+
+const isBlank = (value: unknown): boolean =>
+  value === undefined ||
+  value === null ||
+  (typeof value === "string" && value.trim() === "");
+
+const nameKey = (name: string | undefined): string => (name ?? "").trim().toLowerCase();
+
+/** Append `incoming`, skipping any whose name is already held (case-insensitive). */
+const appendNewByName = <T extends { name: string }>(held: T[], incoming: T[]): T[] => {
+  const seen = new Set(held.map((item) => nameKey(item.name)));
+  const out = [...held];
+  for (const item of incoming) {
+    const key = nameKey(item.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+};
+
+/**
+ * What the CV becomes when an imported document is applied to it.
+ *
+ * "replace" — the imported document becomes the CV. Template and style
+ * settings are the user's, not the file's, so they are kept; the photo is NOT
+ * (a different person's file on a shared computer must never inherit the last
+ * person's photo).
+ *
+ * "merge" — the current CV is kept and the import is added to it:
+ *   - a personal detail is filled when the import has one and the CV does
+ *     not. "Does not" means missing OR blank. It used to mean exactly `""`,
+ *     and the optional details (nationality, visa status, availability,
+ *     driving licence, date of birth) are `undefined` on a CV whose UAE step
+ *     was never opened — so the review screen said "UAE details found" and
+ *     Merge then threw every one of them away (audit 2026-11 O4);
+ *   - the blank experience / education cards the builder seeds are dropped
+ *     before the imported entries are appended, instead of being left as an
+ *     empty card above them;
+ *   - skills, languages and certifications already on the CV by name are not
+ *     added again, so merging the same file twice no longer doubles them.
+ *
+ * Pure and exported so the rules are tested without a browser.
+ */
+export function applyImportedCv(
+  current: CvData,
+  partial: Partial<CvData>,
+  mode: "replace" | "merge",
+): CvData {
+  if (mode === "replace") {
+    return {
+      ...defaultCvData,
+      ...partial,
+      // Always preserve user-chosen template settings
+      settings: current.settings,
+    };
+  }
+
+  const filled = Object.fromEntries(
+    Object.entries(partial.personal ?? {}).filter(
+      ([key, value]) =>
+        !isBlank(value) &&
+        isBlank(current.personal[key as keyof CvData["personal"]]),
+    ),
+  );
+
+  return {
+    ...current,
+    personal: { ...current.personal, ...filled },
+    // Only the untouched seeded cards are dropped. A card with anything typed
+    // into it — dates, a location, a note — stays, even though it is too thin
+    // to print yet: "meaningful" (role, company or a bullet) was the test
+    // here and it threw away in-progress entries while the review promised to
+    // keep everything (2026-11, review of PR #45).
+    experience: [
+      ...current.experience.filter((entry) => hasTypedContent(entry)),
+      ...(partial.experience ?? []),
+    ],
+    education: [
+      ...current.education.filter((entry) => hasTypedContent(entry)),
+      ...(partial.education ?? []),
+    ],
+    skills: appendNewByName(current.skills, partial.skills ?? []),
+    languages: appendNewByName(current.languages, partial.languages ?? []),
+    certifications: appendNewByName(
+      current.certifications,
+      partial.certifications ?? [],
+    ),
+    projects: [...current.projects, ...(partial.projects ?? [])],
+  };
+}
 
 export const defaultCvData: CvData = {
   personal: {
@@ -255,6 +366,13 @@ type AccessState = {
 };
 type ApplyCouponResult = { ok: boolean; message: string };
 
+/** The state an import replaces — everything undoImport has to put back. */
+export type ImportUndo = {
+  data: CvData;
+  parseSignals: ParseSignals | null;
+  scoreBaseline: ScoreBaseline | null;
+};
+
 type CvStore = {
   data: CvData;
   hydrated: boolean;
@@ -298,15 +416,26 @@ type CvStore = {
   reset: () => void;
   importJson: (data: CvData) => void;
   /**
-   * Import a partial CV document from an external source (PDF/DOCX/LinkedIn).
-   * mode "replace": overwrites the current document (preserves settings).
-   * mode "merge":   appends arrays and fills empty personal fields only.
-   * Importing always saves to localStorage (versioning via timestamp).
+   * What the builder held just before the last import, so that import can be
+   * undone. In memory only: it is a safety net for the minutes after an
+   * import, not a second saved CV, and it is gone on reload. null when there
+   * is nothing to go back to.
+   */
+  importUndo: ImportUndo | null;
+  /**
+   * Import a partial CV document from an external source (PDF / DOCX / ATS
+   * report). See applyImportedCv for what "replace" and "merge" do. The CV as
+   * it was is kept in `importUndo`; the result autosaves like any other edit.
    */
   importCvVersion: (
     partial: Partial<CvData>,
     mode: "replace" | "merge",
   ) => void;
+  /**
+   * Put back the CV, parse signals and score baseline from before the last
+   * import. Returns false when there is nothing to undo.
+   */
+  undoImport: () => boolean;
   /** Set (or clear with null) parseSignals. Persists to localStorage. */
   setParseSignals: (signals: ParseSignals | null) => void;
   /**
@@ -325,6 +454,30 @@ type CvStore = {
 };
 
 const PRO_STORAGE_KEY = "makemycv:isPro";
+
+/**
+ * sessionStorage keys that hold something derived from the user's CV or the
+ * job they pasted. They are owned by other modules (which cannot be imported
+ * here without a cycle through components/), so the names are repeated and
+ * `startOver.test.ts` fails if one of them is renamed at its source:
+ *   - makemycv:checkerPreview        the checker's extracted CV text
+ *   - makemycv:coverLetterSeed       job text handed from JD Match
+ *   - makemycv:linkedinMessageSeed   the same, for the LinkedIn message
+ */
+export const CV_SESSION_KEYS = [
+  "makemycv:checkerPreview",
+  "makemycv:coverLetterSeed",
+  "makemycv:linkedinMessageSeed",
+] as const;
+
+const clearCvSessionKeys = (): void => {
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of CV_SESSION_KEYS) window.sessionStorage.removeItem(key);
+  } catch {
+    /* storage blocked: nothing to remove */
+  }
+};
 const FREE_DL_STORAGE_KEY = "makemycv:hasUsedFreeDownload";
 const COUPON_STORAGE_KEY = "makemycv:appliedCoupon";
 
@@ -402,10 +555,23 @@ export const useCvStore = create<CvStore>((set, get) => ({
   parseSignals: null,
   scoreBaseline: null,
   jdTarget: null,
+  importUndo: null,
   setHydrated: (value) => set({ hydrated: value }),
-  setData: (data) => set({ data }),
+  // An import's Undo puts back the whole CV as it was before the import. Once
+  // the CV has been edited, that would also throw the edit away — the
+  // ATS-report banner kept offering it for as long as it stayed open (2026-11,
+  // review of PR #45). So every write that changes the CV ends the Undo.
+  // updateSection compares first: after an import the builder's forms write
+  // back what they were just given, and the Personal step re-guesses the job
+  // field when the headline box loses focus. Neither is an edit
+  // (sameSectionContent). The comparison only runs while an Undo exists.
+  setData: (data) => set({ data, importUndo: null }),
   updateSection: (key, value) =>
-    set((state) => ({ data: { ...state.data, [key]: value } })),
+    set((state) => {
+      const data = { ...state.data, [key]: value };
+      if (state.importUndo === null || sameSectionContent(key, state.data[key], value)) return { data };
+      return { data, importUndo: null };
+    }),
   // KEEP — setIsPro deletion cancelled 2026-06-12 (paid tier returning).
   // Currently a no-op that always settles isPro=true; localStorage write
   // preserved so old code paths that still call it don't crash.
@@ -437,14 +603,20 @@ export const useCvStore = create<CvStore>((set, get) => ({
     // CV inherits a park list belonging to a CV that no longer exists.
     clearSetAside();
     removeStorage(JD_TARGET_STORAGE_KEY);
+    // Session-only leftovers of the CV that was just cleared (see
+    // CV_SESSION_KEYS). Without this, "Start a new CV" on a shared computer
+    // left the previous person's extracted CV text one page away.
+    clearCvSessionKeys();
     set({
       data: defaultCvData,
       parseSignals: null,
       scoreBaseline: null,
       jdTarget: null,
+      // "Start over" must not leave the previous CV one tap away.
+      importUndo: null,
     });
   },
-  importJson: (data) => set({ data }),
+  importJson: (data) => set({ data, importUndo: null }),
   setParseSignals: (signals) => {
     if (signals) {
       writeStorage(PARSE_SIGNALS_STORAGE_KEY, JSON.stringify(signals));
@@ -501,41 +673,36 @@ export const useCvStore = create<CvStore>((set, get) => ({
     set({ scoreBaseline: baseline });
   },
   importCvVersion: (partial, mode) => {
-    const current = get().data;
-    let next: CvData;
-    if (mode === "replace") {
-      next = {
-        ...defaultCvData,
-        ...partial,
-        // Always preserve user-chosen template settings
-        settings: current.settings,
-      };
+    const { data: current, parseSignals, scoreBaseline } = get();
+    set({
+      data: applyImportedCv(current, partial, mode),
+      // Taken BEFORE the write, and before the caller's setParseSignals /
+      // captureScoreBaseline, so undo restores all three as they were. An
+      // import used to be final: "Replace" overwrote the whole CV with no way
+      // back (audit 2026-11 O3).
+      importUndo: { data: current, parseSignals, scoreBaseline },
+    });
+  },
+  undoImport: () => {
+    const undo = get().importUndo;
+    if (!undo) return false;
+    if (undo.parseSignals) {
+      writeStorage(PARSE_SIGNALS_STORAGE_KEY, JSON.stringify(undo.parseSignals));
     } else {
-      // Merge: fill empty personal fields, append arrays
-      next = {
-        ...current,
-        personal: {
-          ...current.personal,
-          ...Object.fromEntries(
-            Object.entries(partial.personal ?? {}).filter(
-              ([k, v]) =>
-                v !== "" &&
-                current.personal[k as keyof typeof current.personal] === "",
-            ),
-          ),
-        },
-        experience: [...current.experience, ...(partial.experience ?? [])],
-        education: [...current.education, ...(partial.education ?? [])],
-        skills: [...current.skills, ...(partial.skills ?? [])],
-        languages: [...current.languages, ...(partial.languages ?? [])],
-        certifications: [
-          ...current.certifications,
-          ...(partial.certifications ?? []),
-        ],
-        projects: [...current.projects, ...(partial.projects ?? [])],
-      };
+      removeStorage(PARSE_SIGNALS_STORAGE_KEY);
     }
-    set({ data: next });
+    if (undo.scoreBaseline) {
+      writeStorage(SCORE_BASELINE_STORAGE_KEY, JSON.stringify(undo.scoreBaseline));
+    } else {
+      removeStorage(SCORE_BASELINE_STORAGE_KEY);
+    }
+    set({
+      data: undo.data,
+      parseSignals: undo.parseSignals,
+      scoreBaseline: undo.scoreBaseline,
+      importUndo: null,
+    });
+    return true;
   },
 }));
 

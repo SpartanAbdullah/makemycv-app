@@ -92,8 +92,12 @@ const ProfessionalBase = ({
   const hasProjects = projects.length > 0;
   const skillsFirst = isSkillsFirst(data.settings.domain);
 
+  // `showPhoto` here is the template variant (Professional vs Professional
+  // Photo), not the user's choice. Until 2026-11 the user's own "Show photo
+  // on CV" switch was never consulted, so this template printed the photo
+  // with the switch off (product audit T7). Both now have to say yes.
   const photo =
-    showPhoto && theme.photoVisible && data.personal.photo
+    showPhoto && data.personal.showPhoto && theme.photoVisible && data.personal.photo
       ? data.personal.photo
       : null;
 

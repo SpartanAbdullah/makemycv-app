@@ -10,7 +10,7 @@ import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
-import { getEssentialChips } from "../utils/essentials";
+import { getEssentialChips, type EssentialKey } from "../utils/essentials";
 import { splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
 import { getFullName, bulletLiProps } from "./utils";
@@ -121,18 +121,18 @@ export const chronicleContactItems = (
  * filtering from getEssentialChips, plus the date of birth at the end when
  * it was entered — Chronicle has no other place to print it.
  */
-const ESSENTIAL_LABELS: Record<string, string> = {
-  Visa: "Visa status",
-  Available: "Availability",
-  DL: "Driving licence",
-  Nationality: "Nationality",
+const ESSENTIAL_LABELS: Record<EssentialKey, string> = {
+  visa: "Visa status",
+  availability: "Availability",
+  licence: "Driving licence",
+  nationality: "Nationality",
 };
 
 export const chronicleEssentials = (
   personal: CvPersonal,
 ): Array<{ label: string; value: string }> => {
   const items = getEssentialChips(personal).map((chip) => ({
-    label: ESSENTIAL_LABELS[chip.label] ?? chip.label,
+    label: ESSENTIAL_LABELS[chip.key],
     value: chip.value,
   }));
   const dob = personal.dateOfBirth?.trim();

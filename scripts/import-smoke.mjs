@@ -15,6 +15,14 @@
 //   npm run build && npx next start -p 3500        (or `next dev -p 3300`)
 //   SMOKE_BASE=http://localhost:3500 npm run smoke:import
 //
+// OCR fallback (2026-11-21): build with NEXT_PUBLIC_OCR_IMPORT=1 and run with
+// SMOKE_OCR=1. scanned-cv.pdf must then IMPORT (the overlay says it is a
+// scan, the review says so too, cv_import carries import_path "ocr") and no
+// request may leave the origin while it is read. Without SMOKE_OCR the scan
+// must fail with no_text_layer and carry no OCR param, i.e. the flag-off
+// build behaves as before. SMOKE_VIEWPORT=375x812 runs the cases at a phone
+// size; SMOKE_ONLY=scanned-cv.pdf,text-cv.pdf limits the run to those cases.
+//
 // Deliberately NOT a `test:*` script (needs a server and a browser) — same
 // rule as builder-smoke.mjs. Uses the installed Chrome when present.
 
@@ -25,6 +33,9 @@ import path from "node:path";
 import { FIXTURE_DIR, makeLargePdf } from "./make-import-fixtures.mjs";
 
 const BASE = process.env.SMOKE_BASE ?? "http://localhost:3000";
+const OCR = process.env.SMOKE_OCR === "1";
+const [VW, VH] = (process.env.SMOKE_VIEWPORT ?? "1440x900").split("x").map(Number);
+const ONLY = process.env.SMOKE_ONLY ? new Set(process.env.SMOKE_ONLY.split(",")) : null;
 
 // Mirrors IMPORT_ERROR_REASONS in lib/importers/importErrors.ts (file-import
 // subset). Kept as a literal so the smoke can run against an older build.
@@ -49,7 +60,7 @@ const CASES = [
   ["header-contact.docx", "import"],
   ["two-column-table.docx", "import"],
   ["rtl-mixed.docx", "import"],
-  ["scanned-cv.pdf", "no_text_layer"],
+  ["scanned-cv.pdf", OCR ? "import" : "no_text_layer"],
   ["encrypted-cv.pdf", "encrypted_pdf"],
   ["legacy-doc-renamed.docx", "unsupported_type"],
   ["empty.pdf", "empty_file"],
@@ -115,8 +126,11 @@ const largePath = path.join(tmp, "large-25mb.pdf");
 fs.writeFileSync(largePath, makeLargePdf(25 * 1024 * 1024));
 
 const browser = await chromium.launch({ channel: "chrome" }).catch(() => chromium.launch());
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({ viewport: { width: VW, height: VH } });
 const page = await ctx.newPage();
+// Every request the page makes, so the OCR case can prove nothing left the origin.
+const requested = [];
+page.on("request", (r) => requested.push(r.url()));
 page.on("pageerror", (e) => console.log(`      pageerror: ${e.message.slice(0, 160)}`));
 // The consent banner only mounts when the build has NEXT_PUBLIC_GTM_ID; keep
 // Google's script off the wire so the smoke stays local when it does.
@@ -144,16 +158,22 @@ async function runCase(name, file, expected) {
     rows.push({ name, expected, outcome: "no chooser", message: "", pushes: [] });
     return;
   }
+  const requestsBefore = requested.length;
   await fc.setFiles(file);
 
   const review = page.getByRole("dialog", { name: /Import from/ });
   // BuilderShell's error bar carries data-testid="import-error" (2026-10-31).
   const errorBar = page.getByTestId("import-error");
+  const ocrNotice = page.getByTestId("import-ocr-notice");
+  let ocrNoticeText = null;
 
   let outcome = "nothing happened";
   let message = "";
   const started = Date.now();
-  while (Date.now() - started < 90000) {
+  while (Date.now() - started < 150000) {
+    if (ocrNoticeText === null && (await ocrNotice.isVisible().catch(() => false))) {
+      ocrNoticeText = ((await ocrNotice.textContent().catch(() => "")) ?? "").trim();
+    }
     if (await review.isVisible().catch(() => false)) {
       const btn = review.getByRole("button", { name: /^Import/ });
       const label = (await btn.textContent())?.trim() ?? "";
@@ -183,6 +203,24 @@ async function runCase(name, file, expected) {
           if (EXPECT_COVER_HINT[name] ? shown && href === "/cover-letter" : !shown) ok(`${name}: cover-letter hint ${shown ? `shown → ${href}` : "absent"}`);
           else fail(`${name}: cover-letter hint`, `expected ${EXPECT_COVER_HINT[name] ? "shown" : "absent"}, shown=${shown} href=${href}`);
         }
+        if (name === "scanned-cv.pdf" || name === "text-cv.pdf") {
+          const note = review.getByTestId("import-ocr-review-note");
+          const shown = await note.isVisible().catch(() => false);
+          const want = OCR && name === "scanned-cv.pdf";
+          if (shown === want) ok(`${name}: "read from a scan, check it" note ${shown ? "shown" : "absent"} in the review`);
+          else fail(`${name}: OCR review note`, `expected ${want ? "shown" : "absent"}, shown=${shown}`);
+          if (want) {
+            const text = (await review.textContent()) ?? "";
+            const roles = Number(text.match(/Work experience \((\d+)\)/)?.[1] ?? 0);
+            if (roles === 2) ok(`${name}: review shows 2 experience cards from the scan`);
+            else fail(`${name}: review shows 2 experience cards from the scan`, `got ${roles}`);
+            // The button must be reachable at this viewport (phone included).
+            const box = await btn.boundingBox();
+            if (box && box.x >= 0 && box.x + box.width <= VW + 1 && box.y >= 0 && box.y + box.height <= VH + 1) ok(`${name}: Import button inside the ${VW}x${VH} viewport`);
+            else fail(`${name}: Import button inside the ${VW}x${VH} viewport`, JSON.stringify(box));
+            console.log(`      scan read in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+          }
+        }
         await btn.click();
         await page.getByText(/Imported \d+ section|Merged \d+ section/).waitFor({ timeout: 10000 }).catch(() => {});
       }
@@ -199,9 +237,37 @@ async function runCase(name, file, expected) {
   const pushes = await page.evaluate(() =>
     (window.dataLayer ?? [])
       .filter((e) => e && typeof e.event === "string" && e.event.startsWith("cv_import"))
-      .map((e) => ({ event: e.event, file_type: e.file_type, error_reason: e.error_reason, sections_filled: e.sections_filled })),
+      .map((e) => ({ event: e.event, file_type: e.file_type, error_reason: e.error_reason, sections_filled: e.sections_filled, import_path: e.import_path, ocr_outcome: e.ocr_outcome })),
   );
   rows.push({ name, expected, outcome, message, pushes });
+
+  // OCR fallback (2026-11-21).
+  if (name === "scanned-cv.pdf") {
+    const push = pushes[0] ?? {};
+    const during = requested.slice(requestsBefore);
+    const ocrAssets = during.filter((u) => /^https?:/.test(u) && new URL(u).pathname.startsWith("/ocr/"));
+    if (OCR) {
+      if (ocrNoticeText && /scan/i.test(ocrNoticeText) && /longer/i.test(ocrNoticeText)) ok(`${name}: overlay said the file is a scan and takes longer`);
+      else fail(`${name}: overlay said the file is a scan and takes longer`, JSON.stringify(ocrNoticeText));
+      if (push.import_path === "ocr") ok(`${name}: cv_import carries import_path "ocr"`);
+      else fail(`${name}: cv_import carries import_path "ocr"`, JSON.stringify(push));
+      const foreign = during.filter((u) => /^https?:/.test(u) && new URL(u).origin !== new URL(BASE).origin && !/googletagmanager\.com|google-analytics\.com/.test(u));
+      if (foreign.length === 0) ok(`${name}: nothing requested off-origin while the scan was read`);
+      else fail(`${name}: nothing requested off-origin while the scan was read`, foreign.slice(0, 5).join(", "));
+      if (ocrAssets.length >= 3) ok(`${name}: OCR assets came from /ocr/ (${ocrAssets.map((u) => u.split("/").pop()).join(", ")})`);
+      else fail(`${name}: OCR assets came from /ocr/`, ocrAssets.join(", ") || "none requested");
+    } else {
+      if (ocrNoticeText === null && ocrAssets.length === 0) ok(`${name}: flag off, no scan notice and no /ocr/ request`);
+      else fail(`${name}: flag off, no scan notice and no /ocr/ request`, `notice=${JSON.stringify(ocrNoticeText)} assets=${ocrAssets.length}`);
+      if (push.import_path === undefined && push.ocr_outcome === undefined) ok(`${name}: flag off, cv_import_failed carries no OCR param`);
+      else fail(`${name}: flag off, cv_import_failed carries no OCR param`, JSON.stringify(push));
+    }
+  }
+  if (name === "text-cv.pdf") {
+    const ocrAssets = requested.slice(requestsBefore).filter((u) => /^https?:/.test(u) && new URL(u).pathname.startsWith("/ocr/"));
+    if (ocrAssets.length === 0 && ocrNoticeText === null && pushes[0]?.import_path === undefined) ok(`${name}: a text PDF never touches OCR (no /ocr/ request, no notice, no import_path)`);
+    else fail(`${name}: a text PDF never touches OCR`, `assets=${ocrAssets.length} notice=${JSON.stringify(ocrNoticeText)} import_path=${pushes[0]?.import_path}`);
+  }
 
   const label = `${name} → ${expected}`;
   const summary = pushes.map((p) => `${p.event}${p.error_reason ? `(${p.error_reason})` : ""}${p.file_type ? `[${p.file_type}]` : ""}`).join(", ") || "no push";
@@ -240,6 +306,7 @@ async function runCase(name, file, expected) {
 }
 
 for (const [name, expected] of CASES) {
+  if (ONLY && !ONLY.has(name)) continue;
   await runCase(name, name === "large-25mb.pdf" ? largePath : path.join(FIXTURE_DIR, name), expected);
 }
 
@@ -369,7 +436,9 @@ async function checkImportAfterTyping() {
       fail(label, "the import review never opened");
       return;
     }
-    await review.getByRole("radio", { name: /Replace current CV/ }).check().catch(() => {});
+    // "Placeholder" makes this a CV with content, so the review opens on
+    // "Add to my current CV" (audit 2026-11 O3). This check is about Replace.
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
     await review.getByRole("button", { name: /^Import/ }).click();
     await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
 
@@ -410,6 +479,142 @@ async function checkImportAfterTyping() {
 }
 
 /** Pick `file` on the CURRENT page (no navigation) through the Import button. */
+// ── An import must not cost the user the CV they had (audit 2026-11 O3/O4) ──
+// Until 2026-11 the review opened on "Replace" for everyone and an import was
+// final. Three things are checked on a builder that already holds a name:
+//   1. the review opens on "Add to my current CV";
+//   2. adding keeps the typed name and brings the file's roles in;
+//   3. after a Replace, "Undo" on the toast puts the previous CV back.
+async function checkImportKeepsExistingCv() {
+  const label = "import safety (O3)";
+  const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg = await c.newPage();
+  await pg.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  const storedCv = () =>
+    pg.evaluate(() => {
+      try {
+        const raw = JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null");
+        return {
+          firstName: raw?.personal?.firstName ?? "",
+          roles: (raw?.experience ?? []).filter((e) => (e.role ?? "").trim() || (e.company ?? "").trim()).length,
+        };
+      } catch {
+        return null;
+      }
+    });
+  const openReviewInPlace = async () => {
+    if (!(await pickInPlace(pg, path.join(FIXTURE_DIR, "text-cv.pdf")))) return null;
+    const review = pg.getByRole("dialog", { name: /Import from/ });
+    return (await review.waitFor({ timeout: 60000 }).then(() => true).catch(() => false)) ? review : null;
+  };
+  try {
+    await pg.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg.getByLabel(/First name/).waitFor({ timeout: 30000 });
+    await pg.getByLabel(/First name/).fill("Existing");
+    await pg.waitForTimeout(900); // form debounce (250 ms) + storage debounce (500 ms)
+
+    let review = await openReviewInPlace();
+    if (!review) return fail(label, "the import review never opened");
+    const mergeDefault = await review.getByRole("radio", { name: /Add to my current CV/ }).isChecked().catch(() => false);
+    if (mergeDefault) ok(`${label}: a CV with content opens the review on "Add to my current CV"`);
+    else fail(`${label}: a CV with content opens the review on "Add to my current CV"`, "the add option is not the default");
+
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const merged = await storedCv();
+    if (merged && merged.firstName === "Existing" && merged.roles >= 1) {
+      ok(`${label}: adding keeps the typed name and brings in ${merged.roles} role(s)`);
+    } else {
+      fail(`${label}: adding keeps the typed name and brings in the file's roles`, JSON.stringify(merged));
+    }
+
+    review = await openReviewInPlace();
+    if (!review) return fail(label, "the second import review never opened");
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const replaced = await storedCv();
+    await pg.getByRole("button", { name: "Undo", exact: true }).click({ timeout: 8000 });
+    await pg.waitForTimeout(900);
+    const restored = await storedCv();
+    if (replaced && replaced.firstName === "Layla" && restored && restored.firstName === "Existing" && restored.roles === merged?.roles) {
+      ok(`${label}: Undo after a Replace puts the previous CV back`);
+    } else {
+      fail(`${label}: Undo after a Replace puts the previous CV back`, `after replace ${JSON.stringify(replaced)}, after undo ${JSON.stringify(restored)}`);
+    }
+
+    // 4. Undo puts back the WHOLE CV from before the import, so once the user
+    //    has edited the imported CV it must refuse rather than throw the edit
+    //    away (review of PR #45, 2026-11). The check above also proves the
+    //    other half: the forms writing back what an import gave them does not
+    //    count as an edit, or that Undo would have been dead on arrival.
+    review = await openReviewInPlace();
+    if (!review) return fail(label, "the third import review never opened");
+    await review.getByRole("radio", { name: /Replace my current CV/ }).check();
+    await review.getByRole("button", { name: /^Import/ }).click();
+    await review.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    await pg.getByLabel(/First name/).fill("Edited");
+    await pg.waitForTimeout(900);
+    await pg.getByRole("button", { name: "Undo", exact: true }).click({ timeout: 8000 });
+    const refused = await pg.getByText(/Not undone: your CV has changed since that import/).waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+    await pg.waitForTimeout(900);
+    const afterEdit = await storedCv();
+    if (refused && afterEdit && afterEdit.firstName === "Edited") {
+      ok(`${label}: after an edit, Undo refuses and the edit is kept`);
+    } else {
+      fail(`${label}: after an edit, Undo refuses and the edit is kept`, `refused=${refused}, stored ${JSON.stringify(afterEdit)}`);
+    }
+  } catch (e) {
+    fail(label, String(e).slice(0, 200));
+  } finally {
+    await c.close();
+  }
+
+  // 5. Anything the user entered counts as a CV worth keeping. With only an
+  //    email address typed, the review used to treat the builder as empty:
+  //    Replace by default, the choice hidden, no Undo (review of PR #45).
+  const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const pg2 = await c2.newPage();
+  await pg2.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort("blockedbyclient"));
+  try {
+    await pg2.goto(`${BASE}/builder?step=personal`, { waitUntil: "domcontentloaded" });
+    await pg2.getByLabel(/Email/).waitFor({ timeout: 30000 });
+    await pg2.getByLabel(/Email/).fill("only.email@example.com");
+    await pg2.waitForTimeout(900);
+    const opened = await pickInPlace(pg2, path.join(FIXTURE_DIR, "text-cv.pdf"));
+    const review2 = pg2.getByRole("dialog", { name: /Import from/ });
+    if (!opened || !(await review2.waitFor({ timeout: 60000 }).then(() => true).catch(() => false))) {
+      fail(`${label}: an email-only CV still gets the add / replace choice`, "the import review never opened");
+    } else {
+      const addRadio = review2.getByRole("radio", { name: /Add to my current CV/ });
+      const shown = (await addRadio.count()) === 1;
+      const checked = shown && (await addRadio.isChecked().catch(() => false));
+      if (shown && checked) ok(`${label}: an email-only CV still gets the choice, and it opens on "Add to my current CV"`);
+      else fail(`${label}: an email-only CV still gets the add / replace choice`, `choice shown=${shown}, add is default=${checked}`);
+      await review2.getByRole("button", { name: /^Import/ }).click();
+      await review2.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+      await pg2.waitForTimeout(900);
+      const kept = await pg2.evaluate(() => {
+        try {
+          return JSON.parse(window.localStorage.getItem("makemycv:data") ?? "null")?.personal?.email ?? "";
+        } catch {
+          return "";
+        }
+      });
+      const undoOffered = (await pg2.getByRole("button", { name: "Undo", exact: true }).count()) === 1;
+      if (kept === "only.email@example.com" && undoOffered) ok(`${label}: the typed email survives the import, and Undo is offered`);
+      else fail(`${label}: the typed email survives the import, and Undo is offered`, `email="${kept}", undo offered=${undoOffered}`);
+    }
+  } catch (e) {
+    fail(`${label}: email-only CV`, String(e).slice(0, 200));
+  } finally {
+    await c2.close();
+  }
+}
+
 async function pickInPlace(pg, file) {
   let fc = null;
   for (let attempt = 0; attempt < 6 && !fc; attempt++) {
@@ -626,6 +831,7 @@ await checkSlowReadHint();
 await checkProbeUnderDeadline();
 await checkDocxUnderDeadline();
 await checkImportAfterTyping();
+await checkImportKeepsExistingCv();
 await checkErrorClearedByNextPick();
 await checkFirstImportToast();
 

@@ -13,7 +13,7 @@ import { fieldValidators } from "../../../lib/validation/cvRequirements";
 import { NavigationButtons } from "../NavigationButtons";
 import { StepHeader } from "../StepHeader";
 import { Icon } from "../Icon";
-import { hasPlaceholder } from "../../../lib/ai/placeholders";
+import { countUnfilled, hasPlaceholder } from "../../../lib/ai/placeholders";
 import { PlaceholderText, PLACEHOLDER_HINT } from "../../ai/PlaceholderText";
 import { BulletRow } from "../BulletRow";
 import { CardIconBtn } from "./shared";
@@ -23,6 +23,7 @@ import { suggestionsForRole } from "../../../lib/data/ideaSuggestions";
 import { inferRoleFamily } from "../../../lib/data/roleFamily";
 import { canTailorByDomain } from "../../../lib/utils/entitlements";
 import { useAIImprove } from "../../../hooks/useAIImprove";
+import { describeRetryAfter } from "../../../lib/ai/improveOutcome";
 import {
   sanitizeJobTitle,
   sanitizeJobTitleLive,
@@ -367,6 +368,10 @@ export const ExperienceStep = ({
           const canMoveDown = index < fields.length - 1;
           const bullets = watch(`experience.${index}.bullets`) || [""];
           const filledBullets = bullets.filter(Boolean).length;
+          const blanksInBullets = bullets.reduce(
+            (sum: number, b: string | undefined) => sum + countUnfilled(b),
+            0,
+          );
           const roleSuggestions = suggestions[index] ?? [];
           // The card no longer auto-folds when its compulsory fields are
           // filled and focus leaves (audit F02: folding moved the Continue
@@ -605,6 +610,16 @@ export const ExperienceStep = ({
                       }}
                     >
                       {filledBullets} of {MAX_BULLETS}
+                      {/* A ready-made idea leaves "__" where the user's own
+                          figure goes. Counted here, on a line that is always
+                          present, so nothing moves when the count changes;
+                          the export dialog repeats it (audit 2026-11 A1). */}
+                      {blanksInBullets > 0 && (
+                        <span style={{ color: "var(--ff-warn)" }}>
+                          {" · "}
+                          {blanksInBullets} blank{blanksInBullets === 1 ? "" : "s"} (__) to fill
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -677,22 +692,39 @@ export const ExperienceStep = ({
                         other errors get a retry. */}
                     {aiError && aiActiveIndex === index && (
                       <div
+                        data-testid={
+                          aiError.code === "NOTHING_TO_SUGGEST"
+                            ? "ai-nothing-to-suggest"
+                            : "ai-inline-error"
+                        }
+                        // "Nothing to suggest" is an answer, not a fault —
+                        // neutral surface and ink instead of the error red.
                         style={{
                           marginTop: 6,
                           padding: "10px 12px",
                           borderRadius: 10,
-                          background: "#FBEFED",
-                          border: "1px solid #F2D2CE",
+                          background:
+                            aiError.code === "NOTHING_TO_SUGGEST" ? "var(--ff-sunken)" : "#FBEFED",
+                          border:
+                            aiError.code === "NOTHING_TO_SUGGEST"
+                              ? "1px solid var(--ff-line)"
+                              : "1px solid #F2D2CE",
                         }}
                       >
                         <p
                           style={{
                             fontSize: 12,
-                            color: "var(--ff-red)",
+                            color:
+                              aiError.code === "NOTHING_TO_SUGGEST"
+                                ? "var(--ff-ink-2)"
+                                : "var(--ff-red)",
                             fontWeight: 500,
                           }}
                         >
                           {aiError.message}
+                          {describeRetryAfter(aiError.retryAfter)
+                            ? ` You can use AI help again ${describeRetryAfter(aiError.retryAfter)}.`
+                            : ""}
                         </p>
                         <div
                           style={{
