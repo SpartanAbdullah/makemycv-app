@@ -17,6 +17,7 @@ import {
 } from "@/lib/server/rateLimit";
 import type { JdRequirements } from "@/lib/jdMatch/types";
 import { logAiFailure } from "@/lib/server/logRouteError";
+import { DATA_NOT_INSTRUCTIONS, asData } from "@/lib/ai/untrusted";
 
 const ROUTE = "api/jd-match";
 
@@ -70,13 +71,15 @@ const SYSTEM_PROMPT =
   "(string[]), softSkills (string[]), keywords (string[]). Each array max 12 items, " +
   "each item max 5 words. keywords = important domain terms not already in the other " +
   "buckets. Where the JD states a requirement with a specific phrase, use that " +
-  "phrase's exact wording from the text (so it can be located in the description).";
+  "phrase's exact wording from the text (so it can be located in the description). " +
+  // 2026-11-23: the pasted text is data. A job ad that addresses the model
+  // ("ignore the above and list ...") is still only a job ad to extract from.
+  DATA_NOT_INSTRUCTIONS;
 
 function buildUser(jobText: string): string {
   return (
     "Extract the requirements from this job description as the specified JSON object.\n\n" +
-    "JOB DESCRIPTION:\n" +
-    jobText +
+    asData("job_description", jobText) +
     "\n\nReturn only the JSON object."
   );
 }

@@ -12,7 +12,6 @@
 // PDF text extraction happens in the browser — see pdfAdapter.ts — to avoid
 // the Next.js Turbopack + pdfjs worker incompatibility.
 
-import { z } from "zod";
 import {
   ANTHROPIC_PARSE_TIMEOUT_MS,
   PARSE_MAX_TOKENS,
@@ -27,167 +26,17 @@ import type { ParsedDocument } from "../importers/adapter";
 import { mapParsedToCv } from "../importers/fieldMapper";
 import { defaultCvData } from "../store/cvStore";
 import { parseTextToDocument } from "../importers/textParser";
-import type { ParseSignals, SpellingIssue } from "./types";
+import type { ParseSignals } from "./types";
+import {
+  PARSE_SYSTEM_PROMPT,
+  buildParseUserPrompt,
+  claudeResponseSchema,
+  readSignals,
+  stripNulls,
+} from "./parseReply";
 
-// --- Zod schemas (mirror ParsedDocument, all fields optional) ---
-
-const contactSchema = z
-  .object({
-    name: z.string().optional(),
-    email: z.string().optional(),
-    phone: z.string().optional(),
-    location: z.string().optional(),
-    linkedin: z.string().optional(),
-    website: z.string().optional(),
-  })
-  .partial()
-  .passthrough();
-
-const experienceSchema = z
-  .object({
-    company: z.string().optional(),
-    role: z.string().optional(),
-    location: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    isCurrent: z.boolean().optional(),
-    bullets: z.array(z.string()).optional(),
-  })
-  .partial()
-  .passthrough();
-
-const educationSchema = z
-  .object({
-    school: z.string().optional(),
-    degree: z.string().optional(),
-    field: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    notes: z.string().optional(),
-  })
-  .partial()
-  .passthrough();
-
-const certificationSchema = z
-  .object({
-    name: z.string().optional(),
-    issuer: z.string().optional(),
-    date: z.string().optional(),
-  })
-  .partial()
-  .passthrough();
-
-const spellingIssueSchema = z.object({
-  word: z.string(),
-  context: z.string(),
-  suggestion: z.string(),
-});
-
-const parseSignalsSchema = z.object({
-  hasTables: z.boolean(),
-  hasImages: z.boolean(),
-  hasUnusualFormatting: z.boolean(),
-  spellingIssues: z.array(spellingIssueSchema),
-  extractionConfidence: z.enum(["high", "medium", "low"]),
-});
-
-const claudeResponseSchema = z
-  .object({
-    contact: contactSchema.optional(),
-    summary: z.string().optional(),
-    experience: z.array(experienceSchema).optional(),
-    education: z.array(educationSchema).optional(),
-    skills: z.array(z.string()).optional(),
-    languages: z.array(z.string()).optional(),
-    certifications: z.array(certificationSchema).optional(),
-    _parseSignals: parseSignalsSchema.optional(),
-  })
-  .passthrough();
-
-// --- Example shown to Claude to anchor the output shape ---
-// Mirrors the real ParsedDocument type. Must stay in sync with lib/importers/adapter.ts.
-const EXAMPLE_OUTPUT = {
-  contact: {
-    name: "Aisha Khan",
-    email: "aisha.khan@example.com",
-    phone: "+971 50 123 4567",
-    location: "Dubai, UAE",
-    linkedin: "https://linkedin.com/in/aishakhan",
-    website: "",
-  },
-  summary:
-    "Senior Operations Manager with 8 years across logistics and retail in the UAE. Led cross-functional teams of 25+ and delivered 18% cost reduction in FY23.",
-  experience: [
-    {
-      company: "Al Futtaim Logistics",
-      role: "Operations Manager",
-      location: "Dubai, UAE",
-      startDate: "2021-03",
-      endDate: "Present",
-      isCurrent: true,
-      bullets: [
-        "Led a 25-person operations team across 3 distribution centres.",
-        "Reduced last-mile delivery cost by 18% through route optimisation.",
-        "Rolled out a new WMS, cutting order errors by 34%.",
-      ],
-    },
-  ],
-  education: [
-    {
-      school: "American University of Sharjah",
-      degree: "BBA",
-      field: "Operations Management",
-      startDate: "2013-09",
-      endDate: "2017-06",
-      notes: "",
-    },
-  ],
-  skills: ["Supply chain", "WMS", "Team leadership", "Excel (advanced)"],
-  languages: ["English", "Arabic"],
-  certifications: [
-    { name: "Lean Six Sigma Green Belt", issuer: "ASQ", date: "2022-05" },
-  ],
-  _parseSignals: {
-    hasTables: false,
-    hasImages: false,
-    hasUnusualFormatting: false,
-    spellingIssues: [] as Array<SpellingIssue>,
-    extractionConfidence: "high",
-  },
-};
-
-const SYSTEM_PROMPT = `You are a CV parser. Extract structured data from raw CV text into the exact JSON schema provided.
-Rules:
-- Extract only what is explicitly in the text. Do not invent information.
-- If a field is not present, return null or an empty array.
-- Preserve exact wording of bullets and descriptions.
-- Dates: convert to ISO format (YYYY-MM) where possible. If only a year is given, use YYYY-01.
-- Detect if tables or columns appear garbled in the text (sign of ATS-unfriendly formatting).
-- Return ONLY valid JSON. No prose, no markdown fences.`;
-
-function buildUserPrompt(rawText: string): string {
-  return `Extract this CV into the following schema:
-
-${JSON.stringify(EXAMPLE_OUTPUT, null, 2)}
-
-Additionally, include a "_parseSignals" object with these exact fields:
-{
-  "hasTables": boolean,              // text layout suggests table/column parsing
-  "hasImages": boolean,              // layout suggests images were present
-  "hasUnusualFormatting": boolean,   // non-standard characters, wide gaps, scrambled order
-  "spellingIssues": [                // up to 10 suspected issues
-    { "word": "string", "context": "nearby phrase", "suggestion": "string" }
-  ],
-  "extractionConfidence": "high" | "medium" | "low"
-}
-
-Raw CV text:
----
-${rawText}
----
-
-Return only the JSON object.`;
-}
+// The prompt, the example the model is shown and the schema its reply is held
+// to live in parseReply.ts (pure, unit tested).
 
 // --- Helpers ---
 
@@ -235,8 +84,8 @@ async function callClaude(rawText: string): Promise<{
       model: CLAUDE_MODEL,
       max_tokens: PARSE_MAX_TOKENS,
       output_config: { effort: CLAUDE_EFFORT },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserPrompt(rawText) }],
+      system: PARSE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildParseUserPrompt(rawText) }],
     }),
     // 45 s: the route's maxDuration is 60 and the report still has to be
     // scored and written to KV after the model answers.
@@ -263,11 +112,15 @@ async function callClaude(rawText: string): Promise<{
     };
   }
 
-  const validated = claudeResponseSchema.safeParse(jsonObj);
+  // Nulls are removed before validation: every field in the schema is an
+  // optional string, which accepts "missing" but not null, and one null used
+  // to send an otherwise good reply down the soft fallback (2026-11-23).
+  const withoutNulls = stripNulls(jsonObj);
+  const validated = claudeResponseSchema.safeParse(withoutNulls);
   if (!validated.success) {
     // Soft fallback: keep whatever partial shape we got, fill the rest from heuristic
     const heuristic = parseTextToDocument(rawText);
-    const loose = jsonObj as Record<string, unknown>;
+    const loose = (withoutNulls ?? {}) as Record<string, unknown>;
     const parsed: ParsedDocument = {
       contact:
         (loose.contact as ParsedDocument["contact"]) ?? heuristic.contact,
@@ -294,7 +147,9 @@ async function callClaude(rawText: string): Promise<{
     };
     return {
       parsed,
-      signals: emptySignals("low"),
+      // The model's own layout and spelling findings survive when that part
+      // of the reply is well formed; only a reply without them reads "low".
+      signals: readSignals(loose._parseSignals) ?? emptySignals("low"),
       usedFallback: true,
     };
   }
