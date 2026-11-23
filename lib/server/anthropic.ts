@@ -1,5 +1,6 @@
-// Shared settings for the four Claude-proxy routes (ai-improve, jd-match,
-// jd-match/rewrite-bullet, resume-checker parse).
+// Shared settings for the six Claude-proxy routes (ai-improve, jd-match,
+// jd-match/rewrite-bullet, cover-letter, linkedin-message, resume-checker
+// parse).
 //
 // One place for the model ID so the next model bump is a one-line change
 // rather than a hunt across routes.
