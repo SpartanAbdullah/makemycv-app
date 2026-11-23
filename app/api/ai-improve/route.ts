@@ -15,15 +15,15 @@ import {
   getClientIp,
   makeLimiter,
 } from "@/lib/server/rateLimit";
-import type { RoleFamily } from "@/lib/data/roleFamily";
 import { clipImproveInput } from "@/lib/ai/improveInput";
+import { buildImprovePrompt, type ImproveType } from "@/lib/ai/improvePrompt";
 import { askWithOneRetry, readImproveReply, type ImproveReply } from "@/lib/ai/improveReply";
 import { NOTHING_TO_SUGGEST, nothingToSuggestMessage } from "@/lib/ai/improveOutcome";
 import { logAiFailure } from "@/lib/server/logRouteError";
 
 const ROUTE = "api/ai-improve";
 
-type AIType = "bullets" | "skills" | "summary";
+type AIType = ImproveType;
 
 type RequestBody = {
   type: AIType;
@@ -34,46 +34,10 @@ type RequestBody = {
   experienceRoles?: { title: string; company: string; bullets: string[] }[];
   existingSkills?: string[];
   existingSummary?: string;
-  // Job domain (Phase 1 personalization) — prepends a specialist clause to the
-  // system prompt so wording is domain-native, not generic "UAE job market".
-  domain?: RoleFamily;
-};
-
-// Per-domain specialist clause. Each names the family's "proof unit" so the
-// model quantifies the way that field's recruiters expect.
-const DOMAIN_CLAUSE: Partial<Record<RoleFamily, string>> = {
-  sales:
-    "The candidate works in Sales & Business Development — every bullet should quantify revenue, quota, pipeline or client growth in AED or %.",
-  marketing:
-    "The candidate works in Marketing & Digital — quantify reach, engagement, CAC/ROAS and campaign-attributed revenue.",
-  finance:
-    "The candidate works in Finance — quantify AED amounts, budgets, variances and compliance (FTA/VAT, IFRS).",
-  accounting:
-    "The candidate works in Accounting & Audit — emphasise accuracy, reconciliations, close cycles and IFRS/VAT compliance.",
-  operations:
-    "The candidate works in Operations & Management — quantify team size, budget owned, cost savings and efficiency %.",
-  logistics:
-    "The candidate works in Logistics & Supply Chain — quantify shipments, cost/lead-time reductions and supplier savings.",
-  hr:
-    "The candidate works in Human Resources — quantify headcount, time-to-hire, turnover and MOHRE/WPS compliance.",
-  admin:
-    "The candidate works in Administration/PRO — emphasise scope (execs supported, entities), named systems (Tasheel, MS365) and zero-error accuracy.",
-  engineering:
-    "The candidate works in Engineering & Construction — quantify project value, on-time/on-budget delivery, HSE (NEBOSH) and code compliance.",
-  it:
-    "The candidate works in IT & Software — quantify users, uptime, performance gains and name concrete technologies.",
-  hospitality:
-    "The candidate works in Hospitality & F&B — quantify covers/occupancy and guest-satisfaction, and name systems (Opera PMS, HACCP).",
-  retail:
-    "The candidate works in Retail — quantify sales-target attainment, basket size, footfall and shrinkage.",
-  realestate:
-    "The candidate works in Real Estate — quantify deal value in AED, occupancy and leads, and note RERA where relevant.",
-  healthcare:
-    "The candidate works in Healthcare — emphasise patient volumes, clinical standards and DHA/DOH/MOH licensure.",
-  education:
-    "The candidate works in Education & Training — quantify learners, attainment gains and curriculum (KHDA/ADEK).",
-  customerservice:
-    "The candidate works in Customer Service — quantify CSAT, handling time, first-contact resolution and languages.",
+  // Job field (Phase 1 personalization). Adds a FIELD CONTEXT paragraph after
+  // the rules of the system prompt; see lib/ai/improvePrompt.ts, which holds
+  // all three prompts.
+  domain?: string;
 };
 
 const SUPPORT_URL = "https://www.makemycv.ae/support";
@@ -107,122 +71,6 @@ function rateLimitedResponse(retryAfterSeconds: number) {
       headers: { "Retry-After": String(safeRetryAfter) },
     },
   );
-}
-
-// Prepends the domain specialist clause (when a domain is set) to the base
-// system prompt, so the model writes domain-native wording.
-function buildPrompt(body: RequestBody): { system: string; user: string } {
-  const base = buildBasePrompt(body);
-  // own-property check: `domain` comes from the request, and "constructor" would
-  // otherwise resolve to a function on the object's prototype.
-  const clause =
-    typeof body.domain === "string" && Object.hasOwn(DOMAIN_CLAUSE, body.domain)
-      ? DOMAIN_CLAUSE[body.domain]
-      : undefined;
-  if (!clause) return base;
-  return { system: `${clause}\n\n${base.system}`, user: base.user };
-}
-
-function buildBasePrompt(body: RequestBody): { system: string; user: string } {
-  switch (body.type) {
-    case "bullets": {
-      const existing = (body.existingBullets ?? []).filter(Boolean).join("\n");
-      // Truthfulness contract (2026-10-24, audit F31). The previous prompt said
-      // "use realistic estimates if not provided" and the model obliged with a
-      // 22% saving, an AED 4.5M budget and a 91→98% accuracy gain the candidate
-      // never entered. Figures now come from the user: the model writes the
-      // literal {{number}} token and the UI refuses to insert text that still
-      // carries one (lib/ai/placeholders.ts, components/ai/PlaceholderText).
-      return {
-        system:
-          "You are an expert CV editor for the UAE job market. You write " +
-          "ATS-optimised, impact-focused bullet points using the CAR framework " +
-          "(Context, Action, Result): strong action verb, one sentence, never " +
-          "first person.\n\n" +
-          "TRUTHFULNESS OVERRIDES EVERYTHING. The ONLY facts you may state are " +
-          "the job title, the company and the existing bullets you are given. " +
-          "You must NEVER invent numbers, percentages, amounts, headcounts, " +
-          "durations, named tools or systems, certifications, clients, " +
-          "projects or outcomes. A plausible-sounding figure the candidate " +
-          "never stated is a failure, not a success.\n\n" +
-          "Wherever a figure would strengthen a bullet, write the literal " +
-          "placeholder {{number}} in its place - e.g. \"Reduced delivery lead " +
-          "time by {{number}}% across {{number}} warehouses\". The user " +
-          "replaces it with the real value. Never write a real number that is " +
-          "not in the input.\n\n" +
-          "Respond ONLY with a JSON array of strings. No explanation. No markdown.",
-        user:
-          `Suggest 4 CV bullet points for this role, within the candidate's own scope:\n` +
-          `Job Title: ${body.jobTitle ?? ""}\n` +
-          `Company: ${body.company ?? ""}\n` +
-          `Existing bullets (the ONLY source of facts beyond the title): ${existing || "(none)"}\n\n` +
-          `Rules:\n` +
-          `- Each bullet starts with a strong action verb, one sentence, max 20 words.\n` +
-          `- Describe responsibilities and outcomes typical for this title only in terms the candidate can confirm - no named tools, clients or metrics unless they appear above.\n` +
-          `- Use {{number}} wherever a metric, amount, headcount or duration belongs. Never a real number that is not in the input.\n` +
-          `- Do not repeat an existing bullet.\n` +
-          `Format: ["bullet 1", "bullet 2", "bullet 3", "bullet 4"]`,
-      };
-    }
-    case "skills": {
-      const roles = (body.experienceRoles ?? [])
-        .map((r) => `- ${r.title} at ${r.company}: ${r.bullets.join("; ")}`)
-        .join("\n");
-      const existing = (body.existingSkills ?? []).join(", ");
-      return {
-        system:
-          "You are a UAE job market expert and ATS optimisation specialist. " +
-          "You suggest skills a candidate's OWN headline and experience make " +
-          "plausible - you do not assert skills, tools or credentials they " +
-          "never mentioned. Respond ONLY with a JSON array of strings. " +
-          "No explanation. No markdown. No duplicates from existing skills.",
-        user:
-          `Suggest 8-10 relevant professional skills for this candidate:\n` +
-          `Headline / Job Title: ${body.headline ?? ""}\n` +
-          `Experience:\n${roles}\n\n` +
-          `Already has these skills (do NOT repeat): ${existing}\n\n` +
-          `Return 8-10 skill strings as a JSON array.\n` +
-          `Name a specific product or system ONLY if it appears in the experience above; otherwise use the general skill (e.g. 'ERP systems', not 'Odoo ERP').\n` +
-          `Never suggest certifications, licences or qualifications - employers verify those.\n` +
-          `Mix: technical skills and soft skills relevant to the UAE market.\n` +
-          `Format: ["Skill 1", "Skill 2", ...]`,
-      };
-    }
-    case "summary": {
-      const roles = (body.experienceRoles ?? [])
-        .map((r) => `- ${r.title} at ${r.company}`)
-        .join("\n");
-      return {
-        system:
-          "You are an expert CV writer specialising in the UAE job market. " +
-          "You write compelling professional summaries that pass ATS filters " +
-          "and engage human recruiters. TRUTHFULNESS OVERRIDES EVERYTHING: " +
-          "state only facts present in the headline, roles, bullets and " +
-          "existing summary you are given. Never invent years of experience, " +
-          "metrics, team sizes, tools, clients or outcomes - write the literal " +
-          "placeholder {{number}} wherever such a figure belongs and the user " +
-          "will fill it in. Respond ONLY with a JSON array of exactly 3 " +
-          "strings. No explanation. No markdown.",
-        user:
-          `Write 3 different professional summary variations for this candidate:\n` +
-          `Headline / Job Title: ${body.headline ?? ""}\n` +
-          `Experience:\n${roles}\n` +
-          `Existing summary for context: ${body.existingSummary ?? ""}\n\n` +
-          `Requirements for each variation:\n` +
-          `- 3-4 sentences maximum\n` +
-          `- Open with the role and {{number}} years of experience (use the placeholder unless the years are stated above), or a strong value statement\n` +
-          `- Where a metric or achievement belongs, write {{number}} - never a figure that is not in the input\n` +
-          `- UAE-market appropriate tone (professional, direct)\n` +
-          `- ATS-friendly (include relevant keywords from their field)\n` +
-          `- Each variation must have a distinct tone:\n` +
-          `  Variation 1: Achievement-focused\n` +
-          `  Variation 2: Skills and expertise focused\n` +
-          `  Variation 3: Career narrative / growth focused\n\n` +
-          `Return exactly 3 summaries as a JSON array of strings.\n` +
-          `Format: ["Summary 1", "Summary 2", "Summary 3"]`,
-      };
-    }
-  }
 }
 
 // A second attempt is only worth starting with this much of the 25 s budget
@@ -308,7 +156,7 @@ export async function POST(request: Request) {
     const spend = await takeSpendUnits(1);
     if (!spend.allowed) return spendCapResponse(spend.retryAfterSeconds);
 
-    const { system, user } = buildPrompt(input);
+    const { system, user } = buildImprovePrompt(input);
 
     // One retry when the reply could not be read (cut off, prose instead of
     // JSON). A refusal or an empty list is an answer, not a fault, and is not
