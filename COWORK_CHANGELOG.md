@@ -6,6 +6,17 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-23 13:40] AI prompts: the three points left open by the prompt review
+
+**Goal:** the release of the four prompt fixes listed three things not done. The owner asked for them ("fix the three open points too").
+**Files:**
+- created: `lib/ai/skillGuard.ts` (+ test), edited: `app/api/ai-improve/route.ts`, `lib/ai/improvePrompt.ts` - **skill suggestions could name a product the user never mentioned** ("AutoCAD" for a site engineer who typed no tool). The skills system prompt now says so with the general form to use ("CAD software", "Spreadsheets", "ERP systems"), and the route removes any suggestion that names a known product (about 65 product families: Office, SAP, Oracle, Salesforce, AutoCAD, Tally and so on) unless the user's headline, roles, bullets or existing skills name that product or another name of the same family. General categories always pass. If nothing is left, the answer is the usual "nothing to suggest". The builder's own one-tap skill chips are unchanged.
+- edited: `lib/ai/improvePrompt.ts` (+ test) - **summaries were written from job titles alone.** The builder has always sent each role's bullets with a summary request; the prompt dropped them. The first 3 roles now bring up to 4 bullets each, and the system prompt says to build the summary from them. Nothing new leaves the browser.
+- edited: `scripts/ai-eval.mjs` - **the repeatable check only covered bullets and summaries with no job field.** It now sends each fixture's job field, sends bullets with the summary request, covers skills, and also counts named regulators, licences and products the input did not contain. Default run is 10 requests (the route's daily per-IP limit).
+**Notes / risks / follow-up:** on `stagingmmc` only. Live check against the model (direct API calls with the compiled prompts): skills for 4 job fields, 40 suggestions, none named a product the input lacked, so the new route check removed nothing (the accountant whose bullet says "Tally" got "Tally software"); summaries for 3 fields, 9 summaries, no invented number, all drew on the bullets. Seen and not fixed: one summary added "FTA requirements" for an accountant whose input mentions VAT but not the FTA; one skills list offered "Bilingual communication (English and Arabic)" with no language in the input; summaries still contain soft claims around a blank ("Achieved {{number}} reduction in ..."), which the UI makes the user fill or remove. The product list in `skillGuard.ts` is hand-kept: a product not on it passes.
+**Verification:** tsc, lint 11/11, `npm test` (5 suites; 8 new tests), `npm run build`, `node --check scripts/ai-eval.mjs`, and the live check above. `scripts/ai-eval.mjs` itself was not run end to end (it needs a server with the rate-limit store).
+**Suggested commit:** fix(ai): skills never name an unmentioned product; summaries use the role's bullets; wider eval script
+
 ## [2026-11-23 12:10] AI prompts: four fixes from the prompt review
 
 **Goal:** the owner asked whether the fixed prompts behind the builder's AI features are current and useful. The review of the six call sites (all on `claude-haiku-5-5`) found four defects; the owner approved fixing all four ("Yes, fix all four").
