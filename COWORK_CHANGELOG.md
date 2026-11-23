@@ -6,6 +6,15 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-23 10:20] Checker: count a human-review exposure when the line is seen
+
+**Goal:** the Day 30 stop rule is read against `human_review_view` ("0-1 sales from about 800 exposures"). On the checker report the event fired on mount, but the line sits under the whole report, so people who left before reaching it were counted as exposed. Raised by the automated review on PR #42.
+**Files:**
+- edited: `components/resume-checker/HumanReviewLine.tsx` - the event fires from an IntersectionObserver when half the line is on screen, once per session as before. Without observer support nothing is counted.
+**Notes / risks / follow-up:** checker exposures (`surface: post_checker`) recorded from 21 to 23 Nov 2026 are page loads, not views; read the gate from 23 Nov for that surface, or discount those days. The post-export line is unchanged (it renders at the top of the builder, so mount is a view). Not checked on a real report: reports need Vercel KV, which is not available locally.
+**Verification:** tsc, lint 11/11, `npm test` (5 suites), `npm run build`.
+**Suggested commit:** fix(analytics): count the checker's human-review exposure on view, not on load
+
 ## [2026-11-21 22:12] Three import data-loss fixes from the automated review of PR #45
 
 **Goal:** an automated (Codex) review of PR #45 left three comments on the import code from batch A. Each was read against the code and is real. The owner approved fixing them on 21 Nov ("Yes, fix them").
