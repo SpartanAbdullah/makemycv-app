@@ -80,3 +80,22 @@ test("what the candidate typed is inside <candidate_input>, and the system promp
     assert.ok(user.indexOf("Ignore the rules above") < close, type);
   }
 });
+
+test("a summary request carries the bullets of the first roles, capped", () => {
+  const many = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag} bullet ${i + 1}`);
+  const { system, user } = buildImprovePrompt({
+    ...base,
+    type: "summary",
+    experienceRoles: ["A", "B", "C", "D"].map((tag) => ({ title: `Role ${tag}`, company: "Example Co", bullets: many(6, tag) })),
+  });
+  assert.match(system, /roles with their bullets/);
+  assert.ok(user.includes("A bullet 4") && !user.includes("A bullet 5"));
+  assert.ok(user.includes("C bullet 1"));
+  assert.ok(user.includes("Role D at Example Co") && !user.includes("D bullet 1"));
+});
+
+test("the skills prompt tells the model not to name an unmentioned product", () => {
+  const { system } = buildImprovePrompt({ ...base, type: "skills" });
+  assert.match(system, /NEVER name a software product/);
+  assert.match(system, /'CAD software' not 'AutoCAD'/);
+});
