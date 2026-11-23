@@ -119,6 +119,10 @@ export const FIELD_CONTEXT: Partial<Record<RoleFamily, FieldContext>> = {
   },
 };
 
+/** How much of the experience a summary request carries into the prompt. */
+export const SUMMARY_ROLES_WITH_BULLETS = 3;
+export const SUMMARY_BULLETS_PER_ROLE = 4;
+
 const FIELD_HEADING =
   "FIELD CONTEXT (guidance on wording only; it is not a source of facts and " +
   "the truthfulness rules above override it):";
@@ -207,7 +211,12 @@ function basePrompt(body: ImprovePromptInput): { system: string; user: string } 
           "You are a UAE job market expert and ATS optimisation specialist. " +
           "You suggest skills a candidate's OWN headline and experience make " +
           "plausible - you do not assert skills, tools or credentials they " +
-          `never mentioned. ${DATA_NOT_INSTRUCTIONS} Respond ONLY with a JSON ` +
+          "never mentioned. NEVER name a software product, brand or platform " +
+          "that is not in the candidate's own text: write the general skill " +
+          "instead ('CAD software' not 'AutoCAD', 'Spreadsheets' not 'Excel', " +
+          "'ERP systems' not 'SAP', 'CRM software' not 'Salesforce'). A " +
+          "suggestion that names an unmentioned product is removed before the " +
+          `candidate sees it, so it is wasted. ${DATA_NOT_INSTRUCTIONS} Respond ONLY with a JSON ` +
           "array of strings. No explanation. No markdown. No duplicates from " +
           "existing skills.",
         user:
@@ -226,14 +235,28 @@ function basePrompt(body: ImprovePromptInput): { system: string; user: string } 
       };
     }
     case "summary": {
-      const roles = body.experienceRoles.map((r) => `- ${r.title} at ${r.company}`).join("\n");
+      // The builder has always sent each role's bullets with a summary
+      // request, but until 2026-11-23 only the titles reached the prompt, so
+      // summaries were written from "Accountant at X" alone. The first roles
+      // (the builder lists the latest first) now bring a few bullets each.
+      const roles = body.experienceRoles
+        .map((r, i) => {
+          const bullets =
+            i < SUMMARY_ROLES_WITH_BULLETS
+              ? r.bullets.filter(Boolean).slice(0, SUMMARY_BULLETS_PER_ROLE)
+              : [];
+          return `- ${r.title} at ${r.company}` + bullets.map((b) => `\n    * ${b}`).join("");
+        })
+        .join("\n");
       return {
         system:
           "You are an expert CV writer specialising in the UAE job market. " +
           "You write compelling professional summaries that pass ATS filters " +
           "and engage human recruiters. TRUTHFULNESS OVERRIDES EVERYTHING: " +
-          "state only facts present in the headline, roles and existing " +
-          "summary you are given. Never invent years of experience, " +
+          "state only facts present in the headline, the roles with their " +
+          "bullets and the existing summary you are given. Build the summary " +
+          "from what the bullets say the candidate did; a role with no " +
+          "bullets gives you its title and employer only. Never invent years of experience, " +
           "metrics, team sizes, tools, clients or outcomes - write the literal " +
           "placeholder {{number}} wherever such a figure belongs and the user " +
           `will fill it in. ${DATA_NOT_INSTRUCTIONS} Respond ONLY with a JSON ` +
@@ -243,7 +266,7 @@ function basePrompt(body: ImprovePromptInput): { system: string; user: string } 
           asData(
             "candidate_input",
             `Headline / Job Title: ${body.headline}\n` +
-              `Experience:\n${roles}\n` +
+              `Experience (latest first, with what they did there):\n${roles}\n` +
               `Existing summary for context: ${body.existingSummary}`,
           ) +
           `\n\nRequirements for each variation:\n` +

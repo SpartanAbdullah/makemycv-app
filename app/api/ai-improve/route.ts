@@ -17,6 +17,7 @@ import {
 } from "@/lib/server/rateLimit";
 import { clipImproveInput } from "@/lib/ai/improveInput";
 import { buildImprovePrompt, type ImproveType } from "@/lib/ai/improvePrompt";
+import { dropUnmentionedProducts, skillsInputText } from "@/lib/ai/skillGuard";
 import { askWithOneRetry, readImproveReply, type ImproveReply } from "@/lib/ai/improveReply";
 import { NOTHING_TO_SUGGEST, nothingToSuggestMessage } from "@/lib/ai/improveOutcome";
 import { logAiFailure } from "@/lib/server/logRouteError";
@@ -179,7 +180,17 @@ export async function POST(request: Request) {
     }
 
     if (attempt.kind === "results") {
-      return NextResponse.json({ results: attempt.results, type: body.type });
+      // Skills only: a suggestion that names a product the candidate never
+      // typed is removed here, whatever the prompt asked for
+      // (lib/ai/skillGuard.ts). If that leaves nothing, the answer is the
+      // same "nothing to suggest" as an empty reply.
+      const results =
+        body.type === "skills"
+          ? dropUnmentionedProducts(attempt.results, skillsInputText(input))
+          : attempt.results;
+      if (results.length > 0) {
+        return NextResponse.json({ results, type: body.type });
+      }
     }
 
     // Declined, or unreadable twice: say so plainly. 422 — the request was
