@@ -970,6 +970,50 @@ body {
   color: var(--ff-accent-dark);
 }
 
+/* Skills step, backlog F4 (2026-11-28): a technical chip carries a small mono
+   "tech" tag, and the open chip's panel has a General / Technical switch.
+   The switch is two aria-pressed buttons in one pill; the pressed one is
+   ink-filled, like the other segmented controls in the builder. */
+.cv-skill-chip-tag {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ff-muted);
+}
+.cv-skill-kind {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ff-line-strong);
+  border-radius: 999px;
+  background: var(--ff-card);
+}
+.cv-skill-kind-seg {
+  border: none;
+  border-radius: 999px;
+  /* 6px + 18px line + 6px = 30px; .ff-hit-target-v adds 8px above and below,
+     so each half reaches the 44px touch floor without overlapping the other. */
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  background: transparent;
+  color: var(--ff-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.cv-skill-kind-seg:hover {
+  background: var(--ff-sunken);
+  color: var(--ff-ink);
+}
+.cv-skill-kind-seg[aria-pressed="true"] {
+  background: var(--ff-ink);
+  color: #fff;
+  cursor: default;
+}
+
 /* Step heading — large Bricolage display */
 .cv-step-heading {
   font-family: var(--font-display);

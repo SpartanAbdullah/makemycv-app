@@ -64,7 +64,10 @@ export type CvSkill = {
   name: string;
   level?: SkillLevel;
   // Optional grouping: "technical" skills render under a separate "Technical
-  // Skills" heading on the ATS templates. Absent = general skill.
+  // Skills" heading (or "Technical" sub-label / Harvard's "Technical:" line)
+  // on every template, live and PDF (backlog F4, 2026-11-28). Set from the
+  // suggestion's kind when picked, and by the user in the Skills step.
+  // Absent = general skill.
   category?: "technical" | "general";
 };
 

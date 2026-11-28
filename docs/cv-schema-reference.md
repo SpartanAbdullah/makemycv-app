@@ -95,6 +95,7 @@ export type CvSkill = {
   id: string;
   name: string;            // required
   level?: SkillLevel;      // optional; only `beginner|intermediate|advanced`
+  category?: "technical" | "general"; // optional; absent = general
 };
 
 export type CvLanguage = {
@@ -205,6 +206,7 @@ Array minimum: 1 entry.
 | `id` | string | ✅ | |
 | `name` | string | ✅ min 1 | |
 | `level` | enum / optional | optional | Only `beginner` \| `intermediate` \| `advanced` |
+| `category` | enum / optional | optional | `technical` prints under its own "Technical Skills" heading (or "Technical" sub-label) on every template except Harvard, which prints a "Technical:" line. Absent or `general` = general. Set from the suggestion's kind (tool / system) when picked, and by the user in the Skills step (2026-11-28, backlog F4). |
 
 Array minimum: 1 skill.
 
@@ -532,7 +534,7 @@ These are gaps relative to common CV expectations — flagged for product discus
   - No `expiryDate` — critical for safety/compliance certs (NEBOSH, OSHA, etc.).
   - No `credentialId` / `credentialUrl` — needed to make the cert verifiable.
 - **Skills**
-  - No `category` / `group` (e.g. "Languages", "Tools", "Software", "Soft skills"). Some templates would group; today everything is a flat list.
+  - Only two groups: `category` is general or technical (see 3.4). No finer groups ("Languages", "Tools", "Soft skills").
   - No "featured / primary" flag for a top-skills callout.
 - **Projects**
   - No date range (start/end).

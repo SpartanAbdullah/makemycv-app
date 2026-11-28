@@ -34,7 +34,12 @@
  *     the schema for saved CVs; this step no longer writes it.
  *   * The "Add as General/Technical" pre-toggle — a mode you had to set BEFORE
  *     typing, and could only undo by deleting the skill. Category is now
- *     derived from what the thing IS (categoryFor).
+ *     derived from what the thing IS (categoryFor) when a suggestion is
+ *     picked. Since 2026-11-28 (backlog F4, a user asked for software skills
+ *     to stand apart) the user can change it AFTER adding, typed skills
+ *     included: the open chip's panel has a General / Technical switch, and
+ *     a technical chip carries a small "tech" tag. Every template prints
+ *     technical skills under their own heading.
  *   * The 10-20 ATS counter. Term CHOICE beats term COUNT, and a count nudges
  *     padding. Replaced by a mirror of the first three skills, which is what a
  *     recruiter's two seconds actually contains.
@@ -326,6 +331,16 @@ export const SkillsStep = ({
   const putBack = (name: string) => {
     restoreSkill(name);
     addSkill(name);
+  };
+
+  /**
+   * File a skill under General or Technical (backlog F4). Templates print
+   * technical skills under their own heading; categoryFor only sets the
+   * starting value when a suggestion is picked, and a typed skill starts
+   * general. The choice is the user's, in the open chip's panel.
+   */
+  const setSkillCategory = (id: string, category: "technical" | "general") => {
+    writeSkills(fields.map((f) => toCvSkill(f.id === id ? { ...f, category } : f)));
   };
 
   const moveSkill = (index: number, dir: -1 | 1) => {
@@ -934,6 +949,9 @@ export const SkillsStep = ({
                       }}
                     >
                       {field.name}
+                      {field.category === "technical" && (
+                        <span className="cv-skill-chip-tag">tech</span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -980,6 +998,37 @@ export const SkillsStep = ({
                   : arrival.evidenceUsable
                     ? "this word doesn't appear anywhere else in your CV."
                     : "on your list."}
+              </span>
+              {/* General / Technical (backlog F4): where the CV lists it. A
+                  labelled pair of toggle buttons, not a select, so both
+                  options are visible and one tap switches. */}
+              <span
+                role="group"
+                aria-label={`List ${openChip.field.name} under`}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                <span aria-hidden="true">List under</span>
+                <span className="cv-skill-kind">
+                  {(["general", "technical"] as const).map((kind) => {
+                    const active =
+                      kind === "technical"
+                        ? openChip.field.category === "technical"
+                        : openChip.field.category !== "technical";
+                    return (
+                      <button
+                        key={kind}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          if (!active) setSkillCategory(openChip.field.id, kind);
+                        }}
+                        className="cv-skill-kind-seg ff-hit-target-v"
+                      >
+                        {kind === "technical" ? "Technical" : "General"}
+                      </button>
+                    );
+                  })}
+                </span>
               </span>
               {/* The doubt gets somewhere to go that is neither a claim nor a
                   deletion. Equal weight to the other actions. */}
