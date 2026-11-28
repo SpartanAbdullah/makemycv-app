@@ -6,6 +6,15 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-28 16:10] Skills: separate items on ATS Clean, Classic and Professional too (backlog F3)
+
+**Goal:** the first F3 pass (entry below) left ATS Clean, Classic and Professional alone because they were not in the approved four, though they also printed skills as one joined line. The owner asked for the same treatment ("Yes, add those three").
+**Files:**
+- edited: `lib/templates/{ats-clean,classic,professional}.tsx`, `components/pdf/CVDocument.tsx`, `lib/templates/skillItems.tsx` (`className`, `centered`) - each skill is its own item that wraps whole, with a lighter separator and half an em either side: gray-400 "·" on ATS Clean, slate-400 "·" on Classic, Professional's own light "•" (#CBD5E1), still centred. ATS Clean stays plain text, not chips. Professional's PDF used to wrap differently from its preview and printed a stray dash ("Client Relationship Management-"); both now break at the same skill.
+**Notes / risks / follow-up:** ATS Clean with the Arabic-only test CV moved from 10.26% to 11.55% page-1 block difference. The skills block itself matches in both renderers; the number comes from a vertical drift that starts earlier, in the education entry, which this change did not touch. Every other cell matched or improved.
+**Verification:** tsc; lint 11/11; `npm test` (5 suites); `npm run build`; `smoke:pdf`; `smoke:arabic` 98/98; against `next start`: `fidelity:pdf --gate` 42 cells, no regression; `--persona=skills-mix`, `arabic-only`, `bilingual` on the three; `smoke:builder` all checks; real Review-step downloads of the three read back with pdf.js (text in order, separators intact). Before/after in `_cowork/skills-f3-f4-2026-11-28/compare/`.
+**Suggested commit:** fix(templates): print skills as separate items on ATS Clean, Classic and Professional (F3)
+
 ## [2026-11-28 15:20] Skills: separate items on four templates, Technical Skills everywhere, a General / Technical switch (backlog F3, F4)
 
 **Goal:** a user wrote in on 26 Nov with four requests. The owner approved two on 28 Nov and lifted the feature hold for them only: skills that "look like one continuous sentence" (F3) and software skills that should stand apart (F4). F1 (renamable sections) and F2 (user section order) stay on hold and were not touched.
@@ -17,7 +26,7 @@ Format:
 - edited: `lib/data/preview-profiles.ts`, `scripts/pdf-fidelity.mjs`, `app/preview/[templateId]/page.tsx` - a synthetic `skills-mix` review persona (16 skills, half technical) for `/preview/<id>?persona=skills-mix` and `pdf-fidelity.mjs --persona=skills-mix`.
 - edited: `lib/types/cv.ts`, `docs/cv-schema-reference.md` - `category` documented.
 **Notes / risks / follow-up:**
-- ATS Clean, Classic and Professional also join skills into one line (" · ", ", ", " • "). They were not in the approved four and ATS Clean's single text line is a deliberate 2026-10 audit choice, so they are unchanged. Applying the same item layout to them is one line per renderer; owner's call.
+- ATS Clean, Classic and Professional also join skills into one line (" · ", ", ", " • "). They were not in the approved four and ATS Clean's single text line is a deliberate 2026-10 audit choice, so they are unchanged. Applying the same item layout to them is one line per renderer; owner's call. (Done later the same day at the owner's request: entry above.)
 - The Word export keeps commas between skills (Word wraps by word, and the request was about the templates).
 - In the PDF each skill is now its own text run; the text layer still reads "A · B · C" in order (pdf.js puts a space at each gap, checked on all ten touched templates). A parser that glues runs without spaces would read "A ·B ·C"; the separator still splits them.
 - The switch is in the panel that opens when a skill is tapped; nothing on the step says so. If people do not find it, a one-line hint under "Your skills" is the next step.
