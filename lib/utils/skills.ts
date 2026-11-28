@@ -21,6 +21,40 @@ export function splitSkills(skills: CvSkill[]): {
   return { general, technical };
 }
 
+export type SkillGroup = {
+  /**
+   * Section key for first-section spacing. The first group printed is always
+   * "skills", so a CV with only technical skills keeps the gap rules a lone
+   * Skills section had; a technical group after a general one is
+   * "technical-skills".
+   */
+  key: "skills" | "technical-skills";
+  title: "Skills" | "Technical Skills";
+  skills: CvSkill[];
+};
+
+/**
+ * The skills sections a template prints, in order, empties dropped (backlog
+ * F4, 2026-11-28): general skills under "Skills", then technical skills under
+ * their own "Technical Skills" heading — the split ATS Clean, Classic and
+ * Professional already printed, for the templates that list skills as chips
+ * or rows. An untagged CV (every legacy one) gets one "Skills" group, exactly
+ * as before.
+ */
+export function skillGroups(skills: CvSkill[]): SkillGroup[] {
+  const { general, technical } = splitSkills(skills);
+  const groups: SkillGroup[] = [];
+  if (general.length > 0) groups.push({ key: "skills", title: "Skills", skills: general });
+  if (technical.length > 0) {
+    groups.push({
+      key: general.length > 0 ? "technical-skills" : "skills",
+      title: "Technical Skills",
+      skills: technical,
+    });
+  }
+  return groups;
+}
+
 /** The names a skills list prints: trimmed, empties dropped, order kept. */
 export function skillNames(skills: CvSkill[]): string[] {
   return skills.map((skill) => skill.name.trim()).filter(Boolean);

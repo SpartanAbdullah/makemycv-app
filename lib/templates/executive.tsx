@@ -10,6 +10,7 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
+import { skillGroups } from "../utils/skills";
 import { resolveTheme } from "./theme";
 import { bulletLiProps } from "./utils";
 
@@ -330,36 +331,37 @@ export const ExecutiveTemplate = ({
           </div>
         )}
 
-        {/* Skills */}
-        {hasSkills && (
-          <div style={{ marginTop: `${20 * sp}px` }}>
-            <SidebarLabel color={onAccentMuted} fontScale={fs}>Skills</SidebarLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {data.skills.map((skill) => (
-                <div
-                  key={skill.id}
-                  style={{ display: "flex", alignItems: "baseline", gap: "6px" }}
-                >
-                  <span
-                    style={{
-                      color: onAccentMuted,
-                      fontSize: `${12 * fs}px`,
-                      lineHeight: 1 * ls,
-                      flexShrink: 0,
-                    }}
+        {/* Skills, then Technical Skills under their own label (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <div key={group.key} style={{ marginTop: `${20 * sp}px` }}>
+              <SidebarLabel color={onAccentMuted} fontScale={fs}>{group.title}</SidebarLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                {group.skills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    style={{ display: "flex", alignItems: "baseline", gap: "6px" }}
                   >
-                    ·
-                  </span>
-                  <span
-                    style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.7 * ls }}
-                  >
-                    {skill.name}
-                  </span>
-                </div>
-              ))}
+                    <span
+                      style={{
+                        color: onAccentMuted,
+                        fontSize: `${12 * fs}px`,
+                        lineHeight: 1 * ls,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ·
+                    </span>
+                    <span
+                      style={{ fontSize: `${10 * fs}px`, color: onAccentMuted, lineHeight: 1.7 * ls }}
+                    >
+                      {skill.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
 
         {/* Languages */}
         {hasLanguages && (

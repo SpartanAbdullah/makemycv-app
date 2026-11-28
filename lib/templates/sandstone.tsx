@@ -10,6 +10,7 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
+import { skillGroups } from "../utils/skills";
 import { resolveTheme } from "./theme";
 import { bulletLiProps } from "./utils";
 
@@ -367,30 +368,37 @@ export const SandstoneTemplate = ({
           </section>
         )}
 
-        {hasSkills && (
-          <section>
-            <MainHeading accent={accentText} isFirst={!hasSummary && !hasExperience && !hasEducation} fontScale={fs} spaceScale={sp}>
-              Skills
-            </MainHeading>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {data.skills.map((skill) => (
-                <span
-                  key={skill.id}
-                  style={{
-                    fontSize: `${10.5 * fs}px`,
-                    color: "#44403C",
-                    background: "#F5F0E6",
-                    border: "1px solid #E2D8C4",
-                    borderRadius: "4px",
-                    padding: "2px 9px",
-                  }}
-                >
-                  {skill.name}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <section key={group.key}>
+              <MainHeading
+                accent={accentText}
+                isFirst={group.key === "skills" && !hasSummary && !hasExperience && !hasEducation}
+                fontScale={fs}
+                spaceScale={sp}
+              >
+                {group.title}
+              </MainHeading>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {group.skills.map((skill) => (
+                  <span
+                    key={skill.id}
+                    style={{
+                      fontSize: `${10.5 * fs}px`,
+                      color: "#44403C",
+                      background: "#F5F0E6",
+                      border: "1px solid #E2D8C4",
+                      borderRadius: "4px",
+                      padding: "2px 9px",
+                    }}
+                  >
+                    {skill.name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ))}
 
         {hasCertifications && (
           <section>

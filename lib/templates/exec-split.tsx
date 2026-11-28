@@ -10,6 +10,7 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
+import { skillGroups } from "../utils/skills";
 import { resolveTheme } from "./theme";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -566,37 +567,38 @@ export const ExecSplitTemplate = ({
             </section>
           )}
 
-          {/* Skills */}
-          {hasSkills && (
-            <section>
-              <SectionHeading accent={theme.accentText} spaceScale={theme.spaceScale} fontScale={theme.fontScale}>Skills</SectionHeading>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap" as const,
-                  gap: "4px",
-                }}
-              >
-                {data.skills.map((skill) => (
-                  <span
-                    key={skill.id}
-                    style={{
-                      display: "inline-flex",
-                      fontSize: `${9.5 * theme.fontScale}px`,
-                      color: theme.accentText,
-                      border: "1px solid #CBD5E1",
-                      borderRadius: "3px",
-                      padding: "1px 6px",
-                      backgroundColor: "#F1F5F9",
-                      lineHeight: 1.5 * theme.lineScale,
-                    }}
-                  >
-                    {skill.name}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+          {hasSkills &&
+            skillGroups(data.skills).map((group) => (
+              <section key={group.key}>
+                <SectionHeading accent={theme.accentText} spaceScale={theme.spaceScale} fontScale={theme.fontScale}>{group.title}</SectionHeading>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap" as const,
+                    gap: "4px",
+                  }}
+                >
+                  {group.skills.map((skill) => (
+                    <span
+                      key={skill.id}
+                      style={{
+                        display: "inline-flex",
+                        fontSize: `${9.5 * theme.fontScale}px`,
+                        color: theme.accentText,
+                        border: "1px solid #CBD5E1",
+                        borderRadius: "3px",
+                        padding: "1px 6px",
+                        backgroundColor: "#F1F5F9",
+                        lineHeight: 1.5 * theme.lineScale,
+                      }}
+                    >
+                      {skill.name}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            ))}
 
           {/* Languages */}
           {hasLanguages && (

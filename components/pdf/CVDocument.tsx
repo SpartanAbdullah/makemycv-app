@@ -39,7 +39,7 @@ import {
   meaningfulEducation,
 } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
-import { skillListDirection, skillNames, splitSkills } from "../../lib/utils/skills";
+import { skillGroups, skillListDirection, skillNames, splitSkills } from "../../lib/utils/skills";
 import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
 // Gulf Standard shares its Personal Details rows and degree de-dup rule with
 // the live template so both renderers print identical label/value pairs.
@@ -1658,21 +1658,23 @@ const ExecutivePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Skills: 10px × 1.7 rows (the 12px dot sits inside that box), 2px apart */}
-        {hasSkills && (
-          <View>
-            <Text style={sideLabel("skills")}>Skills</Text>
-            {data.skills.map((skill, i) => (
-              <Text
-                key={skill.id}
-                style={{ ...s.execSkillItem, color: onAccentMuted, marginTop: i > 0 ? pt(2) : 0 }}
-              >
-                <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
-                {skill.name}
-              </Text>
-            ))}
-          </View>
-        )}
+        {/* Skills: 10px × 1.7 rows (the 12px dot sits inside that box), 2px
+            apart; technical skills under their own label (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <View key={group.key}>
+              <Text style={sideLabel(group.key)}>{group.title}</Text>
+              {group.skills.map((skill, i) => (
+                <Text
+                  key={skill.id}
+                  style={{ ...s.execSkillItem, color: onAccentMuted, marginTop: i > 0 ? pt(2) : 0 }}
+                >
+                  <Text style={{ color: onAccentMuted }}>{"·  "}</Text>
+                  {skill.name}
+                </Text>
+              ))}
+            </View>
+          ))}
 
         {/* Languages: 10px × 1.7 rows, 2px apart */}
         {hasLanguages && (
@@ -2701,26 +2703,30 @@ const ModernPDFLayout = ({ data }: { data: CvData }) => {
             </>
           )}
 
-          {hasSkills && (
-            <>
-              <ModernHeading style={{ ...heading, ...gapFor(asideOrder, "skills") }}>Skills</ModernHeading>
-              {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
-              <PdfChips
-                items={data.skills.map((sk) => ({ value: sk.name }))}
-                v={{
-                  fontSize: 9 * fs,
-                  lineHeight: absLine(16, 12),
-                  color: SLATE_900,
-                  backgroundColor: MODERN_SLATE_100,
-                  borderRadius: 999,
-                  paddingVertical: 3,
-                  paddingHorizontal: 9,
-                  gap: 6,
-                }}
-                style={{ marginTop: 9 }}
-              />
-            </>
-          )}
+          {/* Skills, then Technical Skills under their own heading (backlog
+              F4); a technical group after the general one is a later aside
+              section, so it takes the space-y gap. */}
+          {hasSkills &&
+            skillGroups(data.skills).map((group) => (
+              <View key={group.key}>
+                <ModernHeading style={{ ...heading, ...gapFor(asideOrder, group.key) }}>{group.title}</ModernHeading>
+                {/* mt-3 flex-wrap gap-2; rounded-full bg-slate-100 px-3 py-1 */}
+                <PdfChips
+                  items={group.skills.map((sk) => ({ value: sk.name }))}
+                  v={{
+                    fontSize: 9 * fs,
+                    lineHeight: absLine(16, 12),
+                    color: SLATE_900,
+                    backgroundColor: MODERN_SLATE_100,
+                    borderRadius: 999,
+                    paddingVertical: 3,
+                    paddingHorizontal: 9,
+                    gap: 6,
+                  }}
+                  style={{ marginTop: 9 }}
+                />
+              </View>
+            ))}
         </View>
         </View>
       </View>
@@ -3017,26 +3023,28 @@ const ExecSplitPDFLayout = ({ data }: { data: CvData }) => {
             </View>
           )}
 
-          {hasSkills && (
-            <View>
-              <PdfHeading fonts={fonts} v={heading}>Skills</PdfHeading>
-              {/* 9.5px accentText on #F1F5F9, 1px #CBD5E1, radius 3, 1px 6px, gap 4px */}
-              <PdfChips
-                items={data.skills.map((sk) => ({ value: sk.name }))}
-                v={{
-                  fontSize: pt(9.5) * fs,
-                  lineHeight: 1.5 * theme.lineScale,
-                  color: theme.accentText,
-                  backgroundColor: "#F1F5F9",
-                  borderColor: "#CBD5E1",
-                  borderRadius: pt(3),
-                  paddingVertical: pt(1),
-                  paddingHorizontal: pt(6),
-                  gap: pt(4),
-                }}
-              />
-            </View>
-          )}
+          {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+          {hasSkills &&
+            skillGroups(data.skills).map((group) => (
+              <View key={group.key}>
+                <PdfHeading fonts={fonts} v={heading}>{group.title}</PdfHeading>
+                {/* 9.5px accentText on #F1F5F9, 1px #CBD5E1, radius 3, 1px 6px, gap 4px */}
+                <PdfChips
+                  items={group.skills.map((sk) => ({ value: sk.name }))}
+                  v={{
+                    fontSize: pt(9.5) * fs,
+                    lineHeight: 1.5 * theme.lineScale,
+                    color: theme.accentText,
+                    backgroundColor: "#F1F5F9",
+                    borderColor: "#CBD5E1",
+                    borderRadius: pt(3),
+                    paddingVertical: pt(1),
+                    paddingHorizontal: pt(6),
+                    gap: pt(4),
+                  }}
+                />
+              </View>
+            ))}
 
           {hasLanguages && (
             <View>
@@ -3442,25 +3450,26 @@ const CorpSidebarPDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {/* Skills */}
-        {hasSkills && (
-          <View>
-            <Text style={sideLabel("skills")}>Skills</Text>
-            <PdfChips
-              items={data.skills.map((sk) => ({ value: sk.name }))}
-              v={{
-                fontSize: pt(9) * fs,
-                lineHeight: 1.5 * theme.lineScale,
-                color: onAccentMuted,
-                backgroundColor: mix(onAccent, theme.accent, 0.92),
-                borderRadius: pt(3),
-                paddingVertical: pt(2),
-                paddingHorizontal: pt(6),
-                gap: pt(3),
-              }}
-            />
-          </View>
-        )}
+        {/* Skills, then Technical Skills under their own label (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <View key={group.key}>
+              <Text style={sideLabel(group.key)}>{group.title}</Text>
+              <PdfChips
+                items={group.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: pt(9) * fs,
+                  lineHeight: 1.5 * theme.lineScale,
+                  color: onAccentMuted,
+                  backgroundColor: mix(onAccent, theme.accent, 0.92),
+                  borderRadius: pt(3),
+                  paddingVertical: pt(2),
+                  paddingHorizontal: pt(6),
+                  gap: pt(3),
+                }}
+              />
+            </View>
+          ))}
 
         {/* Languages */}
         {hasLanguages && (
@@ -4132,25 +4141,27 @@ const OnyxPDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {hasSkills && (
-          <View>
-            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
-            <PdfChips
-              items={data.skills.map((sk) => ({ value: sk.name }))}
-              v={{
-                fontSize: pt(10.5) * fs,
-                lineHeight: LH_NORMAL,
-                color: "#374151",
-                backgroundColor: "#F3F4F6",
-                borderColor: "#E5E7EB",
-                borderRadius: pt(4),
-                paddingVertical: pt(2),
-                paddingHorizontal: pt(9),
-                gap: pt(6),
-              }}
-            />
-          </View>
-        )}
+        {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <View key={group.key}>
+              <PdfHeading fonts={fonts} v={mainHeading(group.key)}>{group.title}</PdfHeading>
+              <PdfChips
+                items={group.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: pt(10.5) * fs,
+                  lineHeight: LH_NORMAL,
+                  color: "#374151",
+                  backgroundColor: "#F3F4F6",
+                  borderColor: "#E5E7EB",
+                  borderRadius: pt(4),
+                  paddingVertical: pt(2),
+                  paddingHorizontal: pt(9),
+                  gap: pt(6),
+                }}
+              />
+            </View>
+          ))}
 
         {hasCertifications && (
           <View>
@@ -4481,25 +4492,27 @@ const SandstonePDFLayout = ({ data }: { data: CvData }) => {
           </View>
         )}
 
-        {hasSkills && (
-          <View>
-            <PdfHeading fonts={fonts} v={mainHeading("skills")}>Skills</PdfHeading>
-            <PdfChips
-              items={data.skills.map((sk) => ({ value: sk.name }))}
-              v={{
-                fontSize: pt(10.5) * fs,
-                lineHeight: LH_NORMAL,
-                color: "#44403C",
-                backgroundColor: "#F5F0E6",
-                borderColor: "#E2D8C4",
-                borderRadius: pt(4),
-                paddingVertical: pt(2),
-                paddingHorizontal: pt(9),
-                gap: pt(6),
-              }}
-            />
-          </View>
-        )}
+        {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <View key={group.key}>
+              <PdfHeading fonts={fonts} v={mainHeading(group.key)}>{group.title}</PdfHeading>
+              <PdfChips
+                items={group.skills.map((sk) => ({ value: sk.name }))}
+                v={{
+                  fontSize: pt(10.5) * fs,
+                  lineHeight: LH_NORMAL,
+                  color: "#44403C",
+                  backgroundColor: "#F5F0E6",
+                  borderColor: "#E2D8C4",
+                  borderRadius: pt(4),
+                  paddingVertical: pt(2),
+                  paddingHorizontal: pt(9),
+                  gap: pt(6),
+                }}
+              />
+            </View>
+          ))}
 
         {hasCertifications && (
           <View>

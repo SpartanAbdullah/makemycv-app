@@ -10,6 +10,7 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
+import { skillGroups } from "../utils/skills";
 import { resolveTheme } from "./theme";
 import { ARABIC_NAME_LINE_HEIGHT, containsArabic } from "../pdf/arabicText";
 
@@ -646,35 +647,36 @@ export const CorpSidebarTemplate = ({
           </div>
         )}
 
-        {/* Skills */}
-        {hasSkills && (
-          <div>
-            <SidebarHeading theme={theme}>Skills</SidebarHeading>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap" as const,
-                gap: "3px",
-              }}
-            >
-              {data.skills.map((skill) => (
-                <span
-                  key={skill.id}
-                  style={{
-                    fontSize: `${9 * theme.fontScale}px`,
-                    color: onAccentMuted,
-                    backgroundColor: "rgba(255,255,255,0.08)",
-                    borderRadius: "3px",
-                    padding: "2px 6px",
-                    lineHeight: 1.5 * theme.lineScale,
-                  }}
-                >
-                  {skill.name}
-                </span>
-              ))}
+        {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+        {hasSkills &&
+          skillGroups(data.skills).map((group) => (
+            <div key={group.key}>
+              <SidebarHeading theme={theme}>{group.title}</SidebarHeading>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap" as const,
+                  gap: "3px",
+                }}
+              >
+                {group.skills.map((skill) => (
+                  <span
+                    key={skill.id}
+                    style={{
+                      fontSize: `${9 * theme.fontScale}px`,
+                      color: onAccentMuted,
+                      backgroundColor: "rgba(255,255,255,0.08)",
+                      borderRadius: "3px",
+                      padding: "2px 6px",
+                      lineHeight: 1.5 * theme.lineScale,
+                    }}
+                  >
+                    {skill.name}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
 
         {/* Languages */}
         {hasLanguages && (

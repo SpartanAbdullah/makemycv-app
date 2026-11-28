@@ -5,7 +5,7 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
 
-import { skillListDirection, skillNames, splitSkills } from "./skills";
+import { skillGroups, skillListDirection, skillNames, splitSkills } from "./skills";
 import type { CvSkill } from "../types/cv";
 
 const s = (name: string, category?: "technical" | "general"): CvSkill => ({
@@ -57,5 +57,29 @@ describe("skillListDirection", () => {
     assert.equal(skillListDirection(["3D", "C++"]), "ltr");
     assert.equal(skillListDirection(["123"]), "ltr");
     assert.equal(skillListDirection([]), "ltr");
+  });
+});
+
+describe("skillGroups", () => {
+  const titles = (skills: CvSkill[]) =>
+    skillGroups(skills).map((g) => [g.key, g.title, g.skills.map((x) => x.name).join("+")]);
+
+  test("untagged CV: one Skills group, as before", () => {
+    assert.deepEqual(titles([s("A"), s("B")]), [["skills", "Skills", "A+B"]]);
+  });
+
+  test("mixed: Skills then Technical Skills, order kept inside each", () => {
+    assert.deepEqual(titles([s("Python", "technical"), s("Leadership"), s("SQL", "technical")]), [
+      ["skills", "Skills", "Leadership"],
+      ["technical-skills", "Technical Skills", "Python+SQL"],
+    ]);
+  });
+
+  test("only technical: one Technical Skills group keyed as the skills section", () => {
+    assert.deepEqual(titles([s("Python", "technical")]), [["skills", "Technical Skills", "Python"]]);
+  });
+
+  test("no skills: no groups", () => {
+    assert.deepEqual(skillGroups([]), []);
   });
 });

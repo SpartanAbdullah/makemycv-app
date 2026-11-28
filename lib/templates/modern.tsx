@@ -10,6 +10,7 @@ import {
 } from "../utils/education";
 import { getFullName, bulletLiProps } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
+import { skillGroups } from "../utils/skills";
 import { resolveTheme } from "./theme";
 
 export const ModernTemplate = ({
@@ -368,13 +369,14 @@ export const ModernTemplate = ({
             </section>
           )}
 
-          {data.skills.length > 0 && (
-            <section>
+          {/* Skills, then Technical Skills under their own heading (backlog F4) */}
+          {skillGroups(data.skills).map((group) => (
+            <section key={group.key}>
               <h2 className="text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Skills
+                {group.title}
               </h2>
               <div className="mt-3 flex flex-wrap gap-2 text-[calc(0.75rem*var(--fs))] leading-[calc(1rem*var(--lh))]">
-                {data.skills.map((skill) => (
+                {group.skills.map((skill) => (
                   <span
                     key={skill.id}
                     className="rounded-full bg-slate-100 px-3 py-1"
@@ -384,7 +386,7 @@ export const ModernTemplate = ({
                 ))}
               </div>
             </section>
-          )}
+          ))}
         </aside>
       </div>
     </div>
