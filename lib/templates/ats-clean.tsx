@@ -11,9 +11,10 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -176,20 +177,22 @@ export const ATSCleanTemplate = ({
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
-  // One " · "-separated text line, not bordered chips: the plainer form is
-  // the ATS-safer one and it is what the PDF has always printed, so the
-  // preview now matches the download (template audit 2026-10 defect 9).
+  // Plain text with a "·" between skills, not bordered chips: the plainer
+  // form is the ATS-safer one (template audit 2026-10 defect 9). Since
+  // 2026-11-28 (backlog F3) each skill is its own item that wraps whole, with
+  // a lighter "·" and half an em either side, so the line no longer reads as
+  // one sentence; still real text in reading order. PDF twin: ATSCleanPDFLayout.
   const renderSkillLine = (list: typeof data.skills) => (
-    <p
+    <SkillItems
+      names={skillNames(list)}
+      separator="·"
+      separatorColor="#9CA3AF"
       style={{
         fontSize: `${11.5 * theme.fontScale}px`,
         color: "#374151",
         lineHeight: 1.55 * theme.lineScale,
-        margin: 0,
       }}
-    >
-      {list.map((skill) => skill.name).join(" \u00B7 ")}
-    </p>
+    />
   );
   const skillsSection = hasSkills ? (
     <>

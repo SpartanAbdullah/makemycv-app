@@ -11,9 +11,10 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 /**
  * "Professional" — centered single-column template inspired by the Enhancv /
@@ -149,20 +150,28 @@ const ProfessionalBase = ({
   const bulletListClass =
     "list-disc pl-4 space-y-1 text-[calc(11px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 marker:text-slate-400";
 
+  // Each skill is its own centred item, split by the template's own light
+  // "•" (#CBD5E1, as between the contact items), instead of one joined line that
+  // could break a skill across lines (backlog F3).
+  const skillLine = (list: typeof data.skills) => (
+    <SkillItems
+      names={skillNames(list)}
+      separator="•"
+      separatorColor="#CBD5E1"
+      className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700"
+      centered
+    />
+  );
   const skillsSection = hasSkills ? (
     <>
       {generalSkills.length > 0 && (
         <ProSection headingStyle={headingStyle} title="Skills">
-          <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 text-center">
-            {generalSkills.map((sk) => sk.name).join("  •  ")}
-          </p>
+          {skillLine(generalSkills)}
         </ProSection>
       )}
       {technicalSkills.length > 0 && (
         <ProSection headingStyle={headingStyle} title="Technical Skills">
-          <p className="text-[calc(11.5px*var(--fs))] leading-[calc(1.5*var(--lh))] text-slate-700 text-center">
-            {technicalSkills.map((sk) => sk.name).join("  •  ")}
-          </p>
+          {skillLine(technicalSkills)}
         </ProSection>
       )}
     </>

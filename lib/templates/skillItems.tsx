@@ -26,6 +26,8 @@ export const SkillItems = ({
   separator,
   separatorColor,
   style,
+  className,
+  centered = false,
   lead,
 }: {
   names: string[];
@@ -33,7 +35,11 @@ export const SkillItems = ({
   separator: string;
   separatorColor: string;
   /** Text style of the list (font size, line height, colour). */
-  style: CSSProperties;
+  style?: CSSProperties;
+  /** Tailwind text classes, for templates that style by class (Classic, Professional). */
+  className?: string;
+  /** Centre each line, for a template whose skills line is centred (Professional). */
+  centered?: boolean;
   /** Optional run before the first item, e.g. Harvard's bold "Skills:". */
   lead?: ReactNode;
 }) => {
@@ -43,7 +49,15 @@ export const SkillItems = ({
   return (
     <div
       dir={rtl ? "rtl" : undefined}
-      style={{ ...style, display: "flex", flexWrap: "wrap", columnGap: gap, margin: 0 }}
+      className={className}
+      style={{
+        margin: 0,
+        ...style,
+        display: "flex",
+        flexWrap: "wrap",
+        columnGap: gap,
+        ...(centered ? { justifyContent: "center" } : {}),
+      }}
     >
       {lead}
       {names.map((name, i) => (

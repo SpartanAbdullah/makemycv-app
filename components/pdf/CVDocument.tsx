@@ -1016,20 +1016,29 @@ const ClassicPDFLayout = ({ data }: { data: CvData }) => {
   const skillsBlock =
     generalSkills.length > 0 || technicalSkills.length > 0 ? (
       <>
+        {/* Each skill its own item, light "·" between (backlog F3; classic.tsx matches). */}
         {generalSkills.length > 0 && (
           <View style={section}>
             {heading("Skills")}
-            <Text style={{ ...body, marginTop: contentGap }}>
-              {generalSkills.map((sk) => sk.name).join(", ")}
-            </Text>
+            <PdfSkillItems
+              names={skillNames(generalSkills)}
+              text={body}
+              separator="·"
+              separatorColor={SLATE_400}
+              style={{ marginTop: contentGap }}
+            />
           </View>
         )}
         {technicalSkills.length > 0 && (
           <View style={section}>
             {heading("Technical Skills")}
-            <Text style={{ ...body, marginTop: contentGap }}>
-              {technicalSkills.map((sk) => sk.name).join(", ")}
-            </Text>
+            <PdfSkillItems
+              names={skillNames(technicalSkills)}
+              text={body}
+              separator="·"
+              separatorColor={SLATE_400}
+              style={{ marginTop: contentGap }}
+            />
           </View>
         )}
       </>
@@ -1887,6 +1896,8 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
   const ATS_INK = "#111827";
   const ATS_TEXT = "#374151";
   const ATS_MUTED = "#6B7280";
+  /** gray-400: the skills separator (backlog F3), as in ats-clean.tsx. */
+  const ATS_SEP = "#9CA3AF";
   const bold: Style = { fontFamily: fonts.bold, fontWeight: 700 };
   /** The live root: 11.5px × 1.55, inherited by everything that sets no own line-height. */
   const rootLine = 1.55 * ls;
@@ -1974,19 +1985,26 @@ const ATSCleanPDFLayout = ({ data }: { data: CvData }) => {
         {generalSkills.length > 0 && (
           <View>
             {heading("skills", "Skills")}
-            {/* Text line, not chips, in both renderers — the ATS-safer form
-                (template audit 2026-10 defect 9); ats-clean.tsx matches. */}
-            <Text style={body}>
-              {generalSkills.map((sk) => sk.name).join(" · ")}
-            </Text>
+            {/* Plain text, not chips, in both renderers — the ATS-safer form
+                (template audit 2026-10 defect 9); each skill its own item with
+                a lighter "·" since backlog F3; ats-clean.tsx matches. */}
+            <PdfSkillItems
+              names={skillNames(generalSkills)}
+              text={body}
+              separator="·"
+              separatorColor={ATS_SEP}
+            />
           </View>
         )}
         {technicalSkills.length > 0 && (
           <View>
             {heading(generalSkills.length === 0 ? "skills" : "technical-skills", "Technical Skills")}
-            <Text style={body}>
-              {technicalSkills.map((sk) => sk.name).join(" · ")}
-            </Text>
+            <PdfSkillItems
+              names={skillNames(technicalSkills)}
+              text={body}
+              separator="·"
+              separatorColor={ATS_SEP}
+            />
           </View>
         )}
       </>
@@ -3647,11 +3665,16 @@ const ProfessionalPDFLayout = ({
       : "",
   ].filter(Boolean) as string[];
 
-  // Live: text-[11.5px] leading-[1.5] centred, items joined by "  •  ".
+  // Live: text-[11.5px] leading-[1.5], each skill its own centred item with
+  // the light "•" (#CBD5E1) between (backlog F3).
   const skillLine = (list: typeof data.skills) => (
-    <Text style={{ ...body, textAlign: "center" }}>
-      {list.map((sk) => sk.name).join("  •  ")}
-    </Text>
+    <PdfSkillItems
+      names={skillNames(list)}
+      text={body}
+      separator="•"
+      separatorColor={SLATE_300}
+      style={{ justifyContent: "center" }}
+    />
   );
   const skillsSection = hasSkills ? (
     <>

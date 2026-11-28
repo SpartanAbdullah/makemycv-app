@@ -8,11 +8,12 @@ import {
   meaningfulEducation,
 } from "../utils/education";
 import { isSkillsFirst } from "../data/sectionOrder";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { formatLanguageLevel } from "../language";
 import { getFullName, bulletLiProps, hasRtlHeader } from "./utils";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
   const name = getFullName(data) || "Your Name";
@@ -45,6 +46,17 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
   const { general: generalSkills, technical: technicalSkills } = splitSkills(
     data.skills,
   );
+  // Each skill is its own item with a light slate-400 "·" between, instead of
+  // one comma-joined line that read like a sentence (backlog F3).
+  const skillLine = (list: typeof data.skills) => (
+    <SkillItems
+      names={skillNames(list)}
+      separator="·"
+      separatorColor="#94A3B8"
+      className={bodyClass}
+      style={{ marginTop: "0.5rem" }}
+    />
+  );
   const skillsSection = hasSkills ? (
     <>
       {generalSkills.length > 0 && (
@@ -52,9 +64,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
           <div className={headingWrapClass}>
             <h2 className={headingClass}>Skills</h2>
           </div>
-          <p className={`mt-2 ${bodyClass}`}>
-            {generalSkills.map((skill) => skill.name).join(", ")}
-          </p>
+          {skillLine(generalSkills)}
         </section>
       )}
       {technicalSkills.length > 0 && (
@@ -62,9 +72,7 @@ export const ClassicTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
           <div className={headingWrapClass}>
             <h2 className={headingClass}>Technical Skills</h2>
           </div>
-          <p className={`mt-2 ${bodyClass}`}>
-            {technicalSkills.map((skill) => skill.name).join(", ")}
-          </p>
+          {skillLine(technicalSkills)}
         </section>
       )}
     </>
