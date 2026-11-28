@@ -6,6 +6,24 @@ considered done. This is the shared handoff record between Cowork, Claude Code a
 Format:
 
 ```
+## [2026-11-28 15:20] Skills: separate items on four templates, Technical Skills everywhere, a General / Technical switch (backlog F3, F4)
+
+**Goal:** a user wrote in on 26 Nov with four requests. The owner approved two on 28 Nov and lifted the feature hold for them only: skills that "look like one continuous sentence" (F3) and software skills that should stand apart (F4). F1 (renamable sections) and F2 (user section order) stay on hold and were not touched.
+**Files:**
+- created: `lib/templates/skillItems.tsx`; edited: `lib/templates/{banner,chronicle,gulf-standard,harvard}.tsx`, `components/pdf/CVDocument.tsx` (`PdfSkillItems`), `lib/utils/skills.ts` (`skillNames`, `skillListDirection`, + tests) - **F3.** These four printed skills as one joined line (" · " or ", "), so a two-word skill could break across lines ("Cross-" / "cultural Communication") and the list read like a sentence. Each skill is now its own item that wraps only as a whole, with the template's own separator in a lighter colour and half an em of space each side: slate-400 "·" on Banner, the slate-400 "|" Chronicle and Gulf Standard already use between role and company, Harvard's grey contact-line "|". Same in the preview and the PDF. An Arabic-first list still flows right to left.
+- edited: `lib/templates/{corp-sidebar,exec-split,executive,modern,onyx,sandstone}.tsx`, `CVDocument.tsx`, `lib/utils/skills.ts` (`skillGroups`, + tests) - **F4a.** These six printed all skills in one list. Technical skills now get a second "Technical Skills" heading in each template's own heading style, with the same chips or rows, live and PDF. A CV with no technical skill (every CV until someone tags one) prints exactly as before. Harvard already printed a "Technical:" line and is unchanged.
+- edited: `components/builder/steps/SkillsStep.tsx`, `app/globals.css` - **F4b.** Tapping a skill opens its panel; it now has "List under: General | Technical" (two aria-pressed buttons, 46px touch targets). Works for typed skills too. Technical chips show a small mono "tech" tag. Stored in the existing `CvSkill.category`; no new storage.
+- edited: `lib/utils/docxExport.ts` - **F4c.** The Word file prints SKILLS and TECHNICAL SKILLS as two sections. Still comma-joined text.
+- edited: `lib/data/preview-profiles.ts`, `scripts/pdf-fidelity.mjs`, `app/preview/[templateId]/page.tsx` - a synthetic `skills-mix` review persona (16 skills, half technical) for `/preview/<id>?persona=skills-mix` and `pdf-fidelity.mjs --persona=skills-mix`.
+- edited: `lib/types/cv.ts`, `docs/cv-schema-reference.md` - `category` documented.
+**Notes / risks / follow-up:**
+- ATS Clean, Classic and Professional also join skills into one line (" · ", ", ", " • "). They were not in the approved four and ATS Clean's single text line is a deliberate 2026-10 audit choice, so they are unchanged. Applying the same item layout to them is one line per renderer; owner's call.
+- The Word export keeps commas between skills (Word wraps by word, and the request was about the templates).
+- In the PDF each skill is now its own text run; the text layer still reads "A · B · C" in order (pdf.js puts a space at each gap, checked on all ten touched templates). A parser that glues runs without spaces would read "A ·B ·C"; the separator still splits them.
+- The switch is in the panel that opens when a skill is tapped; nothing on the step says so. If people do not find it, a one-line hint under "Your skills" is the next step.
+**Verification:** tsc; lint 11/11; `npm test` (5 suites, unit 781, 15 new); `npm run build`; `smoke:pdf`; `smoke:arabic` 98/98; against `next start`: `smoke:builder` all checks, `fidelity:pdf --gate` 42 cells, no regression; `--persona=skills-mix`, `arabic-only` and `bilingual` on all 14 templates (Arabic-only block diffs within 0.2 points of the last recorded run). Real downloads from the Review step for the ten touched templates read back with pdf.js, and a Word file read back with mammoth. The switch exercised on desktop and phone (picked and typed skills, stored, preview updates); axe with the panel open: no serious or critical issue. Before/after captures in `_cowork/skills-f3-f4-2026-11-28/`.
+**Suggested commit:** five commits on `skills-layout-f3-f4`: chore(preview) persona; fix(templates) F3; feat(templates) F4a; feat(skills) F4b; feat(export) F4c
+
 ## [2026-11-23 13:40] AI prompts: the three points left open by the prompt review
 
 **Goal:** the release of the four prompt fixes listed three things not done. The owner asked for them ("fix the three open points too").
