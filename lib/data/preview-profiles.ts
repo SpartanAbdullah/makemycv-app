@@ -1382,9 +1382,47 @@ function arabicNameProfile(base: CvData): CvData {
 }
 
 /**
+ * SYNTHETIC skills overlay (2026-11-28, backlog F3/F4): the template's own
+ * persona with sixteen skills, half tagged technical, in the interleaved order
+ * a user adds them. Long multi-word names make every template wrap its skills,
+ * which is where a list printed as one line reads like a sentence (F3), and the
+ * mix shows each template's general/technical split (F4). Review tooling only:
+ * `/preview/<id>?persona=skills-mix`, `pdf-fidelity.mjs --persona=skills-mix`.
+ */
+const SKILLS_MIX: ReadonlyArray<readonly [string, "technical"?]> = [
+  ["Stakeholder Management"],
+  ["Microsoft Excel (Advanced)", "technical"],
+  ["Team Leadership"],
+  ["Power BI", "technical"],
+  ["Budget Planning & Forecasting"],
+  ["SAP S/4HANA", "technical"],
+  ["Negotiation"],
+  ["SQL", "technical"],
+  ["Client Relationship Management"],
+  ["Oracle NetSuite", "technical"],
+  ["Cross-cultural Communication"],
+  ["Salesforce CRM", "technical"],
+  ["Problem Solving"],
+  ["Python", "technical"],
+  ["Time Management"],
+  ["Tally ERP 9", "technical"],
+];
+
+function skillsMixProfile(base: CvData): CvData {
+  return {
+    ...base,
+    skills: SKILLS_MIX.map(([name, category], i) => ({
+      id: `skills-mix-${i}`,
+      name,
+      ...(category ? { category } : {}),
+    })),
+  };
+}
+
+/**
  * The profile for a persona id, or null when the id is unknown. `bilingual`
  * is the session-3 overlay above; the four `arabic-*` ids are the session-4
- * suite. Photos are dropped from the all-Arabic personas (no synthetic face
+ * suite; `skills-mix` is the skills overlay above. Photos are dropped from the all-Arabic personas (no synthetic face
  * for a synthetic name); the overlays keep the base persona's.
  */
 export function getPersonaProfile(templateId: string, persona: string): CvData | null {
@@ -1406,6 +1444,8 @@ export function getPersonaProfile(templateId: string, persona: string): CvData |
       return arabicMidlineProfile(base);
     case "urdu-name":
       return urduNameProfile(base);
+    case "skills-mix":
+      return skillsMixProfile(base);
     default:
       return null;
   }

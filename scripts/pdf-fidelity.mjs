@@ -42,9 +42,10 @@ const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const BASE_URL = (process.env.PREVIEW_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 const DAY = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD
 const PERSONA = opt("persona");
-// bilingual = session-3 overlay; arabic-* = the session-4 Arabic PDF suite
+// bilingual = session-3 overlay; arabic-* = the session-4 Arabic PDF suite;
+// skills-mix = sixteen general + technical skills (backlog F3/F4, 2026-11-28)
 // (lib/data/preview-profiles.ts getPersonaProfile).
-const PERSONAS = ["bilingual", "arabic-only", "arabic-first", "arabic-name", "arabic-dense", "arabic-dense2", "arabic-midline", "urdu-name"];
+const PERSONAS = ["bilingual", "arabic-only", "arabic-first", "arabic-name", "arabic-dense", "arabic-dense2", "arabic-midline", "urdu-name", "skills-mix"];
 if (PERSONA && !PERSONAS.includes(PERSONA)) throw new Error(`unknown --persona=${PERSONA} (one of ${PERSONAS.join(", ")})`);
 const OUT_DIR = path.resolve(process.env.FIDELITY_OUT || path.join(ROOT, "..", "_cowork", `pdf-fidelity-${DAY}${PERSONA ? `-${PERSONA}` : ""}`));
 const BASELINE_FILE = path.join(ROOT, "scripts", "pdf-fidelity-baseline.json");
