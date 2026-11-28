@@ -10,6 +10,7 @@ import { meaningfulProjects } from "./projects";
 import { meaningfulExperience } from "./experience";
 import { meaningfulEducation } from "./education";
 import { getEssentialChips } from "./essentials";
+import { skillGroups, skillNames } from "./skills";
 import { buildCvFilename, triggerBlobDownload } from "./download";
 
 export async function exportToDocx(data: CvData): Promise<void> {
@@ -169,10 +170,12 @@ export async function exportToDocx(data: CvData): Promise<void> {
     }
   }
 
-  // Skills
-  if (skills.length) {
-    children.push(makeSection("Skills"));
-    children.push(makeText(skills.map((s) => s.name).join(", ")));
+  // Skills: general under "Skills", technical under their own "Technical
+  // Skills" heading, the split every template prints (backlog F4). An
+  // untagged CV gets the one "Skills" section it always had.
+  for (const group of skillGroups(skills)) {
+    children.push(makeSection(group.title));
+    children.push(makeText(skillNames(group.skills).join(", ")));
   }
 
   // Languages
