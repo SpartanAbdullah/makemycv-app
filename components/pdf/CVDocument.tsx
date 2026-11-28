@@ -39,7 +39,7 @@ import {
   meaningfulEducation,
 } from "../../lib/utils/education";
 import { isSkillsFirst } from "../../lib/data/sectionOrder";
-import { splitSkills } from "../../lib/utils/skills";
+import { skillListDirection, skillNames, splitSkills } from "../../lib/utils/skills";
 import { PDF_FAMILY, pdfFontPair, pdfFontsReady, type PdfFontPair } from "../../lib/pdf/fonts";
 // Gulf Standard shares its Personal Details rows and degree de-dup rule with
 // the live template so both renderers print identical label/value pairs.
@@ -67,6 +67,7 @@ import {
 } from "../../lib/templates/chronicle";
 import {
   HARVARD_INK,
+  HARVARD_BAR_INK,
   HARVARD_INK_SOFT,
   HARVARD_PAGE_PADDING_PT,
   HARVARD_RULE,
@@ -775,6 +776,62 @@ const PdfChips = ({
             </Text>
           ) : null}
           <Text style={text}>{item.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/* ─── Skills as separate text items (backlog F3, 2026-11-28) ─ */
+/*
+ * The PDF twin of lib/templates/skillItems.tsx. The inline-skills layouts
+ * printed `names.join(" · ")` as one <Text>, which wraps between any two words
+ * ("Cross-" / "cultural Communication") and reads like a sentence. Each skill
+ * is now its own row item that only wraps as a whole, followed by the
+ * template's separator in a lighter colour with 0.5em of space either side —
+ * the same items, separator and spacing the preview draws. The text layer
+ * still reads "Excel · SQL · Power BI" in order (pdf.js and ATS parsers put a
+ * space at each half-em gap). An Arabic-first list flows right to left, as
+ * the joined line did (`skillListDirection`).
+ */
+const PdfSkillItems = ({
+  names,
+  text,
+  separator,
+  separatorColor,
+  lead,
+  style,
+}: {
+  names: string[];
+  /** Style of every run (font, size, lineHeight, colour); needs a numeric fontSize. */
+  text: Style;
+  separator: string;
+  separatorColor: string;
+  /** Optional run before the first item, e.g. Harvard's bold "Skills:". */
+  lead?: ReactNode;
+  style?: Style;
+}) => {
+  if (names.length === 0) return null;
+  const rtl = skillListDirection(names) === "rtl";
+  const row = rtl ? "row-reverse" : "row";
+  const gap = (typeof text.fontSize === "number" ? text.fontSize : 8.6) * 0.5;
+  return (
+    <View style={{ flexDirection: row, flexWrap: "wrap", columnGap: gap, ...style }}>
+      {lead}
+      {names.map((name, i) => (
+        <View key={`${i}-${name}`} style={{ flexDirection: row, flexShrink: 1 }}>
+          <Text style={{ ...text, flexShrink: 1 }}>{name}</Text>
+          {i < names.length - 1 ? (
+            <Text
+              style={{
+                ...text,
+                color: separatorColor,
+                ...(rtl ? { marginRight: gap } : { marginLeft: gap }),
+              }}
+            >
+              {separator}
+            </Text>
+          ) : null}
         </View>
       ))}
     </View>
@@ -4630,8 +4687,10 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
     );
   };
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((sk) => sk.name.trim()).filter(Boolean).join(" · ");
+  // Each skill is its own item with a light "·" between (backlog F3).
+  const skillLine = (skills: typeof generalSkills) => (
+    <PdfSkillItems names={skillNames(skills)} text={bodyText} separator="·" separatorColor={SLATE_400} />
+  );
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
 
   return (
@@ -4815,7 +4874,7 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
                     General
                   </Text>
                 )}
-                <Text style={bodyText}>{skillLine(generalSkills)}</Text>
+                {skillLine(generalSkills)}
               </View>
             )}
             {technicalSkills.length > 0 && (
@@ -4825,7 +4884,7 @@ const BannerPDFLayout = ({ data }: { data: CvData }) => {
                     Technical
                   </Text>
                 )}
-                <Text style={bodyText}>{skillLine(technicalSkills)}</Text>
+                {skillLine(technicalSkills)}
               </View>
             )}
           </>
@@ -5090,8 +5149,10 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
     </View>
   );
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Each skill is its own item, split by the template's light "|" (backlog F3).
+  const skillLine = (skills: typeof generalSkills) => (
+    <PdfSkillItems names={skillNames(skills)} text={body} separator="|" separatorColor={SLATE_400} />
+  );
   // Sub-labels only when BOTH groups exist (same rule as the live template).
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
   const skillLabel: Style = { ...small, ...bold, color: SLATE_800 };
@@ -5187,20 +5248,20 @@ const GulfStandardPDFLayout = ({ data }: { data: CvData }) => {
         </>
       ) : null}
 
-      {/* ── Core Skills: text lines under bold sub-labels, no chips ── */}
+      {/* ── Core Skills: text items under bold sub-labels, no chips ── */}
       {hasSkills ? (
         <>
           {heading("skills", "CORE SKILLS")}
           {generalSkills.length > 0 ? (
             <View>
               {showSkillLabels ? <Text style={skillLabel}>General</Text> : null}
-              <Text style={body}>{skillLine(generalSkills)}</Text>
+              {skillLine(generalSkills)}
             </View>
           ) : null}
           {technicalSkills.length > 0 ? (
             <View style={{ marginTop: generalSkills.length > 0 ? 4 : 0 }}>
               {showSkillLabels ? <Text style={skillLabel}>Technical</Text> : null}
-              <Text style={body}>{skillLine(technicalSkills)}</Text>
+              {skillLine(technicalSkills)}
             </View>
           ) : null}
         </>
@@ -5602,8 +5663,10 @@ const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
     };
   });
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Each skill is its own item, split by the template's light "|" (backlog F3).
+  const skillLine = (skills: typeof generalSkills) => (
+    <PdfSkillItems names={skillNames(skills)} text={body} separator="|" separatorColor={SLATE_400} />
+  );
   // Sub-labels only when BOTH groups exist (same rule as the live template).
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
   const skillLabel: Style = { ...small, ...bold, color: SLATE_800 };
@@ -5728,13 +5791,13 @@ const ChroniclePDFLayout = ({ data }: { data: CvData }) => {
           {generalSkills.length > 0 ? (
             <View>
               {showSkillLabels ? <Text style={skillLabel}>General</Text> : null}
-              <Text style={body}>{skillLine(generalSkills)}</Text>
+              {skillLine(generalSkills)}
             </View>
           ) : null}
           {technicalSkills.length > 0 ? (
             <View style={{ marginTop: generalSkills.length > 0 ? 4 : 0 }}>
               {showSkillLabels ? <Text style={skillLabel}>Technical</Text> : null}
-              <Text style={body}>{skillLine(technicalSkills)}</Text>
+              {skillLine(technicalSkills)}
             </View>
           ) : null}
         </>
@@ -6003,12 +6066,27 @@ const HarvardPDFLayout = ({ data }: { data: CvData }) => {
       {hasSkills ? (
         <>
           {heading("skills", "SKILLS & INTERESTS")}
-          {skillLines.map((line, i) => (
-            <Text key={line.label} style={{ ...body, marginBottom: i < skillLines.length - 1 ? 1.5 : 0 }}>
-              <Text style={bold}>{`${line.label}: `}</Text>
-              {line.value}
-            </Text>
-          ))}
+          {skillLines.map((line, i) => {
+            const marginBottom = i < skillLines.length - 1 ? 1.5 : 0;
+            // Skills lines print as separate items (backlog F3); languages
+            // and certifications stay one joined run.
+            return line.items ? (
+              <PdfSkillItems
+                key={line.label}
+                names={line.items}
+                text={body}
+                separator="|"
+                separatorColor={HARVARD_BAR_INK}
+                lead={<Text style={{ ...body, ...bold }}>{`${line.label}:`}</Text>}
+                style={{ marginBottom }}
+              />
+            ) : (
+              <Text key={line.label} style={{ ...body, marginBottom }}>
+                <Text style={bold}>{`${line.label}: `}</Text>
+                {line.value}
+              </Text>
+            );
+          })}
         </>
       ) : null}
     </View>

@@ -5,7 +5,7 @@
 import { test, describe } from "node:test";
 import { strict as assert } from "node:assert";
 
-import { splitSkills } from "./skills";
+import { skillListDirection, skillNames, splitSkills } from "./skills";
 import type { CvSkill } from "../types/cv";
 
 const s = (name: string, category?: "technical" | "general"): CvSkill => ({
@@ -34,5 +34,28 @@ describe("splitSkills", () => {
 
   test("empty list", () => {
     assert.deepEqual(splitSkills([]), { general: [], technical: [] });
+  });
+});
+
+describe("skillNames", () => {
+  test("trims, drops empty names, keeps order", () => {
+    assert.deepEqual(skillNames([s(" Excel "), s(""), s("   "), s("SQL")]), ["Excel", "SQL"]);
+  });
+});
+
+describe("skillListDirection", () => {
+  test("a Latin-first list flows left to right", () => {
+    assert.equal(skillListDirection(["Excel", "Power BI"]), "ltr");
+    assert.equal(skillListDirection(["Excel", "التحرير باللغة العربية"]), "ltr");
+  });
+
+  test("an Arabic-first list flows right to left, as the joined line did", () => {
+    assert.equal(skillListDirection(["إدارة المشاريع", "Excel"]), "rtl");
+  });
+
+  test("letterless or empty lists fall back to left to right", () => {
+    assert.equal(skillListDirection(["3D", "C++"]), "ltr");
+    assert.equal(skillListDirection(["123"]), "ltr");
+    assert.equal(skillListDirection([]), "ltr");
   });
 });

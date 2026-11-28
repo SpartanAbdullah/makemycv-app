@@ -6,10 +6,11 @@ import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips, type EssentialKey } from "../utils/essentials";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
 import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 /**
  * "Banner" — a full-width accent header band (large square portrait on the
@@ -29,6 +30,7 @@ const SLATE_800 = "#1E293B";
 const SLATE_700 = "#334155";
 const SLATE_600 = "#475569";
 const SLATE_500 = "#64748B";
+const SLATE_400 = "#94A3B8";
 
 const shortenDisplayUrl = (value: string): string => {
   const cleaned = value
@@ -249,8 +251,10 @@ export const BannerTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
     );
   };
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((skill) => skill.name.trim()).filter(Boolean).join(" · ");
+  // Each skill is its own item with a light "·" between (backlog F3).
+  const skillLine = (skills: typeof generalSkills) => (
+    <SkillItems names={skillNames(skills)} separator="·" separatorColor={SLATE_400} style={bodyText} />
+  );
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
 
   return (
@@ -444,7 +448,7 @@ export const BannerTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
                       General
                     </div>
                   )}
-                  <p style={{ ...bodyText, margin: 0 }}>{skillLine(generalSkills)}</p>
+                  {skillLine(generalSkills)}
                 </div>
               )}
               {technicalSkills.length > 0 && (
@@ -454,7 +458,7 @@ export const BannerTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => {
                       Technical
                     </div>
                   )}
-                  <p style={{ ...bodyText, margin: 0 }}>{skillLine(technicalSkills)}</p>
+                  {skillLine(technicalSkills)}
                 </div>
               )}
             </div>

@@ -6,9 +6,10 @@ import { formatDateRange, normalizeHref } from "../utils/format";
 import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { getEssentialChips } from "../utils/essentials";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 import { ARABIC_NAME_LINE_HEIGHT, containsArabic } from "../pdf/arabicText";
 
 /**
@@ -298,8 +299,11 @@ export const GulfStandardTemplate = ({
     );
   };
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Each skill is its own item, split by the template's own light "|" (the
+  // role | company separator) — backlog F3.
+  const skillLine = (skills: typeof generalSkills) => (
+    <SkillItems names={skillNames(skills)} separator="|" separatorColor={SLATE_400} style={bodyStyle} />
+  );
   // Sub-labels only when BOTH groups exist: a lone "General" over an untagged
   // list (every legacy CV) would be noise.
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
@@ -494,20 +498,20 @@ export const GulfStandardTemplate = ({
           </section>
         ) : null}
 
-        {/* ── Core Skills: text lines under bold sub-labels, no chips ── */}
+        {/* ── Core Skills: text items under bold sub-labels, no chips ── */}
         {hasSkills ? (
           <section style={sectionStyle("skills")}>
             {heading("CORE SKILLS")}
             {generalSkills.length > 0 ? (
               <div>
                 {showSkillLabels ? <div style={skillLabelStyle}>General</div> : null}
-                <p style={{ ...bodyStyle, margin: 0 }}>{skillLine(generalSkills)}</p>
+                {skillLine(generalSkills)}
               </div>
             ) : null}
             {technicalSkills.length > 0 ? (
               <div style={{ marginTop: generalSkills.length > 0 ? "5px" : 0 }}>
                 {showSkillLabels ? <div style={skillLabelStyle}>Technical</div> : null}
-                <p style={{ ...bodyStyle, margin: 0 }}>{skillLine(technicalSkills)}</p>
+                {skillLine(technicalSkills)}
               </div>
             ) : null}
           </section>

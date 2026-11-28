@@ -11,10 +11,11 @@ import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips, type EssentialKey } from "../utils/essentials";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { mix } from "../utils/color";
 import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 /**
  * "Chronicle" — the single-column reverse-chronological timeline (template
@@ -427,8 +428,11 @@ export const ChronicleTemplate = ({ data }: { data: CvData; plan?: PlanTier }) =
     };
   });
 
-  const skillLine = (skills: typeof generalSkills) =>
-    skills.map((skill) => skill.name.trim()).join(" · ");
+  // Each skill is its own item, split by the template's own light "|" (the
+  // role | company separator) — backlog F3.
+  const skillLine = (skills: typeof generalSkills) => (
+    <SkillItems names={skillNames(skills)} separator="|" separatorColor={SLATE_400} style={bodyStyle} />
+  );
   // Sub-labels only when BOTH groups exist: a lone "General" over an untagged
   // list (every legacy CV) would be noise.
   const showSkillLabels = generalSkills.length > 0 && technicalSkills.length > 0;
@@ -593,20 +597,20 @@ export const ChronicleTemplate = ({ data }: { data: CvData; plan?: PlanTier }) =
           </section>
         ) : null}
 
-        {/* ── Skills: text lines under bold sub-labels, no chips ── */}
+        {/* ── Skills: text items under bold sub-labels, no chips ── */}
         {hasSkills ? (
           <section style={sectionStyle("skills")}>
             {heading("Skills")}
             {generalSkills.length > 0 ? (
               <div>
                 {showSkillLabels ? <div style={skillLabelStyle}>General</div> : null}
-                <p style={{ ...bodyStyle, margin: 0 }}>{skillLine(generalSkills)}</p>
+                {skillLine(generalSkills)}
               </div>
             ) : null}
             {technicalSkills.length > 0 ? (
               <div style={{ marginTop: generalSkills.length > 0 ? "5px" : 0 }}>
                 {showSkillLabels ? <div style={skillLabelStyle}>Technical</div> : null}
-                <p style={{ ...bodyStyle, margin: 0 }}>{skillLine(technicalSkills)}</p>
+                {skillLine(technicalSkills)}
               </div>
             ) : null}
           </section>

@@ -14,9 +14,10 @@ import { meaningfulProjects } from "../utils/projects";
 import { meaningfulExperience } from "../utils/experience";
 import { educationTitle, meaningfulEducation } from "../utils/education";
 import { getEssentialChips } from "../utils/essentials";
-import { splitSkills } from "../utils/skills";
+import { skillNames, splitSkills } from "../utils/skills";
 import { getFullName, bulletLiProps } from "./utils";
 import { resolveTheme } from "./theme";
+import { SkillItems } from "./skillItems";
 
 /**
  * "Harvard" — the Harvard/MCS and Jake's Resume grammar (template audit
@@ -43,6 +44,8 @@ import { resolveTheme } from "./theme";
 export const HARVARD_INK = "#000000";
 /** Secondary ink for the contact and essentials lines. */
 export const HARVARD_INK_SOFT = "#333333";
+/** The light "|" between contact items, and between skills (backlog F3). */
+export const HARVARD_BAR_INK = "#999999";
 export const HARVARD_RULE = "#000000";
 
 /** Page padding in pt: tighter than the shared 27/24 sheet (22 top/bottom, 20 sides). */
@@ -172,18 +175,28 @@ export const harvardCertificationsLine = (certifications: CvCertification[]): st
 export const harvardSkillsLine = (skills: CvSkill[]): string =>
   skills.map((skill) => skill.name.trim()).filter(Boolean).join(", ");
 
-/** The label-prefixed lines of SKILLS & INTERESTS, in order, empties dropped. */
+/**
+ * The label-prefixed lines of SKILLS & INTERESTS, in order, empties dropped.
+ * The two skills lines also carry `items`: both renderers print those as
+ * separate items split by the contact line's light "|" (backlog F3), instead
+ * of the comma-joined `value` that read like a sentence. Languages and
+ * certifications stay joined text.
+ */
 export const harvardSkillLines = (
   data: CvData,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: string; value: string; items?: string[] }> => {
   const { general, technical } = splitSkills(
     data.skills.filter((skill) => skill.name?.trim()),
   );
-  const lines: Array<{ label: string; value: string }> = [];
+  const lines: Array<{ label: string; value: string; items?: string[] }> = [];
   const technicalLine = harvardSkillsLine(technical);
-  if (technicalLine) lines.push({ label: "Technical", value: technicalLine });
+  if (technicalLine) {
+    lines.push({ label: "Technical", value: technicalLine, items: skillNames(technical) });
+  }
   const generalLine = harvardSkillsLine(general);
-  if (generalLine) lines.push({ label: "Skills", value: generalLine });
+  if (generalLine) {
+    lines.push({ label: "Skills", value: generalLine, items: skillNames(general) });
+  }
   const languagesLine = harvardLanguagesLine(data.languages);
   if (languagesLine) lines.push({ label: "Languages", value: languagesLine });
   const certificationsLine = harvardCertificationsLine(
@@ -498,11 +511,22 @@ export const HarvardTemplate = ({ data }: { data: CvData; plan?: PlanTier }) => 
           <section style={sectionStyle("skills")}>
             {heading("SKILLS & INTERESTS")}
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {skillLines.map((line) => (
-                <p key={line.label} style={{ ...bodyStyle, margin: 0 }}>
-                  <span style={{ fontWeight: 700 }}>{line.label}:</span> {line.value}
-                </p>
-              ))}
+              {skillLines.map((line) =>
+                line.items ? (
+                  <SkillItems
+                    key={line.label}
+                    names={line.items}
+                    separator="|"
+                    separatorColor={HARVARD_BAR_INK}
+                    style={bodyStyle}
+                    lead={<span style={{ fontWeight: 700 }}>{line.label}:</span>}
+                  />
+                ) : (
+                  <p key={line.label} style={{ ...bodyStyle, margin: 0 }}>
+                    <span style={{ fontWeight: 700 }}>{line.label}:</span> {line.value}
+                  </p>
+                ),
+              )}
             </div>
           </section>
         ) : null}

@@ -1,3 +1,4 @@
+import { firstStrongDirection } from "../pdf/arabicText";
 import type { CvSkill } from "../types/cv";
 
 /**
@@ -18,4 +19,21 @@ export function splitSkills(skills: CvSkill[]): {
     else general.push(skill);
   }
   return { general, technical };
+}
+
+/** The names a skills list prints: trimmed, empties dropped, order kept. */
+export function skillNames(skills: CvSkill[]): string[] {
+  return skills.map((skill) => skill.name.trim()).filter(Boolean);
+}
+
+/**
+ * Direction a printed skills list flows in (backlog F3, 2026-11-28). The
+ * list used to be ONE joined line whose direction came from its first strong
+ * character (the preview's `unicode-bidi: plaintext`, the PDF's
+ * `firstStrongDirection`). Printed as separate items, it keeps that rule for
+ * the whole list, so an Arabic-first list still starts on the right in both
+ * renderers. Each name keeps its own direction inside its item.
+ */
+export function skillListDirection(names: readonly string[]): "ltr" | "rtl" {
+  return firstStrongDirection(names.join(" ")) === "rtl" ? "rtl" : "ltr";
 }
